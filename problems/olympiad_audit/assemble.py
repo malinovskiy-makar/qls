@@ -92,6 +92,8 @@ def collect(root, files, role):
     запись страницы, блок)]. role — tasks/solutions/criteria."""
     out = []
     for entry in files:
+        if not entry.get('page_dir'):
+            continue      # docx: текст напрямую, страниц нет (см. docx_records)
         for page in range(1, int(entry.get('pages') or 0) + 1):
             record = load_page(root, entry['page_dir'], page)
             if record is None:
@@ -181,7 +183,7 @@ def build_event(root, event, figures_dir, crop=True):
     # 2. Решения и 3. критерии из своих файлов.
     # Смешанный файл стоит и в task_files, и в solution_files: его решения
     # уже легли при проходе условий — второй раз их не берём.
-    seen_dirs = {entry['page_dir'] for entry in event.get('task_files') or []}
+    seen_dirs = {entry.get('page_dir') for entry in event.get('task_files') or []} - {None}
     for role, files in (('solution', [f for f in event.get('solution_files') or []
                                       if f['page_dir'] not in seen_dirs]),
                         ('criteria', [f for f in event.get('criteria_files') or []
@@ -417,10 +419,33 @@ def task_record(task, event, model):
     }
 
 
+def docx_records(event, v1_rows):
+    """Задания комплекта, чьи условия лежат только в docx: текст v1."""
+    out = []
+    for row in v1_rows:
+        out.append({
+            'event_id': event['event_id'], 'number': str(row['number']),
+            'task_variant': row.get('task_variant') or '', 'title': row.get('title') or '',
+            'year': event.get('year'), 'academic_year': event.get('academic_year'),
+            'stage': event.get('stage'), 'grade': event.get('grade'),
+            'statement_md': row.get('raw_text') or '', 'parts': [], 'tables': 0,
+            'figures': [], 'solution_figures': [], 'solution_md': '', 'answer': '',
+            'criteria_md': '', 'max_score': row.get('max_score'),
+            'source_file': [f['file'] for f in event['task_files']], 'source_pages': [],
+            'solution_pages': [], 'criteria_pages': [], 'layer_ratio': None,
+            'numbers_ok': None, 'needs_eyes': False, 'retries': 0,
+            'statement_from_solution_file': False, 'source_text': 'docx',
+            'official': event.get('official', True), 'source': event.get('source', 'official'),
+            'digitized_by': {'model': 'docx-text (v1)', 'date': date.today().isoformat()},
+        })
+    return out
+
+
 def completeness(records):
     if not records or not any(r['statement_md'] for r in records):
         return 'index_only'
-    if all(r['statement_md'] and (r['solution_md'] or r['criteria_md']) for r in records):
+    if all(r['statement_md'] and (r['solution_md'] or r['criteria_md'] or r['answer'])
+           for r in records):
         return 'full'
     return 'partial'
 
@@ -432,16 +457,30 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
     meta = {e['event_id']: e for e in reference_events}
     figures_dir = os.path.join(digitized, 'figures')
     v1_counts = Counter(r['event_id'] for r in v1_rows)
+    v1_by_event = defaultdict(list)
+    for row in v1_rows:
+        v1_by_event[row['event_id']].append(row)
     out_rows, out_events, compare = [], [], []
     summary = Counter()
     unmatched = []
     for event_id in sorted(set(events_files) | set(meta)):
         if only_events and event_id not in only_events:
             continue
-        event = {**meta.get(event_id, {}), **events_files.get(event_id, {})}
+        # Файлы комплекта — только из описи digitized (в reference_events у
+        # файлов нет папок страниц); комплект без файлов — пустой.
+        files = events_files.get(event_id, {})
+        event = {**meta.get(event_id, {}), **files}
+        for key in ('task_files', 'solution_files', 'criteria_files'):
+            event[key] = files.get(key) or []
         event['event_id'] = event_id
         tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop)
         records = [task_record(t, event, model) for t in tasks]
+        if not records and any(f.get('docx_md') for f in event['task_files']):
+            # Условия только в docx (дистанционный тур МОШ 2017/18): текст
+            # извлечён напрямую, модель не вызывалась — задания берутся из
+            # v1 этого комплекта (там тоже текст docx, а не PDF).
+            records = docx_records(event, v1_by_event.get(event_id, []))
+            summary['заданий из docx (v1)'] += len(records)
         out_rows.extend(records)
         unmatched.extend(report.pop('_unmatched', []))
         summary.update({k: v for k, v in report.items() if isinstance(v, int)})
