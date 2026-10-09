@@ -237,7 +237,7 @@ def render_control_html(items):
 
 def build_control_pack(entries, out_root):
     """entries: словари {olympiad, digitized, key, blocks, tasks, events}.
-    Пишет `out_root\index.html`, `img\`, `control_marks.csv` (пустой бланк) и
+    Пишет `index.html`, `img/`, `control_marks.csv` (пустой бланк) и
     `control_pages.csv` (какие страницы вошли — для сверки с судьёй)."""
     os.makedirs(os.path.join(out_root, 'img'), exist_ok=True)
     items = []

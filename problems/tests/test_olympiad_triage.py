@@ -473,3 +473,19 @@ class AnswerRejudgeTests(RunnerBase):
         self.assertEqual(status, 'judge_error')
         self.assertEqual(self.patch(), before)
 
+
+
+class SkeletonGuardTests(RunnerBase):
+    def test_30_human_text_with_changed_structure_is_not_applied(self):
+        """Реклассификация блока task→solution на human-странице не должна
+        тихо убрать задание из сборки; на fixed (подтверждена судьёй) — можно."""
+        base = rec(blocks=[{'type': 'task', 'number': '6.1', 'text': 'условие'}])
+        moved = [{'type': 'solution', 'number': '6.1', 'text': 'решение'}]
+        triage.write_json_atomic(triage.v3_path(self.root, 'pages/abc', 1),
+                                 {'status': 'human', 'chosen': 'v3', 'blocks': moved})
+        overlay = triage.PageOverlay(self.root)
+        out = overlay.apply('pages/abc', 1, base)
+        self.assertEqual((out['blocks'][0]['type'], out['needs_eyes']), ('task', True))
+        triage.write_json_atomic(triage.v3_path(self.root, 'pages/abc', 1),
+                                 {'status': 'fixed', 'blocks': moved})
+        self.assertEqual(overlay.apply('pages/abc', 1, base)['blocks'][0]['type'], 'solution')

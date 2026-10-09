@@ -123,7 +123,10 @@ class PageOverlay:
                         out[key] = patch[key]
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status == 'human':
-            if 'blocks' in patch:
+            # Расшифровка human-страницы судьёй не подтверждена: берём её, только
+            # если «скелет» (тип+номер блоков заданий/решений/критериев) тот же —
+            # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
+            if 'blocks' in patch and skeleton(patch['blocks']) == skeleton(base.get('blocks')):
                 for key in PATCH_FIELDS:
                     if key in patch:
                         out[key] = patch[key]
@@ -131,6 +134,16 @@ class PageOverlay:
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status='ok_norm')
         return out
+
+
+STRUCTURE_TYPES = ('task', 'task_continuation', 'solution', 'criteria')
+
+
+def skeleton(blocks):
+    """Структура страницы для сборки: порядок (тип, номер) блоков заданий,
+    решений и критериев; текст в неё не входит."""
+    return [(b.get('type'), str(b.get('number') or '')) for b in blocks or []
+            if b.get('type') in STRUCTURE_TYPES]
 
 
 #: Поля записи страницы, которые заплатка заменяет целиком.
