@@ -3452,6 +3452,11 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 /* Отрезок «Наибольшего и наименьшего»: «от [ ] до [ ]» одной строкой. */
 .opt-range-row { display: flex; align-items: center; gap: 8px; }
 .opt-range-row > span { font-size: 14px; color: var(--text2); }
+/* «Вернуть по формуле» у отрезка ответа: текстовая ссылка (вид поправит сессия 3). */
+.ans-seg-auto { margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.ans-seg-auto[hidden] { display: none; }
+#ans-seg-row .hint-row { margin-top: 0; }
+#ans-seg-row .hint-row label { margin: 0; }
 .opt-range-row input { width: 0; flex: 1 1 0; height: 34px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums; }
 
 /* Телефон: имя модели не вылезает на кнопки шапки — многоточие; «Сначала сам»

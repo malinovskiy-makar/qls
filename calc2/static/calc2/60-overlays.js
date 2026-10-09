@@ -226,6 +226,7 @@ function redrawGraphMode() {
   drawGrid();
   drawAxes('x', 'y');
   drawCurves();
+  refreshAnswerSeg();   // отрезок ответа (ADR 0143): на нём, а не в окне, считается «Ответ»
   updateGraphPanel();   // А53: нули, вершины и пересечения построенных кривых
 }
 

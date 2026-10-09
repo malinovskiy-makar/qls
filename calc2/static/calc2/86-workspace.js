@@ -1832,20 +1832,16 @@ function wireWrench() {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => applyViewBounds());
   });
-  /* Отрезок «Наибольшего и наименьшего» (COVERAGE, раздел 3): меняет окно по x
-     тем же путём, что поля «Вида графика»; y остаётся. */
-  ['opt-a', 'opt-b'].forEach(id => {
+  /* Отрезок ответа (ADR 0143): вход модели, окно не трогает. Применяется по
+     change (уход из поля, Enter) — на каждый символ отрезок дёргался бы. */
+  ['ans-a', 'ans-b'].forEach(id => {
     const e = document.getElementById(id);
     if (!e) return;
-    e.addEventListener('change', () => {
-      const a = parseFloat(String(document.getElementById('opt-a').value).replace(',', '.'));
-      const b = parseFloat(String(document.getElementById('opt-b').value).replace(',', '.'));
-      if (!(isFinite(a) && isFinite(b) && b > a)) { syncViewFields(); return; }
-      setMathWindow(a, b, STATE.mathYmin, STATE.mathYmax);
-      if (typeof markViewDirty === 'function') markViewDirty();
-      redrawAll();
-    });
+    e.addEventListener('change', () => applyAnsSegInputs());
+    e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); e.blur(); } });
   });
+  const segAuto = document.getElementById('ans-seg-auto');
+  if (segAuto) segAuto.addEventListener('click', () => resetAnsSegToAuto());
   [['inp-xstep', 'xStep'], ['inp-ystep', 'yStep']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('input', () => {

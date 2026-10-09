@@ -43,11 +43,8 @@ function syncViewFields() {
     const e = document.getElementById(id);
     if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
   });
-  // Отрезок «Наибольшего и наименьшего» — те же границы окна по x.
-  if (math) [['opt-a', v[0]], ['opt-b', v[1]]].forEach(([id, val]) => {
-    const e = document.getElementById(id);
-    if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
-  });
+  // Отрезок «Наибольшего и наименьшего» с окном больше не связан: это общий
+  // отрезок ответа, его показывает syncAnsSegUI (ADR 0143).
   /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
      showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
      иначе показывало бы прежнее положение. */

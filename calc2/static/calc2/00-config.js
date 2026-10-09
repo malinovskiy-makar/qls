@@ -183,6 +183,11 @@ const STATE = {
   mathSub: 'tangent',            // сюжет: tangent|optimum|transform|minmax|constraint
   mathFormula: 'x^2',            // общая f(x)
   mathXmin: -6, mathXmax: 6, mathYmin: -4, mathYmax: 20,
+  /* Отрезок ответа (ADR 0143): на нём считаются корни, экстремумы и
+     пересечения. Это ВХОД МОДЕЛИ, а не вид: масштаб и сдвиг его не трогают.
+     ansHand = false — отрезок подобран по формуле и идёт за ней (ansA/ansB
+     пустые); true — человек вписал свои границы. */
+  ansA: null, ansB: null, ansHand: false,
   mathX0: 1,                     // точка касания (7а)
   mathDx: 1,                     // шаг Δx: единичный, так треугольник читается сразу
   mathSecant: false,             // показывать секущую через две точки

@@ -1441,6 +1441,24 @@
         <div class="f-pop" id="fp-mathf" role="region" aria-label="Примеры функций"></div>
       </div>
       <div class="error" id="math-error" style="display:none;"></div>
+      <!-- Отрезок ответа (ADR 0143): на нём, а не в окне, считаются корни,
+           экстремумы и пересечения. Узел один: syncAnsSegUI (70-scenes-math.js)
+           переносит его под поля функций текущего сюжета, в том числе в
+           «Построение графиков». У «С ограничением» строки нет. -->
+      <div class="field opt-range" id="ans-seg-row">
+        <div class="hint-row">
+          <label for="ans-a">Ответ ищем на отрезке x</label>
+          <button class="hint-btn" type="button" data-pop="hp-ans-seg" aria-label="Что это за отрезок">?</button>
+        </div>
+        <div class="hint-pop" id="hp-ans-seg">
+          <p>Корни, вершины и пересечения считаются на этом отрезке. Масштаб графика на ответ не влияет.</p>
+        </div>
+        <div class="opt-range-row">
+          <span>от</span><input type="text" inputmode="decimal" id="ans-a" autocomplete="off" aria-label="Отрезок ответа: от">
+          <span>до</span><input type="text" inputmode="decimal" id="ans-b" autocomplete="off" aria-label="Отрезок ответа: до">
+        </div>
+        <button type="button" class="ans-seg-auto" id="ans-seg-auto" hidden>Вернуть по формуле</button>
+      </div>
 
       <!-- 7а. Производная и касательная -->
       <div id="math-pane-tangent">
@@ -1487,15 +1505,8 @@
 
       <!-- 7б. Оптимизация -->
       <div id="math-pane-optimum" style="display:none;">
-        <!-- Отрезок поиска наибольшего и наименьшего (COVERAGE, раздел 3): это
-             границы окна по x, поэтому поля связаны с окном в обе стороны. -->
-        <div class="field opt-range">
-          <label>Отрезок</label>
-          <div class="opt-range-row">
-            <span>от</span><input type="number" id="opt-a" step="any" aria-label="Отрезок от">
-            <span>до</span><input type="number" id="opt-b" step="any" aria-label="Отрезок до">
-          </div>
-        </div>
+        <!-- Отрезок наибольшего и наименьшего — общий отрезок ответа
+             (#ans-seg-row выше, ADR 0143); с окном он больше не связан. -->
         <label class="chk"><input type="checkbox" id="chk-convex" checked>
           <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
         <label class="chk"><input type="checkbox" id="chk-inflect" checked>
@@ -1506,7 +1517,7 @@
         </div>
         <div class="hint-pop" id="hp-optimum">
           <p>Пишите функцию от x в поле выше: x^2, x^3 - 3*x, sqrt(x), 1/x.
-            Отрезок задают границы окна в настройках плоскости.</p>
+            Отрезок задаётся строкой «Ответ ищем на отрезке» выше.</p>
           <p>Подписи на графике читаются так: x* это точка на оси x, y* это
             значение функции в ней.</p>
         </div>

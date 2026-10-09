@@ -24,9 +24,15 @@
 function compileMath(expr, name) { return compileVar(expr, [name]); }
 function evalMathAt(compiled, name, v) { return compiled ? evalVar(compiled, v, [name]) : NaN; }
 
-// Шаг численного дифференцирования: доля видимого диапазона, а не константа —
-// иначе на окне 0..0.1 шаг «съест» всю картинку, а на 0..1000 потеряет точность.
-function mathH() { return Math.max(1e-6, (STATE.mathXmax - STATE.mathXmin) * 1e-4); }
+// Шаг численного дифференцирования: доля ОТРЕЗКА ОТВЕТА, а не константа —
+// иначе на отрезке 0..0.1 шаг «съест» всю картинку, а на 0..1000 потеряет точность.
+// ⚠️ Не доля окна (ADR 0143): тогда приближение меняло бы f′(x₀) в «Ответе».
+// Отрезок на кадр один (_ansSeg ставит перерисовка); до первой перерисовки — окно.
+function mathH() {
+  const s = _ansSeg;
+  const w = s ? (s.b - s.a) : (STATE.mathXmax - STATE.mathXmin);
+  return Math.max(1e-6, w * 1e-4);
+}
 function dNum(f, x, h) {
   h = h || mathH();
   const a = f(x + h), b = f(x - h);
@@ -90,6 +96,246 @@ function mathAnalyse(f, lo, hi) {
   ext.forEach(p => consider(p.x));
   consider(lo); consider(hi);
   return { ext, inf, gMax, gMin };
+}
+
+/* ── ОТРЕЗОК ОТВЕТА (ADR 0143) ──────────────────────────────────────────
+   Корни, экстремумы и пересечения «Математики» и «Построения графиков»
+   считаются на ОТРЕЗКЕ ОТВЕТА, а не в окне: ответ — свойство функции, а не
+   кадра (то же правило, что ADR 0020 для экономики). Окно решает только, что
+   нарисовано; приближение и сдвиг на ответ не влияют.
+   Отрезок — вход модели (STATE.ansA/ansB/ansHand): его задаёт человек в
+   «Условии», а пока не задал, он подобран по формуле (autoAnswerSeg) и идёт за
+   ней при каждой её смене. */
+const ANS_AUTO_SPAN = 100;     // подбор по формуле перебирает [−100; 100]
+const ANS_AUTO_N = 1000;       // шаг 0,2: подбору хватает, ответ считается гуще
+const ANS_N = 1200;            // сетка на самом отрезке ответа
+const ANS_MAX_KEYS = 12;       // ключевых точек больше — функция периодическая
+// Пробные x для подписи функции: совпали значения — функция та же (кэш).
+const ANS_PROBE = [-7.31, -2.17, -0.53, 0.37, 1.13, 2.71, 4.49, 9.07];
+let _ansSeg = null;            // отрезок текущего кадра (ставит refreshAnswerSeg)
+const _ansCache = new Map();
+
+// Число ответа в записи сайта: запятая, настоящий минус.
+function ansFmt(v) { return fmt(v).replace(/^-/, '−'); }
+function ansPt(x, y) { return '(' + ansFmt(x) + '; ' + ansFmt(y) + ')'; }
+// Несколько значений — через «; », нет ни одного — «нет» (решение владельца 09.10).
+function ansList(xs) { return xs.length ? xs.map(v => ansFmt(v)).join('; ') : 'нет'; }
+function ansPts(ps) { return ps.length ? ps.map(p => ansPt(p.x, p.y)).join('; ') : 'нет'; }
+
+function fnSig(f) {
+  return ANS_PROBE.map(x => { let v; try { v = f(x); } catch (e) { v = NaN; } return isFinite(v) ? v.toPrecision(12) : 'n'; }).join(',');
+}
+function ansCached(key, make) {
+  if (_ansCache.has(key)) return _ansCache.get(key);
+  if (_ansCache.size > 60) _ansCache.clear();
+  const v = make();
+  _ansCache.set(key, v);
+  return v;
+}
+
+/* Нули на отрезке: смена знака и бисекция (rootsOf). Отсеиваются полюса и
+   скачки через ноль (у 1/x знак меняется в нуле, а корня нет: значение в
+   найденной точке не мало рядом с соседями) и участки, где функция равна
+   нулю целиком (совпадение кривых — не точка пересечения). */
+function ansZeros(f, lo, hi, N) {
+  const d = (hi - lo) / N / 2;
+  return rootsOf(f, lo, hi, N).filter(x => {
+    const y = f(x);
+    if (!isFinite(y)) return false;
+    const l = Math.abs(f(x - d)), r = Math.abs(f(x + d));
+    const nb = Math.max(isFinite(l) ? l : 0, isFinite(r) ? r : 0);
+    if (!(nb > 0)) return false;
+    return Math.abs(y) <= 1e-6 * (1 + nb);
+  });
+}
+
+/* Локальные экстремумы: производная меняет знак внутри отрезка; концы
+   отрезка экстремумами не считаются. Вид — по знаку производной слева и
+   справа, а не по второй производной: так ловится и излом (|x|, огибающая
+   min/max), и не ловится плато (x³ в нуле). Полюс (1/x² в нуле) отсеивается
+   скачком значения: у настоящей вершины соседние значения рядом. */
+function ansExtrema(f, lo, hi, N) {
+  const d = (hi - lo) / N / 2, h = Math.max(1e-9, (hi - lo) * 1e-5);
+  const df = (x) => dNum(f, x, h);
+  const out = [];
+  rootsOf(df, lo, hi, N).forEach(x => {
+    if (x <= lo + d || x >= hi - d) return;
+    const y = f(x);
+    if (!isFinite(y)) return;
+    const l = df(x - d), r = df(x + d);
+    const kind = (l > 0 && r < 0) ? 'max' : ((l < 0 && r > 0) ? 'min' : null);
+    if (!kind) return;
+    const yl = f(x - d), yr = f(x + d), yl2 = f(x - 2 * d), yr2 = f(x + 2 * d);
+    const jump = Math.max(Math.abs(y - yl), Math.abs(y - yr));
+    const ref = Math.max(Math.abs(yl - yl2), Math.abs(yr - yr2));
+    if (!(jump <= 4 * ref + 1e-9 * (1 + Math.abs(y)))) return;
+    out.push({ x, y, kind });
+  });
+  return out;
+}
+
+/* Всё, что «Ответ» знает об одной функции на отрезке: нули (вместе с
+   касанием оси — у x² корень есть, а смены знака нет), локальные максимумы и
+   минимумы, значение в нуле (если ноль на отрезке). Кэш по подписи функции и
+   отрезку: кадр колеса пересчёта не стоит. */
+function ansAnalyse(f, lo, hi, sig) {
+  return ansCached('a|' + (sig || fnSig(f)) + '|' + lo + '|' + hi, () => {
+    const ext = ansExtrema(f, lo, hi, ANS_N);
+    const step = (hi - lo) / ANS_N;
+    const zeros = ansZeros(f, lo, hi, ANS_N);
+    ext.forEach(p => { if (Math.abs(p.y) <= 1e-8 && !zeros.some(z => Math.abs(z - p.x) < step)) zeros.push(p.x); });
+    zeros.sort((a, b) => a - b);
+    const v0 = (lo <= 0 && hi >= 0) ? f(0) : NaN;
+    return {
+      zeros,
+      max: ext.filter(p => p.kind === 'max'),
+      min: ext.filter(p => p.kind === 'min'),
+      y0: isFinite(v0) ? v0 : null,
+    };
+  });
+}
+
+// Пересечения двух функций на отрезке: нули разности, точка — по первой.
+function ansCrosses(f, g, lo, hi) {
+  return ansZeros((x) => f(x) - g(x), lo, hi, ANS_N)
+    .map(x => ({ x, y: f(x) })).filter(p => isFinite(p.y));
+}
+
+/* «Круглое» число 1, 2, 5 × 10ᵏ наружу: нижний край вниз, верхний вверх. */
+function niceOut(v, up) {
+  if (v === 0 || !isFinite(v)) return v;
+  const a = Math.abs(v), grow = (up === (v > 0));     // от нуля или к нулю
+  const k = Math.floor(Math.log10(a));
+  const steps = [1, 2, 5, 10].map(m => m * Math.pow(10, k));
+  const eps = a * 1e-9;
+  const n = grow ? steps.find(s => s >= a - eps) : steps.slice().reverse().find(s => s <= a + eps);
+  return Math.sign(v) * n;
+}
+
+/* Отрезок по формуле: ключевые точки на [−100; 100] — нули, локальные
+   экстремумы, пересечение с осью y и пересечения кривых. Их не больше 12 —
+   [min; max] с запасом max(1; 25 % размаха) с каждой стороны, не уже [−5; 5],
+   края округлены наружу до круглых. Больше 12 (периодическая функция) — [−10; 10]. */
+function autoAnswerSeg(keyFns, diffFns) {
+  const L = -ANS_AUTO_SPAN, R = ANS_AUTO_SPAN, N = ANS_AUTO_N;
+  const xs = [];
+  const add = (x) => { if (isFinite(x) && !xs.some(v => Math.abs(v - x) < 1e-6)) xs.push(x); };
+  keyFns.forEach(f => {
+    ansZeros(f, L, R, N).forEach(add);
+    ansExtrema(f, L, R, N).forEach(p => add(p.x));
+    if (isFinite(f(0))) add(0);
+  });
+  diffFns.forEach(g => ansZeros(g, L, R, N).forEach(add));
+  if (xs.length > ANS_MAX_KEYS) return { a: -10, b: 10 };
+  if (!xs.length) return { a: -5, b: 5 };
+  const lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs);
+  const pad = Math.max(1, (hi - lo) * 0.25);
+  return { a: Math.min(-5, niceOut(lo - pad, false)), b: Math.max(5, niceOut(hi + pad, true)) };
+}
+
+/* Функции, о которых говорит «Ответ» текущей модели: keyFns — у них нули,
+   экстремумы и ось y; diffFns — у них нули это пересечения кривых. null —
+   у модели отрезка ответа нет («С ограничением»: две переменные, область
+   задаёт само ограничение) или формула не разобралась. */
+function answerSpec() {
+  if (STATE.mode === 'graph') {
+    const fs = STATE.curves.filter(c => c.visible && !isVertical(c)).map(c => (x) => evalCurve(c, x));
+    if (!fs.length) return null;
+    const diff = [];
+    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) diff.push((x) => fs[i](x) - fs[j](x));
+    return { keyFns: fs, diffFns: diff };
+  }
+  if (STATE.mode !== 'math' || STATE.mathSub === 'constraint') return null;
+  const f = mathF();
+  if (!f) return null;
+  if (STATE.mathSub === 'transform') return { keyFns: [mathTransformed(f, STATE.mathTrans, paramValue('a', 1))], diffFns: [] };
+  if (STATE.mathSub === 'minmax') {
+    const mm = mmParts(f);
+    if (mm.parts.length < 2) return { keyFns: [f], diffFns: [] };
+    const diff = [];
+    for (let i = 0; i < mm.parts.length; i++) for (let j = i + 1; j < mm.parts.length; j++) {
+      const a = mm.parts[i].fn, b = mm.parts[j].fn;
+      diff.push((x) => a(x) - b(x));
+    }
+    return { keyFns: [mm.z], diffFns: diff };
+  }
+  return { keyFns: [f], diffFns: [] };
+}
+
+// Отрезок ответа текущей модели: свой у человека или подобранный по формуле.
+function answerSeg() {
+  const a = +STATE.ansA, b = +STATE.ansB;
+  if (STATE.ansHand && STATE.ansA != null && STATE.ansB != null && isFinite(a) && isFinite(b) && b > a) return { a, b, hand: true };
+  const spec = answerSpec();
+  if (!spec) return { a: -5, b: 5, hand: false };
+  const sig = 's|' + spec.keyFns.map(fnSig).join('/') + '|' + spec.diffFns.map(fnSig).join('/');
+  const s = ansCached(sig, () => autoAnswerSeg(spec.keyFns, spec.diffFns));
+  return { a: s.a, b: s.b, hand: false };
+}
+
+/* Отрезок кадра: считается один раз в начале перерисовки модели и тут же
+   показывается в строке «Ответ ищем на отрезке». */
+function refreshAnswerSeg() {
+  _ansSeg = answerSeg();
+  syncAnsSegUI(_ansSeg);
+  return _ansSeg;
+}
+
+// Запись числа в поле отрезка: запятая и настоящий минус, как в «Ответе».
+function ansSegText(v) { return String(+(+v).toFixed(6)).replace('.', ',').replace(/^-/, '−'); }
+function ansSegParse(t) {
+  const s = String(t == null ? '' : t).replace(/[\s  ]+/g, '').replace(/[−–]/g, '-').replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$|^-?\.\d+$/.test(s)) return null;
+  return parseFloat(s);
+}
+
+/* Строка «Ответ ищем на отрезке x от [ ] до [ ]» живёт под полями функций
+   своего сюжета: в «Построении графиков» — под строками кривых, в «Функциях
+   min и max» — под их полями, в остальных — под полем f(x). Узел один и
+   переезжает; у «С ограничением» строки нет. */
+function syncAnsSegUI(seg) {
+  const row = document.getElementById('ans-seg-row');
+  if (!row) return;
+  const graph = (STATE.mode === 'graph');
+  const show = graph || (STATE.mode === 'math' && STATE.mathSub !== 'constraint');
+  const after = document.getElementById(graph ? 'graph-rows'
+    : (STATE.mathSub === 'minmax' ? 'mm-rows' : 'math-error'));
+  if (show && after && after.nextElementSibling !== row) after.after(row);
+  if (row.style.display !== (show ? '' : 'none')) row.style.display = show ? '' : 'none';
+  if (!show) return;
+  [['ans-a', seg.a], ['ans-b', seg.b]].forEach(([id, v]) => {
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) { const t = ansSegText(v); if (e.value !== t) e.value = t; }
+  });
+  const back = document.getElementById('ans-seg-auto');
+  if (back) back.hidden = !seg.hand;
+  // Ползунок точки касания ходит по отрезку ответа, а не по окну.
+  if (STATE.mode === 'math' && STATE.mathSub === 'tangent') {
+    const sl = document.getElementById('mathx0-slider');
+    if (sl && (+sl.min !== seg.a || +sl.max !== seg.b)) {
+      sl.min = seg.a; sl.max = seg.b; sl.step = (seg.b - seg.a) / 200; sl.value = STATE.mathX0;
+    }
+  }
+}
+
+/* Человек вписал границы. Пусто или «от ≥ до» — отрезок возвращается к
+   подобранному по формуле, и об этом говорит короткая подсказка. */
+function applyAnsSegInputs() {
+  const a = ansSegParse((document.getElementById('ans-a') || {}).value);
+  const b = ansSegParse((document.getElementById('ans-b') || {}).value);
+  if (a == null || b == null || !(b > a)) {
+    STATE.ansHand = false; STATE.ansA = null; STATE.ansB = null;
+    if (typeof toast === 'function') toast(a == null || b == null
+      ? 'Пустое поле: отрезок снова подобран по формуле'
+      : '«От» должно быть меньше «до»: отрезок снова подобран по формуле');
+  } else {
+    STATE.ansHand = true; STATE.ansA = a; STATE.ansB = b;
+  }
+  redrawAll();
+}
+function resetAnsSegToAuto() {
+  STATE.ansHand = false; STATE.ansA = null; STATE.ansB = null;
+  redrawAll();
 }
 
 // Преобразование графика (7в). Возвращает новую функцию и человеческую подпись.
@@ -721,11 +967,9 @@ function mmColor(i) {
   return pal[i % pal.length];
 }
 
-function drawMathMinMax(f) {
-  const { mx, my } = mathScales();
-  const g = svg.append('g');
-  drawGrid(mx, my, g);
-  drawPlaneAxes(g, mx, my, 'x', 'y');
+/* Исходные функции сюжета и итоговая Z — одна сборка на рисунок и на
+   «Ответ» (отрезок ответа подбирается по Z и по парам исходных). */
+function mmParts(f) {
   const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0), expr: STATE.mathFormula }];
   for (let i = 1; i < mmSlots(); i++) {
     const expr = mmGet(i);
@@ -734,7 +978,6 @@ function drawMathMinMax(f) {
     if (!compiled) continue;
     parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i), expr });
   }
-  if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   const isMin = (STATE.mathMinMax === 'min');
   const z = (x) => {
     let best = NaN;
@@ -746,6 +989,16 @@ function drawMathMinMax(f) {
     });
     return best;
   };
+  return { parts, isMin, z };
+}
+
+function drawMathMinMax(f) {
+  const { mx, my } = mathScales();
+  const g = svg.append('g');
+  drawGrid(mx, my, g);
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  const { parts, isMin, z } = mmParts(f);
+  if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   parts.forEach(p => {
     mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4', { expr: p.expr, name: p.name });
     labelCurveMath(g, p.fn, mx, my, p.name, p.color);
@@ -1126,6 +1379,7 @@ function updateMathPanel() {
 function redrawMath() {
   svg.selectAll('*').remove();
   addDefs();
+  refreshAnswerSeg();    // отрезок ответа кадра — до любого расчёта (ADR 0143)
   /* Панель раздела: окно здесь полный план, а не первая четверть, поэтому
      'main', зарегистрированная makeScales по CONFIG, тут не годится совсем.
      Сюжет про производную заменит эту запись двумя своими. */
@@ -1195,9 +1449,10 @@ function setMathWindow(x0, x1, y0, y1) {
   }
   STATE.mathXmin = x0; STATE.mathXmax = x1; STATE.mathYmin = y0; STATE.mathYmax = y1;
   syncViewFields();     // поля границ в меню плоскости идут за окном вживую
-  const sl = document.getElementById('mathx0-slider');
-  if (sl) { sl.min = x0; sl.max = x1; sl.step = (x1 - x0) / 200; }
-  setMathX0(Math.max(x0, Math.min(x1, STATE.mathX0)));
+  /* Точку касания окно больше не трогает (ADR 0143): раньше приближение мимо
+     x₀ зажимало её в окно, и f(x₀) в «Ответе» менялось от масштаба. Ползунок
+     x₀ ходит по отрезку ответа (syncAnsSegUI). */
+  redrawAll();
 }
 function setMathX0(x) {
   STATE.mathX0 = x;
