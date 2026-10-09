@@ -142,13 +142,17 @@ class VerdictTests(SimpleTestCase):
         self.assertIn('6 баллов', text)
         self.assertNotIn('Колонтитул', text)
 
-    def test_7a_judge_does_not_see_answer_field(self):
-        """Поле answer дублирует текст; судья его не видит (строки «Ответ:» на
-        картинке нет), а человеку в пакете оно показывается."""
+    def test_7a_answer_field_is_shown_to_judge_as_part_of_block(self):
+        """Поле answer судье — с пометкой «часть блока» (не голая строка «Ответ:»,
+        которую он принимал за лишнее), человеку в пакете — как есть."""
         blocks = [{'type': 'task', 'number': '1', 'text': 'Выберите (отмечено) вариант 2',
                    'answer': 'ОТВЕТ-ДУБЛЬ'}]
-        self.assertNotIn('ОТВЕТ-ДУБЛЬ', judge.judge_user_text('pages/a/p1', blocks, []))
-        self.assertIn('ОТВЕТ-ДУБЛЬ', judge.judge_transcript(blocks))
+        for_judge = judge.judge_user_text('pages/a/p1', blocks, [])
+        self.assertIn('ОТВЕТ-ДУБЛЬ', for_judge)
+        self.assertIn('часть блока', for_judge)
+        self.assertNotIn('Ответ: ОТВЕТ-ДУБЛЬ', for_judge)
+        self.assertIn('Ответ: ОТВЕТ-ДУБЛЬ', judge.judge_transcript(blocks))
+        self.assertIn('Поле answer', judge.JUDGE_PROMPT)
         patches = {
             'p1': {'phase': 'judge', 'judge': {'issues': [{'detail': 'Строка «Ответ: 2» лишняя'}]}},
             'p2': {'phase': 'judge', 'judge': {'issues': [{'detail': 'нет таблицы'}]}},
@@ -421,4 +425,51 @@ class ControlPackTests(DigitizeBase):
         self.assertTrue(os.path.isfile(os.path.join(out, 'img', 'vp_abc_p1.png')))
         with open(os.path.join(out, 'control_marks.csv'), encoding='utf-8-sig') as handle:
             self.assertIn('ошибок найдено', handle.read())
+
+
+class AnswerRejudgeTests(RunnerBase):
+    def human_page(self):
+        v2 = self.write_v2()
+        self.runner(judge.JudgeRunner, StubProvider([verdict_json(['нет ответа'])])
+                    ).transcribe_page(self.job())
+        provider = HintProvider([page_reply(FULL), verdict_json(['пропущен ответ 0,1'])])
+        self.runner(judge.RereadRunner, provider).transcribe_page(self.job())
+        self.assertEqual(self.patch()['status'], 'human')
+        return v2
+
+    def test_26_selection_only_human_with_answer_remark(self):
+        self.human_page()
+        patches = judge.v3_statuses(self.root)
+        self.assertEqual(judge.answer_rejudge_pages(patches), ['pages/abc/p1'])
+        self.assertEqual(judge.answer_rejudge_pages({'k': {**patches['pages/abc/p1'],
+                                                           'rejudge': {}}}), [])
+
+    def test_27_both_versions_judged_clean_reread_is_fixed(self):
+        v2 = self.human_page()
+        provider = StubProvider([verdict_json(['а', 'б']), verdict_json()])
+        status = self.runner(judge.AnswerRejudgeRunner, provider).transcribe_page(self.job())
+        patch = self.patch()
+        self.assertEqual((status, provider.calls, patch['chosen']), ('fixed', 2, 'v3'))
+        self.assertIn('blocks', patch)
+        self.assertEqual(patch['rejudge']['status'], 'human')
+        self.assert_v2_untouched(v2)
+
+    def test_28_old_text_clean_is_ok_judge_without_blocks(self):
+        self.human_page()
+        provider = StubProvider([verdict_json(numbers=[('100', False, False)]),
+                                 verdict_json(['хуже'])])
+        status = self.runner(judge.AnswerRejudgeRunner, provider).transcribe_page(self.job())
+        patch = self.patch()
+        self.assertEqual((status, patch['chosen']), ('ok_judge', 'v2'))
+        self.assertNotIn('blocks', patch)
+        overlay = triage.PageOverlay(self.root).apply('pages/abc', 1, rec(blocks=SHORT))
+        self.assertEqual((overlay['needs_eyes'], overlay['blocks']), (False, SHORT))
+
+    def test_29_judge_failure_keeps_page_human(self):
+        self.human_page()
+        before = self.patch()
+        status = self.runner(judge.AnswerRejudgeRunner, StubProvider(['не json'])
+                             ).transcribe_page(self.job())
+        self.assertEqual(status, 'judge_error')
+        self.assertEqual(self.patch(), before)
 

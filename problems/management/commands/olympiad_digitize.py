@@ -137,6 +137,10 @@ class Command(BaseCommand):
                                 help='Докачка (готовые страницы и так пропускаются).')
             runner.add_argument('--yes', action='store_true',
                                 help='Действительно вызывать модель (без флага — только план).')
+            if name == 'reread':
+                runner.add_argument('--rejudge-answers', action='store_true',
+                                    help='Не перечитывать, а пересудить human-страницы с '
+                                         'замечанием про ответ (обе расшифровки).')
             if name == 'judge':
                 runner.add_argument('--redo-answer-artifact', action='store_true',
                                     help='Пересудить страницы с замечанием про «Ответ» '
@@ -473,6 +477,11 @@ class Command(BaseCommand):
 
     def _reread(self, options):
         setup = self._runner_setup(options)
+        if options.get('rejudge_answers'):
+            keys = judge.answer_rejudge_pages(judge.v3_statuses(str(self.digitized)))
+            self._run_phase(options, judge.AnswerRejudgeRunner, keys, setup, estimate=0.004,
+                            per_page=0.0025, label='rejudge-answers')
+            return
         keys = judge.select_for_reread(sorted(judge.v3_statuses(str(self.digitized))),
                                        str(self.digitized))
         self._run_phase(options, judge.RereadRunner, keys, setup, estimate=0.005,

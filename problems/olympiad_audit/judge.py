@@ -42,7 +42,7 @@ JUDGE_PROMPT = """Ты проверяешь расшифровку страни�
 - «формула» — формула записана неверно (другие знаки, индексы, степени, дроби);
 - «номер» — неверный номер задания, вариант или баллы;
 - «искажение» — другие слова, числа или знаки в обычном тексте и таблицах.
-Не считаются расхождениями: колонтитулы и номера страниц, оформление Markdown/LaTeX, пробелы, «е» вместо «ё». Не придумывай: не уверен — не пиши. В `detail` процитируй фрагмент (что на картинке и что в расшифровке).
+Строка «Поле answer» в расшифровке — ответ, вынесенный из текста решения, или отмеченный вариант теста; она ЧАСТЬ блока: не пиши «лишнее» за то, что строки «Ответ:» нет на картинке в таком виде, и не пиши «пропуск» ответа, если он есть в этом поле. Сверяй само содержимое ответа с картинкой. Не считаются расхождениями: колонтитулы и номера страниц, оформление Markdown/LaTeX, пробелы, «е» вместо «ё». Не придумывай: не уверен — не пиши. В `detail` процитируй фрагмент (что на картинке и что в расшифровке).
 
 Если в запросе дан список «Числа для проверки», то про КАЖДОЕ число из него заполни запись в `numbers`: `on_image` — есть ли это число на картинке (отдельно или внутри записи), `in_transcript` — есть ли оно в расшифровке. Если списка нет — `numbers` пустой.
 
@@ -77,11 +77,18 @@ class BadVerdict(ValueError):
 
 # ── Что видит судья ──────────────────────────────────────────────────────
 
-def judge_transcript(blocks, with_answer=True):
-    """Блоки расшифровки → читаемый текст (не сырой JSON). Судье поле `answer`
-    НЕ показывается (`with_answer=False`): оно дублирует текст блока или
-    отметку «(отмечено)», а строки «Ответ: …» на картинке нет — судья
-    принимал дубль за лишнее (стоп-гейт 1, 10 из 15 срабатываний контроля)."""
+ANSWER_LABEL = 'Поле answer'
+
+
+def judge_transcript(blocks, for_judge=False):
+    """Блоки расшифровки → читаемый текст (не сырой JSON).
+
+    Поле `answer` — ответ, вынесенный из текста решения, или отмеченный
+    вариант теста. Голой строкой «Ответ: …» судья принимал его за лишнее
+    (на картинке такой строки нет — стоп-гейт 1, 10 из 15 срабатываний
+    контроля), а скрытое — жаловался на «пропущенный ответ», который лежит
+    в поле (фаза 3, 87 страниц). Поэтому судье оно показывается с пометкой
+    «часть блока» (`for_judge=True`), человеку — как есть."""
     parts = []
     for block in blocks:
         kind = block.get('type')
@@ -103,8 +110,10 @@ def judge_transcript(blocks, with_answer=True):
                 lines.append(f'{key}: {block[key]}')
         if block.get('text'):
             lines.append(block['text'])
-        if with_answer and block.get('answer'):
-            lines.append(f'Ответ: {block["answer"]}')
+        if block.get('answer'):
+            lines.append(f'{ANSWER_LABEL} (часть блока: ответ, вынесенный из текста, или '
+                         f'отмеченный вариант): {block["answer"]}' if for_judge
+                         else f'Ответ: {block["answer"]}')
         if block.get('caption'):
             lines.append(f'Подпись рисунка: {block["caption"]}')
         parts.append('\n'.join(lines))
@@ -112,7 +121,7 @@ def judge_transcript(blocks, with_answer=True):
 
 
 def judge_user_text(key, blocks, expected_numbers):
-    text = f'Страница {key}. Расшифровка:\n\n{judge_transcript(blocks, with_answer=False)}'
+    text = f'Страница {key}. Расшифровка:\n\n{judge_transcript(blocks, for_judge=True)}'
     if expected_numbers:
         text += ('\n\nЧисла для проверки (по текстовому слою PDF их не хватает в '
                  'расшифровке): ' + ', '.join(str(n) for n in expected_numbers))
@@ -305,6 +314,43 @@ class RereadRunner(JudgeBase):
         return result['status']
 
 
+class AnswerRejudgeRunner(JudgeBase):
+    """Пересуд страниц `human` с замечанием про ответ (судья фазы 3 не видел
+    поле `answer`): судятся ОБЕ расшифровки — прежняя и перечитанная; берётся
+    та, где замечаний строго меньше у перечитанной, иначе прежняя. Чистая
+    прежняя — `ok_judge`, чистая перечитанная — `fixed`, иначе остаётся
+    `human`. Прежнее заключение — в `rejudge`."""
+
+    def transcribe_page(self, job):
+        old = triage.read_json(job.out_path(self.root))
+        patch = triage.read_json(self.v3(job))
+        reread = patch['reread']
+        want_old = list(old.get('numbers_missing') or []) if job.has_layer else []
+        want_new = list(reread.get('numbers_missing') or []) if job.has_layer else []
+        verdict_old, error_old, cost_old = self.judge_blocks(
+            job, old.get('blocks') or [], want_old, 'judge3')
+        verdict_new, error_new, cost_new = self.judge_blocks(
+            job, reread.get('blocks') or [], want_new, 'judge3')
+        if verdict_old is None or verdict_new is None:
+            return 'judge_error'                  # патч не тронут: страница остаётся human
+        chosen = 'v3' if defect_count(verdict_new) < defect_count(verdict_old) else 'v2'
+        best = verdict_new if chosen == 'v3' else verdict_old
+        clean = decide_status(best) == 'ok_judge'
+        result = {key: value for key, value in patch.items()
+                  if key not in triage.PATCH_FIELDS}
+        result.update(
+            rejudge={'status': patch['status'], 'judge': patch.get('judge'),
+                     'judge_before': patch.get('judge_before'), 'at': _now()},
+            judge_before=verdict_old, judge=verdict_new, chosen=chosen,
+            status=('fixed' if chosen == 'v3' else 'ok_judge') if clean else 'human',
+            cost_usd=round(float(patch.get('cost_usd') or 0) + cost_old + cost_new, 6))
+        if chosen == 'v3':
+            for key in triage.PATCH_FIELDS:
+                result[key] = reread[key]
+        triage.write_json_atomic(self.v3(job), result)
+        return result['status']
+
+
 # ── Отбор страниц ────────────────────────────────────────────────────────
 
 JUDGE_DONE = ('ok_judge', 'needs_fix', 'fixed', 'human')
@@ -324,6 +370,17 @@ def answer_artifact_pages(patches):
                   if patch.get('phase') == 'judge' and 'judge_prev' not in patch
                   and any('ответ' in str(i.get('detail', '')).lower()
                           for i in (patch.get('judge') or {}).get('issues') or []))
+
+
+def answer_rejudge_pages(patches):
+    """Страницы `human`, где замечание (до или после перечитывания) касалось
+    ответа, а пересуда с видимым полем `answer` ещё не было."""
+    return sorted(key for key, patch in patches.items()
+                  if patch.get('phase') == 'reread' and patch.get('status') == 'human'
+                  and 'rejudge' not in patch and patch.get('reread')
+                  and any('ответ' in str(i.get('detail', '')).lower()
+                          for verdict in (patch.get('judge'), patch.get('judge_before'))
+                          for i in (verdict or {}).get('issues') or []))
 
 
 def select_for_reread(keys, digitized):
