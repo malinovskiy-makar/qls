@@ -313,6 +313,19 @@ class VerdictTests(SimpleTestCase):
         self.assertTrue(scores.tolerant_parse('')['_format_error'])
         self.assertEqual(scores.to_number('7,5'), 7.5)
 
+    def test_blank_cell_is_zero_but_null_is_unreadable(self):
+        data = {'tasks': [{'n': 1, 'score': '23'}, {'n': 2, 'score': ''}], 'readable': True}
+        self.assertEqual(scores.verdict(data, 23)[0], 'ok')
+        data['tasks'][1]['score'] = None
+        self.assertEqual(scores.verdict(data, 23)[1]['reason'], 'task_unreadable')
+
+    def test_layouts_are_fractions_and_unseen_seasons_have_none(self):
+        for bands in scores.LAYOUTS.values():
+            for x0, y0, x1, y1 in bands:
+                self.assertTrue(0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1)
+        self.assertIsNone(scores.layout_for('2014/2015'))
+        self.assertEqual(scores.layout_for('2025/2026'), 'v3_2026')
+
 
 TEST_LAYOUT = {'test': ((0.05, 0.35, 0.95, 0.40), (0.05, 0.55, 0.95, 0.65))}
 GOOD_REPLY = json.dumps({'tasks': [{'n': 1, 'score': '40'}, {'n': 2, 'score': '34'}],

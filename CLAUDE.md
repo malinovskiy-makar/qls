@@ -236,6 +236,7 @@ import_olympiads_data             # настоящие факты раздела
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
 import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
+vp_works index|download|scores|report --dir D  # работы дипломантов ВП: списки, PDF, баллы по задачам (GLM, без --yes только план); файлы ВНЕ репозитория, ФИО не храним (docs/VP_WORKS.md)
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
 ai_load_probe --ai K --problem ID [--ai-user U --baseline F.json]  # зонд «Сайт не встаёт»: K вопросов к ИИ разом,
                                   # ждут ли лёгкие страницы; запускать ВНУТРИ контейнера web
@@ -417,6 +418,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | Банк задач: цифры, конвейеры, брак | [docs/DATA.md](docs/DATA.md) |
 | **Игра: механика, экономика, таблица, анти-чит, дуэль в реальном времени** | [docs/GAME.md](docs/GAME.md) |
 | **Тренажёр «Высшая проба»: маршруты, доступ к попытке, время, сохранение, тесты** | [docs/VP.md](docs/VP.md) |
+| **Работы дипломантов ВП: сайт olymp46, index, вырез баллов, правила про ФИО** | [docs/VP_WORKS.md](docs/VP_WORKS.md) |
 | Цвета, типографика, правила экранов (канон, части 0–5) | [DESIGN.md](DESIGN.md) |
 | Почему решили именно так | [docs/adr/](docs/adr/) |
 | Как это было сделано (история сессий) | [CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md) |
