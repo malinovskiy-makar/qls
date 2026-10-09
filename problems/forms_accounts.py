@@ -49,7 +49,9 @@ class RegisterForm(UserCreationForm):
         widget=forms.RadioSelect,
     )
     consent = forms.BooleanField(
-        label='Согласен на обработку персональных данных',
+        # Текст с тремя ссылками рисует `legal/_agree_label.html`; здесь только
+        # подпись поля для служебных мест (админка, сообщения формы).
+        label='Принимаю Пользовательское соглашение и даю Согласие на обработку персональных данных',
         required=True,
         error_messages={'required': 'Без согласия зарегистрировать нельзя.'},
     )

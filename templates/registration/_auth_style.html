@@ -129,6 +129,10 @@ a:focus-visible, button:focus-visible {
   margin-top: 8px;
 }
 .btn-login:hover { background: var(--btn-bg-hover); }
+.btn-login:disabled {
+  background: var(--surface-2); color: var(--text3);
+  border: 1px solid var(--border); cursor: not-allowed;
+}
 .back-link {
   display: block;
   text-align: center;
@@ -217,5 +221,7 @@ a:focus-visible, button:focus-visible {
 }
 .consent input { margin-top: 2px; flex-shrink: 0; }
 .consent span { font-weight: 400; }
+.consent a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.consent a:hover { color: var(--text); }
 {% include '_fb_btn_style.html' %}
 </style>

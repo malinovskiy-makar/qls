@@ -1,0 +1,87 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Правила обработки данных · Weconomics</title>
+  <meta name="robots" content="noindex, nofollow">
+  {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
+  {% include '_metrika.html' %}
+  {% include 'registration/_auth_style.html' %}
+  <style>
+    .login-card.accept-card { width: 480px; }
+    .accept-docs { list-style: none; margin: 0 0 20px; padding: 0; border: .5px solid var(--border); border-radius: var(--r); }
+    .accept-docs li + li { border-top: .5px solid var(--border); }
+    .accept-docs a { display: block; padding: 10px 12px; font-size: 14px; color: var(--accent-ink); text-decoration: none; }
+    .accept-docs a:hover { text-decoration: underline; }
+    .accept-docs a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+    .accept-actions { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+    .accept-actions .btn-login { margin-top: 0; flex: 1; }
+    .accept-logout { margin: 0; }
+    .accept-logout button {
+      background: none; border: 0; padding: 6px 2px; font: inherit; font-size: 14px;
+      color: var(--text2); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .accept-logout button:hover { color: var(--text); }
+    .accept-logout button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+    .accept-small { margin-top: 20px; font-size: 12px; line-height: 1.5; color: var(--text2); }
+    .accept-small a { color: var(--accent-ink); }
+    .accept-small .lg-missing { background: var(--amber-tint); color: var(--amber-ink);
+      border: 1px solid var(--amber); border-radius: 4px; padding: 0 5px; font-weight: 600; }
+  </style>
+</head>
+<body>
+{% include '_metrika_noscript.html' %}
+
+<div class="login-card accept-card">
+  <div class="login-logo">
+    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
+  </div>
+  <h1>Правила обработки данных Weconomics</h1>
+  <p class="login-sub">Чтобы продолжить, ознакомьтесь с документами и примите их.</p>
+
+  {% if error %}<div class="error-list">{{ error }}</div>{% endif %}
+
+  <ul class="accept-docs">
+    <li><a href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политика обработки персональных данных</a></li>
+    <li><a href="{% url 'legal:document' 'consent' %}" target="_blank" rel="noopener">Согласие на обработку персональных данных</a></li>
+    <li><a href="{% url 'legal:document' 'terms' %}" target="_blank" rel="noopener">Пользовательское соглашение</a></li>
+  </ul>
+
+  <form method="post" id="accept-form" novalidate>
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <div class="form-group">
+      <label class="consent">
+        <input type="checkbox" name="agree" id="accept-agree" value="1">
+        <span>{% include 'legal/_agree_label.html' %}</span>
+      </label>
+    </div>
+    <div class="accept-actions">
+      <button type="submit" class="btn-login" id="accept-go">Принимаю</button>
+    </div>
+  </form>
+
+  <form method="post" action="/logout/" class="accept-logout" style="margin-top: 12px;">
+    {% csrf_token %}
+    <button type="submit">Выйти</button>
+  </form>
+
+  <p class="accept-small">Не согласны? Напишите нам, и мы удалим учётную запись: {{ req.mail }} или Telegram <a href="https://t.me/{{ req.telegram }}" target="_blank" rel="noopener">@{{ req.telegram }}</a></p>
+</div>
+
+<script>
+(function () {
+  var box = document.getElementById('accept-agree');
+  var go = document.getElementById('accept-go');
+  if (!box || !go) return;
+  function sync() { go.disabled = !box.checked; }
+  box.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% include '_site_version.html' %}
+{% include '_legal_footer.html' %}
+</body>
+</html>

@@ -348,6 +348,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | `calendar_stub` | Календарь занятий |
 | `olympiads` | Справочник олимпиад: даты туров, льготы вузов, комплекты |
 | `vp` | Тренажёр 1 тура «Высшей пробы»: варианты из файлов, таймер, подсчёт баллов ([ADR 0124](docs/adr/0124-vp-app-separate-from-bank.md)) |
+| `legal` | Правовые документы `/legal/*`, экран согласия, защита помощника, проверка реквизитов; **модель `ConsentRecord` живёт в `problems/models_legal.py`** (правило «модели только в `problems`» не нарушено) |
 
 **Тренажёр ВП после сессии 5 (22.09.2026):** читать может любой, ПРОХОДИТЬ — только
 вошедший (стена в `vp.views.start`). Экраны: посадочная `/vp/` в один экран без
@@ -394,6 +395,19 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 результат `/game/r/<код>/`; API `game/api/set_check/`, `teacher/api/game-set/pool/`, срок набора
 `teacher/game-sets/<код>/deadline/`. Макеты и спецификации — `claude/mockups/wecon_rush_20260917/`,
 журнал прогона — `claude/JOURNAL_WECON_RUSH_REDESIGN_20260917.md`.
+
+**Правовой контур, часть А (ветка `feat/legal-a-20261008`, 08.10.2026).** Шесть документов лежат
+ДОСЛОВНО в `legal/texts/*.md`; реквизиты подставляются при показе из `settings.LEGAL` (почта и дата —
+только из `LEGAL_CONTACT_EMAIL` / `LEGAL_DOCS_DATE`; при `DEBUG=False` и пустых значениях
+`manage.py check` падает с `legal.E001`). Согласие — `ConsentRecord`, ВСЕ чтения и записи только через
+`legal/consent.py`; вид `pd` (документы) и `ai` (помощник и Сингапур). Блокирующий экран —
+`legal.middleware.ConsentGateMiddleware` (в сессии `legal_pd_version`, чтобы не ходить в базу на
+каждой странице) + `legal/ws.py` для сокетов дуэли; всё, что отправляет данные человека модели,
+закрыто `@legal.guards.ai_consent_required` (403, код `ai_consent_required`). ⚠️ В прогоне тестов
+экран и защита ВЫКЛЮЧЕНЫ (`LEGAL_ENFORCEMENT_ENABLED`, как `SCRAPE_GUARD_ENABLED`): прежние тесты ходят
+вошедшим без записи; тесты `legal/` включают флаг сами. Новое место вызова `core.run` обязано попасть
+в `legal/tests/test_ai_consent.py::CallSiteInventoryTests`. Часть Б (окно cookie, удаление данных,
+сроки хранения) — не сделана; тексты документов описывают состояние ПОСЛЕ неё.
 
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·

@@ -95,13 +95,18 @@ class PageTests(TestCase):
         self.assertLess(html.index('<aside class="pf-aside"'),
                         html.index('<div class="card pf-card pf-card--form'))
 
-    def test_06_both_cards_link_out_safely(self):
+    def test_06_the_telegram_card_links_out_safely_and_feedback_is_our_own_button(self):
+        """Внешней Google Формы нет (решение владельца 08.10.2026): обратная связь идёт
+        через свою кнопку «Проблема или предложение», внешняя ссылка осталась одна."""
         html = self.page()
         aside = html.split('class="pf-aside"', 1)[1].split('</aside>', 1)[0]
         self.assertIn('https://t.me/weconomics_ru"', aside)
         self.assertNotIn('?direct', aside)
-        self.assertIn('docs.google.com/forms/', aside)
-        self.assertEqual(aside.count('target="_blank" rel="noopener"'), 2)
+        self.assertNotIn('docs.google.com', aside)
+        self.assertNotIn('forms.gle', aside)
+        self.assertEqual(aside.count('target="_blank" rel="noopener"'), 1)
+        self.assertIn('data-fb-open', aside)
+        self.assertIn('Проблема или предложение', aside)
 
     def test_07_email_hint_is_a_tooltip_and_not_a_line_under_the_field(self):
         html = self.page()

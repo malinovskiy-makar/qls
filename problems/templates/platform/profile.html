@@ -136,6 +136,14 @@
 .pf-cta-arrow { position: absolute; top: 14px; right: 14px; color: var(--text3); }
 .pf-cta-arrow .qi { width: 16px; height: 16px; }
 .pf-cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Карточка-кнопка: сбросить вид <button>, остальное берёт у .pf-cta */
+.pf-cta--btn { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+/* Согласие на помощника (Правовой контур, часть А) */
+.pf-card--consent { max-width: none; }
+.pf-consent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 4px; }
+.pf-consent-row form { margin: 0; }
+.pf-consent-link { font-size: 13px; color: var(--accent-ink); }
+.pf-consent-link:hover { color: var(--text); }
 
 /* Строка аватара и имени пользователя */
 .pf-ava-row {
@@ -449,15 +457,20 @@
       </span>
       <span class="pf-cta-arrow">{% include '_icon.html' with name='external' %}</span>
     </a>
-    <a class="pf-cta" href="https://docs.google.com/forms/d/e/1FAIpQLSd2GFSG1LevlZrGQPANoiYHE05Y18ACT3Y8IdoMmozwxSkVTw/viewform?usp=dialog" target="_blank" rel="noopener">
+    {% comment %}
+    Обратная связь идёт через СВОЮ кнопку «Проблема или предложение» (решение
+    владельца 08.10.2026): внешняя форма складывала данные россиян в базу за
+    рубежом. Окно открывает общий скрипт `_feedback.html` по атрибуту
+    `data-fb-open`; вид карточки тот же, что у соседней.
+    {% endcomment %}
+    <button type="button" class="pf-cta pf-cta--btn" data-fb-open>
       <span class="pf-cta-icon">{% include '_icon.html' with name='message' %}</span>
       <span class="pf-cta-body">
-        <span class="pf-cta-title">Оставить обратную связь</span>
+        <span class="pf-cta-title">Проблема или предложение</span>
         <span class="pf-cta-sub">Помогите сделать Weconomics лучше</span>
-        <span class="pf-cta-go">Заполнить форму</span>
+        <span class="pf-cta-go">Написать нам</span>
       </span>
-      <span class="pf-cta-arrow">{% include '_icon.html' with name='external' %}</span>
-    </a>
+    </button>
   </aside>
 
   {% comment %}
@@ -646,6 +659,34 @@
 
       <button type="submit" class="btn-primary">Сохранить</button>
     </form>
+  </div>
+
+  {% comment %}
+  Согласие на помощника с ИИ: дата и отзыв (Правовой контур, часть А).
+  Отзыв отключает только помощника; строка согласия в базе остаётся.
+  {% endcomment %}
+  <div class="card pf-card pf-card--consent ym-hide-content" id="pf-ai-consent">
+    <h2 class="pf-h2">Помощник на основе ИИ</h2>
+    {% if ai_consent %}
+    <p class="pf-hint pf-hint--block">Помощник на основе ИИ: согласие дано {{ ai_consent.given_at|date:"j E Y" }}</p>
+    <div class="pf-consent-row">
+      <form method="post" action="{% url 'legal:ai_revoke' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-quiet">Отозвать</button>
+      </form>
+      <a class="pf-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
+    </div>
+    {% else %}
+    <p class="pf-hint pf-hint--block">Помощник на основе ИИ: согласие не дано. Помощник работает на зарубежной модели и без согласия закрыт.</p>
+    <div class="pf-consent-row">
+      <form method="post" action="{% url 'legal:ai_grant' %}">
+        {% csrf_token %}
+        <input type="hidden" name="source" value="profile">
+        <button type="submit" class="btn-quiet">Дать согласие</button>
+      </form>
+      <a class="pf-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
+    </div>
+    {% endif %}
   </div>
 </div>
 

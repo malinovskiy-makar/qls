@@ -1,0 +1,38 @@
+{% comment %}
+Футер со ссылками на правовые документы (Правовой контур, часть А, 08.10.2026).
+
+Одна строка: «© 2026 Weconomics · Документы · Политика · Соглашение ·
+Рекомендации · 12+». Подключается в каждый корневой шаблон-документ сразу
+ПОСЛЕ `_site_version.html`: метка версии остаётся последним блоком страницы
+(её сторожит `config/tests/test_nav.py`), а здесь `<p>`, а не блок.
+
+⚠️ НЕ ПОДКЛЮЧАЕТСЯ В ИГРУ И КАЛЬКУЛЯТОР: экран игры занят ровно в высоту окна,
+а у калькулятора `body` не прокручивается (`overflow: hidden`) и всё, что ниже
+приложения, не видно. Там ссылка «Документы» стоит в шапке (`_nav.html`,
+параметр `nav_docs_link`). Полный список корневых шаблонов и исключений
+сверяет `legal/tests/test_footer.py`.
+
+На бумаге футер не печатается. Цвета — токены, эмодзи нет.
+{% endcomment %}
+<style>
+.legal-foot {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
+  margin: -8px 0 0; padding: 0 16px 14px;
+  font-size: 12px; line-height: 1.4; color: var(--text3);
+}
+body > .legal-foot { align-self: stretch; }
+.legal-foot a { color: var(--text2); text-decoration: none; }
+.legal-foot a:hover { color: var(--text); text-decoration: underline; }
+.legal-foot a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.legal-foot-sep { color: var(--text3); }
+.legal-foot-age { font-weight: 600; color: var(--text2); }
+</style>
+<style media="print">.legal-foot { display: none; }</style>
+<p class="legal-foot">
+  <span>© 2026 Weconomics</span><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:index' %}">Документы</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'privacy' %}">Политика</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'terms' %}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'recommendations' %}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <span class="legal-foot-age" title="Для аудитории 12+">12+</span>
+</p>

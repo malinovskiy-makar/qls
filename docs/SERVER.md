@@ -323,6 +323,7 @@ docker compose -f deploy/docker-compose.loadtest.yml down
 | `SEMANTIC_SEARCH_ENABLED` | `0` — см. [ADR 0012](adr/0012-semantic-search-flag-off-in-prod.md) |
 | `GUNICORN_WORKERS` | `4` |
 | `YANDEX_METRIKA_ID` | номер счётчика Метрики, только цифры; на площадке dev — пусто ([ADR 0133](adr/0133-yandex-metrika-and-signup-source.md)) |
+| `LEGAL_CONTACT_EMAIL`, `LEGAL_DOCS_DATE` | почта для обращений по данным и дата редакции документов («15 октября 2026 г.»); **обязательны**, пусто = `manage.py check` падает с `legal.E001` и контейнер `web` не стартует |
 | `BACKUP_S3_*` | внешнее хранилище копий, пока пусто |
 
 ⚠️ **`DATABASE_URL` и `REDIS_URL` живут ТОЛЬКО в `.env`.** Раньше

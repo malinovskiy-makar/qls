@@ -2293,3 +2293,6 @@ from .models_platform import (  # noqa: E402,F401
     UserProfile,
     WorkFeedback,
 )
+
+# Согласия на обработку данных и на помощника с ИИ (Правовой контур, часть А).
+from .models_legal import ConsentRecord  # noqa: E402,F401

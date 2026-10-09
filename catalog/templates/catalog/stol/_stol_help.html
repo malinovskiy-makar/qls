@@ -66,6 +66,23 @@
       {% if test %}<button type="button" class="quick-link" data-step="reveal">Ответ</button>{% elif sol.has_any %}<button type="button" class="quick-link" id="sol-btn" data-step="sol"{% if solution_viewed %} hidden{% endif %}>Решение</button>{% endif %}
     </div>
     {% if user.is_authenticated %}
+    {% comment %}
+    Согласие на помощника (Правовой контур, часть А): помощник отправляет
+    сообщения и фото на зарубежную модель, поэтому без отдельного согласия
+    вместо поля ввода стоит этот блок. Рабочая часть панели лежит под
+    `#ai-live` и появляется без перезагрузки (`stol_task.js::bindConsent`).
+    {% endcomment %}
+    <div class="ai-consent" id="ai-consent"{% if ai_consent %} hidden{% endif %}>
+      <p class="ai-consent-h">Помощник работает на зарубежной модели</p>
+      <p class="ai-consent-t">В Сингапур уходят ваши сообщения, история диалога, текст решения и фото целиком.<br>Не уходят логин, имя и почта.<br>Не фотографируйте фамилию и лицо.</p>
+      <p class="ai-consent-err" id="ai-consent-err" role="alert" hidden></p>
+      <div class="ai-consent-row">
+        <button type="button" class="btn btn--main btn--sm" id="ai-consent-yes">Согласен, открыть помощника</button>
+        <button type="button" class="btn btn--quiet btn--sm" id="ai-consent-no">Не сейчас</button>
+      </div>
+      <a class="ai-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
+    </div>
+    <div class="ai-live" id="ai-live"{% if not ai_consent %} hidden{% endif %}>
     <div class="ai-sug" id="ai-sug">
       {% if chat_available %}<button type="button" data-mode="theory" data-prompt="Объясни теорию">Теория</button>
       <button type="button" data-mode="method" data-prompt="Как решать">Как решать</button>{% endif %}
@@ -82,6 +99,7 @@
     </div>
     {% comment %}Строка лимита (решение владельца 24.09.2026): счётчик общий на проверку и чат, видна при остатке ≤ limit_warn_at (`ai.core.LIMIT_WARN_AT`); после ответа число и видимость обновляет `stol_task.js`.{% endcomment %}
     <p class="sv-limit" id="sv-limit"{% if remaining > limit_warn_at %} hidden{% endif %}>Запросов к ИИ на сегодня: осталось <b id="sv-remaining">{{ remaining }}</b></p>
+    </div>
     {% else %}
     <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
     {% endif %}

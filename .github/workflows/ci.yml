@@ -327,6 +327,10 @@ jobs:
       # не подключается — Redis-бэкенд Django соединение не открывает,
       # пока у него не попросят ключ.
       REDIS_URL: redis://127.0.0.1:6379
+      # Реквизиты правовых документов обязательны (legal.E001): подставные,
+      # джоб только читает настройки.
+      LEGAL_CONTACT_EMAIL: ${{ format('ci{0}example.org', '@') }}
+      LEGAL_DOCS_DATE: 15 октября 2026 г.
 
     steps:
       - uses: actions/checkout@v4

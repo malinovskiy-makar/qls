@@ -18,7 +18,8 @@
    24.09.2026): обычной строкой после <main> она давала пустую полосу под
    панелями. Правило следует за видом «Стола» (`data-view`), а не за
    адресом: задача открывается и без перезагрузки (`?pane=1`). */
-body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
+body:has(.stol-app[data-view="stol"]) .site-version,
+body:has(.stol-app[data-view="stol"]) .legal-foot { display: none; }
 
 /* ── Вход ───────────────────────────────────────────────────────────── */
 .stol-entry { position: relative; overflow: hidden; padding: 0 16px 80px; }
@@ -961,6 +962,18 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .help-foot .ai-in { background: var(--surface-2); border-radius: 14px; }
 .help-foot .ai-send { background: var(--brand-amber); color: var(--brand-amber-ink); }
 .help-foot .sv-limit { margin: 0; }
+.help-foot .ai-live { display: flex; flex-direction: column; gap: 8px; }
+.help-foot .ai-live[hidden], .help-foot .ai-consent[hidden] { display: none; }
+/* Запрос согласия на помощника (Правовой контур, часть А) */
+.help-foot .ai-consent { display: flex; flex-direction: column; gap: 8px; background: var(--surface-2);
+  border: .5px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.help-foot .ai-consent p { margin: 0; }
+.help-foot .ai-consent-h { font-size: 14px; font-weight: 700; color: var(--text); }
+.help-foot .ai-consent-t { font-size: 13px; line-height: 1.5; color: var(--text2); }
+.help-foot .ai-consent-err { font-size: 13px; color: var(--error); }
+.help-foot .ai-consent-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.help-foot .ai-consent-link { font-size: 13px; color: var(--accent-ink); }
+.help-foot .ai-consent-link:hover { color: var(--text); }
 
 /* «Спросить ИИ про этот пункт» и «Спросить об этом» по выделению (README §3). */
 .stm .part { position: relative; padding-right: 38px; }
