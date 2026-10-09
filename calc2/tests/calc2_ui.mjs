@@ -510,7 +510,12 @@ await t('клавиша ставит символ в поле, не стирая
     setFieldValue(inp, '');
     const kb = document.querySelector('.mkbd.open');
     const keys = [...kb.querySelectorAll('.mk')];
-    const hit = (t) => { const b = keys.find(x => x.textContent === t); if (b) b.click(); };
+    /* ПЕРЕНАЦЕЛЕНО (10.10, ADR 0144): буквы клавиатуры подписаны формулой
+       KaTeX (static/mathkbd/mathkbd.js, paintLabel), и textContent клавиши «Q»
+       — это «QQQ» (видимая буква плюс невидимая копия для чтеца). Имя клавиши —
+       её aria-label; у цифр и знаков его нет, там подпись — сам текст. */
+    const name = (x) => x.getAttribute('aria-label') || x.textContent;
+    const hit = (t) => { const b = keys.find(x => name(x) === t); if (b) b.click(); };
     hit('1'); hit('0'); hit('0'); hit('−'); hit('Q');
     return inp.value.replace(/\s/g, '') === '100-Q' || `в поле «${inp.value}»`;
   });
@@ -780,6 +785,13 @@ await t('опасные команды в .tex отклоняются серве
     const res = await fetch(url, { method: 'POST', body: b });
     return res.status;
   }, await page.evaluate(() => CALC2_PDF_URL));
+  /* Отказ 400 здесь — ожидаемый ответ, а браузер пишет его в консоль как
+     «Failed to load resource». Это не ошибка страницы: убираем ровно эту
+     строку, иначе прибор при 158/158 отдавал код 1 (замечено 10.10). */
+  await page.waitForTimeout(100);
+  for (let i = errors.length - 1; i >= 0; i--) {
+    if (/Failed to load resource: the server responded with a status of 400/.test(errors[i])) { errors.splice(i, 1); break; }
+  }
   return [400, 503].includes(r) || `код ${r} (ожидался отказ)`;
 });
 
@@ -854,14 +866,21 @@ await t('регуляторы сцены живут в «Условии», в «
    (аудит, п. 50). Теперь число 13/700 против подписи 12/600: крупнее и
    тяжелее, но в шкале. Требование «плюс три пункта» противоречило бы канону,
    поэтому проверяем то, что канон и обещает. */
-await t('в аналитике число крупнее и тяжелее подписи', () => page.evaluate(() => {
-  const b = document.querySelector('#sb-body .stat b'), s = document.querySelector('#sb-body .stat span');
-  if (!b || !s) return 'нет строк в табло';
+/* ПЕРЕНАЦЕЛЕНО (10.10, решение владельца 09.10, ADR 0144): «Ответ» строками —
+   у ВСЕХ значений колонки один формульный шрифт (KaTeX_Main) и один кегль 16 px,
+   обычного веса, как главные числа и раньше; подпись 13,5 px цветом --text2.
+   Вес 700 у чисел таблиц (канон 1.2.2, DESIGN.md 5.1) для «Ответа» снят:
+   иначе в колонке было бы два начертания значений. Число отличается от
+   подписи кеглем, шрифтом и цветом. */
+await t('в «Ответе» число крупнее подписи и набрано формульным шрифтом', () => page.evaluate(() => {
+  const row = [...document.querySelectorAll('#sb-body .stat')].find(r => r.getClientRects().length);
+  const b = row && row.querySelector(':scope > b'), s = row && row.querySelector(':scope > span');
+  if (!b || !s) return 'нет видимых строк в табло';
   const cb = getComputedStyle(b), cs = getComputedStyle(s);
   const bs = parseFloat(cb.fontSize), ss = parseFloat(cs.fontSize);
-  const bw = parseInt(cb.fontWeight, 10), sw = parseInt(cs.fontWeight, 10);
-  if (bw !== 700) return `вес числа ${bw}, канон 1.2.2 требует 700`;
-  return (bs >= ss && bw > sw) || `число ${bs}px/${bw}, подпись ${ss}px/${sw}`;
+  const fam = cb.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+  if (fam !== 'KaTeX_Main') return 'шрифт числа ' + cb.fontFamily;
+  return (bs > ss && cb.color !== cs.color) || `число ${bs}px ${cb.color}, подпись ${ss}px ${cs.color}`;
 }));
 
 await t('панель параметров наполняется и в сцене «Труд»', async () => {
@@ -1221,7 +1240,8 @@ await t('раздел букв даёт латиницу и греческие',
     const ab = tabs.find(t => /Букв/.test(t.textContent));
     if (!ab) return 'нет раздела букв';
     ab.click();
-    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.textContent);
+    // ПЕРЕНАЦЕЛЕНО (10.10): буквы подписаны формулой, имя клавиши — aria-label.
+    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.getAttribute('aria-label') || b.textContent);
     const need = ['a', 'z', 'α', 'β', 'π', 'Δ'];
     const miss = need.filter(n => labels.indexOf(n) < 0);
     return !miss.length || 'нет: ' + miss.join(', ');
@@ -1457,12 +1477,20 @@ await page.waitForTimeout(400);
 await page.evaluate(() => setToolsOpen(true));
 await page.waitForTimeout(180);
 
-await t('сцена открывается пустой: ни одной кривой', () => page.evaluate(() =>
-  (STATE.curves.length === 0 && STATE.mode === 'graph') || `кривых ${STATE.curves.length}, режим ${STATE.mode}`));
+/* ПЕРЕНАЦЕЛЕНО (10.10, ADR 0144): «Построение графиков» открывается не пустым,
+   а с функцией x^2-4 (решение владельца 27.09; контрольное число в calc2/CLAUDE.md).
+   Правило списка то же: под последней кривой всегда одна пустая строка. */
+await t('сцена открывается с x^2-4: одна кривая', () => page.evaluate(() =>
+  (STATE.curves.length === 1 && STATE.curves[0].expr === 'x^2-4' && STATE.mode === 'graph')
+  || `кривых ${STATE.curves.length} (${STATE.curves.map(c => c.expr).join(', ')}), режим ${STATE.mode}`));
 
-await t('в списке ровно одна пустая строка', async () =>
-  (await page.locator('#graph-rows .grow').count()) === 1
-  || 'строк: ' + (await page.locator('#graph-rows .grow').count()));
+await t('в списке строка этой кривой и ровно одна пустая', async () => {
+  const r = await page.evaluate(() => [...document.querySelectorAll('#graph-rows .grow .f-slot input')].map(i => i.value));
+  return (r.length === 2 && r[0].replace(/\s/g, '') === 'x^2-4' && r[1] === '') || 'строки: ' + JSON.stringify(r);
+});
+/* Дальше список проверяется с чистого листа, как раньше: кривую убираем. */
+await page.evaluate(() => { STATE.curves = []; curveCounter = 0; renderGraphRows(); redrawAll(); });
+await page.waitForTimeout(300);
 
 await t('начали печатать — строка стала кривой, снизу новая пустая', async () => {
   await page.evaluate(() => {

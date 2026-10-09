@@ -59,10 +59,15 @@ function plainCopy(v, depth) {
    «Как писать формулы»…) тоже не входят: их поля — не модель. Иначе ссылка
    «Поделиться» несла в себе текст прошлой ссылки и росла от раза к разу, а
    открытие окна давало пустой шаг «Отменить» (независимое ревью фазы 11). */
+/* ⚠️ «Сначала сам» (#btn-self) — ВИД, а не вход модели (решение 10.10,
+   ADR 0144): его aria-pressed в форме делал включение режима шагом истории, и
+   «Отменить» гасила кнопку, а режим оставался (SELF.on, body.self-on). Режим
+   живёт в SELF, ссылка несёт его отдельно (&self=1, окно «Поделиться»). */
+const FORM_SKIP_IDS = new Set(['btn-self']);
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];
-  return [...app.querySelectorAll('[id]')].filter(el => !el.closest('#chart, #graph-wrap svg, .modal, .pop'));
+  return [...app.querySelectorAll('[id]')].filter(el => !FORM_SKIP_IDS.has(el.id) && !el.closest('#chart, #graph-wrap svg, .modal, .pop'));
 }
 function captureForm() {
   const out = {};

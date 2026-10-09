@@ -18,6 +18,11 @@
         ширина (разброс ≤ 1 px), поле не уже 60 % строки; подписей, обрезанных
         многоточием, нет; высота строки до и после вердикта одна; пояснение
         формата ответа у математики и у экономики своё.
+     Д. Режим — вид, а не вход модели (ADR 0144): включение не делает шаг
+        истории; «ползунок → режим → Отменить» откатывает ползунок, режим
+        остаётся; в сценарии из 20 шагов (включить, выключить, отменить,
+        повторить, сменить модель) кнопка и режим не расходятся ни разу;
+        ссылка «Поделиться» с галочкой несёт режим (&self=1).
 */
 import { chromium } from 'playwright';
 
@@ -52,8 +57,8 @@ window.__sp = {
     if (typeof setSelfMode === 'function' && SELF.on) setSelfMode(false);
     resetSceneMemory(); pickScene(key); await __sp.wait(250);
     if (setup) { setup(); redrawAll(); await __sp.wait(250); }
-    // Включение режима — шаг истории (aria-pressed кнопки в форме): через 300 мс
-    // затишья она рассылает calc2:history и снимает вердикты. Ждём его.
+    // Включение режима больше не шаг истории (ADR 0144, раздел Д), но перерисовка
+    // после него будит проверку истории через 300 мс затишья. Ждём её.
     setSelfMode(true); await __sp.wait(600);
   },
   cells: () => [...document.querySelectorAll('#ans-hero .ans-cell')].map((c, i) => ({
@@ -249,6 +254,66 @@ if (want('Г')) {
   const note2 = await ev(() => document.getElementById('self-note').textContent);
   ok('пояснение у экономики — числом, своё', /^Впишите ответ числом/.test(note2), note2);
   await ev(() => setSelfMode(false));
+}
+
+/* ── Д. Режим не входит в историю ───────────────────────────────────── */
+if (want('Д')) {
+  head('Д. «Сначала сам» — вид, а не вход модели');
+  const snap = () => ev(() => ({ undo: histOf().undo.length, redo: histOf().redo.length,
+    undoOff: document.getElementById('btn-undo').disabled,
+    pressed: document.getElementById('btn-self').getAttribute('aria-pressed'), on: SELF.on,
+    body: document.body.classList.contains('self-on'),
+    slider: (document.querySelector('.col-cond input[type=range]:not([disabled])') || {}).value }));
+  const step = async (fn) => { await fn(); await page.waitForTimeout(700); };
+  const freshSd = () => ev(async () => { if (SELF.on) setSelfMode(false); resetSceneMemory(); pickScene('sd'); closePicker(); redrawAll(); await __sp.wait(700); });
+  await freshSd();
+  const a0 = await snap();
+  await step(() => page.click('#btn-self'));
+  const a1 = await snap();
+  ok('включение режима не делает шаг истории', a1.undo === a0.undo && a1.undoOff === a0.undoOff && a1.on && a1.pressed === 'true',
+    JSON.stringify({ до: [a0.undo, a0.undoOff], после: [a1.undo, a1.undoOff, a1.pressed, a1.on] }));
+  await step(() => page.click('#btn-self'));
+  // Ползунок → режим → «Отменить»: откатывается ползунок, режим остаётся.
+  const sl = page.locator('.col-cond input[type=range]:not([disabled])').first();
+  await sl.focus();
+  await step(async () => { await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); });
+  const b0 = await snap();
+  await step(() => page.click('#btn-self'));
+  await step(() => page.click('#btn-undo'));
+  const b1 = await snap();
+  ok('«ползунок → режим → Отменить»: ползунок вернулся, режим остался',
+    b1.slider === a0.slider && b0.slider !== a0.slider && b1.on && b1.pressed === 'true' && b1.body,
+    JSON.stringify({ было: a0.slider, сдвинут: b0.slider, после: b1.slider, режим: [b1.pressed, b1.on, b1.body] }));
+  // 20 шагов: кнопка и режим не расходятся.
+  await freshSd();
+  const STEPS = ['self', 'undo', 'self', 'redo', 'slider', 'self', 'undo', 'undo', 'model:taxes', 'self',
+    'undo', 'redo', 'model:sd', 'self', 'slider', 'undo', 'self', 'redo', 'undo', 'self'];
+  const bad20 = [];
+  for (let i = 0; i < STEPS.length; i++) {
+    const st = STEPS[i];
+    if (st === 'self') await step(() => page.click('#btn-self'));
+    else if (st === 'undo') await step(() => ev(() => { if (!document.getElementById('btn-undo').disabled) document.getElementById('btn-undo').click(); }));
+    else if (st === 'redo') await step(() => ev(() => { if (!document.getElementById('btn-redo').disabled) document.getElementById('btn-redo').click(); }));
+    else if (st === 'slider') { const s2 = page.locator('.col-cond input[type=range]:not([disabled])').first(); await s2.focus(); await step(() => page.keyboard.press('ArrowRight')); }
+    else if (st.startsWith('model:')) await step(() => ev((k) => { pickScene(k); closePicker(); redrawAll(); }, st.slice(6)));
+    const x = await snap();
+    if ((x.pressed === 'true') !== x.on || x.body !== x.on) bad20.push((i + 1) + '. ' + st + ': кнопка ' + x.pressed + ', режим ' + x.on + ', body ' + x.body);
+  }
+  eq('20 шагов: расхождений кнопки и режима', bad20.length + (bad20.length ? ' — ' + bad20.slice(0, 3).join(' | ') : ''), '0');
+  // Ссылка «Поделиться» с галочкой «Сначала сам».
+  await ev(async () => { if (SELF.on) setSelfMode(false); await __sp.wait(300); });
+  await page.click('#btn-share'); await page.waitForTimeout(400);
+  await page.check('#share-self'); await page.waitForTimeout(400);
+  const link = await ev(() => document.getElementById('share-url').value);
+  await ev(() => closePop());
+  ok('ссылка несёт режим (&self=1)', /[#&]self=1\b/.test(link), link.slice(-40));
+  const p2 = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  await p2.goto(link, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(1500);
+  const r2 = await p2.evaluate(() => ({ on: SELF.on, pressed: document.getElementById('btn-self').getAttribute('aria-pressed'),
+    undoOff: document.getElementById('btn-undo').disabled }));
+  ok('по ссылке модель открыта в режиме: кнопка и режим согласны, «Отменить» выключена', r2.on && r2.pressed === 'true' && r2.undoOff, JSON.stringify(r2));
+  await p2.context().close();
 }
 
 ok('ошибок страницы нет', !errs.length, errs.slice(0, 3).join(' | '));
