@@ -92,6 +92,8 @@ class Command(BaseCommand):
                 p.add_argument('--max-usd', type=float, default=3.0)
                 p.add_argument('--yes', action='store_true',
                                help='без него — только план, ни одного вызова модели')
+                p.add_argument('--retry-review', action='store_true',
+                               help='второй проход по review: тот же вырез, затем повёрнутый')
 
     def say(self, message=''):
         self.stdout.write(message)
@@ -220,11 +222,23 @@ class Command(BaseCommand):
             # Проба — случайная, но воспроизводимая, из разных сезонов.
             todo = random.Random(20261009).sample(todo, min(opts['limit'], len(todo)))
 
-        text_layer = [r for r in todo if r.get('has_text_layer')]
-        no_layout = [r for r in todo if not r.get('has_text_layer')
-                     and scores.layout_for(r['season'], r['subject']) is None]
-        to_model = [r for r in todo if not r.get('has_text_layer')
+        retry = bool(opts.get('retry_review'))
+        if retry:
+            # Второй проход: только review, где модель могла ошибиться в чтении,
+            # и только по проверенным парам. Текстовый путь не повторяем.
+            todo = [r for r in records if r.get('status') == 'ok'
+                    and r.get('scores_status') == 'review'
+                    and r.get('scores_reason') in scores.RETRYABLE
+                    and not r.get('scores_retried')
                     and scores.layout_for(r['season'], r['subject']) is not None]
+            if wanted:
+                todo = [r for r in todo if r['work_id'] in wanted]
+        text_layer = [] if retry else [r for r in todo if r.get('has_text_layer')]
+        no_layout = [] if retry else [r for r in todo if not r.get('has_text_layer')
+                                      and scores.layout_for(r['season'], r['subject']) is None]
+        to_model = list(todo) if retry else [
+            r for r in todo if not r.get('has_text_layer')
+            and scores.layout_for(r['season'], r['subject']) is not None]
 
         self.say('работ к разбору: %d; с текстовым слоем: %d; без раскладки бланка: %d; '
                  'в модель: %d' % (len(todo), len(text_layer), len(no_layout), len(to_model)))
@@ -242,7 +256,8 @@ class Command(BaseCommand):
             if data is None:
                 words, height = pdfwork.first_page_words(pdf)
                 data = scores.text_scores(words, height)
-            status, details = scores.verdict(data, rec.get('score_before')) if data                 else ('review', {'reason': 'text_unparsed'})
+            status, details = (scores.verdict(data, rec.get('score_before')) if data
+                               else ('review', {'reason': 'text_unparsed'}))
             if status == 'ok':
                 text_ok += 1
                 rec.update({'scores_status': 'ok', 'scores_reason': '', 'scores_source': 'text',
@@ -289,8 +304,13 @@ class Command(BaseCommand):
         def call(rec):
             with open(os.path.join(data_dir, rec['scores_crop']), 'rb') as fh:
                 png = fh.read()
-            user_text = ('Работа %s, сезон %s. Перепиши баллы из таблички.'
-                         % (rec['work_id'], rec['season']))
+            if rec.get('_rot'):
+                # Скан вверх ногами: тот же вырез, повёрнутый на 180°; сохраняем
+                # рядом — каждый отправленный в модель вырез лежит в папке данных.
+                png = self._rotated_crop(data_dir, rec, png)
+            user_text = ('Работа %s, сезон %s. Перепиши баллы из таблички.%s'
+                         % (rec['work_id'], rec['season'],
+                            ' (вырез повёрнут на 180°)' if rec.get('_rot') else ''))
             try:
                 # ⚠️ atomic: при отказе поставщика core.run пишет строку
                 # AiUsageLog даже с log=False (известный баг, карточка в
@@ -333,6 +353,24 @@ class Command(BaseCommand):
                                 'scores_error': error})
                     if errors_in_row >= 10 and not stopped:
                         stopped = '10 сбоев модели подряд'
+                elif retry:
+                    errors_in_row = 0
+                    status, details = scores.verdict(data, rec.get('score_before'))
+                    total_cost = round((rec.get('scores_cost') or 0) + cost, 6)
+                    if status == 'ok' or rec.get('_rot'):
+                        rec.update({'scores_status': status,
+                                    'scores_source': 'model_rot' if rec.get('_rot')
+                                    else 'model_retry',
+                                    'scores_reason': details.get('reason', ''),
+                                    'scores_tasks': details.get('tasks'),
+                                    'scores_sum': details.get('sum'),
+                                    'scores_model_total': details.get('model_total'),
+                                    'scores_raw': None if status == 'ok' else data,
+                                    'scores_cost': total_cost, 'scores_retried': True})
+                        rec.pop('_rot', None)
+                    else:
+                        rec.update({'scores_cost': total_cost, '_rot': True})
+                        queue.append(rec)
                 else:
                     errors_in_row = 0
                     status, details = scores.verdict(data, rec.get('score_before'))
@@ -374,6 +412,18 @@ class Command(BaseCommand):
             with open(out, 'wb') as fh:
                 fh.write(scores.png_bytes(crop))
         return rel
+
+    def _rotated_crop(self, data_dir, rec, png):
+        import io
+
+        from PIL import Image
+
+        rel = rec['scores_crop'][:-4] + '_rot180.png'
+        image = Image.open(io.BytesIO(png)).rotate(180)
+        data = scores.png_bytes(image)
+        with open(os.path.join(data_dir, rel), 'wb') as fh:
+            fh.write(data)
+        return data
 
     def _write_review(self, data_dir, records):
         import csv

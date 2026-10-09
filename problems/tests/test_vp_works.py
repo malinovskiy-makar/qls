@@ -444,6 +444,28 @@ class ScoresCommandTests(TempDirMixin, TestCase):
                      stdout=io.StringIO())
         self.assertEqual(len([r for r in load_records(self.dir) if r.get('scores_status')]), 1)
 
+    @override_settings(VP_WORKS_PROVIDER='fake', AI_FAKE_REPLY=json.dumps(
+        {'tasks': [{'n': 1, 'score': '1'}], 'total': '1', 'readable': True}))
+    def test_retry_review_rotates_and_accepts_only_matching_sum(self):
+        self.prepare(n=2)
+        call_command('vp_works', 'scores', '--dir', self.dir, '--yes', stdout=io.StringIO())
+        self.assertEqual({r['scores_status'] for r in load_records(self.dir)}, {'review'})
+        # Второй проход: прямой вырез снова мимо, повёрнутый — сходится с баллом.
+        def reply(system, user_text):
+            ok = '(вырез повёрнут' in user_text
+            return json.loads(GOOD_REPLY) if ok else {'tasks': [{'n': 1, 'score': '1'}],
+                                                      'readable': True}
+        with override_settings(AI_FAKE_REPLY=reply):
+            call_command('vp_works', 'scores', '--dir', self.dir, '--yes', '--retry-review',
+                         stdout=io.StringIO())
+        rows = load_records(self.dir)
+        self.assertEqual([(r['scores_status'], r['scores_source']) for r in rows],
+                         [('ok', 'model_rot')] * 2)
+        self.assertTrue(all(r['scores_retried'] for r in rows))
+        rot = [f for f in os.listdir(os.path.join(self.dir, 'crops', '2019_2020'))
+               if f.endswith('_rot180.png')]
+        self.assertEqual(len(rot), 2)
+
     def test_data_dir_inside_repo_is_refused(self):
         from django.core.management.base import CommandError
 
