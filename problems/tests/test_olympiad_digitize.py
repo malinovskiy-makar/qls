@@ -303,6 +303,38 @@ class AssembleTests(DigitizeBase):
         record = assemble.task_record(by_no['2'], event, 'm')
         self.assertTrue(record['needs_eyes'])
 
+    def test_9e_shared_answers_file_by_grade(self):
+        """Общий файл ответов на 5–6 классы («5.1», «6.1»): в комплекте 5
+        класса «5.1» ложится на задачу 1, «6.1» — мимо (другой комплект);
+        в своём файле «6.3» — по-прежнему пункт задания 6."""
+        self.write_page('pages/t', 1, [{'type': 'task', 'number': '1', 'text': 'У1'}])
+        self.write_page('pages/t', 2, [])
+        self.write_page('pages/s', 1, [
+            {'type': 'solution', 'number': '5.1', 'text': 'Р5.1'},
+            {'type': 'solution', 'number': '6.1', 'text': 'Р6.1'}])
+        event = dict(self.event(), grade='5')
+        tasks, report, _ = assemble.build_event(self.root, event, 'figs', crop=False,
+                                                shared={'pages/s'})
+        self.assertEqual(tasks[0].solution, ['Р5.1'])
+        self.assertEqual(report['номер другого класса общего файла — мимо'], 1)
+        block = {'type': 'solution', 'number': '6.3'}
+        self.assertEqual(assemble._own_grade_number(block, {10}), None)  # только общий файл
+        tasks, report, _ = assemble.build_event(self.root, dict(self.event(), grade='5'),
+                                                'figs', crop=False)
+        self.assertEqual(report['номер другого класса общего файла — мимо'], 0)
+
+    def test_9f_solutions_only_event(self):
+        """Условий у комплекта нет (финал 2017/18): решения с номером
+        заводят задания с пустым условием, на глаза."""
+        self.write_page('pages/s', 1, [
+            {'type': 'solution', 'number': '1', 'title': 'Нефтяная республика', 'text': 'Р1'},
+            {'type': 'criteria', 'number': '1', 'text': 'К1'}])
+        event = dict(self.event(), task_files=[])
+        tasks, _report, _ = assemble.build_event(self.root, event, 'figs', crop=False)
+        self.assertEqual([(t.number, t.title, t.solution, t.criteria) for t in tasks],
+                         [('1', 'Нефтяная республика', ['Р1'], ['К1'])])
+        self.assertTrue(assemble.task_record(tasks[0], event, 'm')['needs_eyes'])
+
     def test_9b_test_answer_from_answers_file(self):
         """Файл ответов повторяет вопрос теста (блок task) с отмеченным
         ответом: ответ ложится на задание с тем же номером И вариантом."""

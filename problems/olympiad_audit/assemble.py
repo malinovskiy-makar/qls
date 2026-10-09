@@ -27,6 +27,8 @@ from datetime import date
 
 from rapidfuzz import fuzz
 
+from problems.olympiad_grades import parse_grades
+
 TITLE_MATCH = 0.85
 #: Рамка рисунка расширяется на 2 % размера страницы с каждой стороны.
 FIGURE_PAD = 0.02
@@ -104,7 +106,7 @@ def collect(root, files, role):
     return out
 
 
-def build_event(root, event, figures_dir, crop=True):
+def build_event(root, event, figures_dir, crop=True, shared=()):
     """Комплект → (задания по порядку, отчёт комплекта)."""
     event_id = event['event_id']
     tasks = OrderedDict()
@@ -181,6 +183,8 @@ def build_event(root, event, figures_dir, crop=True):
             _attach_answer(tasks, current, block, kind, entry, page, report)
 
     # 2. Решения и 3. критерии из своих файлов.
+    grades = parse_grades(event.get('grade') or '')
+    no_task_files = not (event.get('task_files') or []) and not tasks
     # Смешанный файл стоит и в task_files, и в solution_files: его решения
     # уже легли при проходе условий — второй раз их не берём.
     seen_dirs = {entry.get('page_dir') for entry in event.get('task_files') or []} - {None}
@@ -194,7 +198,21 @@ def build_event(root, event, figures_dir, crop=True):
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
                 continue
+            if entry['page_dir'] in shared:
+                block = _own_grade_number(block, grades)
+            if block is None:
+                report['номер другого класса общего файла — мимо'] += 1
+                continue
             kind = block['type']
+            if (kind in ('solution', 'criteria') and no_task_files
+                    and _real_number(_block_number(block))
+                    and _find_task(tasks, _block_number(block), '', '') is None):
+                # Условий у комплекта нет вовсе (финал МОШ 2017/18, 8, 9, 11
+                # кл.): решение с номером заводит задание с пустым условием.
+                created = task_for(_block_number(block), block.get('task_variant') or '')
+                created.title = (block.get('title') or '').strip()
+                created.quality.append(record)
+                report['задание только из решений (условий нет)'] += 1
             if kind in ('footer', 'noise', 'header'):
                 continue
             if kind == 'figure':
@@ -279,6 +297,28 @@ def build_event(root, event, figures_dir, crop=True):
                     break
     report['страниц без расшифровки'] = len(missing_pages)
     return list(tasks.values()), report, missing_pages
+
+
+_GRADE_NUMBER = re.compile(r'(\d{1,2})\.(\d+)')
+
+
+def _own_grade_number(block, grades):
+    """Общий файл решений на несколько классов нумерует «класс.задача»
+    («5.1» — 5 класс, задача 1; МОШ 2019/20, 5–7 кл.). Номер своего класса
+    → номер задачи; чужого класса → None (решение другого комплекта).
+    Номер вида N.M без класса впереди (у МОШ «1.2» — задание 1, пункт 2)
+    не трогается: первое число должно быть классом 5–11 и совпасть с
+    классом комплекта или с другим классом из того же диапазона."""
+    number = _block_number(block)
+    match = _GRADE_NUMBER.fullmatch(number or '')
+    if not match or not grades:
+        return block
+    grade = int(match.group(1))
+    if grade in grades and len(grades) == 1:
+        return dict(block, number=match.group(2))
+    if 5 <= grade <= 11 and grade not in grades and min(grades) >= 5:
+        return None
+    return block
 
 
 def _real_number(number):
@@ -457,6 +497,10 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
     meta = {e['event_id']: e for e in reference_events}
     figures_dir = os.path.join(digitized, 'figures')
     v1_counts = Counter(r['event_id'] for r in v1_rows)
+    # Файлы решений, общие для нескольких комплектов (один PDF на 5–7 кл.).
+    usage = Counter(f.get('page_dir') for e in events_files.values()
+                    for key in ('solution_files', 'criteria_files') for f in e.get(key) or [])
+    shared = {page_dir for page_dir, n in usage.items() if page_dir and n > 1}
     v1_by_event = defaultdict(list)
     for row in v1_rows:
         v1_by_event[row['event_id']].append(row)
@@ -473,7 +517,8 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
         for key in ('task_files', 'solution_files', 'criteria_files'):
             event[key] = files.get(key) or []
         event['event_id'] = event_id
-        tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop)
+        tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop,
+                                             shared=shared)
         records = [task_record(t, event, model) for t in tasks]
         if not records and any(f.get('docx_md') for f in event['task_files']):
             # Условия только в docx (дистанционный тур МОШ 2017/18): текст
