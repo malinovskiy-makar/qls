@@ -208,6 +208,16 @@ class SiteClientTests(SimpleTestCase):
         self.assertEqual(len(client.winners('1', 'Олимпиада 11 класс', 'Экономика', 1)), 2)
         self.assertIn(5, slept)
 
+    def test_broken_read_is_retried(self):
+        import http.client
+
+        class Broken(_Resp):
+            def read(self, *a):
+                raise http.client.IncompleteRead(b'%PDF-1.4 half', 100)
+        client, slept = self.client_with(Broken(b''), _Resp(b'%PDF-1.4 whole', 'application/pdf'))
+        self.assertEqual(client.work_pdf('1'), b'%PDF-1.4 whole')
+        self.assertEqual(slept[0], 5)
+
     def test_non_pdf_answer_is_not_a_pdf(self):
         client, _ = self.client_with(*[_Resp(b'<data/>')] * 4)
         with self.assertRaises(hse.SiteError):

@@ -14,6 +14,7 @@
 запроса в секунду, понятный User-Agent, три повтора с паузой 5/15/45 с;
 403/429/капча — `Blocked`, и дальше никто не идёт.
 """
+import http.client
 import time
 import urllib.error
 import urllib.parse
@@ -193,7 +194,9 @@ class Client:
                                   % (error.code, endpoint))
                 last_error = 'HTTP %d' % error.code
                 continue
-            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as error:
+            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError,
+                    http.client.HTTPException) as error:
+                # HTTPException — в том числе IncompleteRead: обрыв посреди PDF.
                 self._last = self.clock()
                 last_error = '%s: %s' % (type(error).__name__, error)
                 continue
