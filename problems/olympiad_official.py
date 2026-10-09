@@ -216,8 +216,11 @@ def parse_claude_review(path):
     """Файл проверки Claude → `ClaudeReview`.
 
     Разделы различаются по заголовку `## ` («Высокий ярус», «Перенумеровка»).
-    Внутри высокого яруса строка со словами «на глаза» открывает таблицу
-    НЕподтверждённых пар — у ВП её не было, у МОШ она есть (16 пар).
+    Внутри высокого яруса строка, НАЧИНАЮЩАЯСЯ с «На глаза», открывает
+    таблицу НЕподтверждённых пар — у ВП её не было, у МОШ она есть (16 пар).
+    ⚠️ Именно «начинается»: слова «на глаза» стоят и в пояснительном абзаце
+    перед таблицей подтверждённых — по вхождению все 657 пар МОШ ушли бы в
+    «на глаза» (поймано сухим прогоном 09.10).
     """
     review = ClaudeReview()
     section, eyeball_table, variant_col = None, False, False
@@ -230,8 +233,7 @@ def parse_claude_review(path):
                            'renumber' if 'перенумер' in lowered else None)
                 eyeball_table, variant_col = False, False
                 continue
-            if section == 'high' and not stripped.startswith('|') \
-                    and 'на глаза' in stripped.lower():
+            if section == 'high' and stripped.lower().startswith('на глаза'):
                 eyeball_table = True
                 continue
             if stripped.startswith('|') and 'event_id' in stripped:

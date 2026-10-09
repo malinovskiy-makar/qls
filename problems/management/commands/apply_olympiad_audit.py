@@ -181,7 +181,8 @@ class Command(BaseCommand):
         parser.add_argument('--assume-updates', metavar='JOURNAL', nargs='+',
                             help='Только сухой прогон импорта: считать новые '
                                  'строки и правки из журналов сухих прогонов '
-                                 '--new-refs / --update-existing уже записанными.')
+                                 '--new-refs / --update-existing уже записанными '
+                                 '(импорт и правки).')
         parser.add_argument('--reference', metavar='JSONL',
                             help='Эталон (reference_problems_full.jsonl); по '
                                  'умолчанию — рядом с входным файлом.')
@@ -341,7 +342,7 @@ class Command(BaseCommand):
             existing[ref.problem_id].append(ref)
         problems = set(Problem.objects.filter(pk__in=pids).values_list('pk', flat=True))
         family, slug = self.olympiad.family, self.olympiad.slug
-        seen = set()
+        seen, used = set(), set()
         self.tests_written = 0
         for row in rows:
             pid, event_id, number = row['problem_id'], row['event_id'], row['number']
@@ -371,7 +372,19 @@ class Command(BaseCommand):
             same = [r for r in existing[pid] if self._same_tour(r, year, grade, stage)]
             if same:
                 # Вторую строку того же тура не заводим — дописываем первую.
+                # Пустой класс «подходит» любому комплекту, поэтому раньше
+                # берётся строка с классом, затем строка, чей комплект
+                # агрегатора назван этим классом (`ile-mosh-2014-9-3`), и одну
+                # строку не дописывают две пары одного прогона (задача 1936:
+                # две строки ILE без класса, пары 9 и 10 класса).
+                same.sort(key=lambda r: (r.id in used, not r.grade,
+                                         f'-{grade}-' not in (r.event_id or ''), r.id))
                 ref = same[0]
+                if ref.id in used:
+                    plan.skip(key, f'строку того же тура (ref {ref.id}) уже дописывает '
+                                   'другая пара этого прогона')
+                    continue
+                used.add(ref.id)
                 meta = dict(ref.raw_meta or {})
                 if ref.official_url != task['source_url']:
                     meta.setdefault('aggregator_url', ref.official_url)
@@ -440,7 +453,12 @@ class Command(BaseCommand):
         for ref in OlympiadRef.objects.filter(
                 problem_id__in={int(r['problem_id']) for r in rows},
                 olympiad_slug__in=self.olympiad.family):
+            ref = refs.get(ref.id, ref)      # тот же объект, что в строках CSV
             siblings[ref.problem_id].append(ref)
+        self.siblings = siblings
+        self.planned_official = {}
+        self.claim_stats = Counter()
+        self._assume_journals(plan, refs.values())
         self.twin_stats = Counter()
         self.renumber_stats = Counter()
         self.text_check = self._load_text_check()
@@ -558,6 +576,9 @@ class Command(BaseCommand):
         meta = dict(ref.raw_meta or {})
         event_id = row['official_event_id']
         action = row['action']
+        key = f'ref {ref.id} (задача {ref.problem_id})'
+        if event_id and not self._claim(plan, ref, event_id, ref.grade, key):
+            return
         if 'set_stage' in action and not ref.stage:
             self._set_stage(plan, ref, row['proposed_stage'] or self._event_stage(event_id),
                             'coords_ok: этап')
@@ -623,6 +644,8 @@ class Command(BaseCommand):
         if task is None:
             plan.skip(key, f'в эталоне нет {event_id} №{new}')
             return
+        if not self._claim(plan, ref, event_id, ref.grade or task['grade'], key):
+            return
         meta = dict(ref.raw_meta or {})
         if old != new:
             meta.setdefault('aggregator_number', old)
@@ -631,6 +654,76 @@ class Command(BaseCommand):
                               task['grade'], 'renumber', meta,
                               official_stage=task.get('stage'))
         plan.update(ref, 'raw_meta', meta, 'renumber: raw_meta')
+
+    def _official_of(self, ref):
+        """Официальный комплект строки: `raw_meta['official_event_id']` или
+        её `event_id`, если строка сама `official`."""
+        event = (ref.raw_meta or {}).get('official_event_id')
+        return event or (ref.event_id if ref.source_site == 'official' else None)
+
+    def _claim(self, plan, ref, event_id, grade, key):
+        """Можно ли этой правке перевести строку на комплект `event_id`.
+
+        Нельзя, если строка УЖЕ сверена с другим официальным комплектом
+        (высокий ярус дописал её раньше — задача 1936: строка `…-10-1`
+        сверена с 10 классом, а CSV правок вёл её в 9-й), и если другая
+        строка той же задачи в том же классе уже указывает на этот комплект
+        (дубль двух агрегаторов — задача 50835: ILE и SolveHub). Строки 8 и
+        9 класса на общий комплект `8-9` — не дубль: классы разные."""
+        current = self._official_of(ref)
+        if current and current != event_id:
+            plan.skip(key, f'строка уже сверена с {current}, правка ведёт в '
+                           f'{event_id} — не трогаем')
+            self.claim_stats['уже сверена с другим комплектом'] += 1
+            return False
+        for other in self.siblings[ref.problem_id]:
+            if other.id == ref.id:
+                continue
+            other_event = self.planned_official.get(other.id) or self._official_of(other)
+            if other_event == event_id and _grades_overlap(
+                    self.planned_grades.get(other.id, other.grade), grade):
+                plan.skip(key, f'другая строка задачи (ref {other.id}) уже указывает на '
+                               f'{event_id} в том же классе — дубль агрегаторов, не трогаем')
+                self.claim_stats['дубль агрегаторов'] += 1
+                return False
+        for created in self.assumed_creates.get(ref.problem_id, ()):
+            if created['event_id'] == event_id and _grades_overlap(created['grade'], grade):
+                plan.skip(key, f'на {event_id} укажет новая строка высокого яруса — '
+                               'не трогаем')
+                self.claim_stats['новая строка того же комплекта'] += 1
+                return False
+        self.planned_official[ref.id] = event_id
+        return True
+
+    def _assume_journals(self, plan, refs):
+        """`--assume-updates` для правок: считать записанным то, что
+        запланировали журналы сухих прогонов новых привязок (поля строк и
+        новые строки). Так сухой прогон правок видит итог после высокого
+        яруса, а не базу «до». Только для сухого прогона."""
+        self.assumed_creates = defaultdict(list)
+        self.assumed_fields = {}
+        paths = self.options.get('assume_updates') or []
+        if not paths:
+            return
+        if self.apply:
+            raise CommandError('--assume-updates — только для сухого прогона')
+        for journal_path in paths:
+            with open(journal_path, encoding='utf-8') as handle:
+                journal = json.load(handle)
+            for created in journal.get('planned_creates', []):
+                self.assumed_creates[created['problem_id']].append(created)
+            for change in journal.get('planned_updates', []):
+                self.assumed_fields.setdefault(change['id'], {})[change['field']] = change['new']
+        for ref in refs:
+            for field, value in self.assumed_fields.get(ref.id, {}).items():
+                setattr(ref, field, value)
+        for siblings in self.siblings.values():
+            for ref in siblings:
+                for field, value in self.assumed_fields.get(ref.id, {}).items():
+                    setattr(ref, field, value)
+        plan.notes.append(f'журналы сухих прогонов считаются записанными ({len(paths)}): '
+                          f'полей строк {sum(map(len, self.assumed_fields.values()))}, '
+                          f'новых строк {sum(map(len, self.assumed_creates.values()))}')
 
     def _load_text_check(self):
         path = self.options['text_check'] or os.path.join(
@@ -700,6 +793,8 @@ class Command(BaseCommand):
         number, variant, score, own_ev = best
         meta = dict(ref.raw_meta or {})
         if score >= TWIN_THRESHOLD:
+            if not self._claim(plan, ref, own_ev, ref.grade, key):
+                return
             self.twin_stats['класс верен (близнец)'] += 1
             event_id = own_ev
         else:
@@ -714,6 +809,8 @@ class Command(BaseCommand):
                 plan.skip(key, f'исправление класса на {new_grade} дало бы вторую '
                                f'строку того же тура (ref {clash[0].id})')
                 self.twin_stats['класс исправить — пропущено (вторая строка)'] += 1
+                return
+            if not self._claim(plan, ref, event_id, new_grade, key):
                 return
             self.twin_stats['класс исправить'] += 1
             if ref.grade != new_grade:
@@ -817,28 +914,39 @@ class Command(BaseCommand):
             raise CommandError(f'Нарушен инвариант: {self.invariants}')
 
     def _official_duplicates(self, plan):
-        """Пары (задача, официальный комплект), на которые указывают две и
-        более строки этой олимпиады — до плана и после него. Официальный
-        комплект строки — `raw_meta['official_event_id']` или её собственный
-        `event_id`, если строка `official`."""
+        """Задачи, у которых две строки этой олимпиады указывают на один
+        официальный комплект В ПЕРЕСЕКАЮЩЕМСЯ КЛАССЕ — до плана и после.
+        Строки 8 и 9 класса на общий комплект `8-9` — не дубль. С
+        `--assume-updates` «до» уже включает записанное журналами."""
         pids = ({c['problem_id'] for c in plan.creates}
                 | set(OlympiadRef.objects.filter(pk__in=list(plan.updates))
                       .values_list('problem_id', flat=True)))
         refs = list(OlympiadRef.objects.filter(
             problem_id__in=pids, olympiad_slug__in=self.olympiad.family))
+        assumed = getattr(self, 'assumed_fields', {}) or {}
+        extra = getattr(self, 'assumed_creates', {}) or {}
 
-        def official(ref, meta):
-            event = (meta or {}).get('official_event_id')
-            return event or (ref.event_id if ref.source_site == 'official' else None)
+        def entry(ref, changes):
+            fields = {**assumed.get(ref.id, {}), **changes}
+            meta = fields.get('raw_meta', ref.raw_meta) or {}
+            event = meta.get('official_event_id') or (
+                ref.event_id if ref.source_site == 'official' else None)
+            return ref.problem_id, event, fields.get('grade', ref.grade)
 
         def duplicates(entries):
-            counts = Counter(e for e in entries if e[1])
-            return {e for e, n in counts.items() if n > 1}
+            groups = defaultdict(list)
+            for pid, event, grade in entries:
+                if event:
+                    groups[(pid, event)].append(grade)
+            return {key for key, grades in groups.items()
+                    if any(_grades_overlap(a, b) for i, a in enumerate(grades)
+                           for b in grades[i + 1:])}
 
-        before = duplicates((r.problem_id, official(r, r.raw_meta)) for r in refs)
-        after = [(r.problem_id, official(
-            r, plan.updates.get(r.id, {}).get('raw_meta', r.raw_meta))) for r in refs]
-        after += [(c['problem_id'], c['event_id']) for c in plan.creates]
+        base = [(c['problem_id'], c['event_id'], c['grade'])
+                for pid in pids for c in extra.get(pid, ())]
+        before = duplicates([entry(r, {}) for r in refs] + base)
+        after = [entry(r, plan.updates.get(r.id, {})) for r in refs] + base
+        after += [(c['problem_id'], c['event_id'], c['grade']) for c in plan.creates]
         return before, duplicates(after)
 
     def _print_plan(self, plan):
@@ -869,6 +977,8 @@ class Command(BaseCommand):
             w(f'БЛИЗНЕЦЫ (other_event): {dict(self.twin_stats)}')
         if getattr(self, 'renumber_stats', None):
             w(f'ПЕРЕНУМЕРОВКА: {dict(self.renumber_stats)}')
+        if getattr(self, 'claim_stats', None):
+            w(f'НЕ ТРОНУТО (комплект занят): {dict(self.claim_stats)}')
         if plan.stage_counts:
             w(f'ЭТАП: {dict(plan.stage_counts)}')
         if getattr(self, 'tests_written', 0):
@@ -1046,6 +1156,7 @@ class Command(BaseCommand):
         journal['update_kinds'] = dict(plan.update_kinds)
         journal['twin_stats'] = dict(getattr(self, 'twin_stats', {}) or {})
         journal['renumber_stats'] = dict(getattr(self, 'renumber_stats', {}) or {})
+        journal['claim_stats'] = dict(getattr(self, 'claim_stats', {}) or {})
         journal['stage_counts'] = dict(plan.stage_counts)
         journal['invariants'] = self.invariants
         journal['new_duplicates'] = self.new_duplicates

@@ -118,6 +118,7 @@ class MoshAuditTestBase(TestCase):
 
     def review_md(self, high=(), high_eyeball=(), doubtful=()):
         lines = ['# Проверка', '', '## Высокий ярус: подтверждено', '',
+                 'Расхождения — колонтитулы; спорные пары вынесены на глаза владельцу.', '',
                  '| problem_id | event_id | № | вариант | fuzzy | ratio |',
                  '|---|---|---|---|---|---|']
         lines += [f'| {pid} | {ev} | {no} | {tv} | 0.95 | 0.99 |' for pid, ev, no, tv in high]
@@ -193,6 +194,31 @@ class OlympiadParamTests(MoshAuditTestBase):
         self.assertEqual((ref.match_method, ref.reviewed_by_human, ref.raw_meta['reviewed_by']),
                          ('manual', True, 'claude-chat-20261009'))
         self.assertFalse(OlympiadRef.objects.filter(problem=eye).exists())
+
+
+class SameTourTests(MoshAuditTestBase):
+    def test_9_two_classless_rows_each_get_own_pair(self):
+        """Две строки агрегатора без класса (комплекты `…-10-…` и `…-11-…`) и
+        две пары высокого яруса 10 и 11 класса: каждая пара дописывает
+        «свою» строку, новых строк нет, одну строку две пары не трогают."""
+        p = Problem.objects.create(statement=TEXT['D'])
+        r10 = self.aggregator_ref(p, grade='', event_id='ile-mosh-2019-10-1')
+        r11 = self.aggregator_ref(p, grade='', event_id='ile-mosh-2019-11-1')
+        queue = write_csv(os.path.join(self.s1, 'candidates_review.csv'), [
+            {'problem_id': p.pk, 'ref_event_id': ev, 'ref_number': no,
+             'task_variant': '', 'fuzzy': '0.95', 'margin': '0.4', 'is_test': 'False',
+             'review_tier': 'высокий (текст ≥0,90)'}
+            for ev, no in (('mosh-2019-final-11-v1', '1'), ('mosh-2019-final-10-v1', '3'))])
+        md = self.review_md(high=[(p.pk, 'mosh-2019-final-11-v1', '1', ''),
+                                  (p.pk, 'mosh-2019-final-10-v1', '3', '')])
+        self.run_cmd(new_refs=queue, tier='high', confirmed_by=md, **APPROVE)
+        r10.refresh_from_db()
+        r11.refresh_from_db()
+        self.assertEqual(OlympiadRef.objects.filter(problem=p).count(), 2)
+        self.assertEqual((r10.raw_meta['official_event_id'], r10.number),
+                         ('mosh-2019-final-10-v1', '3'))
+        self.assertEqual((r11.raw_meta['official_event_id'], r11.number),
+                         ('mosh-2019-final-11-v1', '1'))
 
 
 class MoshUpdateTests(MoshAuditTestBase):
