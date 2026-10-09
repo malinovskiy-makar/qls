@@ -325,10 +325,18 @@ class Command(BaseCommand):
                 'is_test': row.get('is_test') == 'True',
             }
 
-    def _same_tour(self, ref, year, grade, stage):
+    def _same_tour(self, ref, year, grade, stage, event_id):
         """Строка этой олимпиады того же тура: год, класс (пустой — «тот
-        же»), а у многоэтапной олимпиады ещё и этап (пустой — «тот же»)."""
+        же»), а у многоэтапной олимпиады ещё и этап (пустой — «тот же»).
+
+        ⚠️ Строка, уже сверенная с ДРУГИМ официальным комплектом, — не «та
+        же»: у отбора МОШ 2017/18 одно задание стоит в вариантах v1 и v2, и
+        пара варианта v2 переписала бы ссылку строки v1 при её event_id v1
+        (поймано на записи 09.10, откачено журналом)."""
         if ref.olympiad_slug not in self.olympiad.family or ref.year != year:
+            return False
+        official = self._official_of(ref)
+        if official and official != event_id:
             return False
         if not _grades_overlap(ref.grade, grade):
             return False
@@ -369,7 +377,8 @@ class Command(BaseCommand):
             if stage not in self.olympiad.stages:
                 plan.skip(key, f'этап эталона {stage!r} не из реестра олимпиады')
                 continue
-            same = [r for r in existing[pid] if self._same_tour(r, year, grade, stage)]
+            same = [r for r in existing[pid]
+                    if self._same_tour(r, year, grade, stage, event_id)]
             if same:
                 # Вторую строку того же тура не заводим — дописываем первую.
                 # Пустой класс «подходит» любому комплекту, поэтому раньше

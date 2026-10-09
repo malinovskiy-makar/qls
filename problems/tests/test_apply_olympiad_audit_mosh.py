@@ -40,13 +40,17 @@ TEXT = {
     'E1': ('Тест. Вариант 1. Если цена товара выросла на 10 процентов, а выручка '
            'не изменилась, то спрос на товар имеет единичную эластичность по цене. '
            'Верно ли это утверждение для линейного спроса на рынке яблок?'),
+    'F': ('Дистанционный тур. Спрос на билеты в театр задан функцией $Q = 500 - 2P$, '
+          'вместимость зала 300 мест. Какую цену назначит театр-монополист, если '
+          'издержки на одного зрителя равны нулю, и сколько мест останется пустыми '
+          'при этой цене в будний день?'),
     'E2': ('Тест. Вариант 2. Если доход потребителя вырос на 20 процентов, а спрос '
            'на товар упал на 5 процентов, то товар является низшим благом для этого '
            'потребителя. Верно ли это утверждение для рынка картофеля зимой?'),
 }
 URL = {ev: f'https://mos.olimpiada.ru/upload/files/{ev}.pdf' for ev in (
     'mosh-2019-final-10-v1', 'mosh-2019-final-11-v1', 'mosh-2019-qualifying-9-v1',
-    'mosh-2018-final-10-v1')}
+    'mosh-2018-final-10-v1', 'mosh-2018-qualifying-10-v1', 'mosh-2018-qualifying-10-v2')}
 
 # (event_id, номер, вариант задания, этап, класс, буква)
 REFERENCE = [
@@ -57,6 +61,8 @@ REFERENCE = [
     ('mosh-2019-qualifying-9-v1', '5', '1', 'qualifying', '9', 'E1'),
     ('mosh-2019-qualifying-9-v1', '5', '2', 'qualifying', '9', 'E2'),
     ('mosh-2018-final-10-v1', '1', '', 'final', '10', 'B'),
+    ('mosh-2018-qualifying-10-v1', '10', '', 'qualifying', '10', 'F'),
+    ('mosh-2018-qualifying-10-v2', '10', '', 'qualifying', '10', 'F'),
 ]
 
 
@@ -219,6 +225,28 @@ class SameTourTests(MoshAuditTestBase):
                          ('mosh-2019-final-10-v1', '3'))
         self.assertEqual((r11.raw_meta['official_event_id'], r11.number),
                          ('mosh-2019-final-11-v1', '1'))
+
+
+    def test_10_other_variant_gets_own_row(self):
+        """Задание стоит в вариантах v1 и v2 одного отборочного тура: у задачи
+        уже есть официальная строка v1 (AUTO), пара v2 заводит СВОЮ строку и
+        строку v1 не переписывает."""
+        p = self.problem('F')
+        self.run_cmd(new_refs=self.auto_csv([(p.pk, 'mosh-2018-qualifying-10-v1', '10', '')]),
+                     tier='auto', **APPROVE)
+        v1 = OlympiadRef.objects.get(problem=p)
+        queue = write_csv(os.path.join(self.s1, 'candidates_review.csv'), [{
+            'problem_id': p.pk, 'ref_event_id': 'mosh-2018-qualifying-10-v2',
+            'ref_number': '10', 'task_variant': '', 'fuzzy': '0.99', 'margin': '0.5',
+            'is_test': 'False', 'review_tier': 'высокий (текст ≥0,90)'}])
+        md = self.review_md(high=[(p.pk, 'mosh-2018-qualifying-10-v2', '10', '')])
+        self.run_cmd(new_refs=queue, tier='high', confirmed_by=md, **APPROVE)
+        refs = {r.event_id: r for r in OlympiadRef.objects.filter(problem=p)}
+        self.assertEqual(sorted(refs), ['mosh-2018-qualifying-10-v1',
+                                        'mosh-2018-qualifying-10-v2'])
+        self.assertEqual(refs['mosh-2018-qualifying-10-v1'].official_url, v1.official_url)
+        self.assertEqual(refs['mosh-2018-qualifying-10-v2'].official_url,
+                         URL['mosh-2018-qualifying-10-v2'])
 
 
 class MoshUpdateTests(MoshAuditTestBase):
