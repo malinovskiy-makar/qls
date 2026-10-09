@@ -348,6 +348,18 @@ class VerdictTests(SimpleTestCase):
         self.assertEqual(scores.verdict(data, 33)[0], 'ok')
         self.assertIsNone(scores.text_scores([w(100, 100, '5')], 842))
 
+    def test_online_season_scores_from_text(self):
+        """Онлайн-сезоны: «Вопрос N … Баллов: X из Y»; пропущенный вопрос — пусто."""
+        text = ('Отзыв Поздравляем!\nВопрос 1\nВыполнен\nБаллов: 25,00 из 25,00\n…\n'
+                'Вопрос 2\nВыполнен\nБаллов: 25,00 из 30,00\nВопрос Инфо\n'
+                'Вопрос 4\nВыполнен\nБаллов: 4,00 из 20,00\nВопрос 1 Баллов: 1 из 2')
+        data = scores.moodle_scores(text)
+        self.assertEqual([t['score'] for t in data['tasks']], ['25,00', '25,00', '', '4,00'])
+        self.assertEqual(data['tasks'][1]['max'], '30,00')
+        self.assertEqual(scores.verdict(data, 54)[0], 'ok')
+        self.assertIsNone(scores.moodle_scores('без баллов'))
+        self.assertIsNone(scores.layout_for('2020/2021', 'economics'))
+
     def test_blank_cell_is_zero_but_null_is_unreadable(self):
         data = {'tasks': [{'n': 1, 'score': '23'}, {'n': 2, 'score': ''}], 'readable': True}
         self.assertEqual(scores.verdict(data, 23)[0], 'ok')
@@ -358,7 +370,7 @@ class VerdictTests(SimpleTestCase):
         for bands in scores.LAYOUTS.values():
             for x0, y0, x1, y1 in bands:
                 self.assertTrue(0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1)
-        self.assertIsNone(scores.layout_for('2014/2015', 'economics'))
+        self.assertIsNone(scores.layout_for('2014/2015', 'fingram'))
         self.assertEqual(scores.layout_for('2025/2026', 'fingram'), 'protocol')
 
 

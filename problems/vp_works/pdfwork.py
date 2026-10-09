@@ -71,6 +71,17 @@ def first_page_text(path):
         doc.close()
 
 
+def full_text(path):
+    """Текст всех страниц (для онлайн-сезонов с баллами по вопросам)."""
+    import fitz
+
+    doc = fitz.open(path)
+    try:
+        return '\n'.join(page.get_text() for page in doc)
+    finally:
+        doc.close()
+
+
 def first_page_words(path):
     """Слова первой страницы с координатами и высота страницы (pt)."""
     import fitz

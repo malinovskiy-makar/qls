@@ -237,21 +237,31 @@ class Command(BaseCommand):
         # вырез этой пары проверен, иначе очередь.
         text_ok = 0
         for rec in text_layer:
-            words, height = pdfwork.first_page_words(os.path.join(data_dir, rec['pdf_path']))
-            data = scores.text_scores(words, height)
+            pdf = os.path.join(data_dir, rec['pdf_path'])
+            data = scores.moodle_scores(pdfwork.full_text(pdf))
+            if data is None:
+                words, height = pdfwork.first_page_words(pdf)
+                data = scores.text_scores(words, height)
             status, details = scores.verdict(data, rec.get('score_before')) if data                 else ('review', {'reason': 'text_unparsed'})
             if status == 'ok':
                 text_ok += 1
                 rec.update({'scores_status': 'ok', 'scores_reason': '', 'scores_source': 'text',
                             'scores_tasks': details['tasks'], 'scores_sum': details['sum'],
+                            'scores_max': [scores.to_number(t.get('max')) for t in data['tasks']]
+                            if any(t.get('max') for t in data['tasks']) else None,
                             'scores_model_total': details.get('model_total'),
                             'scores_cost': 0.0})
             elif scores.layout_for(rec['season'], rec['subject']) is not None:
                 to_model.append(rec)
             else:
+                rec['scores_text_reason'] = details.get('reason')
                 no_layout.append(rec)
         for rec in no_layout:
-            rec.update({'scores_status': 'review', 'scores_reason': 'no_layout'})
+            # Текст не сошёлся, а вырез этой пары в модель не идёт (не просмотрен
+            # или на странице логин участника) — очередь ручной проверки.
+            reason = rec.pop('scores_text_reason', None)
+            rec.update({'scores_status': 'review',
+                        'scores_reason': 'text_' + reason if reason else 'no_layout'})
         self.say('путь (а), текстовый слой: ok %d из %d; итого в модель: %d'
                  % (text_ok, len(text_layer), len(to_model)))
 
