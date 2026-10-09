@@ -395,7 +395,7 @@ if (want('Э')) {
   ok('подсказка TeX без длинного тире', !/—/.test(s1.note));
   const tex = await page.evaluate(() => buildTex(document.getElementById('exp-title').value, ''));
   const lines = tex.split('\n');
-  ok('.tex: первые две строки — чем собирать и имя файла', /^% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX\.$/.test(lines[0]) && /^% Имя файла должно кончаться на \.tex/.test(lines[1]), lines.slice(0, 2).join(' | '));
+  ok('.tex: первые две строки — чем собирать и имя файла', /^% Собирайте через pdfLaTeX; в Overleaf: Menu > Compiler > pdfLaTeX\.$/.test(lines[0]) && /^% Имя файла должно кончаться на \.tex/.test(lines[1]), lines.slice(0, 2).join(' | '));
   ok('.tex: проверка движка сразу после \\documentclass', lines.indexOf('\\usepackage{iftex}') === lines.findIndex(l => /^\\documentclass/.test(l)) + 1
     && lines.some(l => /^\\ifPDFTeX\\else\\errmessage\{Соберите этот файл через pdfLaTeX/.test(l)), lines.slice(2, 6).join(' | '));
   ok('.tex: подпись под картинкой — заголовок этой модели', /\\caption\{КТВ\. Одна страна\}/.test(tex));

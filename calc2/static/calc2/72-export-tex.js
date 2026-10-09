@@ -1619,7 +1619,7 @@ const TexExport = (function () {
        теперь сборка останавливается с понятной ошибкой. iftex есть в любой
        установке TeX; фильтр сервера (_TEX_FORBIDDEN) эти строки пропускает. */
     const head = [
-      '% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX.',
+      '% Собирайте через pdfLaTeX; в Overleaf: Menu > Compiler > pdfLaTeX.',   // только знаки набора T2A (tex/lint.mjs)
       '% Имя файла должно кончаться на .tex (например, grafik.tex), иначе Overleaf не узнает в нём LaTeX.',
       list.name ? '% Модель: ' + commentText(list.name) + '.' : '',
       '\\documentclass[12pt,a4paper]{article}',

@@ -3560,7 +3560,7 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 /* «Под кривой | Между точками»: две половины поровну, выбранная подсвечена —
    тот же сегмент, что формат в окне «Скачать». */
 .seg.ac-mode { margin: 4px 0 10px; }
-.seg.ac-mode .seg-btn { flex: 1 1 0; min-height: 36px; }
+.seg.ac-mode .seg-btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; white-space: nowrap; }   /* на 1280 «Между точками» иначе рвалось в две строки */
 
 /* Кнопки кривых: точка цвета кривой и имя; выбранная — подложка акцента и
    рамка акцентом (сплошной акцент держим за главной кнопкой экрана). Не

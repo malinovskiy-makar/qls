@@ -28,7 +28,7 @@ from calc2.views import _TEX_FORBIDDEN, compile_pdf_pdflatex, normalize_newlines
 # комментария для человека и проверка движка (ADR 0144), pgfplots, T2A +
 # inputenc, кириллица в подписи, настройки осей одной строкой.
 ENGINE_CHECK = [
-    r"% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX.",
+    r"% Собирайте через pdfLaTeX; в Overleaf: Menu > Compiler > pdfLaTeX.",
     r"% Имя файла должно кончаться на .tex (например, grafik.tex), иначе Overleaf не узнает в нём LaTeX.",
     r"\documentclass[12pt,a4paper]{article}",
     r"\usepackage{iftex}",

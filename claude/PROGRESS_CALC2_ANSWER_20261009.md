@@ -226,7 +226,7 @@
   (окно — `.modal`).
 - Подсказка формата TeX: «Готовый документ LaTeX. Собирайте через pdfLaTeX, в Overleaf: Menu → Compiler →
   pdfLaTeX.» — путь в Overleaf склеен неразрывными пробелами (на 1440 в окне он рвался посреди «Menu → Compiler»).
-- `72-export-tex.js`: первые строки файла — «% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX.» и
+- `72-export-tex.js`: первые строки файла — «% Собирайте через pdfLaTeX; в Overleaf: Menu > Compiler > pdfLaTeX.» (стрелку «→» в файле не пускает проверка текста `tex/lint.mjs` — знаки только из набора T2A) и
   «% Имя файла должно кончаться на .tex (например, grafik.tex), иначе Overleaf не узнает в нём LaTeX.»; сразу после
   `\documentclass` — `\usepackage{iftex}` и `\ifPDFTeX\else\errmessage{Соберите этот файл через pdfLaTeX (в Overleaf:
   Menu, Compiler, pdfLaTeX)}\expandafter\stop\fi`. Прежняя строка «Компилируется обычным pdflatex» заменена.
@@ -302,3 +302,48 @@
 повторены: 7 явных FAIL, падения нет. Чистый код: `answer_rows_probe.mjs` целиком — **54/54**.
 
 **Дальше:** фаза 7 (проверка затронутого, снимки).
+
+## Фаза 7. Проверка затронутого — сделано
+
+Полный прогон не делался (он перед слиянием в main). Сервер 8099, `config.settings_check`.
+
+| Проверка | Итог |
+|---|---|
+| `manage.py check` | 0 ошибок |
+| `manage.py test calc2` (Django, сам поднимает сервер) | 29 тестов, OK |
+| `calc2_math.mjs` | 238/238 |
+| `control_numbers.mjs` | 515/515 |
+| `calc2_ui.mjs` | 158/158, ошибок страницы 0, код 0 |
+| `panels_probe.mjs` | 84/84 |
+| `check_font_scale.mjs`, `check_tex_escapes.mjs` | чисто |
+| `export_audit.mjs` | «Выгрузка .tex: всё сошлось» |
+| `tex/ci_quick.mjs` | «ВЫГРУЗКА .tex ЦЕЛА»: 44 старта, 5 моделей в двух окнах, превью сверено 42 |
+| `tex/engine_probe.mjs` (новый) | 6/6 (sd, trade × pdfLaTeX / XeLaTeX / LuaLaTeX) |
+| `tex/audit.mjs` SRC=start + `tex/compile.py` | собралось 44 из 44 (как до сессии) |
+| `self_probe.mjs` | 81/81 |
+| `math_answer_probe.mjs` | 91/91 |
+| `redesign/answer_probe.mjs` | 44 модели, строка = источник |
+| `redesign/answer_rows_probe.mjs` (новый) | 54/54 |
+| `redesign/layout_probe.mjs` (1440, 390 и 360–1024) | 24/24, «раскладка в норме» |
+| `redesign/parity_quick.mjs` (фаза 3) | 44 ключа, 1944 проверки, 0 расхождений |
+| `test_export_pdf` | 14/14 |
+
+**Найдено проверкой и исправлено:** `tex/ci_quick` краснел на 44 стартах — «проверка текста: знак вне набора U+2192 «→»»:
+в первой строке-комментарии `.tex` стояла стрелка, а `tex/lint.mjs` пускает в файл только знаки набора T2A (сборке
+комментарий не мешал). В файле теперь «Menu > Compiler > pdfLaTeX»; в подсказке окна — стрелки. И на снимке 1280 —
+«Между / точками» в сегменте рвалось в две строки: кнопкам сегмента запрещён перенос, поля 8 px.
+
+**Старые проверки, державшиеся за плитки, список или прежние правила** (все поправлены селектором или
+перенацелены на новое правило, смысл не ослаблен): `self_probe` (обозначение ячейки из `data-not`), `math_shots`
+(ось x по `data-not`), `calc2_math` (зазор «Равновесие D = S» у `.ans-ghead` вместо `#ans-title`), `calc2_ui` (4
+устаревшие + «число тяжелее подписи» → «число крупнее, формульным шрифтом» + ожидаемый ответ 400 не ошибка страницы),
+`layer_new.mjs` / `fates.mjs` (замены органов «список кривых» и «тумблер»).
+
+`manage.py calc2_map` — карта обновлена (`docs/calc2/CALC2_MAP.md`). Версия статики — хеш содержимого
+(`calc2_static_version`), меняется сама.
+
+**Снимки** (в git не идут): `claude/shots/calc2_answer_20261009/` — `01_graph_two_curves_1440/1280`,
+`02_self_before_1440/1280`, `03_self_after_1440/1280` (одно «✓», одно «✗»), `04_sd_1440`, `05_taxes_was_delta_1440`,
+`06_m_optimum_1440`, `07_areas_curve_buttons_1440`, `08_export_tex_1440`, `09_phone_390_answer`, `10_left_1280`.
+
+**Дальше:** фаза 8 (документы, ADR 0144, Notion, отчёт).
