@@ -318,7 +318,8 @@ class ReviewPackTests(DigitizeBase):
         plan, patches, records = [], {}, {}
         for n in range(1, count + 1):
             key = f'pages/abc/p{n}'
-            label = triage.URGENT_NEW if n <= urgent else triage.NOT_URGENT
+            # Срочные — с самыми поздними ключами: порядок по ключу их не вынесет вперёд.
+            label = triage.URGENT_NEW if n > count - urgent else triage.NOT_URGENT
             plan.append({'страница': key, 'файл': 'raw/pdf/t.pdf', 'комплекты': 'e1',
                          'ярус': 'A', 'причина': '', 'срочность': label,
                          'задания': f'e1#{n}', 'контроль': ''})
