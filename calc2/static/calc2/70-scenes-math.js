@@ -1344,12 +1344,13 @@ function updateMathPanel() {
       html += `<div class="stat ans-main"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
       html += `<div class="stat ans-main"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
       html += `<div class="stat ans-main"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
-      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b)); }
       if (r.secant != null) {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
       html += `<div class="stat"><span>Касательная</span><b>y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})</b></div>`;
+      // Экстремумы f — ПОСЛЕ прежних строк: их номера держит паритет со старым экраном.
+      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b)); }
       // Разбор: откуда взялось это число и что показывает треугольник.
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Что вообще такое производная?</b> Это скорость: на сколько меняется y, если x подвинуть чуть-чуть. `

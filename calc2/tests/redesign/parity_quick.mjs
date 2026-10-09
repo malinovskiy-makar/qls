@@ -50,6 +50,18 @@ await page.addScriptTag({ content: INPAGE });
 await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
 
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ​]+/g, '').replace(/[−–]/g, '-');
+/* Строки табло, ПЕРЕОПРЕДЕЛЁННЫЕ решением владельца 09.10 (ADR 0143): ответ
+   «Математики» считается на отрезке ответа, а не в окне, числа тремя знаками,
+   экстремум и наибольшее — точкой «(x; y)»; «Вершины» заменены главными строками
+   «Локальный максимум / минимум». У «Угла наклона» базовый снимок записал сам
+   ДЕФЕКТ («63,43textcirc»: \circ заворачивался в \text{}). Закрытый список: новые
+   значения стережёт calc2/tests/math_answer_probe.mjs, а не этот снимок. */
+const REDEFINED = {
+  'm-graph': ['Вершины'],
+  'm-minmax': ['Кривые меняются местами'],
+  'm-optimum': ['Наибольшее на отрезке', 'Наименьшее на отрезке', 'Локальный максимум', 'Локальный минимум', 'Перегиб'],
+  'm-tangent': ['Угол наклона'],
+};
 let bad = 0, checks = 0;
 const issues = [];
 for (const key of keys) {
@@ -100,6 +112,7 @@ for (const key of keys) {
     const c = b1.get(b.id);
     b.rows.forEach(r => {
       checks++;
+      if ((REDEFINED[key] || []).includes(String(r.label).trim())) return;   // ADR 0143, см. выше
       const q = c && c.rows.find(x => String(x.i) === String(r.i));
       if (!q) { bad++; issues.push(key + ': ' + b.id + ' строка «' + r.label + '» не показана'); return; }
       if (norm(q.value) !== norm(r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» ' + r.value + ' → ' + q.value); }
