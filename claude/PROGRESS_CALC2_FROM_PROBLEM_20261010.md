@@ -265,3 +265,33 @@
 `labelCurve` (`30-curves.js`) с другими отступами (±6 по x, −7 или +14 по y). Мерка уточнена: y кривой берётся в
 самой точке привязки текста, без поправок на отступ конкретного помощника — меряется ПЕРЕМЕНА отрыва. С ней чистый
 код даёт 0,41 px за шаг (зелёный), поломка 9 — 6,4 px (красный); переворот подписи над/под кривой (21 px) ловится тоже.
+
+## Фаза 6. Проверка — ГОТОВО
+
+| Проверка | Итог |
+|---|---|
+| `manage.py check` | 0 ошибок |
+| `makemigrations --check --dry-run` | No changes detected |
+| `ruff check .` | All checks passed |
+| Django: `test_calc2_link` + 14 модулей каталога «Стола» (`test_stol_pane`, `test_problem_page`, `test_problem_test_page`, `test_no_slop`, `test_icons`, `test_stol_help`, `test_stol_polish`, `test_stol_teacher`, `test_stol_entry`, `test_stol_api`, `test_guest_solutions`, `test_seo`, `test_filter_canonical`, `test_catalog`) | 231 тест, OK |
+| Django: `manage.py test calc2` | 29 тестов, OK (в т. ч. карта модулей и `.tex`) |
+| `from_problem_probe.mjs` | все проверки зелёные (43 модели; 390: строка 44 px, холст 372×300) |
+| `calc2_ui.mjs` | 158/158, ошибок страницы 0 |
+| `redesign/layout_probe.mjs` (390 / 560 / 760 / 1024 / 1440) | «РАСКЛАДКА В НОРМЕ» |
+| `canon_checks.mjs` против 8099 | 20 проверок, у всех 0 (label_shake 0,41 px за шаг относительно кривой) |
+| `check_font_scale.mjs` | числовых кеглей в коде отрисовки нет |
+| `redesign/session_probe.mjs` | код 1 — два чужих пункта (см. фазу 3), карточка «Надо» |
+| `scripts/check_em_dash.py` | новых нарушений 0; чужое 1 — `96-self.js:38` (`[−–—]` в регулярном выражении, коммит 84968ee3), из-за него красный `problems.tests.test_typography`; карточка «Надо» |
+| `manage.py calc2_map` | `docs/calc2/CALC2_MAP.md` пересобран; версия статики считается сама (хеш содержимого) |
+
+Браузерные serial-тесты «Стола» (`test_stol_browser`, `test_stol_polish_browser`) не гонялись: их фикстуры без
+канонических тегов, кнопки там нет, раскладка центра не меняется.
+
+Снимки (`claude/shots/calc2_from_problem_20261010/`, не в git; база `db_check.sqlite3`):
+`01_task_one_model_1440_light` (6414), `02_task_one_model_1440_dark`, `03_task_one_model_390`,
+`04_task_two_models_1440_light` (6221, «Или: Спрос и предложение»), `05_task_two_models_1440_dark`,
+`06_task_two_models_390`, `07_task_oligopoly_no_button_1440` (108), `08_calc2_from_task_1440`,
+`09_calc2_from_task_390`, `10_calc2_from_task_1440_dark` (mono-d3), `11_area_range_label`.
+
+Найдено по пути (не моё, карточка «Надо»): у `mono-d3` в «Разборе» первым абзацем текст про потоварный налог —
+и при обычном `?m=mono-d3`.
