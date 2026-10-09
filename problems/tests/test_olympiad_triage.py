@@ -474,6 +474,16 @@ class AnswerRejudgeTests(RunnerBase):
         self.assertEqual(self.patch(), before)
 
 
+    def test_31_tie_keeps_old_text(self):
+        """Замечаний поровну — остаётся прежний текст (v2), перечитанный не берётся."""
+        self.human_page()
+        provider = StubProvider([verdict_json(['а'], numbers=[('100', False, False)]),
+                                 verdict_json(['б'])])
+        status = self.runner(judge.AnswerRejudgeRunner, provider).transcribe_page(self.job())
+        patch = self.patch()
+        self.assertEqual((status, patch['chosen']), ('human', 'v2'))
+        self.assertNotIn('blocks', patch)
+
 
 class SkeletonGuardTests(RunnerBase):
     def test_30_human_text_with_changed_structure_is_not_applied(self):
