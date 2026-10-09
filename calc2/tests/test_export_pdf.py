@@ -22,12 +22,19 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, tag
 from django.urls import reverse
 
-from calc2.views import compile_pdf_pdflatex, normalize_newlines, pdflatex_available
+from calc2.views import _TEX_FORBIDDEN, compile_pdf_pdflatex, normalize_newlines, pdflatex_available
 
-# Минимальный документ ровно той формы, что выпускает buildTex: pgfplots,
-# T2A + inputenc, кириллица в подписи, настройки осей одной строкой.
-MINIMAL_TEX = "\n".join([
+# Минимальный документ ровно той формы, что выпускает buildTex: две строки
+# комментария для человека и проверка движка (ADR 0144), pgfplots, T2A +
+# inputenc, кириллица в подписи, настройки осей одной строкой.
+ENGINE_CHECK = [
+    r"% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX.",
+    r"% Имя файла должно кончаться на .tex (например, grafik.tex), иначе Overleaf не узнает в нём LaTeX.",
     r"\documentclass[12pt,a4paper]{article}",
+    r"\usepackage{iftex}",
+    r"\ifPDFTeX\else\errmessage{Соберите этот файл через pdfLaTeX (в Overleaf: Menu, Compiler, pdfLaTeX)}\expandafter\stop\fi",
+]
+MINIMAL_TEX = "\n".join(ENGINE_CHECK + [
     r"\usepackage[T2A]{fontenc}",
     r"\usepackage[utf8]{inputenc}",
     r"\usepackage[english,russian]{babel}",
@@ -147,6 +154,12 @@ class ExportPdfEndpointTests(TestCase):
         with patch("calc2.views.pdflatex_available", return_value=False):
             resp = self.client.post(self.url, {"tex": bad})
         self.assertEqual(resp.status_code, 400)
+
+    def test_engine_check_passes_server_filter(self):
+        """Проверка движка в начале файла (iftex, \\ifPDFTeX) не задевает список
+        запрещённых команд сервера: иначе «Скачать PDF» отвечал бы 400 на
+        каждый файл калькулятора."""
+        self.assertIsNone(_TEX_FORBIDDEN.search("\n".join(ENGINE_CHECK)))
 
     def test_valid_tex_returns_503_without_pdflatex(self):
         """Валидный .tex без pdflatex — честная деградация (503), не падение."""

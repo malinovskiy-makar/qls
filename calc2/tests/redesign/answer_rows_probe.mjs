@@ -18,7 +18,10 @@
         моделях, радио-группа, ни одна не выбрана на старте, стрелки, «Посчитать
         площадь под D» → то же число, что прежде через список), сегмент «Под
         кривой | Между точками» вместо тумблера, строка «x от … до …» и
-        «Вернуть по формуле» только при ручном отрезке.
+        «Вернуть по формуле» только при ручном отрезке;
+     Э  окно «Скачать»: заголовок и имя файла — по текущей модели; правка
+        заголовка помнится в своей модели и не идёт в историю; подсказка TeX
+        честная; в начале .tex — две строки о сборке и проверка движка.
 
    node calc2/tests/redesign/answer_rows_probe.mjs [--only Р,К] [--keys a,b]
    Код 0 — всё сошлось.                                                     */
@@ -358,6 +361,59 @@ if (want('В')) {
   await settle(page);
   const a1 = await page.evaluate(() => { const b = document.getElementById('ans-seg-auto'); const r = b.getBoundingClientRect(), row = document.querySelector('#ans-seg-row .opt-range-row').getBoundingClientRect(); return { back: !b.hidden && !!r.width, below: r.top >= row.bottom - 0.5 }; });
   ok('ручной отрезок: «Вернуть по формуле» видна, отдельной строкой', a1.back && a1.below, JSON.stringify(a1));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── Э: окно «Скачать» ─────────────────────────────────────────────── */
+if (want('Э')) {
+  head('Э. Окно «Скачать»: заголовок по модели, подсказка TeX, начало .tex');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  const state = () => page.evaluate(() => ({ title: document.getElementById('exp-title').value, file: exportBaseName(),
+    note: document.getElementById('exp-fmt-note').textContent, undo: document.getElementById('btn-undo').disabled }));
+  const openTex = async () => { await page.evaluate(() => openExport()); await page.waitForTimeout(400); await page.click('#exp-fmt [data-fmt="tex"]'); await page.waitForTimeout(200); };
+  const close = async () => { await page.evaluate(() => closeExport()); await page.waitForTimeout(150); };
+  await openKey(page, 'm-graph');
+  await openTex();
+  const s0 = await state();
+  eq0('«Построение графиков»: заголовок окна', s0.title, 'Построение графиков');
+  await close();
+  await page.evaluate(() => { pickScene('trade'); closePicker(); redrawAll(); });
+  await settle(page);
+  await openTex();
+  const s1 = await state();
+  eq0('после смены модели: заголовок «КТВ. Одна страна»', s1.title, 'КТВ. Одна страна');
+  eq0('…и имя файла', s1.file + '.tex', 'КТВ. Одна страна.tex');
+  eq0('подсказка TeX', s1.note.replace(/\u00a0/g, ' '), 'Готовый документ LaTeX. Собирайте через pdfLaTeX, в Overleaf: Menu → Compiler → pdfLaTeX.');
+  ok('подсказка TeX без длинного тире', !/—/.test(s1.note));
+  const tex = await page.evaluate(() => buildTex(document.getElementById('exp-title').value, ''));
+  const lines = tex.split('\n');
+  ok('.tex: первые две строки — чем собирать и имя файла', /^% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX\.$/.test(lines[0]) && /^% Имя файла должно кончаться на \.tex/.test(lines[1]), lines.slice(0, 2).join(' | '));
+  ok('.tex: проверка движка сразу после \\documentclass', lines.indexOf('\\usepackage{iftex}') === lines.findIndex(l => /^\\documentclass/.test(l)) + 1
+    && lines.some(l => /^\\ifPDFTeX\\else\\errmessage\{Соберите этот файл через pdfLaTeX/.test(l)), lines.slice(2, 6).join(' | '));
+  ok('.tex: подпись под картинкой — заголовок этой модели', /\\caption\{КТВ\. Одна страна\}/.test(tex));
+  // Правка заголовка руками: щелчок по значению, набор, Enter.
+  const undo0 = (await state()).undo;
+  await page.click('#exp-title-slot .edval');
+  await page.keyboard.type('Мой график');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(500);
+  const s2 = await state();
+  eq0('правка руками в trade', s2.title, 'Мой график');
+  ok('правка заголовка не идёт в историю («Отменить» как была)', s2.undo === undo0, 'было ' + undo0 + ', стало ' + s2.undo);
+  await close();
+  await page.evaluate(() => { pickScene('sd'); closePicker(); redrawAll(); });
+  await settle(page);
+  await openTex();
+  eq0('в sd — своё название', (await state()).title, 'Спрос и предложение');
+  await close();
+  await page.evaluate(() => { pickScene('trade'); closePicker(); redrawAll(); });
+  await settle(page);
+  await openTex();
+  const s3 = await state();
+  eq0('назад в trade — «Мой график»', s3.title, 'Мой график');
+  eq0('…и файл «Мой график.tex»', s3.file + '.tex', 'Мой график.tex');
+  await close();
   ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
 }

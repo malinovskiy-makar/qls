@@ -1761,6 +1761,16 @@ function exportPDFSend(title, label, btn) {
    (А50): щелчок по значению открывает правку прямо там, без окошка внутри
    окошка. Скрытые input сохранены как хранилище значения, чтобы весь
    остальной код (exportTex, exportPDF) читал их прежним способом. */
+/* Заголовок окна «Скачать» по МОДЕЛИ (решение владельца 09.10, ADR 0144).
+   Человек не правил заголовок в этой модели — при каждом открытии окна в нём
+   название модели (или заголовок графика); правил — остаётся его текст, пока
+   модель та же. Прежде поле заполнялось, только когда было пустым, и
+   «КТВ. Одна страна» выгружалась под именем «Построение графиков.tex».
+   Правки живут в памяти страницы: окно — не модель, в историю и в форму они
+   не идут (formNodes, 89-model-state.js). */
+const EXP_TITLE_BY_MODEL = {};
+function exportTitleDefault() { return STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || ''; }
+
 function buildExportFields() {
   [['exp-title', 'exp-title-slot', 'Например: Рынок хлеба'],
    ['exp-label', 'exp-label-slot', 'Например: fig:bread']].forEach(([id, slotId, hint]) => {
@@ -1770,7 +1780,16 @@ function buildExportFields() {
     slot.appendChild(makeEditableValue({
       kind: 'text',
       get: () => inp.value || '',
-      set: (v) => { inp.value = String(v == null ? '' : v).trim(); refreshExportPreview(); refreshExportSheet(); },
+      set: (v) => {
+        inp.value = String(v == null ? '' : v).trim();
+        /* Правил руками — помним по модели. Правка тоже зовёт set при Escape и
+           при Enter без изменений: текст, равный названию модели, правкой не считаем. */
+        if (id === 'exp-title') {
+          if (inp.value !== exportTitleDefault()) EXP_TITLE_BY_MODEL[STATE.sceneKey] = inp.value;
+          else delete EXP_TITLE_BY_MODEL[STATE.sceneKey];
+        }
+        refreshExportPreview(); refreshExportSheet();
+      },
       fmt: (v) => (String(v || '').trim() || hint),
       title: 'Щёлкните, чтобы изменить',
     }));
@@ -1826,7 +1845,9 @@ function expValue(id) { const el = document.getElementById(id); return el ? el.v
 const EXPORT_FORMATS = {
   png: { btn: 'Скачать PNG', note: 'Картинка с двойной чёткостью для презентации и конспекта.' },
   pdf: { btn: 'Скачать PDF', note: 'Лист A4 с полями для печати и домашки.' },
-  tex: { btn: 'Скачать TeX', note: 'Код TikZ для LaTeX: вставьте в свою работу как есть.' },
+  /* Выгружается целый документ, и собирается он только pdfLaTeX: под XeLaTeX
+     кириллица раньше молча пропадала (теперь файл сам остановит сборку). */
+  tex: { btn: 'Скачать TeX', note: 'Готовый документ LaTeX. Собирайте через pdfLaTeX, в Overleaf: Menu\u00a0→ Compiler\u00a0→ pdfLaTeX.' },   // путь в Overleaf не рвём по строкам
 };
 let exportFormat = 'png';
 function syncExportFormat() {
@@ -1882,7 +1903,7 @@ function openExport() {
   const m = document.getElementById('export-modal');
   if (!m) return;
   const t = document.getElementById('exp-title');
-  if (t && !t.value) t.value = STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || '';
+  if (t) t.value = (STATE.sceneKey in EXP_TITLE_BY_MODEL) ? EXP_TITLE_BY_MODEL[STATE.sceneKey] : exportTitleDefault();
   m.classList.add('open');
   m.removeAttribute('inert');
   buildExportFields();

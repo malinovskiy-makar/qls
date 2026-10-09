@@ -1613,10 +1613,18 @@ const TexExport = (function () {
 
     const cap = o.title ? proseTex(String(o.title).trim()) : '';
     const lab = String(o.label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
+    /* Две строки для человека (ADR 0144): чем собирать и как назвать файл —
+       Overleaf не узнаёт LaTeX в файле без «.tex» на конце. И проверка движка:
+       под XeLaTeX и LuaLaTeX шрифт T2A не тот, кириллица пропадала молча, —
+       теперь сборка останавливается с понятной ошибкой. iftex есть в любой
+       установке TeX; фильтр сервера (_TEX_FORBIDDEN) эти строки пропускает. */
     const head = [
-      '% Собран калькулятором Weconomics. Компилируется обычным pdflatex.',
+      '% Собирайте через pdfLaTeX; в Overleaf: Menu → Compiler → pdfLaTeX.',
+      '% Имя файла должно кончаться на .tex (например, grafik.tex), иначе Overleaf не узнает в нём LaTeX.',
       list.name ? '% Модель: ' + commentText(list.name) + '.' : '',
       '\\documentclass[12pt,a4paper]{article}',
+      '\\usepackage{iftex}',
+      '\\ifPDFTeX\\else\\errmessage{Соберите этот файл через pdfLaTeX (в Overleaf: Menu, Compiler, pdfLaTeX)}\\expandafter\\stop\\fi',
       '\\usepackage[T2A]{fontenc}', '\\usepackage[utf8]{inputenc}', '\\usepackage[english,russian]{babel}',
       '\\usepackage{amsmath}', '\\usepackage{pgfplots}', '\\pgfplotsset{compat=1.18}',
       '\\usetikzlibrary{arrows.meta}', needPatterns ? '\\usetikzlibrary{patterns}' : '', needFillBetween ? '\\usepgfplotslibrary{fillbetween}' : '',
