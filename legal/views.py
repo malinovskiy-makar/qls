@@ -9,6 +9,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from problems import erasure
+
 from . import consent, cookie_consent, documents
 from problems.models_legal import ConsentRecord
 
@@ -99,8 +101,13 @@ def ai_grant(request):
 @login_required
 @require_POST
 def ai_revoke(request):
-    """Отзыв согласия на помощника. Строка остаётся, помощник отключается."""
+    """Отзыв согласия на помощника: запись отзывается, диалоги и файлы чата удаляются.
+
+    Сначала отзыв: с этой секунды помощнику ничего не уйдёт. Потом удаление
+    (Согласие на помощника, п. 8; общая внутренность с `erase_user`).
+    """
     consent.revoke(request.user, ConsentRecord.Kind.AI)
+    erasure.erase_chat(request.user)
     if _wants_json(request):
         return JsonResponse({'ok': True})
     return redirect(PROFILE_URL)

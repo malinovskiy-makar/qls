@@ -142,6 +142,18 @@
 .pf-card--consent { max-width: none; }
 .pf-consent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 4px; }
 .pf-consent-row form { margin: 0; }
+/* Окно подтверждения отзыва согласия на помощника (часть Б): своё, не браузерное. */
+.pf-confirm-dlg {
+  border: 0; border-radius: 12px; background: var(--surface); color: var(--text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .30); padding: 20px 24px 22px;
+  width: 420px; max-width: calc(100vw - 32px); margin: auto;
+}
+.pf-confirm-dlg[open] { display: block; }
+.pf-confirm-dlg::backdrop { background: rgba(29, 26, 22, .55); }
+.pf-confirm-dlg h2 { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+.pf-confirm-dlg p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.pf-confirm-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.pf-confirm-foot form { margin: 0; }
 .pf-consent-link { font-size: 13px; color: var(--accent-ink); }
 .pf-consent-link:hover { color: var(--text); }
 
@@ -663,19 +675,29 @@
 
   {% comment %}
   Согласие на помощника с ИИ: дата и отзыв (Правовой контур, часть А).
-  Отзыв отключает только помощника; строка согласия в базе остаётся.
+  Отзыв отключает помощника, строка согласия в базе остаётся (помечена отозванной),
+  а диалоги и файлы чата УДАЛЯЮТСЯ (часть Б, 09.10.2026): перед этим окно
+  подтверждения сайта, `profile.js`.
   {% endcomment %}
   <div class="card pf-card pf-card--consent ym-hide-content" id="pf-ai-consent">
     <h2 class="pf-h2">Помощник на основе ИИ</h2>
     {% if ai_consent %}
     <p class="pf-hint pf-hint--block">Помощник на основе ИИ: согласие дано {{ ai_consent.given_at|date:"j E Y" }}</p>
     <div class="pf-consent-row">
-      <form method="post" action="{% url 'legal:ai_revoke' %}">
-        {% csrf_token %}
-        <button type="submit" class="btn-quiet">Отозвать</button>
-      </form>
+      <button type="button" class="btn-quiet" id="pf-revoke-open">Отозвать</button>
       <a class="pf-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
     </div>
+    <dialog class="pf-confirm-dlg" id="pf-revoke-dlg" aria-labelledby="pf-revoke-h">
+      <h2 id="pf-revoke-h">Отозвать согласие?</h2>
+      <p>Помощник отключится. Ваши диалоги с ним и загруженные файлы будут удалены. Это нельзя отменить.</p>
+      <div class="pf-confirm-foot">
+        <button type="button" class="btn-quiet" data-close>Отмена</button>
+        <form method="post" action="{% url 'legal:ai_revoke' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn-primary">Отозвать и удалить</button>
+        </form>
+      </div>
+    </dialog>
     {% else %}
     <p class="pf-hint pf-hint--block">Помощник на основе ИИ: согласие не дано. Помощник работает на зарубежной модели и без согласия закрыт.</p>
     <div class="pf-consent-row">
