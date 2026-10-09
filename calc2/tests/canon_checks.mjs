@@ -532,8 +532,9 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
         const box = document.querySelector('#chart').getBoundingClientRect();
         const tickX = tick ? tick.getBoundingClientRect().left - box.left : null;
         if (!lab) return { x: null, off: null, tick: tickX };
-        // Якорь подписи (x − 4, y − 7 от точки на кривой, 70-scenes-math.js).
-        const ax = +lab.getAttribute('x') + 4, ay = +lab.getAttribute('y') + 7;
+        // Точка привязки текста подписи; отступ от кривой у помощников свой
+        // (labelCurve ±6 и −7/+14, labelCurveMath −4 и −7) — меряется его ПЕРЕМЕНА.
+        const ax = +lab.getAttribute('x'), ay = +lab.getAttribute('y');
         // y кривой на x якоря: отрезок пути, где x пересекает ax, и бисекция по длине.
         let curveY = null;
         document.querySelectorAll('#chart path').forEach(pth => {
