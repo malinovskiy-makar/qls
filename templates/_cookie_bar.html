@@ -49,8 +49,8 @@ html:has(.ck-bar:not([hidden])) .tg-fab { bottom: calc(16px + var(--ck-h, 64px))
   .ck-actions { width: 100%; }
   .ck-btn { flex: 1 1 0; }
 }
-@media print { .ck-bar { display: none !important; } }
 </style>
+<style media="print">.ck-bar { display: none !important; }</style>
 <div class="ck-bar" id="cookie-bar" role="region" aria-label="Файлы cookie"
      data-metrika-id="{{ metrika_id }}" data-private="{% if metrika_private %}1{% endif %}"{% if cookie_choice %} hidden{% endif %}>
   <p class="ck-text">Мы используем файлы cookie. Необходимые нужны для работы сайта. Аналитические помогают понять, как им пользуются – их можно не разрешать. <a href="{% url 'legal:document' 'cookies' %}">Подробнее</a></p>
