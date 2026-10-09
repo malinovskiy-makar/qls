@@ -131,6 +131,7 @@ def build_event(root, event, figures_dir, crop=True, shared=()):
             # Продолжение и вступление не переходят через границу файла:
             # у МОШ задачи и тест — два файла одного комплекта.
             current, current_file = None, entry['file']
+            file_keys, last_int, restarted = [], 0, False
         if record is None:
             missing_pages.append(f'{entry["page_dir"]}/p{page}')
             continue
@@ -152,7 +153,25 @@ def build_event(root, event, figures_dir, crop=True, shared=()):
                 report['безномерной кусок → к заданию'] += 1
             continue
         if kind == 'task':
+            head = _leading_int(number)
+            if (head is not None and head < last_int and not restarted
+                    and len(file_keys) >= TEST_MIN_ITEMS
+                    and not number.startswith('тест-')):
+                # Нумерация в файле пошла заново: до этого был тест, теперь
+                # задачи (МОШ 2011: вопросы 1–15, затем задачи 6–10). Уже
+                # собранная часть файла — тест, номера «тест-N» (как в v1);
+                # иначе вопрос 10 и задача 10 слились бы в одно задание.
+                restarted = True
+                for key in file_keys:
+                    task = tasks.pop(key)
+                    task.number = f'тест-{task.number}'
+                    tasks[(task.number, task.task_variant)] = task
+                report['нумерация пошла заново: часть файла — тест'] += 1
+            if head is not None:
+                last_int = head
             current = task_for(number, block.get('task_variant') or '')
+            if not restarted and current.key not in file_keys:
+                file_keys.append(current.key)
             current.title = current.title or (block.get('title') or '').strip()
             if block.get('points') not in (None, ''):
                 current.points = block.get('points')
@@ -341,6 +360,17 @@ def _test_number(block, filename):
     if not _TEST_FILE.search(filename.rsplit('__', 1)[-1]) or not _real_number(number):
         return block
     return dict(block, number=f'тест-{number}')
+
+
+#: Перезапуск нумерации считается границей «тест → задачи», только если до
+#: него в файле не меньше стольких вопросов: у ВП файл повторяет задачи 1–5
+#: перед решениями (тоже «перезапуск»), а тест МОШ — это 15–40 вопросов.
+TEST_MIN_ITEMS = 8
+
+
+def _leading_int(number):
+    match = re.match(r'\d+', number or '')
+    return int(match.group()) if match else None
 
 
 def _real_number(number):

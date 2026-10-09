@@ -353,6 +353,24 @@ class AssembleTests(DigitizeBase):
                          {'1': ['Задача 1.'], 'тест-1': ['Вопрос 1.']})
         self.assertEqual(event['preamble'], ['Тест.'])
 
+    def test_9h_numbering_restart_marks_test(self):
+        """В одном файле тест (1–8), затем задачи с новой нумерацией (2–3):
+        тест становится «тест-N», задача 3 не сливается с вопросом 3."""
+        self.write_page('pages/t', 1, [
+            {'type': 'task', 'number': str(n), 'text': f'Вопрос {n}'} for n in range(1, 9)])
+        self.write_page('pages/t', 2, [
+            {'type': 'task', 'number': str(n), 'text': f'Задача {n}'} for n in (2, 3)])
+        tasks, _r, _ = assemble.build_event(self.root, self.event(), 'figs', crop=False)
+        self.assertEqual({t.number: t.statement for t in tasks},
+                         {**{f'тест-{n}': [f'Вопрос {n}'] for n in range(1, 9)},
+                          '2': ['Задача 2'], '3': ['Задача 3']})
+        # Повтор задач 1–2 перед решениями (у ВП) — не тест.
+        self.write_page('pages/t', 1, [
+            {'type': 'task', 'number': str(n), 'text': f'Задача {n}'} for n in (1, 2)])
+        self.write_page('pages/t', 2, [{'type': 'task', 'number': '1', 'text': 'Повтор'}])
+        tasks, _r, _ = assemble.build_event(self.root, self.event(), 'figs', crop=False)
+        self.assertEqual(sorted(t.number for t in tasks), ['1', '2'])
+
     def test_9b_test_answer_from_answers_file(self):
         """Файл ответов повторяет вопрос теста (блок task) с отмеченным
         ответом: ответ ложится на задание с тем же номером И вариантом."""
