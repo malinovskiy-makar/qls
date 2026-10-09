@@ -260,6 +260,20 @@ class AssembleTests(DigitizeBase):
         self.assertEqual(report['solution: сопоставлено по названию'], 1)
         self.assertEqual(report['criteria: не сопоставлено'], 1)
 
+    def test_9b_test_answer_from_answers_file(self):
+        """Файл ответов повторяет вопрос теста (блок task) с отмеченным
+        ответом: ответ ложится на задание с тем же номером И вариантом."""
+        self.write_page('pages/t', 1, [
+            {'type': 'task', 'number': '2', 'task_variant': '1', 'text': 'Вопрос, вариант 1'},
+            {'type': 'task', 'number': '2', 'task_variant': '3', 'text': 'Вопрос, вариант 3'}])
+        self.write_page('pages/t', 2, [])
+        self.write_page('pages/s', 1, [
+            {'type': 'task', 'number': '2', 'task_variant': '3', 'text': 'Вопрос, вариант 3',
+             'answer': '48 рублям'}])
+        tasks, _report, _ = assemble.build_event(self.root, self.event(), 'figs', crop=False)
+        answers = {(t.number, t.task_variant): t.answer for t in tasks}
+        self.assertEqual(answers, {('2', '1'): '', ('2', '3'): '48 рублям'})
+
 
 class CommandTests(DigitizeBase):
     def test_10_plan_without_yes_makes_no_calls(self):

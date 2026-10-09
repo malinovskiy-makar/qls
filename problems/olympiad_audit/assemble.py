@@ -179,6 +179,12 @@ def build_event(root, event, figures_dir, crop=True):
                     target.statement.append(block.get('text') or '')
                     target.pages.append((entry['file'], page))
                     target.quality.append(record)
+                if block.get('answer'):
+                    # Тест с отмеченным ответом (сканы отборочных МОШ): файл
+                    # ответов повторяет вопрос, ответ — в поле answer.
+                    target.answer = (target.answer + '\n' + block['answer']).strip()
+                    target.solution_pages.append((entry['file'], page))
+                    report['ответ теста из файла ответов'] += 1
                 last = target
                 continue
             if kind == 'task_continuation' and last is not None and \

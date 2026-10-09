@@ -65,7 +65,7 @@ SYSTEM_PROMPT = """Ты переписываешь страницу олимпи
 
 Типы блоков:
 - `header` — шапка: олимпиада, год, этап, класс, вариант (поля `olympiad`, `year`, `stage`, `grade`, `variant`; что не указано — пустая строка);
-- `task` — задание: `number` (номер как в тексте: «1», «2.3», для теста — номер вопроса), `task_variant` (если на странице «Вариант K» одного задания), `title` (название, если есть), `points` (баллы, число или null), `text` — условие в Markdown;
+- `task` — задание: `number` (номер как в тексте: «1», «2.3», для теста — номер вопроса), `task_variant` (вариант задания, если указан: «№ 2, вариант 3» → number «2», task_variant «3»), `title` (название, если есть), `points` (баллы, число или null), `text` — условие в Markdown;
 - `task_continuation` — продолжение задания с предыдущей страницы (`number`, если виден, и `text`);
 - `figure` — рисунок или график: `bbox` — рамка [x0, y0, x1, y1] в долях ширины/высоты страницы от 0 до 1000 (0,0 — левый верхний угол), `caption` — подпись, `number` — к какому заданию относится;
 - `solution` — решение: `number` (номер задания), `text` — решение в Markdown, `answer` — ответ отдельно, если он выделен в тексте;
@@ -73,7 +73,9 @@ SYSTEM_PROMPT = """Ты переписываешь страницу олимпи
 - `footer` / `noise` — колонтитулы, номера страниц, служебные надписи: только тип, текст НЕ переписывать.
 
 Правила:
-- Переписывай ДОСЛОВНО, весь текст страницы, ничего не пропуская и не сокращая. Не решай задания и не исправляй ошибки оригинала.
+- Переписывай ДОСЛОВНО, весь текст страницы, ничего не пропуская и не сокращая. Не решай задания и не исправляй ошибки и опечатки оригинала; «ё» и «е» — как на странице.
+- У КАЖДОГО блока задания, решения и критериев заполняй `number`, `task_variant` и `points`, если они видны на странице (в том числе в шапке вида «№ 1, вариант 3 — 6 баллов»); в `text` их не повторяй.
+- В тесте отмеченный (закрашенный, выделенный) вариант ответа пометь в тексте словом «(отмечено)» и продублируй в `answer`.
 - Формулы — в LaTeX внутри `$…$` (выносные — `$$…$$`); дроби `\\frac{}{}`, индексы `Q_d`, степени `x^2`.
 - Подпункты (а), б), 1), 2)…) — списком Markdown, каждый с новой строки.
 - Варианты ответов в тесте — списком, как на странице.
@@ -212,10 +214,15 @@ def repeated_lines(page_layers):
     return {line for line, n in counts.items() if n >= len(page_layers) / 2}
 
 
+_HYPHEN_BREAK = re.compile(r'(\w)[-‐]\s*\n\s*(\w)')
+
+
 def layer_body(layer, footers=()):
-    """Текстовый слой страницы без колонтитулов и номеров страниц."""
+    """Текстовый слой страницы без колонтитулов, номеров страниц и
+    переносов слов по ширине строки («много-\\nлет» → «многолет» — так же,
+    как слово стоит в расшифровке)."""
     lines = []
-    for line in (layer or '').splitlines():
+    for line in _HYPHEN_BREAK.sub(r'\1\2', layer or '').splitlines():
         norm = ' '.join(line.split())
         if not norm or norm in footers or _PAGE_NUM.match(norm):
             continue
@@ -223,46 +230,84 @@ def layer_body(layer, footers=()):
     return '\n'.join(lines)
 
 
-def transcript_text(blocks):
-    """Всё, что модель переписала (без колонтитулов): для сверки со слоем."""
+def transcript_text(blocks, header=False):
+    """Что модель переписала (без колонтитулов) — для сверки со слоем.
+    Номер и баллы — поля блока, а в слое это текст шапки задания, поэтому
+    они тоже идут в сверку. `header=True` — только блоки шапки (год,
+    класс): их числа не считаются лишними, в слое шапка часто срезана как
+    колонтитул."""
     parts = []
     for block in blocks:
         if block['type'] in ('footer', 'noise'):
             continue
-        if block['type'] == 'header':
-            parts.extend(str(block.get(k) or '') for k in
-                         ('olympiad', 'year', 'stage', 'grade', 'variant', 'text'))
+        if (block['type'] == 'header') != header:
             continue
-        for key in ('title', 'text', 'answer', 'caption'):
-            if block.get(key):
-                parts.append(block[key])
-    return '\n'.join(p for p in parts if p)
+        keys = (('olympiad', 'year', 'stage', 'grade', 'variant', 'text') if header else
+                ('number', 'task_variant', 'title', 'text', 'answer', 'caption'))
+        parts.extend(str(block.get(k)) for k in keys if block.get(k))
+        if not header and block.get('points') not in (None, ''):
+            parts.append(str(block['points']))
+    return '\n'.join(parts)
 
 
 _DECIMAL = re.compile(r'(\d)[.,](\d)')
+_WORD = re.compile(r'[а-яёa-z]{3,}')
+_LONE_NUMBER = re.compile(r'^[\s\d.,%−–-]+$')
 
 
 def _numbers(text):
-    return set(extract_numeric_tokens(_DECIMAL.sub(r'\1,\2', text or '')))
+    """Числа без знака: минус в слое — дефис или «−», в LaTeX — `-`."""
+    return {t.lstrip('-−') for t in
+            extract_numeric_tokens(_DECIMAL.sub(r'\1,\2', text or ''))}
+
+
+def _word_f1(model_key, layer_key):
+    """Совпадение слов (от 3 букв) в обе стороны, гармоническое среднее
+    полноты (всё ли из слоя переписано) и точности (нет ли лишнего)."""
+    got, want = Counter(_WORD.findall(model_key)), Counter(_WORD.findall(layer_key))
+    if not want:
+        return None
+    common = sum((got & want).values())
+    if not common:
+        return 0.0
+    recall, precision = common / sum(want.values()), common / sum(got.values())
+    return 2 * recall * precision / (recall + precision)
 
 
 def layer_metrics(blocks, layer, footers=()):
-    """(layer_ratio, numbers_ok, недостающие числа, лишние числа).
+    """(layer_ratio, numbers_ok, недостающие числа, лишние числа, layer_fuzz).
 
-    `layer_ratio` — сходство ключей без разметки (LaTeX, пунктуация,
-    регистр), НЕ зависящее от порядка слов (`token_sort_ratio`): таблица в
-    слое PDF часто идёт по столбцам, а в Markdown — по строкам. Пропущенный
-    абзац всё равно роняет его: недостающие слова — недостающие токены.
-    Числа — множества после единой записи десятичной запятой."""
+    `layer_ratio` — совпадение СЛОВ расшифровки и слоя (F1 по словам от
+    трёх букв, ключ без разметки). Пропущенный абзац роняет полноту, лишний
+    текст — точность. Формулы в него не входят: в слое PDF они рассыпаны
+    («2 ( ) = TC Q Q» вместо TC(Q) = Q²), и посимвольное сходство на
+    таких страницах падало до 0,78 при дословной расшифровке (пилот 09.10,
+    проверено глазами). Посимвольное сходство (`token_sort_ratio`) пишется
+    рядом как `layer_fuzz` — для сравнения.
+
+    Числа — множества без знака. Не требуются числа слоя, стоящие
+    одиночной строкой на странице с рисунком: это подписи осей внутри
+    векторного графика, модель их в текст не переносит. Числа шапки (год,
+    класс) не считаются лишними."""
     body = layer_body(layer, footers)
-    model_key = markup_free_key(transcript_text(blocks))
+    text, head = transcript_text(blocks), transcript_text(blocks, header=True)
+    model_key = markup_free_key(text)
     layer_key = markup_free_key(body, pdf=True)
     if not layer_key:
-        return None, None, [], []
-    ratio = fuzz.token_sort_ratio(model_key, layer_key) / 100.0
-    got, want = _numbers(transcript_text(blocks)), _numbers(body)
-    missing, extra = sorted(want - got), sorted(got - want)
-    return round(ratio, 4), not missing and not extra, missing, extra
+        return None, None, [], [], None
+    ratio = _word_f1(model_key, layer_key)
+    fuzz_ratio = round(fuzz.token_sort_ratio(model_key, layer_key) / 100.0, 4)
+    got = _numbers(text)
+    want = _numbers(body)
+    if any(block['type'] == 'figure' for block in blocks):
+        lone = set().union(*[_numbers(line) for line in body.splitlines()
+                             if _LONE_NUMBER.match(line)] or [set()])
+        want -= lone - got
+    missing = sorted(want - got - _numbers(head))
+    extra = sorted(got - want)
+    if ratio is None:
+        return None, None, missing, extra, fuzz_ratio
+    return round(ratio, 4), not missing and not extra, missing, extra, fuzz_ratio
 
 
 def passes(metrics):
@@ -342,6 +387,31 @@ def build_jobs(inventory_rows, digitized, olympiad_name):
                                 olympiad_name=olympiad_name, footers=footers,
                                 eyes_sample=eyes))
     return jobs
+
+
+def rescore(job, root):
+    """Пересчитать мерило слоя у готовой страницы БЕЗ вызова модели (после
+    правки мерила). Статус меняется только между ok и needs_eyes."""
+    path = job.out_path(root)
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding='utf-8') as handle:
+        record = json.load(handle)
+    if record.get('status') not in ('ok', 'needs_eyes') or not job.has_layer:
+        return record.get('status')
+    metrics = layer_metrics(clean_blocks(record.get('blocks')), job.layer, job.footers)
+    record.update({'layer_ratio': metrics[0], 'numbers_ok': metrics[1],
+                   'numbers_missing': metrics[2][:50], 'numbers_extra': metrics[3][:50],
+                   'layer_fuzz': metrics[4]})
+    reasons = [r for r in record.get('needs_eyes_reasons') or []
+               if r != 'расходится со слоем PDF']
+    if not passes(metrics):
+        reasons.append('расходится со слоем PDF')
+    record['needs_eyes_reasons'] = reasons
+    record['needs_eyes'] = bool(reasons)
+    record['status'] = 'needs_eyes' if reasons else 'ok'
+    Transcriber._write(path, record)
+    return record['status']
 
 
 def make_provider():
@@ -529,6 +599,7 @@ class Transcriber:
             'pages': job.pages, 'kind': job.kind, 'png': os.path.basename(job.png),
             'has_layer': job.has_layer, 'blocks': best['blocks'],
             'flags': best['flags'], 'layer_ratio': best['metrics'][0],
+            'layer_fuzz': best['metrics'][4],
             'numbers_ok': best['metrics'][1], 'numbers_missing': best['metrics'][2][:50],
             'numbers_extra': best['metrics'][3][:50], 'retries': len(attempts) - 1,
             'parse_error': best.get('parse_error', ''),
@@ -560,7 +631,7 @@ class Transcriber:
         blocks = clean_blocks(data.get('blocks'))
         flags = {k: bool(data.get(k)) for k in ('has_formulas', 'has_table', 'has_figure')}
         metrics = (layer_metrics(blocks, job.layer, job.footers) if job.has_layer
-                   else (None, None, [], []))
+                   else (None, None, [], [], None))
         return {'blocks': blocks, 'flags': flags, 'metrics': metrics, 'retry': retry,
                 'parse_error': data.get('_parse_error', ''),
                 'raw': data.get('_raw', ''),

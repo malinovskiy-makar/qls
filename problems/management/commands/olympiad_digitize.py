@@ -50,6 +50,7 @@ _SUBCOMMANDS = {
     'render': '_render',
     'transcribe': '_transcribe',
     'assemble': '_assemble',
+    'rescore': '_rescore',
 }
 
 PROGRESS_EVERY_PAGES = 100
@@ -85,6 +86,10 @@ class Command(BaseCommand):
                         help='Одновременных вызовов (не больше 20; лимит Z.AI — 50).')
         tr.add_argument('--yes', action='store_true',
                         help='Действительно вызывать модель (без флага — только план).')
+        tr.add_argument('--redo', action='store_true',
+                        help='Расшифровать заново и готовые страницы (только с --pages-file).')
+        common(sub.add_parser('rescore', help='Пересчитать мерило слоя у готовых страниц '
+                                              '(без модели).'))
         asm = common(sub.add_parser('assemble', help='Страницы → задания эталона v2.'))
         asm.add_argument('--events', nargs='*', metavar='EVENT_ID',
                          help='Только эти комплекты (по умолчанию все).')
@@ -237,7 +242,10 @@ class Command(BaseCommand):
             with open(options['pages_file'], encoding='utf-8') as handle:
                 wanted = {line.strip() for line in handle if line.strip()}
             jobs = [job for job in jobs if job.key in wanted]
-        all_todo = transcribe.todo(jobs, str(self.digitized))
+        if options.get('redo') and not options.get('pages_file'):
+            raise CommandError('--redo — только вместе с --pages-file. Ничего не сделано.')
+        all_todo = (list(jobs) if options.get('redo')
+                    else transcribe.todo(jobs, str(self.digitized)))
         todo = all_todo
         if options.get('limit') is not None:
             todo = todo[:options['limit']]
@@ -299,3 +307,14 @@ class Command(BaseCommand):
                   f'{self.digitized / "reference_problems_v2.jsonl"}')
         for key, value in sorted(summary.items()):
             self._say(f'  {key}: {value}')
+
+    # ── rescore ─────────────────────────────────────────────────────────
+
+    def _rescore(self, options):
+        jobs = transcribe.build_jobs(digitize.read_jsonl(self.digitized / 'inventory.jsonl'),
+                                     str(self.digitized), self.olympiad.olympiad_name)
+        counts = {}
+        for job in jobs:
+            status = transcribe.rescore(job, str(self.digitized))
+            counts[status] = counts.get(status, 0) + 1
+        self._say(f'Пересчёт мерила {self.olympiad.slug} (без модели): {counts}')
