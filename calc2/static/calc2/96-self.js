@@ -9,10 +9,12 @@
    COVERAGE, раздел 9, п. 5).
 
    Состояние режима — в документе (класс body.self-on) и в памяти страницы:
-   вписанное помнится по моделям, вердикты снимает любая правка модели
-   (событие calc2:history из 91-session.js).
+   вписанное помнится по моделям, вердикт снимается, когда меняется ответ
+   его ячейки (правка формулы, отрезка; сверка в selfCell).
    --------------------------------------------------------------------- */
-const SELF = { on: false, all: false, typed: {}, open: {}, verdict: {} };
+// vtruth — значение ячейки, к которому относится вердикт: поменялся ответ —
+// вердикт снимается сам (selfCell), а не от любой правки модели.
+const SELF = { on: false, all: false, typed: {}, open: {}, verdict: {}, vtruth: {} };
 
 /* Допуск (README макета, 9): ответ и число ячейки читаются одинаково —
    убрать пробелы (в том числе U+202F и U+00A0), «−» → «-», запятая → точка.
@@ -101,6 +103,7 @@ function selfCell(cell, idx) {
   let box = cell.querySelector(':scope > .self-box');
   const val = cell.querySelector('.ans-val');
   const truth = selfText(val);
+  if (id in SELF.verdict && SELF.vtruth[id] !== truth) { delete SELF.verdict[id]; delete SELF.vtruth[id]; }
   // Без поля и открытой остаётся только ячейка, значение которой не ответ вовсе.
   const opened = SELF.all || SELF.open[id] || !selfIsAnswer(truth);
   cell.classList.toggle('self-hidden', SELF.on && !opened);
@@ -130,10 +133,10 @@ function selfCell(cell, idx) {
     // Не разобрали — подсказка формата, вердикта нет. Неверно — только «не
     // сходится»: сколько значений не хватает, не выдаём.
     if (r == null) { toast('Впишите числа через «;», точку как (x; y) или «нет»'); return; }
-    SELF.verdict[id] = r; paintVerdict(); selfAfterAnswer();
+    SELF.verdict[id] = r; SELF.vtruth[id] = cur; paintVerdict(); selfAfterAnswer();
     /* Перерисовки здесь НЕТ намеренно: подпись ключевой точки собирается при
-       каждом наведении и сама видит новый вердикт. Перерисовка будила проверку
-       истории, та рассылала calc2:history, и вердикт тут же стирался. */
+       каждом наведении и сама видит новый вердикт; перерисовка лишь будила бы
+       проверку истории. */
   };
   inp.addEventListener('input', () => { SELF.typed[id] = inp.value; delete SELF.verdict[id]; paintVerdict(); });
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
@@ -212,7 +215,8 @@ function selfCanvas() {
     const h = near.find(x => x.not.charAt(0) === (onY ? yName : xName)) || near[0];
     selfMaskText(t, h && h.not ? h.not : '?');
   });
-  chart.querySelectorAll('g.cross-label text').forEach(t => { selfMaskText(t, '(?; ?)'); });
+  // Подпись ключевой точки («(?; ?)» или координаты) решает её сборка при
+  // наведении — selfPointOpen (60-overlays.js, buildCapsule), а не этот проход.
   /* Прочие подписи холста с числами ответа (README макета, 9): «Δy = ?»,
      «f′(x₀) = ?», координаты точек «(?; ?)», площади «S₁ = ?», «дефицит ?».
      Деления осей, имена осей и кривых, легенда и ставки («t = 20» — их задал
@@ -241,6 +245,43 @@ function selfMaskText(t, text) {
   if (t.hasAttribute('data-raw')) t.setAttribute('data-raw', text);
 }
 
+/* ОТКРЫТА ЛИ КЛЮЧЕВАЯ ТОЧКА (решение владельца 09.10, ADR 0143). В режиме
+   координаты точки — «(?; ?)», пока ответ на её величину не проверен как
+   верный и не открыт «Показать». Точка открыта, если:
+     · она совпала с открытой ТОЧКОЙ ответа (экстремум «(0; −4)»), или
+     · каждая её ненулевая координата совпала с открытым числом своей оси:
+       x — у ячейки с обозначением оси x («Q*», «x»), y — оси y («P*», «y»);
+       число без обозначения оси («Кривые меняются местами») годится обеим.
+   Допуск тот же, что у проверки ответа. Поэтому корень (2; 0) открывает
+   верное «2; −2» на оси x, вершину (0; −4) — верный минимум или верное «−4»
+   на оси y, а равновесие (50; 50) — только оба числа, Q* и P*.
+   Подпись собирается при КАЖДОМ наведении, поэтому вердикт виден сразу. */
+function selfOpenValues() {
+  const k = selfKey();
+  const xL = String(STATE.axisXName || STATE.axisXDefault || 'Q').charAt(0).toLowerCase();
+  const yL = String(STATE.axisYName || STATE.axisYDefault || 'P').charAt(0).toLowerCase();
+  const o = { X: [], Y: [], any: [], pts: [] };
+  document.querySelectorAll('#ans-hero .ans-cell').forEach((c, i) => {
+    const id = k + '#' + i;
+    if (!(SELF.open[id] || SELF.verdict[id] === true)) return;
+    const p = selfParse(selfText(c.querySelector('.ans-val')));
+    if (!p) return;
+    const not = selfText(c.querySelector('.ans-not')).replace(/\s+/g, '').charAt(0).toLowerCase();
+    if (p.pts) { p.items.forEach(it => o.pts.push(it)); return; }
+    const box = (not && not === xL) ? o.X : ((not && not === yL) ? o.Y : o.any);
+    p.items.forEach(it => box.push(it[0]));
+  });
+  return o;
+}
+function selfPointOpen(x, y) {
+  if (!selfMasked()) return true;
+  const o = selfOpenValues();
+  if (o.pts.some(([a, b]) => selfClose(x, a) && selfClose(y, b))) return true;
+  const zero = (v) => Math.abs(v) <= 0.011;
+  const hit = (v, list) => list.some(w => selfClose(v, w));
+  return (zero(x) || hit(x, o.X.concat(o.any))) && (zero(y) || hit(y, o.Y.concat(o.any)));
+}
+
 // Режим прячет числа (включён и «Показать всё» не нажато): этим пользуются
 // выгрузка и печать — там те же «?», что на экране (поправка 04.10, README 9).
 function selfMasked() { return !!(SELF.on && !SELF.all); }
@@ -252,8 +293,11 @@ function wireSelf() {
   if (all) all.addEventListener('click', () => { SELF.all = true; applySelf(); redrawAll(); });
   const gate = document.getElementById('self-gate');
   if (gate) gate.addEventListener('click', () => { SELF.all = true; applySelf(); redrawAll(); });
-  // Любая правка модели, отмена и возврат снимают вердикты; вписанное остаётся.
-  window.addEventListener('calc2:history', () => { SELF.verdict = {}; if (SELF.on) applySelf(); });
+  /* Правка модели, отмена и возврат снимают вердикт той ячейки, ответ которой
+     ИЗМЕНИЛСЯ (сверка с vtruth в selfCell); вписанное остаётся. Прежде любая
+     правка снимала все вердикты, и закрепка открытой точки (это тоже правка)
+     стирала только что заслуженное «✓». */
+  window.addEventListener('calc2:history', () => { if (SELF.on) applySelf(); });
   // Ссылка с self=1 открывает модель в режиме (README макета, раздел 10).
   try { if (/(^#|[#&])self=1\b/.test(location.hash)) setSelfMode(true); } catch (e) {}
 }

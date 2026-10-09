@@ -1601,17 +1601,21 @@ function drawCrossPoints() {
       .attr('fill', 'transparent').attr('data-skip-export', '1').style('cursor', 'pointer');
     const dot = item.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
-    // Капсула собирается при первом показе: ширину текста меряем у видимого узла.
+    // Капсула собирается при КАЖДОМ показе: ширину текста меряем у видимого
+    // узла, а «Сначала сам» решает, открыты ли координаты, в момент наведения
+    // (ADR 0143): прежняя сборка один раз, после прохода selfCanvas, показывала
+    // настоящие числа, а верный ответ без перерисовки их бы не открыл.
     const lab = item.append('g').attr('class', 'cross-label').style('display', 'none');
     let pin = null;
     const buildCapsule = () => {
-      if (pin) return;
+      lab.selectAll('*').remove();
+      const shown = (typeof selfPointOpen !== 'function') || selfPointOpen(p.x, p.y);
       const btnBg = cssVar('--btn-bg'), onBtn = cssVar('--on-btn');
       const font = getComputedStyle(document.body).fontFamily;
       // Кегль — ступень шкалы FS (макет даёт 13; шкала проекта сильнее картинки).
       const txt = lab.append('text').attr('font-size', FS.base).attr('font-weight', 600)
         .attr('font-family', font).attr('fill', onBtn).attr('dominant-baseline', 'central')
-        .text('(' + fmt(p.x) + '; ' + fmt(p.y) + ')');
+        .text(shown ? '(' + fmt(p.x) + '; ' + fmt(p.y) + ')' : '(?; ?)');
       const tw = txt.node().getComputedTextLength ? txt.node().getComputedTextLength() : 7 * txt.text().length;
       const cw = 12 + tw + 9 + 28, ch = 28;
       // Место: справа сверху, у края поля — зеркально (за край поля не выходит).
@@ -1625,8 +1629,9 @@ function drawCrossPoints() {
       lab.append('line').attr('x1', x + 12 + tw + 9).attr('x2', x + 12 + tw + 9)
         .attr('y1', y + 6).attr('y2', y + ch - 6).attr('stroke', onBtn).attr('stroke-opacity', 0.3).attr('stroke-width', 1);
       // Закрепка: контурная канцелярская кнопка 14 px; зона нажатия шире значка.
-      pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer')
-        .attr('data-tip', 'Сохранить в свои точки')
+      pin = lab.append('g').attr('class', 'cross-pin' + (shown ? '' : ' is-off'))
+        .style('cursor', shown ? 'pointer' : 'not-allowed').attr('opacity', shown ? 1 : 0.4)
+        .attr('data-tip', shown ? 'Сохранить в свои точки' : 'Сначала ответьте')
         .attr('transform', 'translate(' + (x + cw - 21) + ',' + (y + 7) + ')');
       pin.append('rect').attr('x', -5).attr('y', -5).attr('width', 24).attr('height', 24).attr('fill', 'transparent');
       pin.append('path').attr('d', 'M5 1.5h4l-.6 4.2 2.6 2.3v1.4H3v-1.4l2.6-2.3zM7 9.4v4.1')
@@ -1634,7 +1639,13 @@ function drawCrossPoints() {
         .attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round');
       /* Значок без подписи и без пояснения — просто точка (решение владельца).
          Он единственный выносит точку в список насовсем. */
-      pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
+      /* Пока координаты скрыты, закрепить точку нельзя: она унесла бы ответ
+         в «Свои точки». */
+      pin.on('click', (ev) => {
+        ev.stopPropagation();
+        if (!shown) { if (typeof toast === 'function') toast('Сначала ответьте'); return; }
+        pinKeyPoint(p);
+      });
     };
 
     /* Точка взведённой кривой горит цветом этой кривой, БЕЗ координат:

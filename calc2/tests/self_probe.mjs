@@ -136,6 +136,10 @@ if (want('Б')) {
   ok('«абв» — подсказка формата', /Впишите числа через «;», точку как \(x; y\) или «нет»/.test(r.toast), r.toast);
   for (const [g, w] of [['(0; −4)', '✓'], ['(0;-4)', '✓'], ['(0; 4)', '✗']]) eq('x²−4, минимум: «' + g + '»', (await answer(MIN, g)).verdict, w);
   for (const [g, w] of [['нет', '✓'], ['Нет', '✓'], ['(0; 1)', '✗']]) eq('x²−4, максимум: «' + g + '»', (await answer(MAX, g)).verdict, w);
+  // Ответ ячейки поменялся (другая формула) — её вердикт снимается.
+  eq('x²−4, ось x: «2; −2» перед сменой формулы', (await answer(X, '2; −2')).verdict, '✓');
+  await ev(async () => { STATE.curves[0].expr = 'x^2-9'; const r = compileFormula('x^2-9'); STATE.curves[0].compiled = r.compiled; redrawAll(); await __sp.wait(600); });
+  eq('после смены формулы на x²−9: вердикт оси x снят', await ev(() => { const c = document.querySelectorAll('#ans-hero .ans-cell')[__sp.idx('Пересекаетось:x')]; const p = c.querySelector('.self-pill'); return p && p.classList.contains('is-ok') ? '✓' : '—'; }), '—');
   await ev(async () => { await __sp.open('m-graph', () => { STATE.curves = []; curveCounter = 0; addCurve('x^3-3*x'); renderGraphRows(); }); });
   eq('x³−3x, ось x: «0; 1,732; −1,732»', (await answer(X, '0; 1,732; −1,732')).verdict, '✓');
   eq('x³−3x, максимум: «(−1; 2)»', (await answer(MAX, '(−1; 2)')).verdict, '✓');
@@ -163,6 +167,8 @@ if (want('В')) {
   eq('после «2; −2»: закрепка доступна', h.pin, 'on');
   eq('после «2; −2»: закрепка добавляет точку', await ev(() => __sp.pinAt(2, 0)), 1);
   eq('вершина всё ещё скрыта', (await ev(() => __sp.hoverAt(0, -4))).label, '(?; ?)');
+  await page.waitForTimeout(500);   // закрепка — шаг истории; вердикт обязан пережить его
+  eq('закрепка не стёрла «✓» оси x', await ev(() => { const c = document.querySelectorAll('#ans-hero .ans-cell')[__sp.idx('Пересекаетось:x')]; return c.querySelector('.self-pill').classList.contains('is-ok') ? '✓' : '—'; }), '✓');
   await answer('Пересекаетось:y', '−4');
   await ev(() => __sp.armFirst());
   eq('после «−4» на оси y: вершина (0; −4)', (await ev(() => __sp.hoverAt(0, -4))).label, '(0; -4)');
