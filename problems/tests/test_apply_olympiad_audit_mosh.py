@@ -328,6 +328,30 @@ class MoshUpdateTests(MoshAuditTestBase):
         self.assertEqual(snapshot(), before)
 
 
+class ClaimTests(MoshAuditTestBase):
+    def test_11_reconciled_row_and_aggregator_duplicate_untouched(self):
+        """Правка не переводит строку, уже сверенную с другим официальным
+        комплектом (задача 1936), и не делает вторую строку того же
+        комплекта в том же классе (дубль ILE + SolveHub, задача 50835)."""
+        p, q = self.problem('B'), self.problem('C')
+        sure = self.aggregator_ref(p, number='2', raw_meta={
+            'official_event_id': 'mosh-2018-final-10-v1'})
+        ile = self.aggregator_ref(q, number='3')
+        sh = self.aggregator_ref(q, source_site='solvehub', number='3',
+                                 event_id='solvehub-mosh-2019-10')
+        rows = [{'ref_id': r.pk, 'problem_id': r.problem_id, 'action': 'set_official_url',
+                 'coord_status': 'coords_ok', 'official_event_id': 'mosh-2019-final-10-v1',
+                 'proposed_official_url': URL['mosh-2019-final-10-v1']}
+                for r in (sure, ile, sh)]
+        self.run_cmd(update_existing=self.update_csv(rows), confirmed_by=self.review_md(),
+                     **APPROVE)
+        for ref in (sure, ile, sh):
+            ref.refresh_from_db()
+        self.assertEqual(sure.raw_meta['official_event_id'], 'mosh-2018-final-10-v1')
+        self.assertEqual(ile.raw_meta['official_event_id'], 'mosh-2019-final-10-v1')
+        self.assertNotIn('official_event_id', sh.raw_meta)
+
+
 class DeleteRefsTests(MoshAuditTestBase):
     def test_8_delete_refs_journal_and_rollback(self):
         """--delete-refs: сухой прогон ничего не меняет; запись снимает строки,
