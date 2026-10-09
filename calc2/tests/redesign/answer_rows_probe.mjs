@@ -255,7 +255,10 @@ if (want('Г')) {
   const fg = g.filter(x => x.dot);
   ok('две группы кривых с точкой цвета и записью', fg.length === 2 && /^f\(x\)=x2?.*4$/.test(fg[0].head.replace(/\s+/g, '')) && /^g\(x\)=x\+2$/.test(fg[1].head.replace(/\s+/g, '')), desc);
   ok('по 4 строки в группе кривой', fg.length === 2 && fg.every(x => x.rows.length === 4), desc);
-  ok('подписи без хвоста «, кривая f»', fg.every(x => x.rows.every(r => !/кривая/.test(r.lab))), fg.map(x => x.rows.map(r => r.lab).join(', ')).join(' | '));
+  // По ВСЕМ строкам «Ответа», а не только в группах кривых: без групп (поломка 2
+  // зубастости) проверка иначе проходила вхолостую.
+  const allLabs = g.flatMap(x => x.rows.map(r => r.lab));
+  ok('подписи без хвоста «, кривая f»', allLabs.length > 0 && allLabs.every(l => !/кривая/.test(l)), allLabs.filter(l => /кривая/.test(l)).join(' | '));
   const cr = g.find(x => x.head === 'Пересечения кривых');
   ok('группа «Пересечения кривых»: одна строка «f и g» → (−2; 0); (3; 5)',
     !!cr && cr.rows.length === 1 && norm(cr.rows[0].lab) === 'fиg' && norm(cr.rows[0].val) === '(-2;0);(3;5)',
@@ -329,7 +332,11 @@ if (want('В')) {
     upgraded: !!document.querySelector('#ac-pane-curve .sel-btn') }));
   ok('группа кнопок — radiogroup, список спрятан и своей кнопки поверх нет', t0.group === 'radiogroup' && t0.selHidden && !t0.upgraded, JSON.stringify(t0));
   eq0('кнопка расчёта до выбора', t0.text + (t0.dis ? ' (выкл.)' : ''), 'Сначала выберите кривую (выкл.)');
-  await page.click('#ac-pick-btns .ac-cbtn[data-name="D"]');
+  // Кнопка спрятана (поломка 4 зубастости) — понятный провал, а не падение прибора.
+  const dVis = await page.evaluate(() => { const b = document.querySelector('#ac-pick-btns .ac-cbtn[data-name="D"]'); return !!(b && b.getClientRects().length); });
+  ok('кнопка «D» видна', dVis);
+  if (dVis) await page.click('#ac-pick-btns .ac-cbtn[data-name="D"]');
+  else await page.evaluate(() => { const b = document.querySelector('#ac-pick-btns .ac-cbtn[data-name="D"]'); if (b) b.click(); });
   await page.waitForTimeout(250);
   const t1 = await page.evaluate(() => ({ text: __ar.t(document.getElementById('ac-calc')), dis: document.getElementById('ac-calc').disabled,
     sel: document.getElementById('ac-pick').value, checked: [...document.querySelectorAll('#ac-pick-btns [aria-checked="true"]')].map(b => b.dataset.name) }));
@@ -338,7 +345,7 @@ if (want('В')) {
   await page.waitForTimeout(300);
   const area = await page.evaluate(() => { const a = (STATE.areaCalcList || [])[0]; return a ? a.value : null; });
   ok('площадь под D — 5000, как через список до сессии', Math.abs(area - 5000) < 1e-9, String(area));
-  await page.focus('#ac-pick-btns .ac-cbtn[data-name="D"]');
+  await page.evaluate(() => { const b = document.querySelector('#ac-pick-btns .ac-cbtn[data-name="D"]'); if (b) b.focus(); });
   await page.keyboard.press('ArrowRight');
   await page.waitForTimeout(200);
   const t2 = await page.evaluate(() => ({ sel: document.getElementById('ac-pick').value, focus: document.activeElement && document.activeElement.dataset.name }));
