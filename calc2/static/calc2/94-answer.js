@@ -21,13 +21,15 @@
 /* Главные числа модели: строки табло [блок, номер строки] и, если есть,
    строка таблицы «До / После / Δ», откуда брать «было» и Δ. Модели без
    записи главных чисел не получают (нет данных — нет секции). */
+/* '*' — все строки блока с пометкой .ans-main, по порядку (ADR 0143): у
+   «Математики» число главных величин зависит от модели и от числа кривых. */
 const HERO = {
-  'm-graph': [['info-graph', 1], ['info-graph', 2]],
-  'm-transform': [['info-math', 1]],
-  'm-optimum': [['info-math', 0], ['info-math', 1]],
-  'm-tangent': [['info-math', 1], ['info-math', 2], ['info-math', 3]],
-  'm-minmax': [['info-math', 2]],
-  'm-constraint': [['info-math', 0], ['info-math', 1], ['info-math', 2]],
+  'm-graph': [['info-graph', '*']],
+  'm-transform': [['info-math', '*']],
+  'm-optimum': [['info-math', '*']],
+  'm-tangent': [['info-math', '*']],
+  'm-minmax': [['info-math', '*']],
+  'm-constraint': [['info-math', '*']],
   'ppf': [['info-ppf', 1], ['info-ppf', 2]],
   'ppfsum': [['info-ppfsum', 1], ['info-ppfsum', 2], ['info-ppfsum', 3]],
   'trade': [['info-ppft', 3], ['info-ppft', 4], ['info-ppft', 5]],
@@ -170,7 +172,16 @@ function buildAnswer() {
   host.innerHTML = '';
   const spec = HERO[STATE.sceneKey];
   const cells = [];
+  const specRows = [];
   (spec || []).forEach(h => {
+    const [blkId, i, tbl] = h;
+    if (i === '*') {
+      const blk = document.getElementById(blkId);
+      const rows = statRows(blk);
+      rows.forEach((r, k) => { if (r.classList.contains('ans-main')) specRows.push([blkId, k, tbl]); });
+    } else specRows.push(h);
+  });
+  specRows.forEach(h => {
     const [blkId, i, tbl] = h;
     const blk = document.getElementById(blkId);
     if (!blk || !blk.isConnected || blk.style.display === 'none') return;

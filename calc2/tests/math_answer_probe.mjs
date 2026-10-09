@@ -173,10 +173,12 @@ if (want('В')) {
   rows = await get('m-graph', "__ma.setGraph(['x^2-4', 'x+2'])");
   eq('x²−4 и x+2: пересечения кривых', val(rows, /^Пересечениякривых/), N('(−2; 0); (3; 5)'));
   // Те же функции в остальных моделях вида y = f(x): экстремумы те же.
-  for (const key of ['m-optimum', 'm-tangent', 'm-transform', 'm-minmax']) {
+  // У «Деформаций» экстремумы ИТОГОВОЙ функции: на старте f(x) + a при a = 1, то есть x³ − 3x + 1.
+  for (const [key, mx, mn] of [['m-optimum', '(−1; 2)', '(1; −2)'], ['m-tangent', '(−1; 2)', '(1; −2)'],
+                               ['m-transform', '(−1; 3)', '(1; −1)'], ['m-minmax', '(−1; 2)', '(1; −2)']]) {
     rows = await get(key, key === 'm-minmax' ? "__ma.setMath('x^3-3*x'); STATE.mathG2 = '100'; STATE.mathMinMax = 'min'" : "__ma.setMath('x^3-3*x')");
-    eq(key + ' x³−3x: лок. максимум', val(rows, /^Локальныймаксимум/), N('(−1; 2)'));
-    eq(key + ' x³−3x: лок. минимум', val(rows, /^Локальныйминимум/), N('(1; −2)'));
+    eq(key + ' x³−3x: лок. максимум', val(rows, /^Локальныймаксимум/), N(mx));
+    eq(key + ' x³−3x: лок. минимум', val(rows, /^Локальныйминимум/), N(mn));
   }
   // Контрольные числа «Математики» (calc2/CLAUDE.md) — на отрезке ответа.
   const cn = await ev(async () => {
@@ -239,6 +241,12 @@ if (want('Г')) {
   await page.waitForTimeout(300);
   r = await ev(() => [_ansSeg.a, _ansSeg.b, _ansSeg.hand]);
   eq('«Вернуть по формуле»', r[0] + '…' + r[1] + (r[2] ? ' (руками)' : ''), '-5…5');
+  // Вписать по порядку «от 7», потом «до 20»: уход во второе поле отрезок не сбрасывает.
+  await page.fill('#ans-a', '7'); await page.click('#ans-b'); await page.fill('#ans-b', '20');
+  await page.focus('#btn-model-reset');      // фокус ушёл из строки (только фокус, без нажатия)
+  await page.waitForTimeout(300);
+  r = await ev(() => [_ansSeg.a, _ansSeg.b, _ansSeg.hand]);
+  eq('«от 7» и «до 20» по порядку', r[0] + '…' + r[1] + (r[2] ? ' (руками)' : ''), '7…20 (руками)');
   // Пустое поле и «от ≥ до» — назад к формуле.
   await page.fill('#ans-a', '7'); await page.fill('#ans-b', '3'); await page.press('#ans-b', 'Enter');
   await page.waitForTimeout(300);

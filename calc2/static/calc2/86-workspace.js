@@ -1832,14 +1832,28 @@ function wireWrench() {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => applyViewBounds());
   });
-  /* Отрезок ответа (ADR 0143): вход модели, окно не трогает. Применяется по
-     change (уход из поля, Enter) — на каждый символ отрезок дёргался бы. */
-  ['ans-a', 'ans-b'].forEach(id => {
-    const e = document.getElementById(id);
-    if (!e) return;
-    e.addEventListener('change', () => applyAnsSegInputs());
-    e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); e.blur(); } });
-  });
+  /* Отрезок ответа (ADR 0143): вход модели, окно не трогает. Применяется,
+     когда человек ушёл из СТРОКИ (не из поля) или нажал Enter: иначе «от 7»
+     при прежнем «до 5» тут же сбрасывалось к формуле, и вписать «от 7 до 20»
+     по порядку было нельзя. На каждый символ отрезок дёргался бы. */
+  const segRow = document.getElementById('ans-seg-row');
+  if (segRow) {
+    let dirty = false;
+    ['ans-a', 'ans-b'].forEach(id => {
+      const e = document.getElementById(id);
+      if (!e) return;
+      e.addEventListener('input', () => { dirty = true; });
+      e.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault(); dirty = false; applyAnsSegInputs();
+      });
+    });
+    segRow.addEventListener('focusout', (ev) => {
+      if (ev.relatedTarget && segRow.contains(ev.relatedTarget)) return;   // перешли во второе поле
+      if (!dirty) return;
+      dirty = false; applyAnsSegInputs();
+    });
+  }
   const segAuto = document.getElementById('ans-seg-auto');
   if (segAuto) segAuto.addEventListener('click', () => resetAnsSegToAuto());
   [['inp-xstep', 'xStep'], ['inp-ystep', 'yStep']].forEach(([id, key]) => {

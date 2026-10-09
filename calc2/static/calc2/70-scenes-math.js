@@ -356,6 +356,16 @@ function answerSeg() {
   return { a: s.a, b: s.b, hand: false };
 }
 
+/* Две главные строки «Ответа» любой модели вида y = f(x): локальные
+   максимум и минимум на отрезке ответа (решение владельца 09.10). Точкой
+   «(x; y)», несколько — через «; », нет — «нет». tail — приписка к подписи
+   (обозначение кривой, когда кривых несколько). */
+function ansExtremaRows(r, tail) {
+  const t = tail || '';
+  return `<div class="stat ans-main"><span>Локальный максимум${t}</span><b>${ansPts(r.max)}</b></div>`
+       + `<div class="stat ans-main"><span>Локальный минимум${t}</span><b>${ansPts(r.min)}</b></div>`;
+}
+
 /* Отрезок кадра: считается один раз в начале перерисовки модели и тут же
    показывается в строке «Ответ ищем на отрезке». */
 function refreshAnswerSeg() {
@@ -1331,9 +1341,10 @@ function updateMathPanel() {
     if (isNaN(r.y0)) html = '<div class="warn">В этой точке функция не определена.</div>';
     else {
       html += `<div class="stat"><span>Точка $x_0$</span><b>${fmt(r.x0)}</b></div>`;
-      html += `<div class="stat"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
-      html += `<div class="stat"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
-      html += `<div class="stat"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
+      html += `<div class="stat ans-main"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
+      html += `<div class="stat ans-main"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
+      html += `<div class="stat ans-main"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
+      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b)); }
       if (r.secant != null) {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
@@ -1364,12 +1375,12 @@ function updateMathPanel() {
         + '</div>';
     }
   } else if (STATE.mathSub === 'optimum') {
-    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>$y^* = ${fmt(r.gMax.y)}$ при $x^* = ${fmt(r.gMax.x)}$</b></div>`;
-    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>$y^* = ${fmt(r.gMin.y)}$ при $x^* = ${fmt(r.gMin.x)}$</b></div>`;
-    (r.ext || []).forEach(p => {
-      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`;
-    });
-    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`; });
+    /* Всё точкой «(x*; y*)», как в задачах: «y* = 18 при x* = 3» ответом в
+       формате «Сначала сам» не читалось (ADR 0143). */
+    if (r.gMax) html += `<div class="stat ans-main"><span>Наибольшее на отрезке</span><b>${ansPt(r.gMax.x, r.gMax.y)}</b></div>`;
+    if (r.gMin) html += `<div class="stat ans-main"><span>Наименьшее на отрезке</span><b>${ansPt(r.gMin.x, r.gMin.y)}</b></div>`;
+    html += ansExtremaRows({ max: (r.ext || []).filter(p => p.kind === 'max'), min: (r.ext || []).filter(p => p.kind === 'min') });
+    html += `<div class="stat"><span>Перегибы</span><b>${ansPts(r.inf || [])}</b></div>`;
     // Разбор: как машина к этому пришла, шаг за шагом и с числами.
     html += mathOptimumReasoning(r);
     if (!html) html = '<div class="muted">На этом отрезке ни экстремумов, ни перегибов.</div>';
@@ -1378,6 +1389,10 @@ function updateMathPanel() {
     const a = paramValue('a', 1);
     html += `<div class="stat"><span>Преобразование</span><b>${t.tex}</b></div>`;
     html += `<div class="stat"><span>Параметр $a$</span><b>${fmt(a)}</b></div>`;
+    /* Главные величины — экстремумы ИТОГОВОЙ функции; параметр a — вход,
+       ответом он не был (раньше стоял единственной главной ячейкой). */
+    { const f = mathF(), seg = _ansSeg || answerSeg();
+      if (f) html += ansExtremaRows(ansAnalyse(mathTransformed(f, STATE.mathTrans, a), seg.a, seg.b)); }
     html += `<div class="hint">${t.note}</div>`;
     // А53: у сюжета не было разбора вовсе, блок «Объяснение модели» открывался пустым.
     html += '<div class="sb-note"><b>Как это получилось</b>'
@@ -1409,7 +1424,10 @@ function updateMathPanel() {
       for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
       html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
       html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
-      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(v => fmt(v)).join('; ') : 'нигде'}</b></div>`;
+      html += `<div class="stat ans-main"><span>Кривые меняются местами</span><b>${ansList(r.switches || [])}</b></div>`;
+      // Экстремумы итоговой огибающей Z на отрезке ответа (излом тоже экстремум).
+      { const f = mathF(), seg = _ansSeg || answerSeg();
+        if (f) html += ansExtremaRows(ansAnalyse(mmParts(f).z, seg.a, seg.b)); }
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Как строится итоговая кривая?</b> В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
         + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
@@ -1431,9 +1449,9 @@ function updateMathPanel() {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
     else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
     else {
-      html += `<div class="stat"><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
-      html += `<div class="stat"><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat"><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
+      html += `<div class="stat ans-main"><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat ans-main"><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat ans-main"><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
       /* Строки «Ищем = максимум» здесь больше нет (решение владельца 01.09):
          переключатель «Какую функцию ищем» стоит в левой панели, и повторять
          его выбор среди ПОСЧИТАННЫХ величин незачем. Слово осталось в разборе
@@ -1893,21 +1911,24 @@ function updateGraphPanel() {
   const lo = seg.a, hi = seg.b;
   let html = '';
   const fns = [];
+  const many = shown.length > 1;
   shown.forEach(c => {
     const f = (x) => evalCurve(c, x);
     fns.push(f);
     const name = curveShortName(c);
     const r = ansAnalyse(f, lo, hi);
+    // Кривых несколько — у подписи величины обозначение кривой.
+    const tail = many ? ', кривая ' + name : '';
     html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
     /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
        Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
        была десятичным знаком, прочитать это невозможно. Десятичная запятая —
        требование канона 2.1, значит менять надо разделитель. Стало «0; 1».
        ⚠️ fmt не отдавать в .map напрямую: второй довод у fmt — число знаков. */
-    html += `<div class="stat"><span>Пересекает ось $x$</span><b>${ansList(r.zeros)}</b></div>`;
-    html += `<div class="stat"><span>Пересекает ось $y$</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
-    const ext = r.max.concat(r.min).sort((a, b) => a.x - b.x);
-    if (ext.length) html += `<div class="stat"><span>Вершины</span><b>${ansPts(ext)}</b></div>`;
+    html += `<div class="stat ans-main"><span>Пересекает ось $x$${tail}</span><b>${ansList(r.zeros)}</b></div>`;
+    html += `<div class="stat ans-main"><span>Пересекает ось $y$${tail}</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
+    // «Вершины» второстепенной строкой больше нет: максимум и минимум — главные величины.
+    html += ansExtremaRows(r, tail);
   });
   /* Пересечения кривых между собой — нули разности на том же отрезке (раньше
      брались у ключевых точек холста, то есть тоже по окну).
@@ -1920,7 +1941,7 @@ function updateGraphPanel() {
       });
     }
     cr.sort((a, b) => a.x - b.x);
-    html += `<div class="stat"><span>Кривые пересекаются</span><b>${ansPts(cr)}</b></div>`;
+    html += `<div class="stat ans-main"><span>Пересечения кривых</span><b>${ansPts(cr)}</b></div>`;
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }
