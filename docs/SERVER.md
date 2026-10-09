@@ -1184,6 +1184,59 @@ docker volume rm weconomics_media_restore_test
 
 ---
 
+## Сроки хранения данных и удаление по запросу
+
+Часть Б правового контура (09.10.2026). Исполняет Политику обработки ПДн, разделы 7 и 8.
+Код: `problems/retention.py`, `problems/erasure.py`, команды `purge_expired` и `erase_user`.
+
+### Еженедельная чистка (`purge_expired`)
+
+Удаляет старше `DATA_RETENTION_MONTHS` (по умолчанию 12, в `.env` не нужен): реплики и
+вложения чата, загруженные файлы, события, журнал поиска, обращения со снимками, жалобы;
+у сдач стирает файл. Вызывает `clearsessions` и уборку гостевых попыток тренировки.
+Аккаунты без входа больше 3 лет только перечисляет числом. Файлы задач банка
+(`Problem.files`) не трогает.
+
+**Таймер НЕ установлен на сервере сам**: файлы лежат в `deploy/systemd/`, включает владелец.
+
+```bash
+# 1. Сухой прогон на бою: числа, ничего не удаляется. Смотрим глазами.
+cd /srv/weconomics/app/deploy
+docker compose exec web python manage.py purge_expired
+
+# 2. Установить и включить еженедельный таймер (воскресенье 04:10, после копии 03:20).
+sudo cp /srv/weconomics/app/deploy/systemd/weconomics-purge.service /etc/systemd/system/
+sudo cp /srv/weconomics/app/deploy/systemd/weconomics-purge.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weconomics-purge.timer
+
+# 3. Проверить.
+systemctl list-timers weconomics-purge.timer
+sudo journalctl -u weconomics-purge.service -n 30
+```
+
+⚠️ Первый боевой запуск с `--apply` удалит всё старше года. Пока сайту меньше года, в сухом
+прогоне везде 0. Резервные копии снимаются ДО чистки и хранят удалённое до 30 суток.
+
+### Удаление аккаунта по требованию человека (`erase_user`)
+
+```bash
+cd /srv/weconomics/app/deploy
+docker compose exec web python manage.py erase_user <логин>           # сухой прогон
+docker compose exec web python manage.py erase_user <логин> --apply   # удалить
+```
+
+Сухой прогон печатает число строк по моделям, число файлов по видам, число сессий и строку
+«останется без автора» (работы, подборки, наборы). С `--apply`: явные строки «без указания
+человека», пользователь с каскадом, файлы с диска, сессии (база и Redis), строка в журнал
+удалений (`problems.ErasureLog`: дата, внутренний номер, числа; без логина). Сотрудника
+(`is_staff`) удалить нельзя. Срок ответа человеку – 10 рабочих дней (Политика, п. 8.2).
+
+Не удаляется командой: резервные копии (до 30 суток), журналы контейнеров, данные у Z.ai и
+Яндекса, события `Event`, записанные по куке посетителя до входа в аккаунт.
+
+---
+
 ## Мелочи, на которых легко споткнуться
 
 - `/root` закрыт для `makar` (права 700). `[ -f /root/что-то ]` вернёт

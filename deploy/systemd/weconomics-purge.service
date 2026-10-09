@@ -1,0 +1,14 @@
+[Unit]
+Description=Сроки хранения данных weconomics (purge_expired --apply)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Все команды docker compose – только из каталога deploy (docs/SERVER.md).
+WorkingDirectory=/srv/weconomics/app/deploy
+# -T: у юнита нет терминала. Команда удаляет данные старше срока хранения (12 месяцев,
+# настройка DATA_RETENTION_MONTHS), чистит просроченные сессии и гостевые попытки.
+ExecStart=/usr/bin/docker compose exec -T web python manage.py purge_expired --apply
+# Нужен docker, поэтому root, как у юнита резервной копии.
+User=root
