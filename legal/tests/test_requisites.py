@@ -33,7 +33,8 @@ class RequisitesTests(SimpleTestCase):
         for p in (base / 'legal').rglob('*'):
             if p.is_file() and p.suffix in {'.py', '.html', '.md'} and 'tests' not in p.parts:
                 texts[str(p.relative_to(base))] = p.read_text(encoding='utf-8')
-        forbidden = [re.compile('Фомич' 'ев')  # чужая фамилия не должна попасть в код; в самом тесте не пишем её целиком,
+        # Чужая фамилия не должна попасть в код; в самом тесте её целиком не пишем.
+        forbidden = [re.compile('Фомич' 'ев'),
                      re.compile(r'(?<!\d)(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)'),
                      re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+')]
         for path, text in texts.items():
