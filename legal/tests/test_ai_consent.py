@@ -196,12 +196,22 @@ class PanelAndProfileTests(TestCase):
     @override_settings(AI_PROVIDER='fake', CATALOG_CHAT_PROVIDER='fake')
     def test_panel_shows_the_consent_block_instead_of_the_input(self):
         html = self.client.get(self.page).content.decode('utf-8')
-        self.assertIn('Помощник работает на зарубежной модели', html)
-        self.assertIn('Согласен, открыть помощника', html)
-        self.assertIn('Не сейчас', html)
-        self.assertIn('Полный текст согласия', html)
-        self.assertIn('href="/legal/consent-ai/"', html)
-        self.assertIn('Не фотографируйте фамилию и лицо', html)
+        self.assertIn('Помощник на основе ИИ', html)
+        self.assertIn('Используя помощника, вы соглашаетесь с условиями обработки данных: '
+                      'ваши сообщения и фото решений отправляются зарубежной модели.', html)
+        # Две кнопки одного веса: один и тот же класс.
+        self.assertIn('<button type="button" class="btn btn--quiet btn--sm" id="ai-consent-yes">Да, согласен</button>', html)
+        self.assertIn('<button type="button" class="btn btn--quiet btn--sm" id="ai-consent-no">Нет, не согласен</button>', html)
+        self.assertIn('<a class="ai-consent-link" href="/legal/consent-ai/" target="_blank" rel="noopener">'
+                      'Условия обработки</a>', html)
+        # Свёрнутая строка есть в разметке, но скрыта, пока человек не отказался.
+        self.assertIn('<div class="ai-consent-off" id="ai-consent-off" hidden>', html)
+        self.assertIn('Без согласия помощник не работает. Передумали?', html)
+        self.assertIn('id="ai-consent-on">Включить помощника</button>', html)
+        # Прежние строки остались только в полном тексте согласия.
+        for gone in ('Сингапур', 'Не фотографируйте', 'Не уходят логин', 'Не сейчас',
+                     'Полный текст согласия'):
+            self.assertNotIn(gone, html.split('id="ai-consent"', 1)[1].split('id="ai-live"', 1)[0])
         block = html.split('id="ai-consent"', 1)[1].split('>', 1)[0]
         self.assertNotIn('hidden', block)
         live = html.split('id="ai-live"', 1)[1].split('>', 1)[0]

@@ -67,20 +67,29 @@
     </div>
     {% if user.is_authenticated %}
     {% comment %}
-    Согласие на помощника (Правовой контур, часть А): помощник отправляет
-    сообщения и фото на зарубежную модель, поэтому без отдельного согласия
-    вместо поля ввода стоит этот блок. Рабочая часть панели лежит под
-    `#ai-live` и появляется без перезагрузки (`stol_task.js::bindConsent`).
+    Согласие на помощника (Правовой контур): помощник отправляет сообщения и
+    фото на зарубежную модель, поэтому без отдельного согласия вместо поля ввода
+    стоит этот блок. Рабочая часть панели лежит под `#ai-live` и появляется без
+    перезагрузки (`stol_task.js::bindConsent`).
+    Две кнопки одного веса (09.10.2026). «Нет, не согласен» сворачивает блок в
+    строку `#ai-consent-off` и НИЧЕГО не пишет на сервер; свёрнутость помнит браузер.
+    «Включить помощника» только разворачивает блок: согласие даёт одна кнопка «Да».
     {% endcomment %}
     <div class="ai-consent" id="ai-consent"{% if ai_consent %} hidden{% endif %}>
-      <p class="ai-consent-h">Помощник работает на зарубежной модели</p>
-      <p class="ai-consent-t">В Сингапур уходят ваши сообщения, история диалога, текст решения и фото целиком.<br>Не уходят логин, имя и почта.<br>Не фотографируйте фамилию и лицо.</p>
-      <p class="ai-consent-err" id="ai-consent-err" role="alert" hidden></p>
-      <div class="ai-consent-row">
-        <button type="button" class="btn btn--main btn--sm" id="ai-consent-yes">Согласен, открыть помощника</button>
-        <button type="button" class="btn btn--quiet btn--sm" id="ai-consent-no">Не сейчас</button>
+      <div class="ai-consent-full" id="ai-consent-full">
+        <p class="ai-consent-h">Помощник на основе ИИ</p>
+        <p class="ai-consent-t">Используя помощника, вы соглашаетесь с условиями обработки данных: ваши сообщения и фото решений отправляются зарубежной модели.</p>
+        <p class="ai-consent-err" id="ai-consent-err" role="alert" hidden></p>
+        <div class="ai-consent-row">
+          <button type="button" class="btn btn--quiet btn--sm" id="ai-consent-yes">Да, согласен</button>
+          <button type="button" class="btn btn--quiet btn--sm" id="ai-consent-no">Нет, не согласен</button>
+        </div>
+        <a class="ai-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Условия обработки</a>
       </div>
-      <a class="ai-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
+      <div class="ai-consent-off" id="ai-consent-off" hidden>
+        <span>Без согласия помощник не работает. Передумали?</span>
+        <button type="button" class="btn btn--quiet btn--sm" id="ai-consent-on">Включить помощника</button>
+      </div>
     </div>
     <div class="ai-live" id="ai-live"{% if not ai_consent %} hidden{% endif %}>
     <div class="ai-sug" id="ai-sug">

@@ -166,6 +166,16 @@ class FooterRenderTests(TestCase):
             # Метка версии и строка документов рядом: в одном месте страницы.
             self.assertLess(html.index('class="site-version"'), html.index('<p class="legal-foot">'))
 
+    def test_calculator_model_picker_shows_the_footer_line(self):
+        """Экран выбора моделей (окно поверх приложения) не закрывает строку документов."""
+        html = self.client.get('/calc2/').content.decode('utf-8')
+        self.assertIn('id="scene-picker"', html)
+        footer = html.split('<div class="calc-foot">', 1)[1].split('</p>', 1)[0]
+        self.assertIn('Beta 1.1', footer)
+        self.assertIn('<a href="/legal/">Документы</a>', footer)
+        # Окно выбора кончается над полосой (и над окном cookie, пока оно открыто).
+        self.assertIn('#scene-picker { bottom: calc(30px + var(--ck-h, 0px)); }', html)
+
     def test_calculator_has_the_docs_link_in_the_header(self):
         from problems.tests.factories import make_user
         self.client.force_login(make_user('calc_legal'))

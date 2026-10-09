@@ -81,6 +81,11 @@
   .calc-foot { display: flex; align-items: baseline; height: 30px; overflow: hidden; background: var(--bg); }
   .calc-foot .site-version { margin: 0; padding: 7px 0 0 16px; flex: none; }
   .calc-foot .legal-foot { margin: 0; padding: 7px 16px 0; flex: 1 1 auto; }
+  /* Узкий экран: строка не переносится (полоса в 30 px), а листается вбок. */
+  .calc-foot .legal-foot { flex-wrap: nowrap; white-space: nowrap; overflow-x: auto; }
+  /* Экран выбора моделей – окно поверх приложения (`.picker`, inset до низа окна):
+     низ уступает ту же полосу, иначе строка документов под ним не видна. */
+  #scene-picker { bottom: calc(30px + var(--ck-h, 0px)); }
   @media print { .calc-foot { display: none; } }
   </style>
 </head>

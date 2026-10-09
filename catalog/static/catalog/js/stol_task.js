@@ -344,22 +344,53 @@
     }
   }
 
-  /* ── Согласие на помощника (Правовой контур, часть А) ───────────────────
+  /* ── Согласие на помощника (Правовой контур) ────────────────────────────
      Помощник работает на зарубежной модели, поэтому без отдельного согласия
-     вместо поля ввода стоит блок `#ai-consent`. Кнопка пишет согласие на
-     сервере (`cfg.aiConsentUrl`), и панель становится рабочей без перезагрузки.
+     вместо поля ввода стоит блок `#ai-consent`. Согласие даёт ТОЛЬКО «Да,
+     согласен»: она пишет его на сервере (`cfg.aiConsentUrl`), и панель
+     становится рабочей без перезагрузки.
+     «Нет, не согласен» (`decline`) и «Включить помощника» (`reopen`) меняют
+     только вид блока и отметку в браузере – на сервер не ходят вовсе: отказ
+     нигде не хранится. Свёрнутость помнит localStorage (`DECLINED_KEY`), чтобы
+     строка не разворачивалась на каждой задаче.
      Сервер отказывает и без нажатия (403, `ai_consent_required`): если
      согласие отозвали в другой вкладке, блок возвращается сам. */
+  var DECLINED_KEY = 'weco_ai_declined';
+  function rememberDeclined(on) {
+    try {
+      if (on) window.localStorage.setItem(DECLINED_KEY, '1');
+      else window.localStorage.removeItem(DECLINED_KEY);
+    } catch (e) { /* хранилище закрыто: блок просто откроется полным */ }
+  }
+  function wasDeclined() {
+    try { return window.localStorage.getItem(DECLINED_KEY) === '1'; } catch (e) { return false; }
+  }
   function bindConsent(t) {
     var box = t.$('ai-consent'), live = t.$('ai-live');
     if (!box || !live || !once(box)) return;
-    var yes = t.$('ai-consent-yes'), no = t.$('ai-consent-no'), err = t.$('ai-consent-err');
-    function show() { live.hidden = true; box.hidden = false; if (yes) yes.focus({ preventScroll: true }); }
+    var full = t.$('ai-consent-full'), off = t.$('ai-consent-off');
+    var yes = t.$('ai-consent-yes'), no = t.$('ai-consent-no'), on = t.$('ai-consent-on');
+    var err = t.$('ai-consent-err');
+    function collapse() { if (full) full.hidden = true; if (off) off.hidden = false; }
+    function expand() { if (off) off.hidden = true; if (full) full.hidden = false; }
+    /* Отказ: строка вместо блока. Запроса к серверу нет и быть не должно. */
+    function decline() { rememberDeclined(true); collapse(); if (on) on.focus({ preventScroll: true }); }
+    /* «Включить помощника»: снова полный блок. Согласия это НЕ даёт. */
+    function reopen() { rememberDeclined(false); expand(); if (yes) yes.focus({ preventScroll: true }); }
+    /* Любой вход в помощника без согласия: блок полным и внимание на него. */
+    function show() {
+      live.hidden = true; box.hidden = false;
+      rememberDeclined(false); expand();
+      box.scrollIntoView({ block: 'nearest' });
+      if (yes) yes.focus({ preventScroll: true });
+    }
     t.consent = {
       needed: function () { return live.hidden; },
       show: show
     };
-    if (no) no.addEventListener('click', function () { box.hidden = true; });
+    if (!box.hidden && wasDeclined()) collapse();
+    if (no) no.addEventListener('click', decline);
+    if (on) on.addEventListener('click', reopen);
     if (!yes) return;
     yes.addEventListener('click', function () {
       if (!t.cfg.aiConsentUrl) return;
@@ -367,6 +398,7 @@
       if (err) err.hidden = true;
       post(t.cfg.aiConsentUrl, {}).then(function (d) {
         if (d && d.ok) {
+          rememberDeclined(false);
           box.hidden = true; live.hidden = false;
           if (window.weco.track) weco.track('ai_consent_given', { problem_id: t.cfg.problemId });
           if (t.chat) t.chat.focus();
@@ -572,10 +604,18 @@
       if (!text) return;
       chat(text, mode);
     }
+    /* Без согласия на помощника любой вход в него (плитка «Спросить ИИ», «про
+       этот пункт», «почему так», «Обсудить с ИИ») только показывает блок
+       согласия: поле ввода не открывается и запрос не уходит. */
+    function blocked() {
+      if (t.consent && t.consent.needed()) { t.consent.show(); return true; }
+      return false;
+    }
     t.chat = {
-      send: function (text) { aiText.value = text; send('free'); },
-      focus: function () { aiText.focus({ preventScroll: true }); },
+      send: function (text) { if (blocked()) return; aiText.value = text; send('free'); },
+      focus: function () { if (blocked()) return; aiText.focus({ preventScroll: true }); },
       prefill: function (prefix, q, source) {
+        if (blocked()) return;
         if (q !== undefined) setQuote(q, source);
         if (prefix && aiText.value.indexOf(prefix) !== 0) aiText.value = prefix + aiText.value;
         sync();

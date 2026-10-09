@@ -976,6 +976,11 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .help-foot .ai-consent-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .help-foot .ai-consent-link { font-size: 13px; color: var(--accent-ink); }
 .help-foot .ai-consent-link:hover { color: var(--text); }
+/* Блок согласия: полный и свёрнутый в строку после «Нет, не согласен» (09.10.2026). */
+.help-foot .ai-consent-full { display: flex; flex-direction: column; gap: 8px; }
+.help-foot .ai-consent-full[hidden], .help-foot .ai-consent-off[hidden] { display: none; }
+.help-foot .ai-consent-off { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 13px; line-height: 1.4; color: var(--text2); }
 
 /* «Спросить ИИ про этот пункт» и «Спросить об этом» по выделению (README §3). */
 .stm .part { position: relative; padding-right: 38px; }
