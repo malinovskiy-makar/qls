@@ -262,6 +262,19 @@ def build_event(root, event, figures_dir, crop=True):
                               'caption': caption, 'flag': flag, 'page': page})
                 report[f'рисунок: {flag or "вырезан"}'] += 1
             setattr(task, out, files)
+        # Рамка рисунка условия не удалась (пустая вырезка / нет рамки), а в
+        # файле решений тот же рисунок (подпись ≥ 0,85) вырезан чисто — берём
+        # его (ВП 2020, «ТратьБанк»: рамки в файле условий мимо, в решениях
+        # точные).
+        for i, fig in enumerate(task.figure_files):
+            if not fig['flag']:
+                continue
+            for alt in task.solution_figure_files:
+                if not alt['flag'] and fig['caption'] and fuzz.ratio(
+                        fig['caption'].lower(), alt['caption'].lower()) / 100 >= TITLE_MATCH:
+                    task.figure_files[i] = dict(alt, replaced=fig['flag'])
+                    report['рисунок условия взят из решений'] += 1
+                    break
     report['страниц без расшифровки'] = len(missing_pages)
     return list(tasks.values()), report, missing_pages
 
