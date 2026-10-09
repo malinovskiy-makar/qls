@@ -1,0 +1,12 @@
+{% comment %}
+«Построить в «Графиках»» (ADR 0145): отдельной строкой сразу под условием, до
+вариантов теста и «Как прошло?». Модель — по каноническим тегам задачи
+(`catalog/calc2_link.py`), открывается в стартовом виде в той же вкладке; чисел
+из условия нет. Правило нуля: модели нет — строки нет. Справа (на телефоне
+под кнопкой) имя модели; вторая модель — ссылкой после «Или:».
+{% endcomment %}{% if calc2_links %}{% with first=calc2_links.0 second=calc2_links.1 %}
+<div class="calc-link">
+  <a class="calc-link-btn" href="{{ first.url }}">{% include '_icon.html' with name='chart' %}<span>Построить в «Графиках»</span></a>
+  <p class="calc-link-note">Откроется модель «{{ first.name }}». Числа из условия впишите сами.{% if second %} Или: <a href="{{ second.url }}">{{ second.name }}</a>{% endif %}</p>
+</div>
+{% endwith %}{% endif %}

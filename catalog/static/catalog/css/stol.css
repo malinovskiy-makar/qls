@@ -772,6 +772,25 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 .pp-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
 .pp-tag-list[hidden] { display: none; }
 
+/* ── «Построить в «Графиках»» (ADR 0145): строка сразу под условием ─────
+   Пилюля 40 px (на телефоне цель касания 44), справа имя модели 13 px; на
+   телефоне подпись уходит под кнопку. Рамка — токен сайта `--border`
+   (`--border-strong` есть только в calc2.css). */
+.calc-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -4px 0 18px; }
+.calc-link-btn { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+                 border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+                 font: 600 14.5px/1 var(--font-ui); text-decoration: none; white-space: nowrap; }
+.calc-link-btn .qi { width: 18px; height: 18px; flex: none; color: var(--accent-ink); }
+.calc-link-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.calc-link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.calc-link-note { flex: 1 1 220px; min-width: 0; margin: 0; font-size: 13px; line-height: 1.45; color: var(--text2); }
+.calc-link-note a { color: var(--accent-ink); }
+@media (max-width: 759px) {
+  .calc-link { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .calc-link-btn { height: 44px; }
+  .calc-link-note { flex: none; }
+}
+
 /* ── Под условием: «Как прошло?» с «Дальше ›», соседи с названиями ───── */
 .how { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 14px;
        border-radius: 14px; background: var(--surface); border: .5px solid var(--border); }

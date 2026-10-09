@@ -17,7 +17,7 @@ from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.templatetags.ru import plural_ru
 
-from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, seo, testplay
+from . import attachments, attempts, calc2_link, chat, filters, map_numbers, progress, search_log, seo, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -1592,6 +1592,9 @@ def _problem_context(request, problem):
         'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
         # Как эту задачу решают в игре (строка под условием и в тесте).
         'game_stat':    _game_stat(problem.pk),
+        # «Построить в «Графиках»»: модель по каноническим тегам (ADR 0145),
+        # из уже загруженных тегов и тем, без запросов.
+        'calc2_links':  calc2_link.links_for(problem.pk, tags, topics),
     }
 
 
