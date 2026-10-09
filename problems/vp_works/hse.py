@@ -29,6 +29,8 @@ USER_AGENT = ('WeconomicsResearchBot/1.0 (+https://weconomics.ai; '
 MIN_INTERVAL = 1.0
 RETRY_PAUSES = (5, 15, 45)
 TIMEOUT = 60
+#: Чем должен начинаться ответ, чтобы считаться тем, что просили.
+SIGNATURES = {'pdf': b'%PDF', 'zip': b'PK'}
 
 
 class Blocked(Exception):
@@ -168,6 +170,24 @@ class Client:
     def post(self, endpoint, query, expect='xml'):
         """Один запрос с повторами. Возвращает байты ответа."""
         data = urllib.parse.urlencode({'query': query}).encode('utf-8')
+
+        def make_request():
+            return urllib.request.Request(BASE + endpoint, data=data, headers={
+                'User-Agent': USER_AGENT,
+                'Disable-Basic-Auth': 'yes',
+                'Referer': SITE + '/schoolwinners.html',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            })
+        return self.fetch(make_request, endpoint, expect)
+
+    def fetch(self, make_request, label, expect='xml', fatal=()):
+        """Общий цикл: интервал, повторы 5/15/45 с, отказ = `Blocked`.
+
+        `make_request()` строит свежий `urllib.request.Request`; `label` — как
+        назвать запрос в сообщениях (адрес без секретов); `fatal` — коды HTTP,
+        которые повторять бессмысленно (404). Им пользуется и `mosh_works`:
+        тот же вежливый клиент, другой сайт.
+        """
         last_error = None
         for attempt in range(len(RETRY_PAUSES) + 1):
             if attempt:
@@ -175,12 +195,7 @@ class Client:
                 self.log('  повтор %d через %d с (%s)' % (attempt, pause, last_error))
                 self.sleep(pause)
             self._wait_turn()
-            request = urllib.request.Request(BASE + endpoint, data=data, headers={
-                'User-Agent': USER_AGENT,
-                'Disable-Basic-Auth': 'yes',
-                'Referer': SITE + '/schoolwinners.html',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            })
+            request = make_request()
             self.requests += 1
             try:
                 with self.opener.open(request, timeout=TIMEOUT) as response:
@@ -191,7 +206,9 @@ class Client:
                 self._last = self.clock()
                 if error.code in (403, 429):
                     raise Blocked('Сайт ответил %d на %s — останавливаюсь.'
-                                  % (error.code, endpoint))
+                                  % (error.code, label))
+                if error.code in fatal:
+                    raise SiteError('%s: HTTP %d' % (label, error.code))
                 last_error = 'HTTP %d' % error.code
                 continue
             except (urllib.error.URLError, TimeoutError, ConnectionError, OSError,
@@ -202,13 +219,14 @@ class Client:
                 continue
             self._last = self.clock()
             if looks_blocked(status, content_type, body):
-                raise Blocked('Похоже на капчу/отказ на %s — останавливаюсь.' % endpoint)
-            if expect == 'pdf' and not body.startswith(b'%PDF'):
-                last_error = 'ответ не PDF (%s, %d байт)' % (content_type, len(body))
+                raise Blocked('Похоже на капчу/отказ на %s — останавливаюсь.' % label)
+            signature = SIGNATURES.get(expect)
+            if signature and not body.startswith(signature):
+                last_error = 'ответ не %s (%s, %d байт)' % (expect.upper(), content_type, len(body))
                 continue
             return body
         raise SiteError('%s: не удалось после %d повторов — %s'
-                        % (endpoint, len(RETRY_PAUSES), last_error))
+                        % (label, len(RETRY_PAUSES), last_error))
 
     # Удобные обёртки ровно под шаги страницы.
     def seasons(self):
