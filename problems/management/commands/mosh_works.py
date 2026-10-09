@@ -243,8 +243,6 @@ class Command(BaseCommand):
                 'total_listed': rec['total_listed'], 'source': None, 'runs': 0, 'cost': 0.0}
 
         if not opts.get('yes'):
-            if hidden:
-                self._save_scores(data_dir, rows)
             sample = random.Random(7).sample(todo, min(opts.get('preview') or 0, len(todo)))
             for rec in sample:
                 self.say('  вырез для осмотра: %s'

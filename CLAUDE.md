@@ -237,6 +237,8 @@ import_problem_attributes         # характер и особенности �
 import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
 vp_works index|download|scores|report --dir D  # работы дипломантов ВП: списки, PDF, баллы по задачам (GLM, без --yes только план); файлы ВНЕ репозитория, ФИО не храним (docs/VP_WORKS.md)
+mosh_works index|download|scores|report --dir D  # работы призёров МОШ 2021–2025: таблицы, zip, баллы по задачам (GLM, без --yes только план);
+                                  # адреса zip только из ссылок таблицы, подбор запрещён; файлы ВНЕ репозитория, ФИО не храним (docs/MOSH_WORKS.md)
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
 ai_load_probe --ai K --problem ID [--ai-user U --baseline F.json]  # зонд «Сайт не встаёт»: K вопросов к ИИ разом,
                                   # ждут ли лёгкие страницы; запускать ВНУТРИ контейнера web
