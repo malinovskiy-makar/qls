@@ -243,6 +243,11 @@ class DeployCheckTests(unittest.TestCase):
         # восстанавливать переменную) — дочерний check --deploy не должен
         # унаследовать флаг ни при каких обстоятельствах.
         env.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
+        # Реквизиты документов обязательны при DEBUG=False (`legal.E001`).
+        # Подставные, как в джобе deploy-check; адрес собран, а не записан:
+        # в репозитории писем нет.
+        env['LEGAL_CONTACT_EMAIL'] = '@'.join(('ci', 'example.org'))
+        env['LEGAL_DOCS_DATE'] = '15 октября 2026 г.'
         # ⚠️ Вывод команды по-русски: без явной кодировки Windows отдаёт его
         # в cp1251, и текст превращается в «РѕР±С‹С‡РЅС‹Р№».
         env['PYTHONIOENCODING'] = 'utf-8'
