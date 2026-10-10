@@ -131,6 +131,11 @@ a:focus-visible, button:focus-visible {
    на свою высоту (10 + 14 px полей и строка 1,3em) и не ловит нажатия. В раунде её нет,
    как и шапки сайта. `body >` — сильнее правила партиала, которое стоит ниже в документе. */
 body > .site-version { position: relative; margin-top: calc(-24px - 1.3em); pointer-events: none; }
+/* Строка документов (`_legal_footer.html`, часть Б, 09.10.2026) — в той же нижней строке
+   экрана, правее метки версии: накладывается на неё теми же отступами и не добавляет
+   своей высоты. Слева оставлено место под метку («Beta 1.1» ≈ 50 px). В раунде её нет,
+   как нет метки версии и шапки: экран занят ровно в высоту окна. */
+body > .legal-foot { position: relative; margin: calc(-24px - 1.3em) 0 0; padding: 10px 16px 14px 84px; }
 
 .screen { display: none; }
 .screen.active { display: block; }
@@ -1168,7 +1173,10 @@ body.figfull .vignette.alarm { opacity: .42; }
    нижний ряд остаются на месте. */
 body.rush-playing nav.site-nav, body.rush-playing #nav-panel { display: none !important; }
 body.rush-playing .tg-fab, body.rush-playing .fb-btn, body.rush-playing .site-version,
-body.figfull .site-version { display: none !important; }
+body.rush-playing .legal-foot, body.rush-playing .ck-bar,
+body.figfull .site-version, body.figfull .legal-foot { display: none !important; }
+/* Окно cookie в раунде не закрывает нижний ряд управления, а отступ тела не нужен. */
+html:has(.ck-bar:not([hidden])) body.rush-playing { padding-bottom: 0; }
 body.rush-playing .rush-wrap { max-width: none; padding: 0; }
 @media (min-width: 721px) {
   html:has(body.rush-playing), body.rush-playing { overflow: hidden; }
@@ -2120,7 +2128,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
 <body class="on-start">
 {% include '_metrika_noscript.html' %}
 
-{% include '_nav.html' %}
+{% include '_nav.html' with nav_docs_link=True %}
 
 <div class="rush-wrap">
 
@@ -7324,7 +7332,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
 здесь — снимок экрана снимается на клиенте, в момент нажатия.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_cookie_bar.html' %}
 {% include '_site_version.html' %}
+{% include '_legal_footer.html' %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 {% include '_problem_report.html' %}

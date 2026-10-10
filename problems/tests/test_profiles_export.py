@@ -23,7 +23,6 @@ class ProfilesExportTests(TestCase):
                                               role='student')
         profile = self.first.profile
         profile.city = '  Москва '
-        profile.phone = '+7 900 000-00-00'
         profile.prep_mode = ['self', 'tutor']
         profile.save()
         self.second = User.objects.create_user(username='exp_two', password=PASSWORD,
@@ -48,10 +47,6 @@ class ProfilesExportTests(TestCase):
         header = self._rows()[0]
         for private in ('phone', 'username', 'email', 'first_name', 'last_name'):
             self.assertNotIn(private, header)
-
-    def test_phone_value_does_not_leak_into_any_cell(self):
-        rows = self._rows()
-        self.assertFalse(any('+7 900' in cell for row in rows for cell in row))
 
     def test_city_is_trimmed_and_lowercased(self):
         rows = self._rows()

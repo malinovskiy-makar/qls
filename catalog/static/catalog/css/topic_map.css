@@ -27,7 +27,7 @@
 .tmap {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 52px);      /* 52px — высота шапки сайта */
+  height: calc(100vh - 52px - var(--ck-h, 0px));      /* 52px — высота шапки сайта */
   min-height: 480px;
   overflow: hidden;                /* правило 1.9.1: страница не едет вбок */
 }

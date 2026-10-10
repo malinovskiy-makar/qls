@@ -1,0 +1,62 @@
+{% load static %}{% comment %}
+Окно cookie (Правовой контур, часть Б, 09.10.2026; Политика cookie, разделы 1 и 2).
+
+Узкая полоса внизу страницы у всех, у кого нет куки `weco_consent`, и у гостей,
+и у вошедших. Подключается в КАЖДЫЙ корневой шаблон-документ рядом с футером
+(сверяет `legal/tests/test_cookie_bar.py`); кабинеты передают `metrika_private`
+так же, как для `_metrika.html`.
+
+⚠️ РАЗМЕТКА ЕСТЬ ВСЕГДА, ПРЯЧЕТСЯ АТРИБУТОМ `hidden`, КОГДА ВЫБОР УЖЕ СДЕЛАН:
+ссылка «Настройки cookie» в футере открывает это же окно заново.
+
+⚠️ НЕ ПЕРЕКРЫВАЕТ СТРАНИЦУ. Полоса закреплена внизу, поэтому окно само сообщает
+стилям свою высоту (`--ck-h`, считает `static/cookie_bar.js`): тело страницы
+получает такой же нижний отступ, кружок Telegram встаёт НАД полосой, а полноэкранные
+экраны (игра, калькулятор) подстраиваются своими правилами в своих шаблонах.
+
+Две кнопки одного веса: совет «Разрешить» нажать громче, чем отказ, — манипуляция.
+Цвета только токены, эмодзи нет, длинного тире нет (правило сайта).
+{% endcomment %}
+<style>
+.ck-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 140;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-top: .5px solid var(--border);
+  box-shadow: var(--shadow-pop);
+  font-size: 13px; line-height: 1.4; color: var(--text2);
+}
+.ck-bar[hidden] { display: none; }
+.ck-text { margin: 0; flex: 1 1 380px; }
+.ck-text a { color: var(--accent-ink); text-decoration: underline; }
+.ck-text a:focus-visible, .ck-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.ck-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ck-btn {
+  font: inherit; font-size: 13px; font-weight: 500; line-height: 1.2;
+  padding: 8px 14px;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r);
+  cursor: pointer;
+  transition: border-color .12s;
+}
+.ck-btn:hover { border-color: var(--accent-ring); }
+/* Страница не уезжает под полосу: нижний отступ тела равен её высоте. */
+html:has(.ck-bar:not([hidden])) body { padding-bottom: var(--ck-h, 64px); }
+/* Кружок Telegram не прячется за полосой. */
+html:has(.ck-bar:not([hidden])) .tg-fab { bottom: calc(16px + var(--ck-h, 64px)); }
+@media (max-width: 560px) {
+  .ck-actions { width: 100%; }
+  .ck-btn { flex: 1 1 0; }
+}
+</style>
+<style media="print">.ck-bar { display: none !important; }</style>
+<div class="ck-bar" id="cookie-bar" role="region" aria-label="Файлы cookie"
+     data-metrika-id="{{ metrika_id }}" data-private="{% if metrika_private %}1{% endif %}"{% if cookie_choice %} hidden{% endif %}>
+  <p class="ck-text">Мы используем файлы cookie. Необходимые нужны для работы сайта. Аналитические помогают понять, как им пользуются – их можно не разрешать. <a href="{% url 'legal:document' 'cookies' %}">Подробнее</a></p>
+  <div class="ck-actions">
+    <button type="button" class="ck-btn" data-cookie-choice="all">Разрешить</button>
+    <button type="button" class="ck-btn" data-cookie-choice="necessary">Только необходимые</button>
+  </div>
+</div>
+<script src="{% static 'cookie_bar.js' %}" defer></script>

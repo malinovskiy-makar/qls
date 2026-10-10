@@ -9,6 +9,13 @@
 регистрируется через неделю — гостевая сессия к этому времени уже другая.
 Первую метку не перезаписываем никогда: последнюю знает Метрика.
 
+⚠️ КУКА `weco_src` — АНАЛИТИЧЕСКАЯ, СТАВИТСЯ ТОЛЬКО ПРИ `weco_consent=all`
+(Политика cookie, раздел 2; часть Б, 09.10.2026). До согласия метки лежат в
+СЕССИИ (необходимая кука) и при регистрации всё равно попадают в
+`SignupSource`; когда человек нажимает «Разрешить», первый же запрос с
+`weco_consent=all` переносит метки из сессии в куку. При «Только необходимые»
+уже стоящую куку стирает сервер: она HttpOnly, скрипт её тронуть не может.
+
 **Запись при регистрации.** `record_signup` заводит `SignupSource` на КАЖДЫЙ
 новый аккаунт, даже без куки (метки пусты, вид регистрации заполнен).
 Там же откладывается цель Метрики: регистрация кончается редиректом, своего
@@ -39,6 +46,8 @@ TEXT_FIELDS = UTM_KEYS + ('landing_path', 'referrer')
 MAX_LENGTH = 100
 
 COOKIE_NAME = 'weco_src'
+#: Ключ сессии, где метки первого касания ждут согласия на аналитические куки.
+SESSION_KEY = 'first_touch'
 COOKIE_SALT = 'problems.signup_source'
 COOKIE_MAX_AGE = 90 * 24 * 60 * 60
 
@@ -110,36 +119,82 @@ def _parse_time(value):
     return moment
 
 
-def read_first_touch(request):
-    """Сохранённое первое касание из подписанной куки или None.
-
-    Нет куки, подпись не сходится, прошло больше 90 дней, внутри мусор —
-    всё это «первого касания нет». Даже подписанное значение проходит те
-    же правила обрезки: кука живёт долго, а правила могут поменяться.
-    """
-    value = request.get_signed_cookie(COOKIE_NAME, default=None, salt=COOKIE_SALT,
-                                      max_age=COOKIE_MAX_AGE)
-    if not value:
-        return None
-    try:
-        data = _unpack(value)
-    except ValueError:        # base64, UTF-8 и JSON бросают его наследников
-        return None
+def _normalize(data):
+    """Метки из куки или сессии → словарь `SignupSource` (обрезка и время)."""
     touch = {key: _clip(data.get(key)) for key in TEXT_FIELDS}
     touch['first_seen_at'] = _parse_time(data.get('first_seen_at'))
     return touch
 
 
-def remember_first_touch(request, response):
-    """Кладёт метку в куку, если она пришла и сохранённой ещё нет."""
-    if request.method != 'GET':
-        return
-    data = capture(request)
-    if data is None or read_first_touch(request) is not None:
-        return
+def _read_cookie(request):
+    value = request.get_signed_cookie(COOKIE_NAME, default=None, salt=COOKIE_SALT,
+                                      max_age=COOKIE_MAX_AGE)
+    if not value:
+        return None
+    try:
+        return _unpack(value)
+    except ValueError:        # base64, UTF-8 и JSON бросают его наследников
+        return None
+
+
+def _read_session(request):
+    """Метки, ждущие согласия, из сессии или None. Сессию без куки не заводит."""
+    session = getattr(request, 'session', None)
+    if session is None or not session.session_key:
+        return None
+    data = session.get(SESSION_KEY)
+    return data if isinstance(data, dict) else None
+
+
+def read_first_touch(request):
+    """Сохранённое первое касание: подписанная кука, иначе сессия, иначе None.
+
+    Нет куки, подпись не сходится, прошло больше 90 дней, внутри мусор —
+    всё это «первого касания нет». Даже подписанное значение проходит те
+    же правила обрезки: кука живёт долго, а правила могут поменяться.
+    Сессия читается, только когда куки нет: так метки, пришедшие ДО согласия
+    на аналитику, доезжают до `SignupSource` при регистрации.
+    """
+    data = _read_cookie(request)
+    if data is None:
+        data = _read_session(request)
+    return None if data is None else _normalize(data)
+
+
+def _set_cookie(response, data):
     response.set_signed_cookie(
         COOKIE_NAME, _pack(data), salt=COOKIE_SALT, max_age=COOKIE_MAX_AGE,
         secure=settings.SESSION_COOKIE_SECURE, httponly=True, samesite='Lax')
+
+
+def remember_first_touch(request, response):
+    """Метка первого касания: в куку при согласии, иначе в сессию.
+
+    1. «Только необходимые»: уже стоящую `weco_src` стираем (на любом методе).
+    2. Метка пришла, сохранённой ещё нет: при `weco_consent=all` — в куку,
+       иначе — в сессию (необходимая кука), пока человек не решил.
+    3. Согласие `all` есть, куки нет, а в сессии ждут метки — переносим в куку.
+    """
+    from legal import cookie_consent
+
+    chosen = cookie_consent.choice(request)
+    if chosen == cookie_consent.NECESSARY and COOKIE_NAME in request.COOKIES:
+        response.delete_cookie(COOKIE_NAME, samesite='Lax')
+    if request.method != 'GET':
+        return
+    allowed = chosen == cookie_consent.ALL
+    data = capture(request)
+    if data is not None and read_first_touch(request) is None:
+        if allowed:
+            _set_cookie(response, data)
+        else:
+            request.session[SESSION_KEY] = data
+        return
+    if allowed and COOKIE_NAME not in request.COOKIES:
+        waiting = _read_session(request)
+        if waiting is not None:
+            _set_cookie(response, waiting)
+            request.session.pop(SESSION_KEY, None)
 
 
 class FirstTouchMiddleware:

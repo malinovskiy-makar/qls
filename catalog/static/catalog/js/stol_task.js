@@ -337,7 +337,79 @@
     else if (what === 'sol' && t.askSolution) t.askSolution();
     else if (what === 'part' && t.askPart) t.askPart();
     else if (what === 'reveal' && t.test) t.test.reveal();
-    else if (what === 'ai' && t.chat) t.chat.focus();
+    else if (what === 'ai') {
+      /* Без согласия на помощника вместо поля стоит его запрос: показываем его. */
+      if (t.consent && t.consent.needed()) t.consent.show();
+      else if (t.chat) t.chat.focus();
+    }
+  }
+
+  /* ── Согласие на помощника (Правовой контур) ────────────────────────────
+     Помощник работает на зарубежной модели, поэтому без отдельного согласия
+     вместо поля ввода стоит блок `#ai-consent`. Согласие даёт ТОЛЬКО «Да,
+     согласен»: она пишет его на сервере (`cfg.aiConsentUrl`), и панель
+     становится рабочей без перезагрузки.
+     «Нет, не согласен» (`decline`) и «Включить помощника» (`reopen`) меняют
+     только вид блока и отметку в браузере – на сервер не ходят вовсе: отказ
+     нигде не хранится. Свёрнутость помнит localStorage (`DECLINED_KEY`), чтобы
+     строка не разворачивалась на каждой задаче.
+     Сервер отказывает и без нажатия (403, `ai_consent_required`): если
+     согласие отозвали в другой вкладке, блок возвращается сам. */
+  var DECLINED_KEY = 'weco_ai_declined';
+  function rememberDeclined(on) {
+    try {
+      if (on) window.localStorage.setItem(DECLINED_KEY, '1');
+      else window.localStorage.removeItem(DECLINED_KEY);
+    } catch (e) { /* хранилище закрыто: блок просто откроется полным */ }
+  }
+  function wasDeclined() {
+    try { return window.localStorage.getItem(DECLINED_KEY) === '1'; } catch (e) { return false; }
+  }
+  function bindConsent(t) {
+    var box = t.$('ai-consent'), live = t.$('ai-live');
+    if (!box || !live || !once(box)) return;
+    var full = t.$('ai-consent-full'), off = t.$('ai-consent-off');
+    var yes = t.$('ai-consent-yes'), no = t.$('ai-consent-no'), on = t.$('ai-consent-on');
+    var err = t.$('ai-consent-err');
+    function collapse() { if (full) full.hidden = true; if (off) off.hidden = false; }
+    function expand() { if (off) off.hidden = true; if (full) full.hidden = false; }
+    /* Отказ: строка вместо блока. Запроса к серверу нет и быть не должно. */
+    function decline() { rememberDeclined(true); collapse(); if (on) on.focus({ preventScroll: true }); }
+    /* «Включить помощника»: снова полный блок. Согласия это НЕ даёт. */
+    function reopen() { rememberDeclined(false); expand(); if (yes) yes.focus({ preventScroll: true }); }
+    /* Любой вход в помощника без согласия: блок полным и внимание на него. */
+    function show() {
+      live.hidden = true; box.hidden = false;
+      rememberDeclined(false); expand();
+      box.scrollIntoView({ block: 'nearest' });
+      if (yes) yes.focus({ preventScroll: true });
+    }
+    t.consent = {
+      needed: function () { return live.hidden; },
+      show: show
+    };
+    if (!box.hidden && wasDeclined()) collapse();
+    if (no) no.addEventListener('click', decline);
+    if (on) on.addEventListener('click', reopen);
+    if (!yes) return;
+    yes.addEventListener('click', function () {
+      if (!t.cfg.aiConsentUrl) return;
+      yes.disabled = true;
+      if (err) err.hidden = true;
+      post(t.cfg.aiConsentUrl, {}).then(function (d) {
+        if (d && d.ok) {
+          rememberDeclined(false);
+          box.hidden = true; live.hidden = false;
+          if (window.weco.track) weco.track('ai_consent_given', { problem_id: t.cfg.problemId });
+          if (t.chat) t.chat.focus();
+          return;
+        }
+        throw new Error('no');
+      }).catch(function () {
+        yes.disabled = false;
+        if (err) { err.textContent = 'Не получилось сохранить согласие, попробуйте ещё раз.'; err.hidden = false; }
+      });
+    });
   }
 
   /* ── Поле помощи: разговор с ИИ и проверка решения ─────────────────────
@@ -446,6 +518,7 @@
           form.append('file', f.file);
           if (extra) Object.keys(extra).forEach(function (k) { form.append(k, extra[k](done)); });
           return upload(url, form).then(function (d) {
+            if (d.error === 'ai_consent_required' && t.consent) t.consent.show();
             if (d.error) throw new Error(d.message || 'Файл не принят.');
             done.push(d);
           });
@@ -472,6 +545,7 @@
         if (window.weco.track) weco.track('chat_send', { problem_id: t.cfg.problemId, mode: mode, has_file: uploaded.length > 0, files: uploaded.length, quote: !!q });
         var wait = typing();
         return post(t.cfg.chatUrl, payload).then(function (d) {
+          if (d.error === 'ai_consent_required' && t.consent) { wait.remove(); t.consent.show(); return; }
           t.limit(d.error === 'limit' ? 0 : d.remaining);
           var reply = d.reply || d.message || 'Не получилось ответить, попробуйте ещё раз.';
           rich(wait, reply);
@@ -505,6 +579,7 @@
       }).then(function (d) {
         if (busyCard) busyCard.remove();
         if (d.error === 'limit') t.limit(0);
+        if (d.error === 'ai_consent_required' && t.consent) t.consent.show();
         if (d.error) { bubble(false, d.message || 'Проверка не удалась, попробуйте ещё раз.'); return; }
         var old = t.$('chk-holder'); if (old) old.removeAttribute('id');
         var card = document.createElement('div');
@@ -529,10 +604,18 @@
       if (!text) return;
       chat(text, mode);
     }
+    /* Без согласия на помощника любой вход в него (плитка «Спросить ИИ», «про
+       этот пункт», «почему так», «Обсудить с ИИ») только показывает блок
+       согласия: поле ввода не открывается и запрос не уходит. */
+    function blocked() {
+      if (t.consent && t.consent.needed()) { t.consent.show(); return true; }
+      return false;
+    }
     t.chat = {
-      send: function (text) { aiText.value = text; send('free'); },
-      focus: function () { aiText.focus({ preventScroll: true }); },
+      send: function (text) { if (blocked()) return; aiText.value = text; send('free'); },
+      focus: function () { if (blocked()) return; aiText.focus({ preventScroll: true }); },
       prefill: function (prefix, q, source) {
+        if (blocked()) return;
         if (q !== undefined) setQuote(q, source);
         if (prefix && aiText.value.indexOf(prefix) !== 0) aiText.value = prefix + aiText.value;
         sync();
@@ -802,6 +885,7 @@
     bindHow(t);
     bindHelp(t);
     bindTip(t);
+    bindConsent(t);
     bindComposer(t);
     bindTest(t);
     return t;

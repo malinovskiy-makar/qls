@@ -180,6 +180,16 @@
         "--settings=scripts.stol_demo_settings"
       ],
       "port": 8611
+    },
+    {
+      "name": "legal-check",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:YANDEX_METRIKA_ID='12345678'; $env:GLM_API_KEY='dummy-local-check'; & 'venv313/Scripts/python.exe' manage.py runserver 8000 --noreload"
+      ],
+      "port": 8000
     }
   ]
 }

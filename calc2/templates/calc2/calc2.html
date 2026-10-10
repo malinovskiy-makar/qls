@@ -71,10 +71,27 @@
   {% endcomment %}
   <link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
+  <style>
+  /* Нижняя строка (часть Б, 09.10.2026): метка версии и ссылки на документы. Калькулятор
+     занимал окно целиком (`body` не прокручивается), и всё ниже приложения не было видно.
+     Теперь приложению уступлено 30 px под строку, а когда открыто окно cookie, приложение
+     поднимается ещё и на его высоту (`--ck-h`, `static/cookie_bar.js`): строка остаётся над окном. */
+  .app { height: calc(100vh - 48px - 30px - var(--ck-h, 0px)); }
+  html:has(.ck-bar:not([hidden])) body { padding-bottom: 0; }
+  .calc-foot { display: flex; align-items: baseline; height: 30px; overflow: hidden; background: var(--bg); }
+  .calc-foot .site-version { margin: 0; padding: 7px 0 0 16px; flex: none; }
+  .calc-foot .legal-foot { margin: 0; padding: 7px 16px 0; flex: 1 1 auto; }
+  /* Узкий экран: строка не переносится (полоса в 30 px), а листается вбок. */
+  .calc-foot .legal-foot { flex-wrap: nowrap; white-space: nowrap; overflow-x: auto; }
+  /* Экран выбора моделей – окно поверх приложения (`.picker`, inset до низа окна):
+     низ уступает ту же полосу, иначе строка документов под ним не видна. */
+  #scene-picker { bottom: calc(30px + var(--ck-h, 0px)); }
+  @media print { .calc-foot { display: none; } }
+  </style>
 </head>
 <body>
 {% include '_metrika_noscript.html' %}
-{% include '_nav.html' %}
+{% include '_nav.html' with nav_docs_link=True %}
 
 <!-- ── ЭКРАН 1 · ОКНО ВЫБОРА СЦЕНАРИЯ ──────────────────────────────────
      Карточки вызывают уже существующие пресеты движка (loadScene/setMode/
@@ -2527,7 +2544,11 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 когда-нибудь опустится, панель сдвигается отступом снизу, а кружок остаётся.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_cookie_bar.html' %}
+<div class="calc-foot">
 {% include '_site_version.html' %}
+{% include '_legal_footer.html' %}
+</div>
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 {% include '_problem_report.html' %}

@@ -11,7 +11,6 @@ MARKER_VALUES = {
     'school': 'ШколаМаркер',
     'city': 'ГородМаркер',
     'goal': 'ЦельМаркер',
-    'phone': '+79990001122',
     'grade': 'none',
     'level': 'final',
     'prep_mode': ['course'],
@@ -22,7 +21,7 @@ MARKER_VALUES = {
 }
 
 #: Что не должно встретиться в тексте запроса и в системном блоке.
-FORBIDDEN = ('ШколаМаркер', 'ГородМаркер', 'ЦельМаркер', '+79990001122',
+FORBIDDEN = ('ШколаМаркер', 'ГородМаркер', 'ЦельМаркер',
              'tgmarker_nick',
              'Уже не школьник', 'vsosh_final', 'На курсах', 'Больше 6',
              'prep_mode', 'hours_week', 'source_channel', 'olympiad_history')

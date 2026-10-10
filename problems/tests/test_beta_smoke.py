@@ -37,7 +37,7 @@ class BetaSmokeTests(TestCase):
             'action': 'data', 'username': 'smoke_student', 'first_name': '', 'last_name': '',
             'email': '', 'grade': 'le7', 'school': 'Школа', 'city': 'Пермь', 'level': 'novice',
             'goal': 'Регион', 'prep_mode': ['self'], 'hours_week': 'lt1',
-            'source_channel': 'friend', 'olympiad_history': ['none'], 'phone': ''})
+            'source_channel': 'friend', 'olympiad_history': ['none']})
         self.assertEqual(response.status_code, 302)
         profile = UserProfile.objects.get(user=self.student)
         self.assertEqual((profile.grade, profile.hours_week, profile.olympiad_history),

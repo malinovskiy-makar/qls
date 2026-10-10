@@ -339,4 +339,17 @@
       view.showModal();
     });
   }
+
+  // ───────────────── отзыв согласия на помощника: окно подтверждения сайта
+  // Свой диалог, а не браузерный confirm: он замораживает вкладку и в нём
+  // нельзя написать, что именно будет удалено.
+  var revokeDialog = $('pf-revoke-dlg');
+  var revokeOpen = $('pf-revoke-open');
+  if (revokeDialog && revokeOpen) {
+    revokeOpen.addEventListener('click', function () { revokeDialog.showModal(); });
+    revokeDialog.addEventListener('click', function (event) {
+      if (event.target === revokeDialog || event.target.closest('[data-close]')) revokeDialog.close();
+    });
+    revokeDialog.addEventListener('close', function () { revokeOpen.focus(); });
+  }
 })();

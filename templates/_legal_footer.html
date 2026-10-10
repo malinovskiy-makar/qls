@@ -1,0 +1,44 @@
+{% comment %}
+Футер со ссылками на правовые документы (Правовой контур, часть А, 08.10.2026).
+
+Одна строка: «© 2026 Weconomics · Документы · Политика · Соглашение ·
+Рекомендации · Настройки cookie · 12+» (кнопка «Настройки cookie» открывает окно
+выбора заново, `_cookie_bar.html`; часть Б, 09.10.2026). Подключается в каждый корневой шаблон-документ сразу
+ПОСЛЕ `_site_version.html`: метка версии остаётся последним блоком страницы
+(её сторожит `config/tests/test_nav.py`), а здесь `<p>`, а не блок.
+
+⚠️ В ИГРЕ И НА КАЛЬКУЛЯТОРЕ строка стоит в той же нижней строке, что метка версии,
+со своими правилами раскладки в `game.html` и `calc2.html` (часть Б, 09.10.2026):
+экран игры занят ровно в высоту окна, а у калькулятора `body` не прокручивается,
+поэтому калькулятору уступлена полоса в 30 px. В раунде игры строки нет вовсе
+(экран занят целиком, шапка тоже скрыта). Список корневых шаблонов сверяет
+`legal/tests/test_pages.py`.
+
+На бумаге футер не печатается. Цвета — токены, эмодзи нет.
+{% endcomment %}
+<style>
+.legal-foot {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
+  margin: -8px 0 0; padding: 0 16px 14px;
+  font-size: 12px; line-height: 1.4; color: var(--text3);
+}
+body > .legal-foot { align-self: stretch; }
+.legal-foot a { color: var(--text2); text-decoration: none; }
+.legal-foot a:hover { color: var(--text); text-decoration: underline; }
+.legal-foot a:focus-visible, .legal-foot-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+/* «Настройки cookie» – кнопка, но выглядит как соседние ссылки строки. */
+.legal-foot-link { font: inherit; color: var(--text2); background: none; border: 0; padding: 0; cursor: pointer; }
+.legal-foot-link:hover { color: var(--text); text-decoration: underline; }
+.legal-foot-sep { color: var(--text3); }
+.legal-foot-age { font-weight: 600; color: var(--text2); }
+</style>
+<style media="print">.legal-foot { display: none; }</style>
+<p class="legal-foot">
+  <span>© 2026 Weconomics</span><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:index' %}">Документы</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'privacy' %}">Политика</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'terms' %}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{% url 'legal:document' 'recommendations' %}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <button type="button" class="legal-foot-link" data-cookie-settings>Настройки cookie</button><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <span class="legal-foot-age" title="Для аудитории 12+">12+</span>
+</p>
