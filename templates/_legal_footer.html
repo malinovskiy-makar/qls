@@ -33,12 +33,16 @@ body > .legal-foot { align-self: stretch; }
 .legal-foot-age { font-weight: 600; color: var(--text2); }
 </style>
 <style media="print">.legal-foot { display: none; }</style>
+{% comment %}Адреса — формой `{% url … as … %}` с подстраховкой буквальным путём: футер
+стоит и на страницах ошибок (`_error_base.html`), а там `{% url %}` не имеет права
+бросить исключение — 500 рисуется с пустым контекстом и при любой схеме адресов.{% endcomment %}
+{% url 'legal:index' as legal_index_url %}{% url 'legal:document' 'privacy' as legal_privacy_url %}{% url 'legal:document' 'terms' as legal_terms_url %}{% url 'legal:document' 'recommendations' as legal_reco_url %}
 <p class="legal-foot">
   <span>© 2026 Weconomics</span><span class="legal-foot-sep" aria-hidden="true">·</span>
-  <a href="{% url 'legal:index' %}">Документы</a><span class="legal-foot-sep" aria-hidden="true">·</span>
-  <a href="{% url 'legal:document' 'privacy' %}">Политика</a><span class="legal-foot-sep" aria-hidden="true">·</span>
-  <a href="{% url 'legal:document' 'terms' %}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
-  <a href="{% url 'legal:document' 'recommendations' %}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{{ legal_index_url|default:'/legal/' }}">Документы</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{{ legal_privacy_url|default:'/legal/privacy/' }}">Политика</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{{ legal_terms_url|default:'/legal/terms/' }}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <a href="{{ legal_reco_url|default:'/legal/recommendations/' }}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <button type="button" class="legal-foot-link" data-cookie-settings>Настройки cookie</button><span class="legal-foot-sep" aria-hidden="true">·</span>
   <span class="legal-foot-age" title="Для аудитории 12+">12+</span>
 </p>
