@@ -236,7 +236,7 @@ class ManualSearchFiltersStayComplete(TestCase):
         # Группа компонента показывается, только если поле размечено хоть
         # у одной задачи. Без этой задачи «пусто» и «фильтр потерян» были
         # бы неотличимы.
-        topic = Topic.objects.create(name=CANONICAL[0])
+        topic = Topic.objects.create(name=CANONICAL[0], is_canonical=True)
         problem = Problem.objects.create(
             statement='Условие для проверки набора фильтров.',
             solution='Решение есть.', difficulty=3,
