@@ -7,6 +7,7 @@ XeTeX. Функция, результат которой зависит от т�
 компилятор, сломана. Сайт при этом УЖЕ рисует эти формулы верно — значит
 листок можно просто напечатать из браузера.
 """
+import re
 from decimal import Decimal
 
 from django.test import TestCase, override_settings
@@ -78,8 +79,12 @@ class PrintSheetTests(TestCase):
         self.assertNotIn('nav-link', body)
         self.assertNotIn('header-nav', body)
         self.assertNotIn('site-header', body)
-        # Название сайта встречается ровно один раз — в подвале.
-        self.assertEqual(body.count('Weconomics'), 1)
+        # Юридический подвал (`_legal_footer.html`, «© 2026 Weconomics») стоит
+        # в каждом корневом шаблоне и на бумаге не печатается — его не считаем.
+        self.assertIn('<p class="legal-foot">', body)
+        sheet = re.sub(r'<p class="legal-foot">.*?</p>', '', body, flags=re.S)
+        # Название сайта встречается ровно один раз — в подвале листка.
+        self.assertEqual(sheet.count('Weconomics'), 1)
         self.assertIn('<span><b>Weconomics</b>', body)
 
     def test_katex_pipeline_matches_the_site(self):

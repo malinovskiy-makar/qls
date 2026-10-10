@@ -750,7 +750,8 @@ class FinishTests(TimeAndFinishBase):
 
     def test_a_garbage_field_does_not_break_the_submission(self):
         attempt = self.started()
-        self.finish(self.guest, attempt, **{'item-31': ['', '99'], 'item-1': 'ок', 'item-999': 'x'})
+        with at(T0 + timedelta(seconds=30)):
+            self.finish(self.guest, attempt, **{'item-31': ['', '99'], 'item-1': 'ок', 'item-999': 'x'})
         attempt.refresh_from_db()
         self.assertIsNotNone(attempt.submitted_at)
         self.assertEqual(attempt.answers.get(item__number=1).raw, 'ок')
@@ -762,7 +763,8 @@ class FinishTests(TimeAndFinishBase):
         item.points = D('5')
         item.save()
         attempt = self.started()
-        self.finish(self.guest, attempt, **{'item-44.к1': '2', 'item-44.к2': ''})
+        with at(T0 + timedelta(seconds=30)):
+            self.finish(self.guest, attempt, **{'item-44.к1': '2', 'item-44.к2': ''})
         self.assertEqual(attempt.answers.get(item__number=44).raw, {'к1': 2})
 
     def test_auto_flag_is_honoured_only_near_the_deadline(self):
