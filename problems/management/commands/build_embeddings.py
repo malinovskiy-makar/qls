@@ -72,17 +72,12 @@ def problem_to_text(problem: Problem) -> str:
     Реализация с 07.09.2026 одна — `problems.embedding_formula.build_text`;
     здесь остаётся тонкая обёртка, потому что имя `problem_to_text`
     вызывается из полутора десятков мест. Что именно собирается, решает
-    `ACTIVE_SPEC` (сегодня — `v1`, и переключается она одной строкой в
-    `embedding_config` после того, как замер назовёт победителя).
+    `ACTIVE_SPEC` (с 09.09.2026 — `v2_focus_repeat`; переключается одной
+    строкой в `embedding_config`). Состав блоков и бюджеты — в
+    `problems/embedding_formula.py`, `SPECS`.
 
-    Сегодняшняя `v1`: title + statement[:500] + подпункты (500 суммарно) +
-    «Темы» + «Навыки» + ai_blurb[:400] + «Теги» по старому списку
-    `CANONICAL_TAG_NAMES`. Решение и ответ в отпечаток не входят.
-
-    ⚠️ Совпадение `build_text(p, SPECS['v1'])` с прежней реализацией —
-    СИМВОЛ В СИМВОЛ, и это держит тест
-    `problems/tests/test_embedding_formula.py::V1ByteForByteTests`. Без него
-    сравнение v1 против v2 было бы сравнением v2 с новой опечаткой.
+    Что обёртка собирает именно по активной формуле, держит тест
+    `problems/tests/test_embedding_formula.py::ActiveSpecWrapperTests`.
 
     ⚠️ Требует `prefetch_related(*PREFETCH)` при батч-запросе.
     """

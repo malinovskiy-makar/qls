@@ -60,7 +60,7 @@ class ЭкспортИмпортTestCase(TestCase):
         self.texts = self.tmp / 'texts.jsonl'
         self.state = self.tmp / 'STATE.json'
 
-    def экспорт(self, spec='v1', scope='all', **kwargs):
+    def экспорт(self, spec=ACTIVE_SPEC_NAME, scope='all', **kwargs):
         buf = StringIO()
         call_command('embeddings_export_texts', spec=spec, out=str(self.texts),
                      scope=scope, stdout=buf, **kwargs)
@@ -95,7 +95,7 @@ class ЭкспортИмпортTestCase(TestCase):
             json.dumps(мета, ensure_ascii=False), encoding='utf-8')
         return str(путь), m
 
-    def сверка_пройдена(self, spec='v1'):
+    def сверка_пройдена(self, spec=ACTIVE_SPEC_NAME):
         self.state.write_text(json.dumps({
             'build_check_passed': True,
             'build_check': {'spec': spec, 'min_cosine': 0.99999,
@@ -231,12 +231,18 @@ class ImportRefusalTests(ЭкспортИмпортTestCase):
         self.assertIn('спецификации', str(ctx.exception))
 
     def test_чужая_версия_формулы_отказ(self):
-        шапка, строки, _ = self.экспорт()
-        prefix, _m = self.привезти(шапка, строки, version=777)
+        """Файл посчитан по `v1` (не активной формуле) и подписан именем
+        активной: имя сходится, версия нет. Файл, подписанный `v1` целиком,
+        отсекается раньше, на имени, — это `test_чужая_спецификация_отказ`."""
+        self.assertNotEqual(ACTIVE_SPEC_NAME, 'v1')
+        шапка, строки, _ = self.экспорт(spec='v1')
+        self.assertNotEqual(шапка['version'], EMBEDDING_FORMULA_VERSION)
+        prefix, _m = self.привезти(шапка, строки, spec=ACTIVE_SPEC_NAME)
         self.сверка_пройдена()
         with self.assertRaises(CommandError) as ctx:
             self.импорт(prefix, apply=True)
         self.assertIn('Версия формулы', str(ctx.exception))
+        self.assertNotIn('спецификации', str(ctx.exception))
 
     def test_неверная_размерность_отказ(self):
         шапка, строки, _ = self.экспорт()

@@ -3,9 +3,10 @@
 
 Главная мысль модуля, ради которой он вообще существует: **правка текста
 задачи и устаревание её вектора — не одно и то же**. В отпечаток
-(`problem_to_text`) входят title, statement, подпункты, темы, навыки,
-ai_blurb и канонические теги — и НЕ входят solution и answer. Значит,
-фикс-пак, поправивший только решение, вектор не трогает.
+(`problem_to_text`) входит то, что задаёт АКТИВНАЯ формула (`ACTIVE_SPEC`,
+с 09.09.2026 — `v2_focus_repeat`): условие и решение в пределах своих
+бюджетов, подпункты, темы, теги и метаданные — и НЕ входит answer. Значит,
+фикс-пак, поправивший только ответ, вектор не трогает.
 
 Считать «правку текста» устареванием — завысить работу пересчёта.
 Не считать правку statement — занизить и оставить поиск сломанным именно
@@ -14,6 +15,7 @@ ai_blurb и канонические теги — и НЕ входят solution 
 from django.test import TestCase
 
 from problems import corpus_diagnostics as diag
+from problems.embedding_config import ACTIVE_SPEC
 from problems.models import Problem, ProblemPart
 
 
@@ -28,13 +30,12 @@ class ShadowFingerprintTests(TestCase):
         ProblemPart.objects.create(
             problem=self.problem, label='а)', statement='Найдите выпуск.', order=1)
 
-    def test_правка_solution_не_старит_вектор(self):
-        """Решение в отпечаток не входит — пересчитывать нечего.
-
-        Если бы этот тест был красным, пересчёт получил бы лишние задачи:
-        фикс-паки правят решения массово.
+    def test_правка_solution_старит_вектор(self):
+        """В активной формуле есть блок решения (`solution`, свой бюджет):
+        правка решения меняет отпечаток, и пересчёт её обязан увидеть.
         """
-        self.assertFalse(diag.fingerprint_changed(
+        self.assertIn('solution', ACTIVE_SPEC.blocks)
+        self.assertTrue(diag.fingerprint_changed(
             self.problem, {'solution': 'Совершенно другое решение'}))
 
     def test_правка_answer_не_старит_вектор(self):
@@ -54,14 +55,16 @@ class ShadowFingerprintTests(TestCase):
             self.problem, {'parts': {part.pk: 'Найдите цену.'}}))
 
     def test_правка_за_границей_обрезки_вектор_не_трогает(self):
-        """Формула берёт statement[:500]. Правка на 900-м символе в отпечаток
-        не попадает, и объявлять такой вектор устаревшим — выдумывать работу.
+        """Формула обрезает условие по бюджету активной формулы. Правка за
+        обрезкой в отпечаток не попадает, и объявлять такой вектор
+        устаревшим — выдумывать работу.
         """
-        long_statement = 'А' * 600 + 'хвост'
+        за_обрезкой = ACTIVE_SPEC.budgets['statement'] + 100
+        long_statement = 'А' * за_обрезкой + 'хвост'
         Problem.objects.filter(pk=self.problem.pk).update(statement=long_statement)
         self.problem.refresh_from_db()
         self.assertFalse(diag.fingerprint_changed(
-            self.problem, {'statement': 'А' * 600 + 'другой хвост'}))
+            self.problem, {'statement': 'А' * за_обрезкой + 'другой хвост'}))
 
     def test_пустой_набор_правок_ничего_не_старит(self):
         self.assertFalse(diag.fingerprint_changed(self.problem, {}))
