@@ -239,7 +239,9 @@ class PanelAndProfileTests(TestCase):
     def test_profile_shows_the_date_and_a_revoke_button(self):
         consent.grant(self.user, AI, ConsentRecord.Source.CHAT)
         html = self.client.get('/profile/?tab=data').content.decode('utf-8')
-        self.assertRegex(html, r'Помощник на основе ИИ: согласие дано \d{1,2} \w+ \d{4}')
+        self.assertRegex(html, r'>Согласие дано \d{1,2} \w+ \d{4}<')
+        # Название блока стоит в заголовке карточки и в строке не повторяется.
+        self.assertNotIn('Помощник на основе ИИ: согласие дано', html)
         self.assertIn(reverse('legal:ai_revoke'), html)
         self.assertIn('Отозвать', html)
 

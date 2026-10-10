@@ -682,7 +682,7 @@
   <div class="card pf-card pf-card--consent ym-hide-content" id="pf-ai-consent">
     <h2 class="pf-h2">Помощник на основе ИИ</h2>
     {% if ai_consent %}
-    <p class="pf-hint pf-hint--block">Помощник на основе ИИ: согласие дано {{ ai_consent.given_at|date:"j E Y" }}</p>
+    <p class="pf-hint pf-hint--block">Согласие дано {{ ai_consent.given_at|date:"j E Y" }}</p>
     <div class="pf-consent-row">
       <button type="button" class="btn-quiet" id="pf-revoke-open">Отозвать</button>
       <a class="pf-consent-link" href="{% url 'legal:document' 'consent-ai' %}" target="_blank" rel="noopener">Полный текст согласия</a>
