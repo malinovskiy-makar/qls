@@ -1425,12 +1425,22 @@ function setCurveFreeTerm(curve, b) {
   }
   /* Кривую перерисовывает не только холст: строка «Построения графиков» живёт
      своим списком, и без этого прохода в поле оставалась бы прежняя запись —
-     то есть ровно тот дефект, ради которого фаза и затевалась. */
-  if (typeof renderGraphRows === 'function' && document.getElementById('graph-rows'))
-    renderGraphRows();
+     то есть ровно тот дефект, ради которого фаза и затевалась.
+     ⚠️ СТРОКИ ОБНОВЛЯЮТСЯ НА МЕСТЕ, А НЕ ПЕРЕСОБИРАЮТСЯ (13.10). Этот путь идёт
+     на КАЖДОМ шаге ползунка и мыши: пересборка списка с полями MathLive стоила
+     70–150 мс на шаг и копила память (Safari ронял вкладку). Пересобирать —
+     только если строки нет (refreshCurveRow вернула false). */
+  const gRow = document.querySelector('#graph-rows .grow[data-cid="' + curve.id + '"] .f-slot > input');
+  if (gRow) setFormulaFieldQuiet(gRow, curve.expr);
+  else if (STATE.mode === 'graph' && typeof renderGraphRows === 'function') renderGraphRows();
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // труд авто-масштабируется → плавно (Фаза 4)
   redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
-  renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
+  // Формула в списке кривых — на месте; ползунки пульта идут за значением.
+  if (typeof refreshCurveRow === 'function' && refreshCurveRow(curve)) {
+    if (typeof updatePult === 'function') updatePult();
+  } else {
+    renderCurveList();
+  }
 }
 
 // TODO (будущие шаги): вернуть перетаскивание кривых, если владелец передумает;

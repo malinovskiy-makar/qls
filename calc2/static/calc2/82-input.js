@@ -49,8 +49,13 @@ function renderTexRaw(el, tex) {
   if (!katexInto(el, tex)) el.textContent = tex;
 }
 // KaTeX подгружается отложенно — когда доедет, перерисовываем то, что уже на экране.
+/* ⚠️ ОЧЕРЕДЬ ЖИВЁТ ТОЛЬКО ДО ЗАГРУЗКИ, ПОТОМ В НЕЁ НЕ КЛАДУТ (13.10). Раньше
+   каждое собранное поле формулы клало сюда своё замыкание навсегда, а строки
+   списка функций пересобирались на каждом шаге ползунка сдвига: замыкание
+   держало старую строку с полем MathLive и его теневым деревом. 808 шагов
+   «Сдвига MC» — 15 979 → 487 483 узла DOM, и Safari ронял вкладку. */
 const _texPending = [];
-function onKatexReady() { _texPending.forEach(fn => { try { fn(); } catch (e) {} }); }
+function onKatexReady() { _texPending.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); }
 
 /* Подсказка формата формулы (Фаза 4а). Карточка под полем: заголовок, сетка
    примеров (каждый — набранная формула + за что её берут) и строка о синтаксисе.
@@ -1012,6 +1017,8 @@ let _sceneOpen = false;   // окно выбора закрыто хотя бы 
 function upgradeFormulaField(inp) {
   if (!inp || inp._mfDone) return;
   inp._mfDone = true;
+  // Оторванные от страницы поля (строку пересобрали) в очереди не держим.
+  for (let i = _mfWaiting.length - 1; i >= 0; i--) if (!_mfWaiting[i].isConnected) _mfWaiting.splice(i, 1);
   _mfWaiting.push(inp);
   /* Запасной путь: как только к полю прикоснулись, собираем его немедленно и
      не полагаясь на учёт видимости. Ленивая сборка экономит четыре десятка
@@ -1413,6 +1420,32 @@ function buildMathfield(inp) {
   fromInput();
 }
 
+/* Записать в поле формулы новое значение ТИХО: без события `input`, то есть
+   без шага истории и без повторного разбора формулы. Нужна сдвигу кривой
+   (ползунок, мышь): модель уже поменяла запись сама, полю остаётся её
+   показать — в MathLive, в накладке-запасе (если поле ещё не собрано) и
+   кеглем по ширине. Пересобирать ради этого строку целиком нельзя (13.10:
+   утечка памяти и 70–150 мс на шаг). */
+function setFormulaFieldQuiet(inp, text) {
+  if (!inp) return;
+  text = String(text == null ? '' : text);
+  if (inp.value === text) return;
+  inp.value = text;
+  const mf = inp._mf;
+  if (mf) {
+    const want = mathToLatexField(text);
+    try { mf.setValue(want, { silenceNotifications: true }); } catch (e) { mf.value = want; }
+    if (fieldActive(inp)) fitFormulaField(inp);
+    return;
+  }
+  const slot = inp.closest('.f-slot');
+  const ts = slot && slot.querySelector(':scope > .f-typeset');
+  if (ts) {
+    renderTex(ts, text.trim());
+    ts.classList.toggle('show', document.activeElement !== inp && !!text.trim() && ts.classList.contains('has'));
+  }
+}
+
 // Вставить кусок формулы в активное поле: в поле MathLive — набранным
 // символом, в обычное поле — текстом Math.js.
 function insertIntoField(inp, tex, txt, back) {
@@ -1693,11 +1726,11 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     inp.addEventListener('focus', sync);
     inp.addEventListener('blur', sync);
     typeset.addEventListener('mousedown', (e) => { e.preventDefault(); inp.focus(); });
-    _texPending.push(sync);
+    if (typeof katex === 'undefined') _texPending.push(sync);   // только до загрузки (см. _texPending)
     sync();
 
     upgradeFormulaField(inp);
-    _mfPending.push(sync);   // библиотека доехала — накладка больше не нужна
+    if (!MATHLIVE_READY) _mfPending.push(sync);   // библиотека доехала — накладка больше не нужна
 
     // Клавиатура живёт под полем и раскрывается кнопкой в строке ввода.
     kbd = document.createElement('div');

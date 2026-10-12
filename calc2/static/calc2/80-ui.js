@@ -496,6 +496,7 @@ function renderCurveList() {
       if (pwRec) row.append(pwRec);
       row.append(fLine, more, sliders);
       syncQpLine();
+      row._syncQp = syncQpLine;   // сдвиг кривой обновляет строку на месте (refreshCurveRow)
       fInp.id = fInp.id || ('curve-expr-' + curve.id);
     } else if (autoLine) {
       row.append(top, autoLine, more, sliders);
@@ -510,6 +511,26 @@ function renderCurveList() {
   if (typeof flushMathfields === 'function') flushMathfields();
   if (typeof updatePult === 'function') updatePult();   // пересобрать ползунки кривых
   if (typeof placeCurveSliders === 'function') placeCurveSliders();
+}
+
+/* СДВИГ КРИВОЙ ОБНОВЛЯЕТ ЕЁ СТРОКУ НА МЕСТЕ (13.10). Ползунок «Сдвиг MC» и
+   перетаскивание прямой меняют только свободный член: строке списка нужно
+   показать новую запись (поле, подсказка, строка Q(P)), а не рождаться заново
+   с полем MathLive, кнопками и клавиатурой. Полная пересборка на каждом шаге
+   стоила 70–150 мс и копила память. Нет строки или она особая (куски) —
+   false, и зовущий пересобирает список как раньше. */
+function refreshCurveRow(curve) {
+  const row = curve && document.querySelector('#curve-list .fc-card[data-cid="' + curve.id + '"]');
+  if (!row || row.classList.contains('is-pw')) return false;
+  const inp = row.querySelector('.crow-formula .curve-expr-inp');
+  if (!inp) return false;
+  setFormulaFieldQuiet(inp, curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr);
+  inp.classList.remove('bad');
+  inp.setAttribute('aria-invalid', 'false');
+  const tipped = row.querySelector('.crow-top .curve-name');
+  if (tipped) tipped.setAttribute('data-tip', tipExpr(curve.expr));
+  if (typeof row._syncQp === 'function') row._syncQp();
+  return true;
 }
 
 /* «Одной формулой»: куски убираются, остаётся формула первого куска;
