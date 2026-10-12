@@ -695,9 +695,32 @@ function ppfTouchXmax(f) {
   return (x > 0) ? x : null;
 }
 
+/* Форма, подогнанная по четырём пробным точкам, совпадает с КПВ на ВСЁМ
+   отрезке [0; Xmax]: густая сетка (PPF_CHECK_N + 1 узел, оба края включены),
+   расхождение не больше миллионной доли Ymax.
+   ⚠️ Без этой проверки кусочная КПВ, у которой все четыре пробные точки
+   легли на один прямой участок, объявлялась прямой. Замер 13.10: КПВ
+   500 − X² (X < 4), 516 − 8X (4 ≤ X < 54), 100 − (X − 50)² (X ≥ 54) с концом
+   X = 60 — пробы 12, 24, 36, 48 все на 516 − 8X, ответ «linear, a = 500,
+   b = 8» (у такой прямой свободный член 516), и КТВ при мировой цене 7,39
+   уходила в угол (0; 500) и шла НИЖЕ КПВ. Неопознанная форма идёт в общее
+   правило bestByValue, и это честный путь, а не поломка. */
+const PPF_CHECK_N = 200;
+function ppfFitsOnGrid(f, c) {
+  const F = ppfFam(c);
+  if (!F) return false;
+  const tol = 1e-6 * Math.max(1, Math.abs(c.Ymax));
+  for (let i = 0; i <= PPF_CHECK_N; i++) {
+    const x = c.Xmax * i / PPF_CHECK_N, y = f(x), g = F.f(c, x);
+    if (!isFinite(y) || !isFinite(g) || Math.abs(y - g) > tol) return false;
+  }
+  return true;
+}
+
 // Распознать тип КПВ из набора по пробным точкам внутри домена.
 // Возвращает { type, a, b, Xmax, Ymax }: linear (a-b·x), ellipse (sqrt(a-b·x²)),
 // parabola (a-b·x²), convex (a-b·√x) или { type:'unknown' }.
+// Форма принимается, только если она прошла проверку на сетке (ppfFitsOnGrid).
 function classifyPpf(f) {
   let Xmax = ppfXmaxOf(f);
   // Кривая может КАСАТЬСЯ оси, не переходя её (см. ppfTouchXmax).
@@ -708,14 +731,28 @@ function classifyPpf(f) {
   const ys = xs.map(f);
   if (ys.some(isNaN)) return { type: 'unknown', Xmax, Ymax };
   const TOL = 1e-6;
+  const ok = (c) => ppfFitsOnGrid(f, c);
   const lin = fitLinear(xs, ys);                                   // y vs x
-  if (lin && lin.r2 > 1 - TOL) return { type: 'linear', a: Ymax, b: -lin.slope, Xmax, Ymax };
+  // У прямой свободный член обязан совпасть с f(0): иначе это участок, а не вся КПВ.
+  if (lin && lin.r2 > 1 - TOL && Math.abs(lin.intercept - Ymax) <= TOL * Math.max(1, Math.abs(Ymax))) {
+    const c = { type: 'linear', a: Ymax, b: -lin.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const ell = fitLinear(xs.map(x => x * x), ys.map(y => y * y));   // y² vs x²  →  эллипс/дуга
-  if (ell && ell.r2 > 1 - TOL && ell.slope < 0) return { type: 'ellipse', a: ell.intercept, b: -ell.slope, Xmax, Ymax };
+  if (ell && ell.r2 > 1 - TOL && ell.slope < 0) {
+    const c = { type: 'ellipse', a: ell.intercept, b: -ell.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const par = fitLinear(xs.map(x => x * x), ys);                   // y vs x²   →  парабола
-  if (par && par.r2 > 1 - TOL) return { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
+  if (par && par.r2 > 1 - TOL) {
+    const c = { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const cvx = fitLinear(xs.map(x => Math.sqrt(x)), ys);            // y vs √x   →  выпуклая
-  if (cvx && cvx.r2 > 1 - TOL) return { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+  if (cvx && cvx.r2 > 1 - TOL) {
+    const c = { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
 
   /* ─ ОБЩИЙ МНОГОЧЛЕН ВТОРОЙ СТЕПЕНИ ────────────────────────────────
      ⚠️ ПОДГОНКА ИДЁТ НЕ ПО ТРЁМ НЕИЗВЕСТНЫМ, А ПО ДВУМ, И ЭТО ТОЧНЕЕ.
@@ -730,7 +767,7 @@ function classifyPpf(f) {
   if (pq) {
     const cand = { type: 'poly2', c0: Ymax, c1: pq.intercept, c2: pq.slope, Xmax, Ymax };
     if (ppfFitR2(xs, ys, (x) => cand.c0 + cand.c1 * x + cand.c2 * x * x) > 1 - TOL
-        && ppfValid(cand)) {
+        && ppfValid(cand) && ok(cand)) {
       /* Конец области берём из САМОЙ формулы (меньший положительный корень), а
          не из численного поиска: у касания он точен, а поиск даёт 10,000000076. */
       cand.Xmax = ppfPoly2Xmax(cand);
@@ -748,7 +785,7 @@ function classifyPpf(f) {
     if (pw && isFinite(pw.slope) && isFinite(pw.intercept)) {
       const cand = { type: 'power', a: Ymax, b: Math.exp(pw.intercept), k: pw.slope, Xmax, Ymax };
       if (ppfFitR2(xs, ys, (x) => cand.a - cand.b * Math.pow(Math.max(0, x), cand.k)) > 1 - TOL
-          && ppfValid(cand)) {
+          && ppfValid(cand) && ok(cand)) {
         cand.Xmax = Math.pow(cand.a / cand.b, 1 / cand.k);
         return cand;
       }
@@ -2553,6 +2590,24 @@ function bestByValue(f, Xmax, Ymax, ratio) {
   return { xp: bx, yp: isFinite(y) ? y : 0, regime: 'касание (внутр. точка)' };
 }
 
+/* Диапазон альтернативных издержек X (наклона КПВ по модулю) на [0; Xmax].
+   Опознанное семейство отвечает формулой (ocAt0 / ocAtMax: у дуги и выпуклой
+   на краю бесконечность); неопознанная КПВ — численно: односторонние разности
+   на краях и центральные на сетке между ними (у кусочной наклон скачет). */
+function ppfOcRange(f, c, Xmax) {
+  const F = ppfFam(c);
+  if (F && F.ocAt0 && F.ocAtMax) {
+    const a = F.ocAt0(c), b = F.ocAtMax(c);
+    if (!isNaN(a) && !isNaN(b)) return { lo: Math.min(a, b), hi: Math.max(a, b) };
+  }
+  const h = Math.max(Xmax * 1e-6, 1e-9), N = PPF_CHECK_N, sl = [];
+  sl.push((f(0) - f(h)) / h, (f(Xmax - h) - f(Xmax)) / h);
+  for (let i = 1; i < N; i++) { const x = Xmax * i / N; sl.push((f(x - h) - f(x + h)) / (2 * h)); }
+  const ok = sl.filter(isFinite);
+  if (!ok.length) return null;
+  return { lo: Math.min.apply(null, ok), hi: Math.max.apply(null, ok) };
+}
+
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
   const r = parsePpfEquation(STATE.ppftFormula);
@@ -2584,12 +2639,35 @@ function recomputePpfTrade() {
     // Выпуклая, кусочная или незнакомая форма — общее правило по ценности.
     ({ xp, yp, regime } = bestByValue(f, Xmax, Ymax, ratio));
   }
+  /* ⚠️ ТОЧКА ПРОИЗВОДСТВА НЕ МОЖЕТ БЫТЬ ХУЖЕ ОБЩЕГО ПРАВИЛА. Что бы ни сказала
+     форма КПВ, ценность выпуска Y + Pw·X в выбранной точке сверяется с её
+     наибольшим значением на густой сетке (bestByValue). Ветка по форме короче и
+     точнее там, где форма опознана верно; ошиблась форма — побеждает общее
+     правило, и КТВ не уходит под КПВ (замер 13.10: угол (0; 500) против
+     касания (3,695; 486,347) у кусочной КПВ, принятой за прямую).
+     «Нет торговли» у прямой (Pw ровно равна наклону) остаётся как есть. */
+  if (regime !== 'нет торговли') {
+    const best = bestByValue(f, Xmax, Ymax, ratio);
+    const vOf = (x, y) => y + ratio * x;
+    const vb = vOf(best.xp, best.yp), vc = vOf(xp, yp);
+    if (!(vc >= vb - 1e-7 * Math.max(1, Math.abs(vb)))) ({ xp, yp, regime } = best);
+  }
   let line = null, xint = null, yint = null;
   if (regime !== 'нет торговли' && xp != null) {
     const c0 = yp + ratio * xp;                     // Y-перехват КТВ: Y = c0 − ratio·X
     line = { intercept: c0, slope: ratio }; yint = c0; xint = c0 / ratio;
   }
-  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax, ppfPts: singlePpfPoints(f, Xmax) };
+  /* У нелинейной КПВ одного числа «внутренней цены» нет: наклон меняется вдоль
+     кривой. Табло показывает диапазон альтернативных издержек (ppfOcRange), а
+     в точке производства — наклон слева и справа: у излома они разные. */
+  const ocRange = (c.type === 'linear') ? null : ppfOcRange(f, c, Xmax);
+  let slopeL = null, slopeR = null;
+  if (xp != null && xp > 0 && xp < Xmax) {
+    const h = Math.max(Xmax * 1e-6, 1e-9);
+    slopeL = (f(xp - h) - f(xp)) / h; slopeR = (f(xp) - f(xp + h)) / h;
+  }
+  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax,
+    ocRange, slopeL, slopeR, ppfPts: singlePpfPoints(f, Xmax) };
   const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
   applyTradeRanges(padMax(xm), padMax(ym));  // плавно при смене Pw, иначе мгновенно
 }
@@ -2683,20 +2761,25 @@ function updatePpfTradePanel() {
       setFinalFunctions([]);
     }
   }
-  // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
-  // берём его в точке производства — там и происходит сравнение с мировой.
-  const inner = (d.c.type === 'linear' && d.c.b > 0)
-    ? d.c.b
-    : ((d.xp != null && d.xp > 0) ? Math.abs(ppfSlopeOf((x) => interpY(d.ppfPts, x), d.xp))
-                                  : (d.Ymax / d.Xmax));
+  /* Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один. У
+     нелинейной КПВ одного числа нет (решение 13.10, карточка «NaN при кусочной
+     КПВ»): табло показывает диапазон альтернативных издержек «от … до …».
+     Наклон в точке производства числом не годится: у касания он по построению
+     равен мировой цене, и разбор говорил «совпала, торговать нечем». */
+  const linear = (d.c.type === 'linear' && d.c.b > 0);
+  const range = linear ? null : d.ocRange;
+  const inner = linear ? d.c.b : null;
+  const ocNum = (v) => (v === Infinity ? '$\\infty$' : fmt(v));
   /* ⚠️ НЕ fmt(inner) НАПРЯМУЮ, ЕСЛИ inner НЕ ЧИСЛО. fmt(NaN) печатает буквально
      «NaN» (isFinite-проверка внутри fmt отдаёт String(v) как есть), а
      fmt(null) — куда коварнее: roundShown(null) считает null нулём, и «нет
      значения» на экране неотличимо от настоящего нуля. Оба варианта врут.
      Есть значение — печатаем; нет — говорим об этом словами. */
-  const innerHtml = (typeof inner === 'number' && isFinite(inner))
+  const innerHtml = linear
     ? fmt(inner)
-    : '<span class="muted">не определена</span>';
+    : ((range && !isNaN(range.lo) && !isNaN(range.hi))
+        ? ('от ' + ocNum(range.lo) + ' до ' + ocNum(range.hi))
+        : '<span class="muted">не определена</span>');
   let html = '';
   html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
   html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
@@ -2730,25 +2813,50 @@ function updatePpfTradePanel() {
   }
 
   html += '<div class="sb-note"><b>Как это получилось</b>';
-  html += `<p><b>Стоит ли вообще торговать?</b> Сравниваем две цены. Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
-        + `единицу X, если делает всё сама. Здесь ${fmt(inner)}. Мировая цена ${fmt(d.ratio)}: `
-        + (Math.abs(d.ratio - inner) < 1e-6
-            ? 'она совпала с внутренней, поэтому торговать нечем.'
-            : (d.ratio > inner
-                ? 'за X дают больше, чем он стоит внутри, значит X выгодно производить и продавать.'
-                : 'за X дают меньше, чем он стоит внутри, значит выгоднее производить Y и покупать X.'))
-        + '</p>';
+  if (linear || !range) {
+    const v = linear ? inner : NaN;
+    html += `<p><b>Стоит ли вообще торговать?</b> Сравниваем две цены. Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
+          + `единицу X, если делает всё сама. Здесь ${fmt(v)}. Мировая цена ${fmt(d.ratio)}: `
+          + (Math.abs(d.ratio - v) < 1e-6
+              ? 'она совпала с внутренней, поэтому торговать нечем.'
+              : (d.ratio > v
+                  ? 'за X дают больше, чем он стоит внутри, значит X выгодно производить и продавать.'
+                  : 'за X дают меньше, чем он стоит внутри, значит выгоднее производить Y и покупать X.'))
+          + '</p>';
+  } else {
+    const eps = 1e-6 * Math.max(1, d.ratio);
+    html += `<p><b>Стоит ли вообще торговать?</b> Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
+          + `единицу X, если делает всё сама. У этой КПВ они не постоянны и меняются ${innerHtml}, смотря сколько X `
+          + `уже производится. Мировая цена ${fmt(d.ratio)} `
+          + (d.ratio < range.lo - eps
+              ? 'ниже любых внутренних издержек X, значит выгоднее производить только Y и покупать X.'
+              : (d.ratio > range.hi + eps
+                  ? 'выше любых внутренних издержек X, значит X выгодно производить и продавать.'
+                  : 'лежит внутри этого диапазона: где остановиться с выпуском, решает ценность выпуска по мировым ценам.'))
+          + '</p>';
+  }
 
+  // Излом КПВ: наклоны слева и справа от точки производства заметно разные.
+  const kink = (d.slopeL != null && d.slopeR != null && isFinite(d.slopeL) && isFinite(d.slopeR)
+    && Math.abs(d.slopeR - d.slopeL) > 1e-3 * Math.max(1, Math.abs(d.slopeR)));
   if (d.xp != null) {
-    if (/касание/.test(d.regime)) {
+    if (/касание/.test(d.regime) && kink) {
+      html += `<p><b>Где остановиться с выпуском?</b> В изломе КПВ. Левее излома единица X обходится в ${fmt(d.slopeL)} `
+            + `единиц Y, дешевле мировой цены, и её выгодно делать; правее она стоит ${fmt(d.slopeR)}, дороже мировой. `
+            + `Точка найдена численно: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    } else if (/касание/.test(d.regime)) {
       html += `<p><b>Где остановиться с выпуском?</b> КПВ вогнутая, поэтому специализация неполная: страна наращивает X, пока `
             + `следующая единица обходится дешевле мировой цены. Останавливается там, где `
             + `издержки сравнялись с ней, то есть где наклон касательной к КПВ равен $P_x/P_y$. `
             + `Точка найдена численно: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
     } else if (/нет торговли/.test(d.regime)) {
       html += '<p>Цены совпали, торговля ничего не меняет: линия возможностей ложится на КПВ.</p>';
-    } else {
+    } else if (linear) {
       html += `<p><b>Где остановиться с выпуском?</b> На самом краю. КПВ прямая, издержки не растут, поэтому выгодно уйти в специализацию целиком. `
+            + `Всё производство идёт в ${d.yp === 0 ? 'X' : 'Y'}: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    } else {
+      html += `<p><b>Где остановиться с выпуском?</b> На самом краю. Выпуск, посчитанный по мировым ценам, $Y + P_x/P_y \\cdot X$, `
+            + `здесь больше, чем в любой другой точке КПВ, поэтому выгодно уйти в специализацию целиком. `
             + `Всё производство идёт в ${d.yp === 0 ? 'X' : 'Y'}: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
     }
   }
