@@ -197,6 +197,35 @@ def compatible_number(task_number, number):
             or task_number.endswith('.' + number))
 
 
+def is_date_number(block):
+    """Номер блока «ДД.ММ», а текст начинается с «ДД.ММ.ГГГГ» — это дата."""
+    number = str(block.get('number') or '').strip()
+    if not re.fullmatch(r'\d{1,2}\.\d{2}', number):
+        return False
+    return bool(re.match(r'^\W*' + re.escape(number) + r'\.(?:19|20)\d\d', block.get('text') or ''))
+
+
+def compatible_target(tasks, number, variant, last=None):
+    """Задание для номера N из файла решений, когда своего N нет: единственный
+    совместимый кандидат (`тест-N`, `тест-k.N`, `4.N`); из нескольких — с тем
+    же префиксом, что у последнего сопоставленного задания этого файла
+    (МОШ-предпринимательство 2013/14, 10-11: критерии «6» за подпунктом кейса
+    «4.5» — это «4.6», а не «тест-6»). Иначе None."""
+    if not _real_number(number):
+        return None
+    cands = [t for t in tasks.values() if t.number != number
+             and compatible_number(t.number, number) and t.task_variant in (variant, '')]
+    head = _leading_int(number)
+    if last is not None and head is not None:
+        prefix, tail = _tail(last.number)
+        seq = [t for t in cands if prefix is not None and _tail(t.number)[0] == prefix
+               and tail == head - 1]
+        if len(seq) == 1:
+            return seq[0]               # продолжение последовательности: 4.5 → «6» = 4.6
+    tests = [t for t in cands if t.number.startswith('тест-')]
+    return tests[0] if len(tests) == 1 else None
+
+
 def match_by_text(tasks, text, number=''):
     """Задание с совместимым номером, чьё условие однозначно повторено в блоке,
     или None. Номер ограничивает выбор: МОШ-финграм 2024/25, отбор 5-6 —
@@ -511,6 +540,11 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             # Новый вариант в том же файле — новая нумерация, не «тест → задачи».
             current, file_keys, last_int = None, [], 0
             report['вариант из шапки файла'] += 1
+        if is_date_number(block):
+            # «20.11.2013 Бизнес моей мечты» — дата записи блога в кейсе, номер
+            # «20.11» — не номер задания (МОШ-предпринимательство 2013/14).
+            block = dict(block, number='')
+            report['дата в начале блока — не номер'] += 1
         raw_number = _block_number(block)
         block = _test_number(block, entry['file'])
         kind = block['type']
@@ -738,6 +772,11 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     last = last or (list(tasks.values())[-1] if tasks else None)
                     report['безномерной кусок решения → к заданию'] += 1
                     continue
+                if target is None:
+                    target = compatible_target(tasks, number, block.get('task_variant') or '',
+                                               last)
+                    if target is not None:
+                        report['номер файла решений → совместимое задание'] += 1
                 if target is None:
                     target = task_for(number, block.get('task_variant') or '')
                     target.from_solution_only = True
@@ -994,7 +1033,7 @@ def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
     how = 'за вопросом' if force is not None else \
         'по номеру' if target is not None and number else 'по названию'
     if target is None and _real_number(number) and not number.startswith('тест-'):
-        test_target = tasks.get((f'тест-{number}', variant)) or tasks.get((f'тест-{number}', ''))
+        test_target = compatible_target(tasks, number, variant, last)
         if test_target is not None:
             target, how = test_target, 'номер → тест-N'
     if force is None:

@@ -526,3 +526,33 @@ class SplitGluedTests(SimpleTestCase):
         self.assertEqual(report['склейка заданий разрезана по пропуску номеров'], 0)
         self.assertIn('3. Сравните варианты.', tasks[('2', '')].statement[0])
         self.assertEqual(tasks[('3', '')].statement, ['Третье из решений.'])
+
+    def test_23_compatible_target_follows_sequence_then_single_test(self):
+        from collections import OrderedDict
+
+        from problems.olympiad_audit import assemble
+        tasks = OrderedDict()
+        for n in ('тест-6', '4.5', '4.6', '2.1', '3.1'):
+            tasks[(n, '')] = assemble.Task('e', n)
+        after = tasks[('4.5', '')]
+        self.assertIs(assemble.compatible_target(tasks, '6', '', after), tasks[('4.6', '')])
+        self.assertIs(assemble.compatible_target(tasks, '6', '', None), tasks[('тест-6', '')])
+        # «1» при подпунктах «2.1», «3.1» — не угадываем.
+        self.assertIsNone(assemble.compatible_target(tasks, '1', '', tasks[('3.1', '')]))
+
+    def test_24_date_at_block_start_is_not_task_number(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from problems.olympiad_audit import assemble, transcribe
+        root = Path(tempfile.mkdtemp(prefix='finbiz2_date_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        transcribe.Transcriber._write(str(root / 'pages/t/p1.json'), {'status': 'ok', 'blocks': [
+            {'type': 'task', 'number': '4', 'text': 'Кейс: прочитайте записи блога.'},
+            {'type': 'task', 'number': '20.11', 'text': '**20.11.2013 Бизнес моей мечты**\n\nТекст.'}]})
+        event = {'event_id': 'mosh-entrepreneurship-2014-final-10-11-v1', 'grade': '10-11',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 1}]}
+        tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
+        self.assertEqual([t.number for t in tasks], ['4'])
+        self.assertIn('20.11.2013 Бизнес', '\n'.join(tasks[0].statement))
