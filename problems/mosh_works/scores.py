@@ -227,6 +227,12 @@ def verdict_rows(data, total_listed):
     if not rows or not max(len(r) for r in rows):
         return 'review', dict(empty, reason='no_tasks')
     width = max(len(r) for r in rows)
+    # Столбец «Сумма» модель иногда кладёт в cells последним: у бланка «Задача 1–4»
+    # задач четыре, у «Задание №1–№5» — пять; лишнее справа — это «Сумма».
+    limit = {'tasks4': 4, 'tasks5': 5}.get(data.get('form'))
+    if limit and width > limit:
+        rows = [r[:limit] for r in rows]
+        width = limit
     tasks, closed, blank = [], [], []
     for j in range(width):
         kinds = [cell(r[j] if j < len(r) else '') for r in rows]

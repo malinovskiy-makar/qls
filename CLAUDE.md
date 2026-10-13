@@ -270,6 +270,8 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
                                               # --apply со снимком, --revert
 ```
 
+⚠️ **Работы МОШ (`mosh_works`):** у части работ 2021 первая страница PDF — обложка с ФИО (фамилия, имя, отчество, школа), таблица баллов на странице 2; вырез — строго после проверки страницы (`scans.is_cover`), для 2022–2025 ещё щит рамки таблицы (`scans.table_shield`, статус `held_shield`). Иначе ФИО уходят в модель. [docs/MOSH_WORKS.md](docs/MOSH_WORKS.md).
+
 Подробности — в [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md), [docs/DATA.md](docs/DATA.md) и
 разделе «Ручное ревью и видимость каталога» ниже.
 

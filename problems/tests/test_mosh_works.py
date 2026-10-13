@@ -678,6 +678,13 @@ class Verdict2021Tests(SimpleTestCase):
         status, d = scores.verdict_rows(rows_reply(['5', '6', '7', '8'], total='30'), 26)
         self.assertEqual((status, d['reason']), ('review', 'sum_mismatch'))
 
+    def test_extra_sum_column_is_not_a_task(self):
+        """Модель положила «Сумма» пятой ячейкой в бланк из четырёх задач — срезается."""
+        status, d = scores.verdict_rows(rows_reply(['7', '9', '25', '25', ''], ['', '', '', '', '']), 66)
+        self.assertEqual((status, len(d['tasks'])), ('ok', 4))
+        status, d = scores.verdict_rows(rows_reply([None] * 5), 66)
+        self.assertEqual((status, len(d['tasks'])), ('hidden_by_stickers', 4))
+
     def test_format_and_no_rows(self):
         self.assertEqual(scores.verdict_rows({'_format_error': True}, 5)[1]['reason'], 'format')
         self.assertEqual(
