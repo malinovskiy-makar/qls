@@ -71,3 +71,52 @@ class ParseEventIdTests(SimpleTestCase):
                          _row('mosh-2015-final-8-9-day2')])
         self.assertEqual(old.event_for(2021, 10), 'vp-2021-final-10-v1')
         self.assertEqual(old.event_for(2015, '8-9'), 'mosh-2015-final-8-9-day2')
+
+
+class LayerMetricRepeatedLinesTests(SimpleTestCase):
+    """Мерило слоя: строки, повторённые на половине страниц файла (формулировки
+    теста, одиночные «1», «2», «3» вариантов), срезаются из слоя как колонтитулы.
+    Дословная расшифровка не должна получать за них «лишний текст»."""
+
+    QUESTION = 'Является ли он потребителем по Закону РФ «О защите прав потребителей»?'
+
+    STORIES = ['Авиапассажир смотрит телепрограмму в зале ожидания аэропорта.',
+               'Дарья Павловна оставила ребенка в бесплатном детском центре супермаркета.',
+               'Геннадий Гаврилович берет в метро бесплатную информационную газету.',
+               'Татьяна Андреевна получает молоко на молочной кухне бесплатно.']
+
+    def _layer(self, extra='', story=0):
+        return (f'9. Задача 9\n{self.STORIES[story]}\n'
+                f'{self.QUESTION}\n1\nНет. Он не является потребителем.\n2\n'
+                f'Да. Он является потребителем по определению.\n{extra}')
+
+    def _blocks(self, text_tail=''):
+        return [{'type': 'solution', 'number': '9',
+                 'text': ('Авиапассажир смотрит телепрограмму в зале ожидания аэропорта.\n\n'
+                          f'{self.QUESTION}\n\n1. Нет. Он не является потребителем.\n'
+                          '2. Да. Он является потребителем по определению.' + text_tail)}]
+
+    def test_5_repeated_lines_not_extra(self):
+        from problems.olympiad_audit import transcribe
+        layers = [self._layer(story=i) for i in range(4)]
+        footers = transcribe.repeated_lines(layers)
+        ratio, numbers_ok, missing, extra, _f = transcribe.layer_metrics(
+            self._blocks(), layers[0], footers, page=1)
+        self.assertGreaterEqual(ratio, 0.95)
+        self.assertEqual(extra, [])
+        self.assertTrue(numbers_ok)
+
+    def test_6_real_loss_still_caught(self):
+        from problems.olympiad_audit import transcribe
+        layers = [self._layer(story=i) for i in range(4)]
+        layers[0] = self._layer('Дополнительный абзац о правах пассажира в аэропорту и '
+                                'компенсации за задержку рейса составляет 500 рублей.')
+        footers = transcribe.repeated_lines(layers)
+        ratio, numbers_ok, missing, extra, _f = transcribe.layer_metrics(
+            self._blocks(), layers[0], footers, page=1)
+        self.assertLess(ratio, 0.90)
+        self.assertEqual(missing, ['500'])
+        # Выдуманное число, которого нет на странице, — по-прежнему лишнее.
+        ratio, numbers_ok, missing, extra, _f = transcribe.layer_metrics(
+            self._blocks(' Штраф 7777 рублей.'), self._layer(), footers, page=1)
+        self.assertEqual(extra, ['7777'])

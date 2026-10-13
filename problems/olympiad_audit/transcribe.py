@@ -305,16 +305,24 @@ def _numbers(text):
             extract_numeric_tokens(_DECIMAL.sub(r'\1,\2', text or ''))}
 
 
-def _word_f1(model_key, layer_key):
+def _word_f1(model_key, layer_key, full_key=None):
     """Совпадение слов (от 3 букв) в обе стороны, гармоническое среднее
-    полноты (всё ли из слоя переписано) и точности (нет ли лишнего)."""
+    полноты (всё ли из слоя переписано) и точности (нет ли лишнего).
+
+    Полнота — против слоя без колонтитулов (`layer_key`), точность — против
+    ВСЕГО слоя страницы (`full_key`): строка, которую `repeated_lines` счёл
+    колонтитулом (формулировка теста на каждой странице, вступление комплекта),
+    на странице есть, и переписать её — не «лишнее» (сессия 2, 13.10.2026:
+    МОШ-предпринимательство, пилот 0,909 при дословных расшифровках)."""
     got, want = Counter(_WORD.findall(model_key)), Counter(_WORD.findall(layer_key))
     if not want:
         return None
+    full = Counter(_WORD.findall(full_key)) if full_key is not None else want
     common = sum((got & want).values())
     if not common:
         return 0.0
-    recall, precision = common / sum(want.values()), common / sum(got.values())
+    recall = common / sum(want.values())
+    precision = sum((got & (full | want)).values()) / sum(got.values())
     return 2 * recall * precision / (recall + precision)
 
 
@@ -334,12 +342,15 @@ def layer_metrics(blocks, layer, footers=(), page=None):
     векторного графика, модель их в текст не переносит. Числа шапки (год,
     класс) не считаются лишними."""
     body = layer_body(layer, footers, page)
+    # Весь слой страницы (без срезки колонтитулов и одиночных чисел) — для
+    # точности: что есть на странице, то не «лишнее».
+    full = _HYPHEN_BREAK.sub(r'', layer or '')
     text, head = transcript_text(blocks), transcript_text(blocks, header=True)
     model_key = markup_free_key(text)
     layer_key = markup_free_key(body, pdf=True)
     if not layer_key:
         return None, None, [], [], None
-    ratio = _word_f1(model_key, layer_key)
+    ratio = _word_f1(model_key, layer_key, markup_free_key(full, pdf=True))
     fuzz_ratio = round(fuzz.token_sort_ratio(model_key, layer_key) / 100.0, 4)
     got = _numbers(text)
     want = _numbers(body)
@@ -357,7 +368,7 @@ def layer_metrics(blocks, layer, footers=(), page=None):
     got |= {form for form in glued if form in want}
     parts = set().union(*[p for form, p in glued.items() if form in want] or [set()])
     missing = sorted(want - got - _numbers(head))
-    extra = sorted(got - want - parts)
+    extra = sorted(got - want - parts - _numbers(full))
     if ratio is None:
         return None, None, missing, extra, fuzz_ratio
     return round(ratio, 4), not missing and not extra, missing, extra, fuzz_ratio
