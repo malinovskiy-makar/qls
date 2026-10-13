@@ -122,6 +122,9 @@ class Command(BaseCommand):
                          help='Только эти комплекты (по умолчанию все).')
         asm.add_argument('--no-crop', action='store_true',
                          help='Не вырезать рисунки (быстрая сборка).')
+        asm.add_argument('--suffix', default=None, metavar='vN',
+                         help='Версия выхода: reference_problems_<vN>.jsonl (по умолчанию v2; '
+                              'у новой олимпиады первая оцифровка — v1).')
         asm.add_argument('--v3', action='store_true',
                          help='Собрать в НОВУЮ папку v3\\ с заплатками pages_v3 '
                               '(v2 не трогается).')
@@ -355,6 +358,8 @@ class Command(BaseCommand):
                 v1_rows = digitize.read_jsonl(v1)
                 break
         extra = {}
+        if options.get('suffix') and not options.get('v3'):
+            extra = {'suffix': options['suffix']}
         if options.get('v3'):
             plan_path = self.digitized / 'triage_plan.csv'
             norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
