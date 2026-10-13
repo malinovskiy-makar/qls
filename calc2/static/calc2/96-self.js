@@ -164,7 +164,7 @@ function selfCell(cell, idx) {
 function selfAfterAnswer() {
   if (!SELF.on || SELF.all) return;
   const k = selfKey();
-  const cells = [...document.querySelectorAll('#ans-hero .ans-cell')];
+  const cells = [...document.querySelectorAll('#ans-hero .ans-cell:not(.ans-own-cell)')];   // свои площади — не числа модели (ADR 0148)
   if (!cells.length) return;
   const done = cells.every((c, i) => {
     const id = k + '#' + i;
@@ -211,7 +211,7 @@ function selfCanvas() {
   if (!chart) return;
   // Значения главных ячеек: у списка и точки — каждое число по отдельности.
   const heroes = [];
-  document.querySelectorAll('#ans-hero .ans-cell').forEach(c => {
+  document.querySelectorAll('#ans-hero .ans-cell:not(.ans-own-cell)').forEach(c => {
     const not = selfNot(c);
     const p = selfParse(selfText(c.querySelector('.ans-val')));
     if (p) p.items.forEach(it => it.forEach(v => heroes.push({ not, v })));
@@ -278,7 +278,7 @@ function selfOpenValues() {
   const xL = String(STATE.axisXName || STATE.axisXDefault || 'Q').charAt(0).toLowerCase();
   const yL = String(STATE.axisYName || STATE.axisYDefault || 'P').charAt(0).toLowerCase();
   const o = { X: [], Y: [], any: [], pts: [] };
-  document.querySelectorAll('#ans-hero .ans-cell').forEach((c, i) => {
+  document.querySelectorAll('#ans-hero .ans-cell:not(.ans-own-cell)').forEach((c, i) => {
     const id = k + '#' + i;
     if (!(SELF.open[id] || SELF.verdict[id] === true)) return;
     const p = selfParse(selfText(c.querySelector('.ans-val')));

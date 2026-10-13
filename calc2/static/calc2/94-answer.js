@@ -162,7 +162,9 @@ function answerSignature() {
   return String(STATE.sceneKey) + '|' + (sb ? sb.textContent.length + ':' + sb.textContent.slice(0, 4000) : '')
     + '|' + (ex ? ex.innerHTML.length : 0) + '|' + STATE.incBuyer + '|' + STATE.incSeller
     // Отрезок ответа: ручной отрезок с теми же числами ответа меняет строку под шапкой.
-    + '|' + (typeof _ansSeg !== 'undefined' && _ansSeg ? _ansSeg.a + ':' + _ansSeg.b : '');
+    + '|' + (typeof _ansSeg !== 'undefined' && _ansSeg ? _ansSeg.a + ':' + _ansSeg.b : '')
+    // Свои площади (ADR 0148): посчитали, убрали, переименовали — группа заново.
+    + '|' + (STATE.areaCalcList || []).map(r => r.id + ':' + r.label + ':' + r.value).join(',');
 }
 /* ⚠️ «ОТВЕТ» НЕ ЖДЁТ КАДРА, КОТОРОГО НЕ БУДЕТ (13.10). Пересборка отложена на
    кадр, чтобы протяжка не собирала колонку трижды за кадр. Но в фоновой
@@ -371,6 +373,25 @@ function buildAnswer() {
     g.cells.forEach(c => box.appendChild(answerRow(c, isMath)));
     host.appendChild(box);
   });
+  /* «Свои площади» (решение владельца 13.10, ADR 0148): посчитанные человеком
+     площади — группой ПОСЛЕ групп модели, в обоих режимах холста, строками
+     «название — число» тем же видом (ADR 0144). Строки помечены .ans-own-cell:
+     «Сначала сам» прячет их число, как остальные (selfCell), но главными
+     числами модели они не считаются — ни для «всё сошлось», ни для подписей
+     холста, ни для строки чисел «Скачать». Свои точки в «Ответ» не идут. */
+  const own = (STATE.areaCalcList || []).filter(r => r && isFinite(r.value));
+  if (own.length) {
+    const box = document.createElement('div');
+    box.className = 'ans-group ans-own';
+    box.appendChild(answerGroupHead({ title: 'Свои площади' }));
+    own.forEach(r => {
+      const row = answerRow({ src: 'area#' + r.id, labText: r.label, valText: fmt(r.value), over: [r.label, ''] }, false);
+      row.classList.add('ans-own-cell');
+      box.appendChild(row);
+    });
+    host.appendChild(box);
+  }
+  host.hidden = !cells.length && !own.length;
   buildSegNote();
   buildStatus();
   buildBurden();

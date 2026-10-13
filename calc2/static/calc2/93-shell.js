@@ -109,9 +109,10 @@ function wireShell() {
   // Панель режима: «← Условие» и «Готово» обе возвращают «Курсор».
   ['pts-back', 'pts-done'].forEach(id => {
     const b = document.getElementById(id);
-    if (b) b.addEventListener('click', () => {
+    if (b) b.addEventListener('click', (e) => {
       setPtsMode(false);
-      if (tp && tp.offsetParent) tp.focus({ preventScroll: true });
+      // С клавиатуры фокус не теряется вместе с панелью; мышью его не двигаем.
+      if (e.detail === 0 && tp && tp.offsetParent) tp.focus({ preventScroll: true });
     });
   });
   const sw = document.getElementById('model-switch');

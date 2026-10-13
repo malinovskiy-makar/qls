@@ -1707,7 +1707,8 @@ function paperChartClone() {
 }
 // Главные числа ответа строкой: «Q = 40   Pb = 60 …» (ячейки «Ответа»).
 function exportNumbersLine() {
-  return [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => {
+  // Свои площади (.ans-own-cell, ADR 0148) в строку чисел не идут: выгрузка не меняется.
+  return [...document.querySelectorAll('#ans-hero .ans-cell:not(.ans-own-cell)')].map(c => {
     const t = (el) => { if (!el) return ''; const k = el.cloneNode(true); k.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return k.textContent.replace(/\s+/g, ' ').trim(); };
     const n = t(c.querySelector('.ans-not'));
     const v = (typeof selfMasked === 'function' && selfMasked()) ? '?' : t(c.querySelector('.ans-val'));   // «Сначала сам»

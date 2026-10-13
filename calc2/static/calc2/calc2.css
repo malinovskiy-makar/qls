@@ -2738,9 +2738,8 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .show-sw { flex: 0 0 14px; width: 14px; height: 14px; border-radius: var(--r-sm); background: var(--chip-bg); border: 1px solid var(--border-soft); }
 .show-name { flex: 1 1 auto; min-width: 0; }
 .show-not { flex: 0 0 auto; font-size: 15px; font-weight: 400; color: var(--text2); font-family: 'KaTeX_Main', 'Times New Roman', serif; }
-/* «Свои точки и площади» — одна секция из двух прежних блоков. */
-#tools-panel .tools-body > #sec-areascalc.section.card { border-top: 0; padding-top: 0; }
-#sec-areascalc > .sec-head { display: none; }
+/* «Точки» и «Площади» с 13.10 живут в панели режима (#pts-panel, ADR 0148),
+   у каждой свой заголовок — прежнее слияние в одну секцию «Условия» снято. */
 
 /* ── Окно «Кусочная функция» (README макета, 6.6 и раздел 10) ─────────
    640, с клавиатурой 992; высота до «окно − 32», тело прокручивается. */
@@ -2968,9 +2967,9 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cv-tool {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--text2);
-  font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
 }
-.cv-tool svg { width: 16px; height: 16px; }
+.cv-tool svg { width: 16px; height: 16px; flex: 0 0 16px; }
 .cv-tool:hover { color: var(--text); }
 .cv-tool[aria-pressed="true"] { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 600; }
 .cv-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
