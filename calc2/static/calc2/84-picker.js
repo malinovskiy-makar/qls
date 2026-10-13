@@ -524,6 +524,10 @@ function plural(n, forms) {
 }
 
 function pickScene(key) {
+  /* Смена модели возвращает «Курсор» (ADR 0148). Только СМЕНА: «Сбросить» и
+     «Отменить» зовут pickScene той же модели, и режим у человека остаётся. */
+  if (STATE.sceneKey && STATE.sceneKey !== key && typeof CANVAS !== 'undefined' && CANVAS.pts
+      && typeof setPtsMode === 'function') setPtsMode(false);
   // П51: уходя из модели, кладём её состояние на полку — вернёмся, достанем.
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
   /* Канонический старт (89-model-state.js): все входы — и в STATE, и в форме —

@@ -27,8 +27,11 @@
 /* Поля STATE, которые не являются входами модели и не переносятся ни в
    чистый старт, ни в память: следы мыши, пиксели панелей, ключ модели
    (его ставит pickScene). */
+/* markArm, vertArm — взведённая заготовка точки и набор вершин: состояние
+   режима холста «Точки и площади», а не модели (ADR 0148). В истории их
+   переключение давало бы шаг «Отменить», в ссылке — взведённый режим. */
 const MODEL_STATE_SKIP = new Set(['panels', 'pointerPx', 'pointerPy', 'roller', 'hoverCross', 'armedCurve',
-  'sceneKey', 'resizeRedraws']);
+  'sceneKey', 'resizeRedraws', 'markArm', 'vertArm']);
 
 /* Глубокая копия ПРОСТЫХ данных. Скомпилированные формулы, функции сцен и
    объекты с прототипом не копируются: это кэши расчёта, их пересобирает
@@ -63,7 +66,10 @@ function plainCopy(v, depth) {
    ADR 0144): его aria-pressed в форме делал включение режима шагом истории, и
    «Отменить» гасила кнопку, а режим оставался (SELF.on, body.self-on). Режим
    живёт в SELF, ссылка несёт его отдельно (&self=1, окно «Поделиться»). */
-const FORM_SKIP_IDS = new Set(['btn-self']);
+/* Кнопки режима холста и панели режима «Точки и площади» (ADR 0148) — тоже вид:
+   нажатость «Курсор» / «Точки и площади» в форме делала бы вход в режим шагом
+   истории и несла бы режим в ссылку. */
+const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc']);
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];

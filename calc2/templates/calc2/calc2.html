@@ -1631,8 +1631,9 @@
     </div>
     </div><!-- /#sec-input -->
 
-    <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
-         границы, легенда) переехало в меню гаечного ключа над графиком. -->
+    <!-- Свои точки и площади переехали в панель режима «Точки и площади»
+         (#pts-panel, ADR 0148). Оформление плоскости (название, оси, сетка,
+         границы, легенда) — в меню «Вид графика» над холстом. -->
     <!-- «Параметры» (редизайн 10.2026): ползунки сдвигов и букв, которые
          раньше пульт собирал в правой панели. Регуляторы сцен остаются в своих
          секциях — пульт их больше не переносит (88-params.js). -->
@@ -1761,114 +1762,127 @@
           <span class="show-sw" data-area="PS"></span><span class="show-name">Излишек продавца</span><span class="show-not">PS</span></label>
       </div>
     </div>
-    <div class="section" id="sec-view">
-      <button class="fold-btn" id="marks-btn" type="button" aria-expanded="true" aria-controls="marks-body">
-        <span>Свои точки и площади</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
-           renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
-      <div class="fold-body open" id="marks-body">
-        <div class="hint-row">
-          <span class="hint-lead">Зачем ставить точки</span>
-          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
-        </div>
-        <div class="hint-pop" id="hp-marks">
-          <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
-            или щелчком по плоскости; рядом с кривой прилипает к ней.</p>
-          <p>Галочки решают, что видно: координаты, пунктир к осям, подпись. У каждой точки свой цвет.</p>
-          <!-- п. 33. Возможности холста названы здесь, а не в подсказке браузера:
-               на сенсорном экране её нет вовсе, а плашка поверх самой фигуры
-               перехватывает указатель и мешает по ней попасть. -->
-          <p>Пересечения, изломы и вершины машина находит сама: по наведению у них появляется
-            значок, кладущий точку в список. Подписи переименовываются двойным щелчком.</p>
-        </div>
-        <div id="mark-list"></div>
-      </div>
-    </div>
-
-    <!-- Раздел «Цвета областей» удалён (Н59): области сцены переехали строками в
-         таблицу площадей, где у них есть и число, и тот же выбор цвета. -->
-
-    <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
-    <div class="section" id="sec-areascalc">
-      <button class="fold-btn" id="areascalc-btn" type="button" aria-expanded="false" aria-controls="areascalc-body">
-        <span>Площади</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="fold-body" id="areascalc-body">
-        <div class="hint-row">
-          <span class="hint-lead">Что здесь считается</span>
-          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
-        </div>
-        <div class="hint-pop" id="hp-areascalc">
-          <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
-          <p>Второй способ считает площадь многоугольника по отмеченным вершинам: так берут излишки, сбор бюджета и потери общества, когда фигуру ограничивают не одна кривая, а отрезки.</p>
-          <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
-        </div>
-
-        <!-- Сегмент «Под кривой | Между точками» (ADR 0144): две половины, как
-             переключатель формата в окне «Скачать», а не тумблер. -->
-        <div class="seg ac-mode" id="ac-mode" role="radiogroup" aria-label="Как считаем площадь">
-          <button class="seg-btn active" id="ac-curve" type="button" role="radio" aria-checked="true">Под кривой</button>
-          <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">Между точками</button>
-        </div>
-
-        <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
-             Границы первой четверти подставляются сами, поля «от/до» больше
-             не нужны: их прежний смысл целиком в этой подписи. -->
-        <!-- Б16. Подпись отрезка стоит ОТДЕЛЬНОЙ СТРОКОЙ под списком. В одной
-             строке со списком места ей не оставалось, и «на отрезке [0; 100]»
-             переносилось по одному знаку в полосу шириной в два десятка
-             пикселей, а хвост обрезался краем панели. -->
-        <div id="ac-pane-curve">
-          <!-- Выбор кривой — кнопками с цветной точкой (ADR 0144). Скрытый
-               select остаётся источником правды: его значение читают сцены,
-               форма модели и приборы; кнопки пишут в него и шлют change. -->
-          <div class="ac-pick-row">
-            <div class="ac-cbtns" id="ac-pick-btns" role="radiogroup" aria-label="Кривая, под которой считается площадь"></div>
-            <select id="ac-pick" hidden aria-hidden="true" tabindex="-1"></select>
-          </div>
-          <div class="ac-range" id="ac-range"></div>
-        </div>
-
-        <!-- п. 27. Пустое состояние по канону 3.13 называет первый шаг, а не
-             ставит человека перед выключенной кнопкой. п. 28: «Убрать все
-             вершины» стоит ПОД списком — разрушающее действие не может
-             опережать то, что оно разрушает. -->
-        <div id="ac-pane-poly" style="display:none;">
-          <div class="k-empty" id="ac-verts-empty">
-            <b>Ещё ни одной вершины</b>
-            <p>Нажимайте на график: каждый щелчок ставит вершину, а рядом с
-               особой точкой она садится точно в неё. Нужно хотя бы три.</p>
-          </div>
-          <div id="ac-verts"></div>
-          <!-- п. 25. Набор вершин можно начать заново: без этой кнопки выход из
-               режима был бы дорогой в один конец. Пока вершины отмечаются, её
-               здесь нет: закончить набор предлагает полоса режима над холстом,
-               и двух одинаковых кнопок в двух местах не нужно. -->
-          <button class="btn btn-quiet" id="ac-vert-arm" type="button" style="margin-top:6px;width:100%;">Отмечать вершины</button>
-          <div class="vert-btns" id="ac-vert-btns" style="display:none;">
-            <button class="btn btn-quiet" id="ac-vert-clear" type="button" style="margin-top:6px;width:100%;">Убрать все вершины</button>
-          </div>
-        </div>
-
-        <button class="btn btn-quiet" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
-        <div class="error" id="ac-error"></div>
-        <div id="info-areacalc" style="margin-top:8px;"></div>
-        <!-- Н57: «Убрать всё» стоит ПОД таблицей, к которой относится. Над ней
-             она читалась как продолжение кнопки расчёта.
-             Б17: главная и второстепенная кнопки одного семейства — один
-             размер и одна геометрия, разная только заливка. Б18: «всё». -->
-        <button class="btn btn-quiet" id="ac-clear" type="button" style="margin-top:6px;width:100%;">Убрать всё</button>
-      </div>
-    </div>
-
 </div><!-- /tools-body -->
         </section>
 
       </div><!-- /side-scroll -->
     </div><!-- /side-inner -->
+  </aside>
+
+  <!-- ── ПАНЕЛЬ РЕЖИМА «ТОЧКИ И ПЛОЩАДИ» (решение владельца 13.10, ADR 0148) ──
+       Стоит на месте «Условия», пока включён режим холста «Точки и площади»
+       (93-shell.js, setPtsMode). Разделы «Точки» и «Площади» — те же узлы с
+       теми же id, что жили в «Условии» (#sec-view, #mark-list, #sec-areascalc,
+       #ac-mode, #ac-pick): ПЕРЕЕЗД, не копия. «Условие» прячется классом
+       body.pts-on, не атрибутом hidden (поле MathLive со скрытым предком
+       fieldActive считает мёртвым); при возврате — afterColumnShown(). -->
+  <aside class="side side-left col-cond col-pts" id="pts-panel" aria-label="Точки и площади">
+    <div class="side-inner">
+      <div class="side-head col-head pts-head">
+        <button class="col-quiet pts-back" id="pts-back" type="button">← Условие</button>
+        <button class="pts-done" id="pts-done" type="button">Готово</button>
+      </div>
+      <div class="side-scroll">
+        <section class="side-part pts-body">
+          <h2 class="pts-title">Точки и площади</h2>
+          <p class="pts-hint">Щёлкните по графику: точка встанет на ближайшую кривую, пересечение или ключевую точку.</p>
+      <div class="section" id="sec-view">
+        <h3 class="sec-head pts-sec-head">Точки</h3>
+        <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
+             renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
+        <div class="fold-body open" id="marks-body">
+          <div class="hint-row">
+            <span class="hint-lead">Зачем ставить точки</span>
+            <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
+          </div>
+          <div class="hint-pop" id="hp-marks">
+            <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
+              или щелчком по плоскости; рядом с кривой прилипает к ней.</p>
+            <p>Галочки решают, что видно: координаты, пунктир к осям, подпись. У каждой точки свой цвет.</p>
+            <!-- п. 33. Возможности холста названы здесь, а не в подсказке браузера:
+                 на сенсорном экране её нет вовсе, а плашка поверх самой фигуры
+                 перехватывает указатель и мешает по ней попасть. -->
+            <p>Пересечения, изломы и вершины машина находит сама: по наведению у них появляется
+              значок, кладущий точку в список. Подписи переименовываются двойным щелчком.</p>
+          </div>
+          <div id="mark-list"></div>
+        </div>
+      </div>
+
+      <!-- Раздел «Цвета областей» удалён (Н59): области сцены переехали строками в
+           таблицу площадей, где у них есть и число, и тот же выбор цвета. -->
+
+      <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
+      <div class="section" id="sec-areascalc">
+        <h3 class="sec-head pts-sec-head">Площади</h3>
+        <div class="fold-body open" id="areascalc-body">
+          <div class="hint-row">
+            <span class="hint-lead">Что здесь считается</span>
+            <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
+          </div>
+          <div class="hint-pop" id="hp-areascalc">
+            <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
+            <p>Второй способ считает площадь многоугольника по отмеченным вершинам: так берут излишки, сбор бюджета и потери общества, когда фигуру ограничивают не одна кривая, а отрезки.</p>
+            <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
+          </div>
+
+          <!-- Сегмент «+ Под кривой | + Между точками» (ADR 0144, 0148): кнопка
+               открывает построение площади своим способом; пока построения нет,
+               панели способа и «Посчитать площадь» спрятаны (#sec-areascalc без
+               .ac-open, 60-overlays.js). Источник правды — по-прежнему STATE.areaCalcMode. -->
+          <div class="seg ac-mode" id="ac-mode" role="radiogroup" aria-label="Как считаем площадь">
+            <button class="seg-btn active" id="ac-curve" type="button" role="radio" aria-checked="true">+ Под кривой</button>
+            <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">+ Между точками</button>
+          </div>
+
+          <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
+               Границы первой четверти подставляются сами, поля «от/до» больше
+               не нужны: их прежний смысл целиком в этой подписи. -->
+          <!-- Б16. Подпись отрезка стоит ОТДЕЛЬНОЙ СТРОКОЙ под списком. В одной
+               строке со списком места ей не оставалось, и «на отрезке [0; 100]»
+               переносилось по одному знаку в полосу шириной в два десятка
+               пикселей, а хвост обрезался краем панели. -->
+          <div id="ac-pane-curve">
+            <!-- Выбор кривой — кнопками с цветной точкой (ADR 0144). Скрытый
+                 select остаётся источником правды: его значение читают сцены,
+                 форма модели и приборы; кнопки пишут в него и шлют change. -->
+            <div class="ac-pick-row">
+              <div class="ac-cbtns" id="ac-pick-btns" role="radiogroup" aria-label="Кривая, под которой считается площадь"></div>
+              <select id="ac-pick" hidden aria-hidden="true" tabindex="-1"></select>
+            </div>
+            <div class="ac-range" id="ac-range"></div>
+          </div>
+
+          <!-- п. 27. Пустое состояние по канону 3.13 называет первый шаг, а не
+               ставит человека перед выключенной кнопкой. п. 28: «Убрать все
+               вершины» стоит ПОД списком — разрушающее действие не может
+               опережать то, что оно разрушает. -->
+          <div id="ac-pane-poly" style="display:none;">
+            <div class="k-empty" id="ac-verts-empty">
+              <b>Ещё ни одной вершины</b>
+              <p>Нажимайте на график: каждый щелчок ставит вершину, а рядом с
+                 особой точкой она садится точно в неё. Нужно хотя бы три.</p>
+            </div>
+            <div id="ac-verts"></div>
+            <!-- п. 25. Набор вершин можно начать заново: без этой кнопки выход из
+                 режима был бы дорогой в один конец. Пока вершины отмечаются, её
+                 здесь нет: закончить набор предлагает полоса режима над холстом,
+                 и двух одинаковых кнопок в двух местах не нужно. -->
+            <button class="btn btn-quiet" id="ac-vert-arm" type="button" style="margin-top:6px;width:100%;">Отмечать вершины</button>
+            <div class="vert-btns" id="ac-vert-btns" style="display:none;">
+              <button class="btn btn-quiet" id="ac-vert-clear" type="button" style="margin-top:6px;width:100%;">Убрать все вершины</button>
+            </div>
+          </div>
+
+          <button class="btn btn-quiet" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
+          <div class="error" id="ac-error"></div>
+          <div id="info-areacalc" style="margin-top:8px;"></div>
+        </div>
+      </div>
+          <button class="btn btn-quiet pts-clear" id="ac-clear" type="button">Убрать всё</button>
+        </section>
+      </div>
+    </div>
   </aside>
 
   <!-- ── КОЛОНКА ХОЛСТА ─────────────────────────────────────────────── -->
@@ -1882,13 +1896,15 @@
          Стоит ВНЕ #graph-wrap: на обёртке холста висят колесо, протяжка и
          двойной щелчок (52-modes.js), и под кнопками они сдвигали бы график. -->
     <div class="cv-bar" id="canvas-bar" role="toolbar" aria-label="Холст">
-      <!-- Инструмент холста (README макета, 7.1): те же режимы, что «Добавить
-           точку» и «Между точками» в «Своих точках и площадях» (93-shell.js). -->
+      <!-- Инструмент холста: «Курсор» | «Точки и площади» (решение владельца 13.10,
+           ADR 0148; 93-shell.js). Режим точек — вид, не модель: кнопки вне формы
+           (FORM_SKIP_IDS), в историю и ссылку не идут. Подпись «Esc: выйти из
+           режима» видна только в режиме. -->
       <div class="cv-tools" role="group" aria-label="Инструмент">
         <button class="cv-tool" id="tool-cursor" type="button" aria-pressed="true" data-tip="Тянуть ручки и двигать график"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg><span>Курсор</span></button>
-        <button class="cv-tool" id="tool-point" type="button" aria-pressed="false" data-tip="Поставить свою точку"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg><span>Точка</span></button>
-        <button class="cv-tool" id="tool-area" type="button" aria-pressed="false" data-tip="Посчитать площадь по вершинам"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 18l3-12 11 4-4 8z"/></svg><span>Площадь</span></button>
+        <button class="cv-tool" id="tool-pts" type="button" aria-pressed="false" data-tip="Ставить свои точки и считать площади"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18l3-12 11 4-4 8z"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/></svg><span>Точки и площади</span></button>
       </div>
+      <span class="cv-esc" id="cv-esc" aria-hidden="true">Esc: выйти из режима</span>
       <span class="cv-gap"></span>
       <button class="gt-btn cv-answer-btn" id="btn-answer" type="button" aria-expanded="false" data-tip="Показать «Ответ»">Ответ</button>
       <span class="cv-zoom" id="zoom-level" aria-live="polite">100&nbsp;%</span>

@@ -1729,30 +1729,33 @@ function wireControls() {
   const yName = document.getElementById('inp-yname');
   if (yName) yName.addEventListener('input', () => { STATE.axisYName = yName.value; redrawAll(); });
 
-  /* Своя точка (П28): режим взводит тумблер «Указать на графике» в самой
-     строке заготовки, отдельной кнопки над списком больше нет. */
+  /* Своя точка. С 13.10 (ADR 0148) её ставит щелчок в режиме холста «Точки и
+     площади» (canvasMode() === 'pts'), режим после щелчка остаётся; прежняя
+     заготовка «на графике» (armMark) снимается после одной точки, как раньше. */
   const chartEl = document.getElementById('chart');
   if (chartEl) chartEl.addEventListener('click', (ev) => {
-    if (!STATE.markArm) return;
+    const cm = canvasMode();
+    if (cm !== 'mark' && cm !== 'pts') return;
     // Панель решает МЕСТО ЩЕЛЧКА: в многопанельной сцене это не одно и то же.
     const [px, py] = d3.pointer(ev, chartEl);
     const pan = panelAt(px, py);
     const pid = pan ? pan.id : null;
     const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-    armMark(false);
-    showSnapHint(null);
+    if (cm === 'mark') { armMark(false); showSnapHint(null); }
     /* Рядом с кривой точка садится НА неё, в пустом месте остаётся где щёлкнули.
        Магнит тот же, что у вершин площади (Н41, Н54): в ключевую точку попасть
        должно быть заметно легче, чем мимо, и правило это одно на все три случая
        (своя точка, вершина площади, перетаскивание готовой). */
     const hit = snapVertexAt(px, py);
+    // Щелчок по своей же точке в режиме — не вторая точка поверх (её тянут или правят).
+    if (cm === 'pts' && hit && hit.mark) return;
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     // К пересечению и к особой точке не привязываем: скольжение по одной из
     // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
-    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid);
+    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid, keyOnText(hit));
   });
   // Набор вершин площади: щелчок ставит вершину и режим не снимается —
   // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
@@ -1779,13 +1782,13 @@ function wireControls() {
      гасит: так решил владелец. Полосы кривых и кружки точек останавливают
      всплытие, поэтому сюда доходит только настоящее «мимо». */
   if (chartEl) chartEl.addEventListener('click', () => {
-    if (STATE.markArm || STATE.vertArm) return;      // взведённые режимы заняты своим
+    if (canvasArmed()) return;      // взведённые режимы заняты своим
     disarmCurve();
   });
 
   // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
   if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
-    if (!STATE.markArm && !STATE.vertArm) return;
+    if (!canvasArmed()) return;
     const [px, py] = d3.pointer(ev, chartEl);
     // Н55: подсказка показывает ключевую точку в обоих режимах, а не только при
     // наборе вершин — иначе не видно, куда именно сядет своя точка.
@@ -1795,9 +1798,19 @@ function wireControls() {
   /* Esc снимает ЛЮБОЙ взведённый режим — иначе курсор-перекрестие остаётся
      «залипшим». Раньше Escape знал только про свою точку, и из набора вершин
      выйти с клавиатуры было нечем. То же делает кнопка в полосе режима. */
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && canvasArmed()) leaveCanvasMode(); });
+  /* Режим «Точки и площади» (ADR 0148): Esc — только вне поля ввода и без
+     открытых окон (их Esc закрывает окно или отменяет правку). Слушаем в фазе
+     захвата: обработчики окон закрывают их на том же нажатии, и после них
+     окно выглядело бы уже закрытым. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !canvasArmed()) return;
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('input, textarea, select, math-field, [contenteditable="true"], [contenteditable=""]')) return;
+    if (document.querySelector('.pop.open, .modal.open, .cpick-menu.open, #wrench-pop.open, .hint-pop.open, #pt-rename')) return;
+    leaveCanvasMode();
+  }, true);
   const cvStop = document.getElementById('cv-mode-stop');
-  if (cvStop) cvStop.addEventListener('click', () => leaveCanvasMode());
+  if (cvStop) cvStop.addEventListener('click', () => finishCanvasMode());
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
   wireFolds();               // сворачивание любых секций со складным заголовком

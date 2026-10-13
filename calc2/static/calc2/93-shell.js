@@ -57,33 +57,62 @@ function afterColumnShown() {
   });
 }
 
-/* Инструмент холста: «Курсор», «Точка», «Площадь» (README макета, 7.1).
-   Своих режимов нет — это прежние «Добавить точку → Указать на графике» и
-   «Площади → Между точками»; состояние спрашивается у canvasMode(). */
+/* Инструмент холста: «Курсор» | «Точки и площади» (решение владельца 13.10,
+   ADR 0148). Прежние три («Курсор», «Точка», «Площадь») слились в два: площадь
+   всё равно строится из точек или под кривой. Режим — ВИД (CANVAS.pts,
+   00-config.js), не модель: кнопки вне формы (FORM_SKIP_IDS), ни истории, ни
+   ссылки. В режиме на месте «Условия» стоит панель #pts-panel; «Условие»
+   прячется классом body.pts-on (не hidden: поле MathLive со скрытым предком
+   fieldActive считает мёртвым), при возврате — afterColumnShown(). */
 function syncToolSeg() {
-  const m = (typeof canvasMode === 'function') ? canvasMode() : 'look';
-  [['tool-cursor', 'look'], ['tool-point', 'mark'], ['tool-area', 'vert']].forEach(([id, want]) => {
+  const on = !!(typeof CANVAS !== 'undefined' && CANVAS.pts);
+  [['tool-cursor', !on], ['tool-pts', on]].forEach(([id, p]) => {
     const b = document.getElementById(id);
-    if (b) b.setAttribute('aria-pressed', m === want ? 'true' : 'false');
+    if (b) b.setAttribute('aria-pressed', p ? 'true' : 'false');
   });
 }
-function setTool(which) {
-  if (STATE.markArm && which !== 'mark' && typeof cancelMarkDraft === 'function') cancelMarkDraft();
-  if (STATE.vertArm && which !== 'vert' && typeof armVerts === 'function') armVerts(false);
-  if (which === 'mark' && !STATE.markArm) {
-    if (typeof startMarkDraft === 'function') startMarkDraft();
-    const m = (typeof pendingMark === 'function') ? pendingMark() : null;
-    if (m) { m.mode = 'graph'; if (typeof renderMarkList === 'function') renderMarkList(); }
-    if (typeof armMark === 'function') armMark(true);
+function setPtsMode(on) {
+  on = !!on;
+  if (!on) {
+    // Выход из режима закрывает всё, что в нём начато: заготовку точки,
+    // набор вершин (без площади), открытое построение.
+    if (STATE.markArm && typeof cancelMarkDraft === 'function') cancelMarkDraft();
+    if (typeof closeAreaBuild === 'function') {
+      if (STATE.vertArm && typeof cancelAreaBuild === 'function') cancelAreaBuild(); else closeAreaBuild();
+    }
   }
-  if (which === 'vert' && !STATE.vertArm && typeof setAreaCalcMode === 'function') setAreaCalcMode('poly');
+  const was = CANVAS.pts;
+  CANVAS.pts = on;
+  document.body.classList.toggle('pts-on', on);
+  const wrap = document.getElementById('graph-wrap');
+  if (wrap && !STATE.markArm && !STATE.vertArm) wrap.style.cursor = on ? 'crosshair' : '';
+  if (!on && typeof showSnapHint === 'function') showSnapHint(null);
   syncToolSeg();
+  if (typeof syncCanvasMode === 'function') syncCanvasMode();
+  if (was === on) return;
+  if (!on) afterColumnShown();
+  // Кружки ключевых точек и полосы кривых в режиме щелчок не ловят: холст заново.
+  if (typeof redrawAll === 'function') redrawAll();
+}
+/* Прежний вход (приборы, старые ссылки в коде): 'mark' и 'vert' — режим
+   «Точки и площади» (второй ещё и открывает «Между точками»), 'look' — «Курсор». */
+function setTool(which) {
+  if (which === 'look') { setPtsMode(false); return; }
+  setPtsMode(true);
+  if (which === 'vert' && !STATE.vertArm && typeof setAreaCalcMode === 'function') setAreaCalcMode('poly');
 }
 
 function wireShell() {
-  [['tool-cursor', 'look'], ['tool-point', 'mark'], ['tool-area', 'vert']].forEach(([id, w]) => {
+  const tc = document.getElementById('tool-cursor'), tp = document.getElementById('tool-pts');
+  if (tc) tc.addEventListener('click', () => setPtsMode(false));
+  if (tp) tp.addEventListener('click', () => setPtsMode(true));
+  // Панель режима: «← Условие» и «Готово» обе возвращают «Курсор».
+  ['pts-back', 'pts-done'].forEach(id => {
     const b = document.getElementById(id);
-    if (b) b.addEventListener('click', () => setTool(w));
+    if (b) b.addEventListener('click', () => {
+      setPtsMode(false);
+      if (tp && tp.offsetParent) tp.focus({ preventScroll: true });
+    });
   });
   const sw = document.getElementById('model-switch');
   if (sw) {

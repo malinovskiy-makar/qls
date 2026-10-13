@@ -33,6 +33,7 @@ function redrawAll() {
      заставал: замер 24.08 находил 26 таких мест в семи сценах. Здесь панель
      собрана целиком, кто бы что ни дописал. */
   markNotationsIn(document.getElementById('tools-panel'));
+  markNotationsIn(document.getElementById('pts-panel'));   // панель режима «Точки и площади» (ADR 0148)
   markNotationsIn(document.getElementById('params-panel'));
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
@@ -47,7 +48,7 @@ function redrawAll() {
   // А6: обычных текстовых окошек в панели не остаётся — имена правятся на
   // месте тем же способом, что и числа. Строки сцен собираются на лету,
   // поэтому проходим по панели после каждой перерисовки.
-  if (typeof upgradeTextFieldsIn === 'function') upgradeTextFieldsIn('tools-panel');
+  if (typeof upgradeTextFieldsIn === 'function') { upgradeTextFieldsIn('tools-panel'); upgradeTextFieldsIn('pts-panel'); }
   // Кусочная запись обязана помещаться в поле целиком (решение владельца 24.08):
   // строка отдаёт полю всю ширину, кегль подбирается вниз до предела 11 px.
   if (typeof fitFormulaFieldsSoon === 'function') fitFormulaFieldsSoon();
@@ -494,6 +495,7 @@ function drawOverlays() {
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+  renderMathIn(document.getElementById('pts-panel'));  // и панели режима «Точки и площади»
   /* Обозначения в подписях панели размечает redrawAll в самом конце: сцена
      дописывает часть текста позже, и проход отсюда её не застаёт. */
 }
@@ -1519,7 +1521,7 @@ function snapVertexAt(px, py) {
   // Своя точка — кандидат только в СВОЕЙ панели: в соседней её нет на экране.
   (STATE.marks || []).filter(mk => markPanelId(mk) === pid).forEach(mk => {
     const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d, panel: pid };
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d, panel: pid, mark: mk.id };
   });
   if (best) return best;
   const hit = snapPointAt(px, py);
@@ -1573,7 +1575,8 @@ function drawCrossPoints() {
   // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
-  if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
+  // То же в режиме «Точки и площади» (ADR 0148): щелчок там ставит свою точку.
+  if (canvasArmed()) g.style('pointer-events', 'none');
 
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
@@ -1732,7 +1735,7 @@ function keyPointLit(p) {
    Имена, у которых полоса уже есть, пропускаем: две полосы на одну кривую
    означали бы, что верхняя молча съедает щелчок по нижней. */
 function drawCurveHits() {
-  if (STATE.markArm || STATE.vertArm) return;   // сейчас на холсте ставят точку
+  if (canvasArmed()) return;   // сейчас на холсте ставят точку или строят площадь
   /* Полосы нужны у ВСЕХ кривых сцены, а не только у панели под курсором:
      щёлкнуть по кривой соседней панели человек вправе. Считает каждую полосу
      её собственная панель. */
@@ -1981,7 +1984,7 @@ function armVerts(on) {
   const was = STATE.vertArm;
   STATE.vertArm = !!on;
   const wrap = document.getElementById('graph-wrap');
-  if (wrap) wrap.style.cursor = STATE.vertArm ? 'crosshair' : '';
+  if (wrap) wrap.style.cursor = (STATE.vertArm || CANVAS.pts) ? 'crosshair' : '';
   if (!STATE.vertArm) showSnapHint(null);
   renderVertList();
   syncCanvasMode();
@@ -2005,10 +2008,12 @@ const CANVAS_MODE_TEXT = {
      появляется результат. */
   vert: () => {
     const n = (STATE.areaVerts || []).length;
-    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ''))
+    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ', щелчок по первой замкнёт'))
                    : '· каждый щелчок ставит вершину';
     return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
   },
+  /* Режим «Точки и площади» без построения строки не показывает: о режиме
+     говорят рамка холста, нажатая кнопка и «Esc: выйти из режима» (ADR 0148). */
 };
 
 /* Служебные узлы холста (COVERAGE, 6.8): ручки (кружки, которые тянут
@@ -2052,11 +2057,18 @@ function syncCanvasMode() {
   if (stop) stop.textContent = t.stop;
 }
 
-// Выйти из любого взведённого режима холста. Одна дверь на кнопку «Готово»,
-// на Escape и на всё, что режим прерывает.
+// Выйти из любого взведённого режима холста. Одна дверь на Escape и на всё,
+// что режим прерывает. Построение площади отменяется, НЕ выходя из режима
+// «Точки и площади»; без построения Esc возвращает «Курсор» (ADR 0148).
 function leaveCanvasMode() {
   if (STATE.markArm) { cancelMarkDraft(); return; }
-  if (STATE.vertArm) armVerts(false);
+  if (STATE.vertArm) { cancelAreaBuild(); return; }
+  if (CANVAS.pts && typeof setPtsMode === 'function') setPtsMode(false);
+}
+// «Готово» в строке построения: набор вершин заканчивается площадью.
+function finishCanvasMode() {
+  if (STATE.markArm) { cancelMarkDraft(); return; }
+  if (STATE.vertArm) finishPolyBuild();
 }
 
 function addAreaVert(x, y, name, panel) {
@@ -2327,6 +2339,9 @@ function drawAreaVerts() {
         // холсту, который придёт следом, надо погасить: иначе на том же месте
         // тут же появится новая вершина.
         STATE._vertClickEaten = true;
+        // Режим «Точки и площади»: щелчок по ПЕРВОЙ вершине при трёх и больше
+        // замыкает фигуру — то же, что «Готово» (ADR 0148).
+        if (i === 0 && list.length >= 3 && CANVAS.pts) { finishPolyBuild(); return; }
         STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
         renderVertList(); redrawAll();
       }));
@@ -2449,7 +2464,7 @@ function runAreaCalc() {
   const res = (STATE.areaCalcMode === 'poly') ? calcAreaPolygon() : calcAreaUnderCurve();
   if (res.error) {
     if (err) { err.textContent = res.error; err.style.display = 'block'; }
-    return;
+    return false;
   }
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   STATE.areaCalcList = STATE.areaCalcList || [];
@@ -2462,6 +2477,7 @@ function runAreaCalc() {
   res.label = 'S' + subDigits(STATE.areaCalcList.length + 1);
   STATE.areaCalcList.push(res);
   redrawAll();
+  return true;
 }
 
 function clearAreaCalc() {
@@ -2714,7 +2730,14 @@ function syncAreaCurveButtons() {
   });
 }
 
+/* «+ Под кривой» и «+ Между точками» (ADR 0148): кнопка сегмента ОТКРЫВАЕТ
+   построение площади своим способом. Открытое построение — класс .ac-open у
+   #sec-areascalc (вид, не модель: класс секции в форму не входит); без него
+   панели способа и «Посчитать площадь» спрятаны стилем. Способ — по-прежнему
+   STATE.areaCalcMode, «Между точками» взводит набор вершин (armVerts). */
 function setAreaCalcMode(mode) {
+  const sec = document.getElementById('sec-areascalc');
+  if (sec) sec.classList.add('ac-open');
   STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
   const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
   if (c) { c.classList.toggle('active', STATE.areaCalcMode === 'curve'); c.setAttribute('aria-checked', STATE.areaCalcMode === 'curve' ? 'true' : 'false'); }
@@ -2725,6 +2748,31 @@ function setAreaCalcMode(mode) {
   armVerts(STATE.areaCalcMode === 'poly');
   updateQuickArea();
   redrawAll();   // кружки ключевых точек перестают ловить щелчок (см. drawCrossPoints)
+}
+// Закрыть построение площади: панели способа уходят, набор вершин снимается.
+function closeAreaBuild() {
+  const sec = document.getElementById('sec-areascalc');
+  if (sec) sec.classList.remove('ac-open');
+  if (STATE.vertArm) armVerts(false);
+}
+// Esc посреди набора вершин: набранное забывается, режим холста остаётся.
+function cancelAreaBuild() {
+  STATE.areaVerts = [];
+  const err = document.getElementById('ac-error');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+  renderVertList();
+  closeAreaBuild();
+  redrawAll();
+}
+/* «Готово» или щелчок по первой вершине: три вершины и больше дают площадь,
+   набор очищается и построение закрывается. Ошибка расчёта (вершины на разных
+   графиках) оставляет построение открытым: поправить есть что. */
+function finishPolyBuild() {
+  if ((STATE.areaVerts || []).length >= 3) {
+    STATE.areaCalcMode = 'poly';
+    if (!runAreaCalc()) return;
+  }
+  cancelAreaBuild();
 }
 
 /* Сворачивание секций. Одна проводка на все складные заголовки: кнопка
@@ -2761,8 +2809,17 @@ function wireAreaCalc() {
   if (p) p.addEventListener('click', () => setAreaCalcMode('poly'));
   const calc = document.getElementById('ac-calc');
   if (calc) calc.addEventListener('click', () => runAreaCalc());
+  /* «Убрать всё» внизу панели режима (ADR 0148): свои точки, набранные
+     вершины и посчитанные площади разом. Шагом истории это становится само
+     (настоящее событие человека). */
   const clr = document.getElementById('ac-clear');
-  if (clr) clr.addEventListener('click', () => clearAreaCalc());
+  if (clr) clr.addEventListener('click', () => {
+    if (STATE.markArm) cancelMarkDraft();
+    STATE.marks = []; STATE.areaVerts = [];
+    renderMarkList(); renderVertList();
+    if (STATE.vertArm) closeAreaBuild();
+    clearAreaCalc();
+  });
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
   if (pick) pick.addEventListener('change', () => { syncAreaCurveButtons(); syncAreaRangeLabel(); syncAreaCalcButton(); });
@@ -2771,6 +2828,7 @@ function wireAreaCalc() {
   const vArm = document.getElementById('ac-vert-arm');
   if (vArm) vArm.addEventListener('click', () => armVerts(!STATE.vertArm));
   setAreaCalcMode('curve');
+  closeAreaBuild();   // на старте построение закрыто: видны только две кнопки
 }
 
 /* ── Ползунки параметров ──────────────────────────────────────────────
@@ -3700,7 +3758,8 @@ function drawMarks() {
         const key = snapVertexAt(ev.x, ev.y);
         // Магнит соседней панели точке не хозяин: она живёт в своей.
         const own = (h) => h && markPanelId(h) === markPanelId(mk);
-        if (key && key.key && own(key)) { mk.snapTo = null; mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
+        if (key && key.key && own(key) && key.mark !== mk.id) { mk.snapTo = null; mk.on = keyOnText(key); mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
+        mk.on = '';   // ушла с ключевой точки: «на чём стоит» теперь скажет привязка к кривой
         if (!mk.snapTo) {
           const hit = snapPointAt(ev.x, ev.y);
           if (hit && !hit.cross && own(hit)) mk.snapTo = hit.name;
@@ -4152,7 +4211,7 @@ function armMark(on) {
   const was = STATE.markArm;
   STATE.markArm = !!on;
   const wrap = document.getElementById('graph-wrap');
-  if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
+  if (wrap) wrap.style.cursor = (on || CANVAS.pts) ? 'crosshair' : '';
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
   syncCanvasMode();
   if (was !== STATE.markArm && typeof redrawAll === 'function') redrawAll();
@@ -4408,20 +4467,45 @@ function restoreSceneSnapshot(key) {
   return true;
 }
 
-function addMarkAt(x, y, snapTo, panel) {
+/* «На чём стоит» своя точка — строкой в списке панели режима (ADR 0148):
+   «на спросе», «на кривой f», «пересечение D и S», «точка E». Привязка к кривой
+   (snapTo) живая и говорит сама; ключевая точка и пересечение запоминаются
+   при постановке (mk.on) и забываются, когда точку увели. */
+const MARK_ON_ROLE = { demand: 'на спросе', supply: 'на предложении' };
+function keyOnText(hit) {
+  if (!hit) return '';
+  if (hit.cross) return 'пересечение ' + hit.name;
+  if (!hit.key || hit.mark) return '';
+  const n = String(hit.name || '');
+  return /^(пересечение|максимум|минимум|плато|излом|проекция|начало|точка|отмеченная)/.test(n) ? n : 'точка ' + n;
+}
+function markOnText(mk) {
+  const t = mk.snapTo;
+  if (t) {
+    if (/^ось /.test(t)) return 'на оси ' + t.slice(4);
+    if (t === 'начало координат') return 'в начале координат';
+    const c = (STATE.curves || []).find(x => curveShortName(x) === t);
+    return (c && MARK_ON_ROLE[c.role]) || ('на кривой ' + t);
+  }
+  return mk.on || '';
+}
+
+function addMarkAt(x, y, snapTo, panel, on) {
   const pid = panel || (activePanel() ? activePanel().id : null);
   // Щелчок по графику в режиме «Указать на графике» достраивает уже заведённую
   // заготовку, а не плодит вторую точку (П28).
   const draft = pendingMark();
-  if (draft) {
-    draft.x = x; draft.y = y; draft.snapTo = snapTo || null;
+  if (draft && draft.mode === 'graph') {
+    draft.x = x; draft.y = y; draft.snapTo = snapTo || null; draft.on = on || '';
     draft.panel = pid;
     draft.pending = false;
     renderMarkList();
     redrawAll();
     return;
   }
-  STATE.marks.push(newMark(x, y, snapTo, 'graph', pid));
+  const mk = newMark(x, y, snapTo, 'graph', pid);
+  mk.on = on || '';
+  STATE.marks.push(mk);
   renderMarkList();
   redrawAll();
 }
@@ -4540,7 +4624,8 @@ function ensureAddMarkButton() {
   if (!box || box.querySelector('.btn-mark-add')) return;
   const add = document.createElement('button');
   add.type = 'button'; add.className = 'btn-sm btn-mark-add';
-  add.textContent = 'Добавить точку';
+  // Щелчок по графику ставит точку сам (режим «Точки и площади»); кнопка — для координат.
+  add.textContent = '+ Точка по координатам';
   add.addEventListener('click', () => startMarkDraft());
   box.appendChild(add);
 }
@@ -4554,16 +4639,11 @@ function buildMarkRow(mk) {
      у заготовки: как только точка появилась на плоскости, способ ввода уже
      выбран и менять его нечем — тумблер из строки уходит совсем. Держать его
      навсегда серым в каждой строке было бы мёртвым элементом. */
-  let seg = null;
-  if (mk.pending) {
-    seg = makeToggle('Ввести координаты', 'Указать на графике', mk.mode === 'graph', (v) => {
-      if (!mk.pending) return;
-      mk.mode = (v === 'right') ? 'graph' : 'coords';
-      armMark(mk.mode === 'graph');
-      renderMarkList();
-    });
-    row.appendChild(seg);
-  }
+  /* С 13.10 (ADR 0148) тумблера «Ввести координаты | Указать на графике» у
+     заготовки нет: «на графике» точку ставит сам режим «Точки и площади»
+     щелчком, а кнопка под списком — «+ Точка по координатам». Заготовка
+     «на графике» (mode 'graph') осталась только у прежнего входа armMark. */
+  const seg = null;
 
   if (mk.pending && mk.mode === 'graph') {
     const hint = document.createElement('div');
@@ -4592,6 +4672,7 @@ function buildMarkRow(mk) {
       title: 'Координата ' + letter,
       set: (v) => {
         mk[key] = isFinite(v) ? v : NaN;
+        mk.on = '';   // координаты правят руками: с ключевой точки она ушла
         // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
         const f = markSnapFn(mk);
         if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
@@ -4653,6 +4734,7 @@ function buildMarkRow(mk) {
     renderMarkList(); redrawAll();
   });
   top.append(pick, nameEl, del);
+  const onText = markOnText(mk);
 
   const toggle = (label, key, def) => {
     const w = document.createElement('label');
@@ -4675,7 +4757,14 @@ function buildMarkRow(mk) {
               toggle('Координаты', 'showCoords', true));
   xy.classList.add('mark-xy-col');
   body.append(xy, chks);
-  row.append(top, body);
+  row.append(top);
+  if (onText) {
+    const on = document.createElement('div');
+    on.className = 'mark-on';
+    on.textContent = onText;
+    row.appendChild(on);
+  }
+  row.appendChild(body);
 
   /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому
      поведению — отдельная строка «Удерживать точку на КПВ» ничего не добавляла

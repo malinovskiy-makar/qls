@@ -3595,3 +3595,59 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .ac-cname .katex { font-size: 1.1em; }
 #ac-calc .ac-cname { margin-left: .25em; }
 @media (max-width: 759px) { .ac-cbtn, .seg.ac-mode .seg-btn, #ans-seg-row .opt-range-row input[type="text"] { min-height: 44px; } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕЖИМ «ТОЧКИ И ПЛОЩАДИ» (13.10.2026, ADR 0148; 93-shell.js)
+   Над холстом два инструмента. В режиме на месте «Условия» стоит панель
+   #pts-panel; «Условие» прячется КЛАССОМ (body.pts-on), не hidden. Признаки
+   режима: рамка карточки холста акцентом 2 px (граница 1 + тень 1 — без
+   сдвига раскладки, холст не перерисовывается), нажатая кнопка, подпись
+   «Esc: выйти из режима».
+   ═══════════════════════════════════════════════════════════════════ */
+#pts-panel { grid-column: 1; grid-row: 2; display: none; }
+body.pts-on #pts-panel { display: flex; }
+body.pts-on #tools-panel { display: none; }
+body.cv-focus #pts-panel { display: none; }
+body.pts-on .cv-card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cv-esc { display: none; margin-left: 8px; font-size: 12.5px; color: var(--text2); white-space: nowrap; }
+body.pts-on .cv-esc { display: inline; }
+@media (max-width: 1239px) { body.pts-on .cv-esc { display: none; } }   /* узкая панель холста; Esc — клавиатурное */
+
+.pts-head { gap: 8px; border-bottom: 1px solid var(--border-soft); }
+.pts-head .pts-back { margin-left: -8px; color: var(--accent-ink); font-size: 14px; }
+.pts-done {
+  height: 32px; padding: 0 14px; border: 0; border-radius: var(--r); cursor: pointer;
+  background: var(--btn-bg); color: var(--on-btn); font: inherit; font-size: 14px; font-weight: 600;
+}
+.pts-done:hover { filter: brightness(1.08); }
+.pts-done:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#pts-panel .side-scroll { padding: 0; }
+.pts-body { padding: 14px 16px 20px; }
+.pts-title { margin: 0 0 10px; font-size: 19px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.pts-hint {
+  margin: 0 0 6px; padding: 10px 12px; border-radius: var(--r); background: var(--accent-tint);
+  font-size: 13.5px; line-height: 1.5; color: var(--text);
+}
+#pts-panel .section { margin: 0; padding: 14px 0 12px; border: 0; border-top: 1px solid var(--border-soft); background: transparent; box-shadow: none; }
+#pts-panel .pts-hint + .section { border-top: 0; }
+#pts-panel .pts-sec-head { padding: 0 0 8px; }
+#pts-panel .fold-body { padding: 0; }
+.pts-clear { width: 100%; margin-top: 8px; }
+.mark-on { margin: -2px 0 4px; font-size: 13px; color: var(--text2); }
+
+/* Построение площади: пока его нет, видны только «+ Под кривой» и «+ Между
+   точками»; кнопка не выглядит выбранной (выбор — у открытого построения). */
+#sec-areascalc:not(.ac-open) #ac-pane-curve,
+#sec-areascalc:not(.ac-open) #ac-pane-poly,
+#sec-areascalc:not(.ac-open) #ac-calc { display: none !important; }
+#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { background: transparent; box-shadow: none; color: var(--text); font-weight: 500; }
+/* Набор вершин заканчивают «Готово» в строке над холстом и щелчок по первой
+   вершине: «Посчитать площадь» в панели на это время не нужна. */
+#sec-areascalc.ac-open:has(#ac-pane-poly:not([style*="none"])) #ac-calc { display: none; }
+
+@media (max-width: 759px) {
+  #pts-panel.col-cond { order: 3; width: auto; height: auto; border: 0; }
+  #pts-panel .side-scroll { overflow: visible; max-height: none; }
+  body.pts-on #tools-panel.col-cond, body.pts-on #params-panel.col-answer, body.pts-on .ph-tabs { display: none; }
+  .pts-done, .pts-head .pts-back, .pts-clear { min-height: 44px; }
+}
