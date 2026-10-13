@@ -734,7 +734,8 @@ span.pp--src:active { transform: none; }
 .rail-filt-sum { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rail-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 14px 6px;
              font-size: 12.5px; color: var(--text2); }
-.rail-list { flex: 1 1 auto; overflow-y: auto; padding: 0 8px 12px; min-height: 0; }
+/* `position: relative` — см. `.help-body`: превью строк рендерит KaTeX. */
+.rail-list { flex: 1 1 auto; overflow-y: auto; padding: 0 8px 12px; min-height: 0; position: relative; }
 .rail-list .rail-row { margin-bottom: 2px; }
 .rail-more { display: block; margin: 8px auto 0; }
 .rail--narrow .rail-meta { font-size: 12px; }
@@ -826,7 +827,12 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 .help-info-pop[hidden] { display: none; }
 /* «Свернуть» — первой слева, «Решить заново» — у правого края (24.09.2026). */
 .help-head .help-reset { margin-left: auto; }
-.help-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+/* `position: relative` обязателен (13.10.2026): KaTeX ставит скрытой копии
+   формулы `.katex-mathml` position: absolute. Без позиционированного скроллера
+   её предком становилась sticky-колонка снаружи, overflow её не обрезал, и
+   длинная лента с формулами растягивала прокрутку страницы на сотни пикселей
+   пустоты (58898: +1 842 px на 1440). Сторож — test_stol_scroll_leak_browser. */
+.help-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; position: relative; }
 .help-body .ai { border: 0; border-radius: 0; max-height: none; flex: 1 1 auto; }
 
 /* Скелет панели задачи на время запроса. */
