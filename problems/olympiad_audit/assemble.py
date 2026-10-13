@@ -91,6 +91,108 @@ class Task:
         return (self.number, self.task_variant)
 
 
+#: Служебные строки страницы, которые модель изредка размечает безномерным
+#: заданием: «Комплект заданий № 1» (шапка каждой страницы теста), «Код
+#: участника», «Бланк ответов». Блок служебный, если ВСЕ его строки такие.
+_SERVICE_LINE = re.compile(
+    r'^(комплект\s+заданий\s*№?\s*\d*|код\s+участника|бланк\s+ответов|'
+    r'таблица\s+заполняется\s+жюри.*)$', re.IGNORECASE)
+#: Вступление (части) комплекта: время, максимальный балл, правила.
+_INTRO = re.compile(r'(общее\s+время|время\s+выполнени|максимальн\w*\s+(количество\s+)?балл|'
+                    r'количество\s+баллов\s+за|критерии\s+оценивания\s*\(всего)',
+                    re.IGNORECASE)
+INTRO_SAME = 0.85
+
+
+def _plain_lines(text):
+    for line in str(text or '').splitlines():
+        line = re.sub(r'[*#_`>|]+', ' ', line)
+        line = ' '.join(re.sub(r'[.:;!\s]+$', '', line.strip()).split())
+        if line:
+            yield line
+
+
+def is_service_text(text):
+    lines = list(_plain_lines(text))
+    return bool(lines) and all(_SERVICE_LINE.match(line) for line in lines)
+
+
+def is_intro_text(text):
+    return bool(_INTRO.search(str(text or '')[:400]))
+
+
+def same_intro(text, seen):
+    """Тот же текст вступления (повтор на следующей странице)."""
+    a, b = ' '.join(_plain_lines(text)).lower(), ' '.join(_plain_lines(seen)).lower()
+    return bool(a and b) and fuzz.ratio(a, b) / 100 >= INTRO_SAME
+
+
+#: Повтор условия в файле решений: кусок входит в условие (partial_ratio).
+ECHO_TAIL = 0.90
+ECHO_PARAGRAPH = 0.95
+_TASK_HEADING = re.compile(r'^\W*(\d+[.)]\s*)?(задача|задание|вопрос|ситуация)\s*№?\s*\d+(\.\d+)?\W*$',
+                           re.IGNORECASE)
+
+
+def _plain(text):
+    return ' '.join(_plain_lines(text)).lower()
+
+
+def is_statement_echo(text, statement):
+    """Кусок — повтор текста условия (хвост условия на новой странице файла
+    решений): от 20 знаков и входит в условие."""
+    a, b = _plain(text), _plain(statement)
+    return len(a) >= 20 and bool(b) and fuzz.partial_ratio(a, b) / 100 >= ECHO_TAIL
+
+
+def strip_statement_echo(text, statement):
+    """Срезать в начале решения абзацы, повторяющие условие, и заголовок
+    «Задача N». Последний абзац не срезается никогда: решение не пустеет."""
+    paras = [p for p in re.split(r'\n\s*\n', text or '') if p.strip()]
+    plain_statement = _plain(statement)
+    i = 0
+    while i < len(paras) - 1:
+        para = _plain(paras[i])
+        if _TASK_HEADING.match(para) or (
+                len(para) >= 20 and plain_statement
+                and fuzz.partial_ratio(para, plain_statement) / 100 >= ECHO_PARAGRAPH):
+            i += 1
+            continue
+        break
+    return '\n\n'.join(paras[i:]) if i else text
+
+
+#: Сопоставление по тексту условия: начало условия (до 200 знаков) входит в
+#: блок файла решений (partial_ratio) не ниже TEXT_MATCH, и второй кандидат
+#: заметно хуже (TEXT_MARGIN) — иначе неоднозначно, остаётся номер.
+TEXT_MATCH = 0.90
+TEXT_MARGIN = 0.05
+#: Задание по номеру «не то», если его условие входит в блок слабее этого.
+TEXT_OTHER = 0.60
+TEXT_MIN = 40
+
+
+def text_score(task, text):
+    head = _plain(join_pieces(task.statement))[:200]
+    plain = _plain(text)
+    if len(head) < TEXT_MIN or len(plain) < TEXT_MIN:
+        return 0.0
+    return fuzz.partial_ratio(head, plain) / 100
+
+
+def match_by_text(tasks, text):
+    """Задание, чьё условие однозначно повторено в блоке, или None."""
+    if len(_plain(text)) < TEXT_MIN:
+        return None
+    scored = sorted(((text_score(task, text), i, task) for i, task in enumerate(tasks.values())),
+                    key=lambda x: (-x[0], x[1]))
+    if not scored or scored[0][0] < TEXT_MATCH:
+        return None
+    if len(scored) > 1 and scored[1][0] > scored[0][0] - TEXT_MARGIN:
+        return None
+    return scored[0][2]
+
+
 def _block_number(block):
     return norm_number(block.get('number')) if block.get('number') not in (None, '') else ''
 
@@ -113,8 +215,65 @@ def collect(root, files, role, overlay=None):
 
 
 def _variant_of_header(block):
-    match = re.search(r'\d+', str(block.get('variant') or ''))
+    """Номер варианта из шапки: «2», «2 Вариант», «Вариант 1». «Комплект
+    заданий № 2 (основы потребительских знаний)» — часть комплекта, а
+    «Решебник, 16 марта 2014 г.» — дата (МОШ-предпринимательство): не варианты."""
+    text = str(block.get('variant') or '')
+    if not (re.fullmatch(r'\s*\d+\s*', text) or 'вариант' in text.lower()):
+        return ''
+    match = re.search(r'\d+', text)
     return match.group() if match else ''
+
+
+_MARKED = re.compile(r'\(отмечено\)')
+_PLUS = re.compile(r'^[+xх×✓]$', re.IGNORECASE)
+
+
+def _tables(text):
+    """Markdown-таблицы текста: [[строка ячеек, …], …] без строк-разделителей."""
+    tables, rows = [], []
+    for line in (text or '').splitlines():
+        if line.strip().startswith('|'):
+            if not re.fullmatch(r'\s*\|?[\s:|-]+\|?\s*', line):
+                rows.append(_cells(line))
+            continue
+        if rows:
+            tables.append(rows)
+            rows = []
+    if rows:
+        tables.append(rows)
+    return tables
+
+
+def parse_answer_grid(text):
+    """Бланк ответов теста → {номер вопроса: ответ} (МОШ-предпринимательство).
+
+    Раскладки: а) шапка — номера вопросов, ниже строки вариантов, выбранный
+    помечен «(отмечено)»; б) «№ | А | В | С …» (группы с «№»), в строке вопроса
+    выбранная буква отмечена «+». Вопрос с нулём или несколькими отметками —
+    без ответа. Таблица без отметок — не бланк ({})."""
+    out = {}
+    for rows in _tables(text):
+        head = rows[0]
+        if len(rows) >= 3 and all(c.isdigit() for c in head if c) and any(head):
+            for j, number in enumerate(head):
+                if not number:
+                    continue
+                marked = [row[j] for row in rows[1:] if j < len(row) and _MARKED.search(row[j])]
+                if len(marked) == 1:
+                    out[number] = _MARKED.sub('', marked[0]).strip(' *')
+            continue
+        groups = [j for j, c in enumerate(head) if c in ('№', 'N')]
+        for row in rows[1:] if groups else ():
+            for k, start in enumerate(groups):
+                end = groups[k + 1] if k + 1 < len(groups) else len(head)
+                if start >= len(row) or not row[start].isdigit():
+                    continue
+                hits = [head[j] for j in range(start + 1, min(end, len(row)))
+                        if _PLUS.match(row[j].strip())]
+                if len(hits) == 1:
+                    out[row[start]] = hits[0]
+    return out
 
 
 def _header_variants(items):
@@ -209,6 +368,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             # у МОШ задачи и тест — два файла одного комплекта.
             current, current_file = None, entry['file']
             file_keys, last_int, restarted = [], 0, False
+            test_section, test_last, sub_prefix, top = 1, 0, '', 0
         if record is None:
             missing_pages.append(f'{entry["page_dir"]}/p{page}')
             continue
@@ -216,16 +376,60 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             # Новый вариант в том же файле — новая нумерация, не «тест → задачи».
             current, file_keys, last_int = None, [], 0
             report['вариант из шапки файла'] += 1
+        raw_number = _block_number(block)
         block = _test_number(block, entry['file'])
         kind = block['type']
         number = _block_number(block)
+        numbered = kind in ('task', 'task_continuation', 'solution', 'criteria', 'figure') \
+            and _real_number(number)
+        if numbered and number.startswith('тест-'):
+            # Несколько тестов подряд в файле теста («Тест № 1» 1–15, «Тест № 2»
+            # 1–15…, МОШ-предпринимательство 2009/10–2011/12): нумерация снова с
+            # 1 — следующий тест, вопросы `тест-<тест>.<вопрос>`, а не слияние.
+            head = _leading_int(raw_number)
+            if kind == 'task' and head == 1 and test_last > 1:
+                test_section += 1
+                if test_section == 2:
+                    for key in file_keys:
+                        task = tasks.pop(key)
+                        task.number = task.number.replace('тест-', 'тест-1.', 1)
+                        tasks[(task.number, task.task_variant)] = task
+                    report['файл теста: несколько тестов подряд'] += 1
+            if kind == 'task' and head is not None:
+                test_last = head
+            if test_section >= 2:
+                number = f'тест-{test_section}.{raw_number}'
+                block = dict(block, number=number)
+        elif numbered and restarted:
+            # После «тест → задачи» нумерация ещё раз пошла с 1 (финал 2013/14,
+            # 10-11: тест 1–15, задания 2 и 3, затем вопросы кейса 1–11):
+            # вопросы — подпункты СЛЕДУЮЩЕГО задания (4.1, 4.2 …).
+            head = _leading_int(number)
+            if kind == 'task' and head == 1 and last_int > 1:
+                top = (top or last_int) + 1
+                sub_prefix, last_int = f'{top}.', 0
+                report['нумерация снова с 1: подпункты следующего задания'] += 1
+            if sub_prefix:
+                if kind == 'task' and head is not None:
+                    last_int = head
+                number = sub_prefix + number
+                block = dict(block, number=number)
         if kind == 'task' and not _real_number(number):
             # Блок «задание» без номера (или «0», «intro», буква подпункта):
             # до первого задания — вступление комплекта («Время выполнения —
             # 90 минут…»), после — кусок текущего задания («(б) …»), который
             # модель пометила заданием. Пилот ВП: 23 лишних «задания» v2.
-            if current is None:
-                event['preamble'].append(block.get('text') or block.get('title') or '')
+            text = block.get('text') or block.get('title') or ''
+            if is_service_text(text):
+                report['служебная строка — мимо'] += 1
+                continue
+            if any(same_intro(text, seen) for seen in event['preamble']):
+                # Вступление части комплекта повторено на каждой странице
+                # (МОШ-предпринимательство 2012/13: «Общее время… баллов…»).
+                report['повтор вступления — мимо'] += 1
+                continue
+            if current is None or is_intro_text(text):
+                event['preamble'].append(text)
                 report['вступление комплекта'] += 1
             else:
                 current.statement.append(block.get('text') or '')
@@ -248,7 +452,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     task.number = f'тест-{task.number}'
                     tasks[(task.number, task.task_variant)] = task
                 report['нумерация пошла заново: часть файла — тест'] += 1
-            if head is not None:
+            if head is not None and not sub_prefix:
                 last_int = head
             current = task_for(number, block.get('task_variant') or '')
             if not restarted and current.key not in file_keys:
@@ -302,6 +506,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                         ('criteria', [f for f in event.get('criteria_files') or []
                                       if f['page_dir'] not in seen_dirs])):
         last = None
+        follow = None             # (задание, номер) вопроса, найденного по тексту
         in_statement = False      # сразу после повторённого условия
         stream, table_header = [], {}
         for entry, page, record, block in collect(root, files, role, overlay):
@@ -338,6 +543,18 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 report['задание только из решений (условий нет)'] += 1
             if kind in ('footer', 'noise', 'header'):
                 continue
+            if kind != 'figure' and not _real_number(_block_number(block)):
+                grid = parse_answer_grid(block.get('text') or '')
+                hits = [(tasks.get((f'тест-1.{n}', '')) or tasks.get((f'тест-{n}', '')), a)
+                        for n, a in grid.items()] if len(grid) >= 3 else []
+                if any(t is not None for t, _a in hits):
+                    # Бланк ответов теста (сетка «вопрос → отмеченный вариант»).
+                    for target, answer in hits:
+                        if target is not None and not target.answer:
+                            target.answer = answer
+                            target.solution_pages.append((entry['file'], page))
+                            report['бланк ответов → ответы теста'] += 1
+                    continue
             if kind == 'figure':
                 # Рисунок сразу за условием, повторённым в файле решений
                 # (у ВП условия часто только там), — рисунок условия, если
@@ -359,6 +576,17 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 number = _block_number(block)
                 target = _find_task(tasks, number, block.get('title') or '',
                                     block.get('task_variant') or '')
+                # Текст повторённого вопроса надёжнее номера: в файле ответов
+                # МОШ-предпринимательства вопрос теста «1» — это «тест-1», а
+                # не задача 1 комплекта (номера в файле ответов идут с 1).
+                by_text = match_by_text(tasks, block.get('text') or '')
+                follow = None
+                if by_text is not None and by_text is not target and (
+                        target is None or text_score(target, block.get('text') or '')
+                        < TEXT_OTHER):
+                    target = by_text
+                    follow = (target, number)
+                    report['условие в файле решений — по тексту'] += 1
                 if target is None and not _real_number(number):
                     # Подпункт, повторённый в файле решений («г», «(а)»): к
                     # последнему заданию, нового не заводим.
@@ -374,6 +602,16 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     target.statement.append(block.get('text') or '')
                     target.pages.append((entry['file'], page))
                     target.quality.append(record)
+                elif target.statement and not target.from_solution_only:
+                    # «Решебник» МОШ-предпринимательства: условие повторено, а
+                    # ответ («СТ. 18») — абзацем в том же блоке: хвост — решение.
+                    text = block.get('text') or ''
+                    statement = join_pieces(target.statement)
+                    rest = strip_statement_echo(text, statement)
+                    if rest != text and rest.strip() and not is_statement_echo(rest, statement):
+                        target.solution.append(rest)
+                        target.solution_pages.append((entry['file'], page))
+                        report['решение внутри повтора условия'] += 1
                 if block.get('answer'):
                     # Тест с отмеченным ответом (сканы отборочных МОШ): файл
                     # ответов повторяет вопрос, ответ — в поле answer.
@@ -382,12 +620,32 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     report['ответ теста из файла ответов'] += 1
                 last = target
                 continue
+            if kind == 'task_continuation':
+                # Хвост условия, повторённого в файле решений (МОШ: условие →
+                # решение, условие переходит на новую страницу), — не решение.
+                number = _block_number(block)
+                echo_of = (_find_task(tasks, number, '', block.get('task_variant') or '')
+                           if _real_number(number) else None) or last
+                if (echo_of is not None and echo_of.statement and not echo_of.from_solution_only
+                        and is_statement_echo(block.get('text') or '',
+                                              join_pieces(echo_of.statement))):
+                    report['повтор условия в файле решений — мимо'] += 1
+                    last = echo_of
+                    continue
             if kind == 'task_continuation' and last is not None and \
                     last.from_solution_only and not (last.solution or last.criteria):
                 last.statement.append(block.get('text') or '')
                 continue
+            force = None
+            if (follow is not None and follow[0] is last and kind in ('solution', 'criteria')
+                    and _block_number(block) == follow[1]):
+                # Решение с тем же номером сразу за вопросом, сопоставленным по
+                # тексту, — решение ЭТОГО вопроса, а не задания с таким номером.
+                force = last
+            else:
+                follow = None
             last = _attach_answer(tasks, last, block, role if kind == 'task_continuation'
-                                  else kind, entry, page, report) or last
+                                  else kind, entry, page, report, force=force) or last
 
     # Рисунки: вырезка.
     for task in tasks.values():
@@ -576,12 +834,29 @@ def _find_task(tasks, number, title, variant=''):
     return best if score >= TITLE_MATCH else None
 
 
-def _attach_answer(tasks, last, block, kind, entry, page, report):
+def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
     """Решение/критерии → задание по номеру, иначе по названию, иначе —
-    продолжение предыдущего решения (блок без номера сразу за ним)."""
+    продолжение предыдущего решения (блок без номера сразу за ним).
+
+    `force` — задание задано вызывающим (решение за вопросом, найденным по
+    тексту). Номер N без своего задания при единственном `тест-N` — к нему
+    (файл ответов нумерует вопросы теста с 1). Блок, повторяющий условие
+    другого задания (по тексту, однозначно), — к тому заданию."""
     number = _block_number(block)
-    target = _find_task(tasks, number, block.get('title') or '', block.get('task_variant') or '')
-    how = 'по номеру' if target is not None and number else 'по названию'
+    variant = block.get('task_variant') or ''
+    target = force if force is not None else _find_task(tasks, number,
+                                                        block.get('title') or '', variant)
+    how = 'за вопросом' if force is not None else \
+        'по номеру' if target is not None and number else 'по названию'
+    if target is None and _real_number(number) and not number.startswith('тест-'):
+        test_target = tasks.get((f'тест-{number}', variant)) or tasks.get((f'тест-{number}', ''))
+        if test_target is not None:
+            target, how = test_target, 'номер → тест-N'
+    if force is None:
+        by_text = match_by_text(tasks, block.get('text') or '')
+        if by_text is not None and by_text is not target and (
+                target is None or text_score(target, block.get('text') or '') < TEXT_OTHER):
+            target, how = by_text, 'по тексту условия'
     if target is None and not _real_number(number) and last is not None:
         target, how = last, 'продолжение'
     head = _leading_int(number)
@@ -600,6 +875,11 @@ def _attach_answer(tasks, last, block, kind, entry, page, report):
                                     f'«{(block.get("title") or "")[:40]}»')
         return None
     text = block.get('text') or ''
+    if kind == 'solution' and target.statement and not target.from_solution_only:
+        trimmed = strip_statement_echo(text, join_pieces(target.statement))
+        if trimmed != text:
+            report['повтор условия в начале решения — срезан'] += 1
+            text = trimmed
     if kind == 'criteria':
         target.criteria.append(text)
         target.criteria_pages.append((entry['file'], page))
