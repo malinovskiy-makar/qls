@@ -508,7 +508,7 @@ class Command(BaseCommand):
             digitized = self.root / registry.get(slug).audit_dir / 'digitized'
             plan_path = digitized / 'triage_plan.csv'
             if digitized in seen or not plan_path.is_file():
-                continue          # vp-ob, vp-fingram — та же папка аудита, что и vp
+                continue          # одна папка аудита — один раз (раньше vp-ob/vp-fingram делили её с vp)
             seen.add(digitized)
             plan_rows = triage.read_plan(plan_path)
             plan = {r['страница']: r for r in plan_rows}

@@ -336,7 +336,9 @@ def other_olympiad_reason(slug, rel):
     name = rel.rsplit('/', 1)[-1]
     if slug == 'mosh' and _RE_OTHER_MOSH.search(name):
         return REASON_OTHER_OLYMPIAD_MOSH
-    if slug.startswith('vp') and _RE_OTHER_VP.search(name):
+    # Только ВП по экономике: у vp-fingram / vp-ob своя папка аудита, и
+    # «finance»/«business» в имени — их собственные файлы.
+    if slug == 'vp' and _RE_OTHER_VP.search(name):
         return REASON_OTHER_OLYMPIAD
     return ''
 
@@ -848,8 +850,9 @@ def _event_sort_key(event_id):
 
 
 def event_year_stage(event_id):
-    """('2014', 'final') из `mosh-2014-final-11-v1`; ('', '') — не разобрать."""
-    match = re.match(r'^[a-z]+-(\d{4})-([a-z]+)-', event_id)
+    """('2014', 'final') из `mosh-2014-final-11-v1` (и из
+    `mosh-fingram-2014-final-…`); ('', '') — не разобрать."""
+    match = re.match(r'^[a-z][a-z-]*?-(\d{4})-([a-z]+)-', event_id)
     return (match.group(1), match.group(2)) if match else ('', '')
 
 

@@ -77,6 +77,31 @@ _VP_COMMON = dict(
     compare='norm',
 )
 
+#: Финграмотность и основы бизнеса (сессия 13.10.2026): у каждой олимпиады
+#: своя папка аудита, свой префикс `event_id` и свой официальный `Source`
+#: (страницы архива — tasks-finance / tasks-business, не tasks-eco).
+#: Семья, сессия и способ сравнения — как у ВП по экономике.
+_FINBIZ_DIR = 'audit_finbiz_20261013'
+
+
+def _vp_subject(slug, subject, page, subdir):
+    return dict(
+        _VP_COMMON,
+        official_source_name=f'Высшая проба по {subject}: официальный архив',
+        official_source_defaults=dict(
+            _VP_SOURCE_DEFAULTS,
+            note=('Официальные задания, решения и критерии заключительного '
+                  f'этапа олимпиады «Высшая проба» по {subject}, '
+                  f'опубликованные организатором: https://olymp.hse.ru/mmo/{page}. '
+                  'У каждой задачи — ссылка на PDF в привязке к источнику.')),
+        event_prefix=f'{slug}-',
+        audit_dir=f'{_FINBIZ_DIR}/{subdir}',
+        session='finbiz1',
+        reviewed_by='claude-code-20261013',
+        journal_dir='journal',
+    )
+
+
 REGISTRY = {
     'vp': OlympiadAudit(
         slug='vp',
@@ -85,11 +110,12 @@ REGISTRY = {
     'vp-fingram': OlympiadAudit(
         slug='vp-fingram',
         olympiad_name='Олимпиада школьников «Высшая проба» по финансовой грамотности',
-        **_VP_COMMON),
+        **_vp_subject('vp-fingram', 'финансовой грамотности', 'tasks-finance',
+                      'vp_fingram')),
     'vp-ob': OlympiadAudit(
         slug='vp-ob',
         olympiad_name='Олимпиада школьников «Высшая проба» по основам бизнеса',
-        **_VP_COMMON),
+        **_vp_subject('vp-ob', 'основам бизнеса', 'tasks-business', 'vp_business')),
     'mosh': OlympiadAudit(
         slug='mosh',
         olympiad_name='Московская олимпиада школьников по экономике',
@@ -113,6 +139,31 @@ REGISTRY = {
         session='mosh2',
         reviewed_by='claude-chat-20261009',
         journal_dir='session2',
+        compare='markup_free',
+    ),
+    'mosh-fingram': OlympiadAudit(
+        slug='mosh-fingram',
+        olympiad_name='Московская олимпиада школьников по финансовой грамотности',
+        official_source_name=('Московская олимпиада школьников по финансовой '
+                              'грамотности: официальный архив'),
+        official_source_defaults={
+            'author': 'Оргкомитет Московской олимпиады школьников',
+            'kind': 'олимпиада',
+            'note': ('Официальные задания, решения и критерии отборочного '
+                     '(дистанционного) и заключительного этапов Московской '
+                     'олимпиады школьников по финансовой грамотности: '
+                     'https://mos.olimpiada.ru/tasks/fingram. У каждой задачи — '
+                     'ссылка на PDF в привязке к источнику.'),
+        },
+        official_site='https://mos.olimpiada.ru/tasks/fingram',
+        official_hosts=('olimpiada.ru',),
+        stages=('qualifying', 'final'),
+        event_prefix='mosh-fingram-',
+        audit_dir=f'{_FINBIZ_DIR}/mosh_fingram',
+        family=('mosh-fingram',),
+        session='finbiz1',
+        reviewed_by='claude-code-20261013',
+        journal_dir='journal',
         compare='markup_free',
     ),
 }
