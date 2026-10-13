@@ -216,3 +216,44 @@ DWL = 100 «0 + 100»; `sd` CS «1 250», PS «1 250», SW «2 500»; бремя
 
 ⚠️ По ходу: отклонённая владельцем команда (копия `calc2.css` в черновики) успела выполнить `sed` поломки 6, и
 строка `nowrap` ушла в коммит `12995663`; исправлено следующим коммитом `ab2dd6fe`, прибор Н после него 36/36.
+
+## Фаза 6. Проверка
+
+**Время CI.** Замер на этой машине: `calc2_math.mjs` **120 с** («до», 240 = 226 случаев + 14 жестов). Вынос сторожа
+утечки «(ж)» в свой Django-тест `calc2/tests/test_calc2_memory.py` (`SHORT=1 memory_probe.mjs`: разделы А — 150 шагов
+«Сдвига MC», пороги +2 000 узлов / +400 обработчиков, как у жеста; Г, Д, Е — строка на месте, запись и «Отменить»,
+очереди KaTeX и MathLive; предел 120 с, идёт **21 с**) дал только 117 с: жест здесь стоил ~3 с. Замер по строкам
+вывода нашёл настоящее узкое место: случай «Два графика (з)» — **21,5 с**, из них ~14 с обход 44 сцен с паузой 320 мс
+на каждую ради подсчёта сцен с двумя полями (поля рисует перерисовка синхронно). Пауза 60 мс → `calc2_math` **104 с**
+(239 = 226 + 13 жестов, «сцен с двумя полями» по-прежнему 2). Сторож утечки остался в CI: `run_tests.py calc2` —
+шаг A 26 тестов, шаг B **4** (было 3: math, parity, tex + memory), оба зелёные, пропусков нет, 209 с.
+
+`manage.py check` — 0 ошибок; `makemigrations --check --dry-run` — No changes detected; `manage.py calc2_map` —
+карта обновлена; метка версии статики считается по содержимому сама (`calc2_static`), правки не нужно;
+`check_tex_escapes` — чисто; `test_calc2_map`, `test_calc2_static_version`, `test_calc2_previews` — 11 OK.
+
+| Прибор | До | После |
+|---|---|---|
+| Django `calc2` (`scripts/run_tests.py calc2`) | — | 26 + 4, код 0 |
+| `webkit_probe.mjs` | прибора не было | **124/124** (WebKit 62, Chromium 62) |
+| `redesign/answer_rows_probe.mjs` | 54/54 | **119/119** (Н — в двух движках) |
+| `redesign/answer_probe.mjs` | 44 модели | 44 модели |
+| `picker_probe.mjs` | 57/57 | **87/87** |
+| `mc_drag_probe.mjs` | прибора не было | **37/37** |
+| `scripts/calc2_nodrag_probe.js` | 1 «сдвинутая» (`cons-slutsky`), кода нет | **0, код 0** |
+| `memory_probe.mjs` | 27/27 | **30/30** |
+| `self_probe.mjs` | 81/81 | 81/81 |
+| `redesign/state_probe.mjs` | **31/44** | **44/44** |
+| `redesign/modes_probe.mjs` | 54/54 | 54/54 |
+| `redesign/layout_probe.mjs` (390/760/1440) | в норме | в норме |
+| `control_numbers.mjs` | 515/515 | 515/515 |
+| `tex/ci_quick.mjs` | цела | цела (44, 5, 42) |
+| `check_font_scale.mjs` | 0 | 0 |
+| `scripts/check_em_dash.py` | 0 | 0 |
+| `calc2_math.mjs` | 240, 120 с | 239, **104 с** |
+| `redesign/parity_quick.mjs` (в Django) | ЦЕЛ, 1 944 | ЦЕЛ, 1 944 |
+
+Снимки (в git не идут) — `claude/shots/calc2_fixes_b_20261013/`: `before_self_{webkit,chromium}_{1280,1440}_{light,dark}.png`
+(до), `self_*` (после), `after_taxes_answer.png`, `after_sd_answer.png`, `after_costs_answer.png`,
+`long_points_1280.png`, `long_points_webkit_1280.png`, `picker_1000_{chromium,webkit}_recents.png`,
+`mono_before_mc_drag.png`, `mono_after_mc_drag.png`.

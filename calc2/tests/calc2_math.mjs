@@ -4505,8 +4505,10 @@ const CASES = [
           // Сцен с двумя полями всего две — считаем по всему списку.
           var two = 0;
           var keys = Object.keys(SCENE_ROUTE);
+          /* Поля рисует перерисовка синхронно: 60 мс хватает. Прежние 320 мс на каждую
+             из 44 сцен стоили ~14 с, и calc2_math подходил к пределу CI (13.10). */
           for (var i = 0; i < keys.length; i++) {
-            resetSceneMemory(); pickScene(keys[i]); await w(320); redrawAll();
+            resetSceneMemory(); pickScene(keys[i]); await w(60); redrawAll();
             if (panes().length >= 2) two++;
           }
           return { tangentPanes: t1.panes, tangentTop: t1.top, tangentBot: t1.bot,
