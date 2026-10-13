@@ -25,6 +25,12 @@
 участвует. Задача, не прошедшая хотя бы один стоп-гейт, не трогается и уходит
 в `manual_list.csv` (или в `blocked_images.csv`, если не хватает только картинок).
 
+Гейт качества конвертации (13.10.2026, после потери `$` у формулы за меткой):
+каждый кусок сверяется со своим сырьём (`conversion_defects`) — чётность `$`,
+`\\$` в конце, `\\quad`/`\\sqrt`/`\\frac` формул, минус формулы не стал тире.
+Картинка `data:image/…;base64` из текста становится рисунком, как файловая;
+битая — задача вручную.
+
     manage.py solvehub_parts_restore                       # сухой прогон, обе группы
     manage.py solvehub_parts_restore --group A --apply     # запись A, свой снимок
     manage.py solvehub_parts_restore --revert <снимок.json>
@@ -46,7 +52,9 @@ from django.core.management.base import BaseCommand, CommandError
 
 from catalog import testplay
 from problems import bank_sync, problem_types
-from problems.corpus_converter.images import MD_IMAGE_RE, replace_images, sniff_content_type
+from problems.corpus_converter.images import (
+    MD_IMAGE_RE, decode_data_image, is_data_image, replace_images, sniff_content_type,
+)
 from problems.corpus_converter.ingest import convert_for_import, data_root
 from problems.corpus_converter.reconvert import solvehub_records, solvehub_resolver
 from problems.corpus_converter.solvehub import format_answer, options_block, parse_options
@@ -84,12 +92,16 @@ ALPHABETS = (
 #: `Задание $2.$`, `**б)**`. Звёздочки снаружи и внутри — жирная метка.
 #: Без `^`: `.match(text, pos)` и так привязан к `pos`, а `^` с позицией
 #: внутри текста не совпал бы никогда. Перевод строки шаблон не перешагивает.
+#: ⚠️ Закрывающий `$` после метки (`d2`) — ТОЛЬКО если был открывающий перед
+#: ней (`d1`): у `б) $TC = …$` это `$` формулы, и без условия он съедался —
+#: остаток без `$` конвертер принимал за текст (`-` → `—`, `$` → `\$`;
+#: 185 записей в 61 задаче полного прогона 13.10.2026).
 LABEL_RE = re.compile(
     r'[ \t ]*(?P<pre>\*\*|\*)?[ \t ]*'
     r'(?:(?P<word>Задание|Задача|Пункт|Вопрос|Часть|Part|Question)\s*)?'
     r'(?P<d1>\$\s*)?(?P<op>\()?'
     r'(?P<tok>\d{1,2}|[а-яёa-zА-ЯЁA-Z])(?P<cl>[).])'
-    r'(?P<d2>\s*\$)?(?P<post>\*\*|\*)?'
+    r'(?(d1)(?P<d2>\s*\$)?)(?P<post>\*\*|\*)?'
 )
 
 
@@ -152,31 +164,127 @@ def find_first_label(md, series, style):
     return hits[0] if len(hits) == 1 else None
 
 
-def convert_piece(text, answer='', solution='', resolve=None):
-    """Один кусок через конвейер импорта, без поиска а)/б) внутри."""
+#: `$`, перед которым нет обратной косой черты.
+_DOLLAR_RE = re.compile(r'(?<!\\)\$')
+#: Формула в сырье: `$$…$$` раньше `$…$`, как на показе (`catalog/base.html`).
+_MATH_RE = re.compile(r'(?<!\\)\$\$(.+?)(?<!\\)\$\$|(?<!\\)\$(.+?)(?<!\\)\$'
+                      r'|\\\((.+?)\\\)|\\\[(.+?)\\\]', re.S)
+_GUARDED_COMMANDS = (r'\quad', r'\sqrt', r'\frac')
+#: `12 - 2x` внутри формулы: по символу с каждой стороны минуса.
+_MINUS_RE = re.compile(r'(\S)\s*-\s*(\S)')
+
+
+def _math(text):
+    return [next(g for g in m.groups() if g is not None) for m in _MATH_RE.finditer(text or '')]
+
+
+def conversion_defects(raw, converted):
+    """Чем конвертер исказил кусок: список причин, пустой — всё в порядке.
+
+    Гейт качества (13.10.2026): формула, принятая конвертером за текст,
+    теряет `$`, `\\quad` становится пробелами, минус — тире. Сравнивается
+    с СЫРЫМ текстом того же куска — вместе с меткой, но не после
+    `split_label`: метка даёт `$` только парой (`$б)$`), а гейт так не
+    зависит от того, правильно ли метку отрезали.
+
+    Чётность `$` — две проверки. Каждый `$` сырья обязан остаться `$` или
+    стать `\\$`: чётность «`$` + новых `\\$`» та же, что у сырья (так
+    ловится и `б) $6$ минут` → `6\\$ минут`). И чётность самих `$` та же —
+    кроме сырья с НЕЧЁТНЫМ их числом: там одинокий знак — валюта
+    (`$5,000`, `$ $145$`), и конвертер законно делает из него `\\$`."""
+    raw, converted = raw or '', converted or ''
+    out = []
+    n_raw, n_conv = len(_DOLLAR_RE.findall(raw)), len(_DOLLAR_RE.findall(converted))
+    escaped = converted.count(r'\$') - raw.count(r'\$')
+    if ((n_conv + escaped) % 2 != n_raw % 2
+            or (n_conv % 2 != n_raw % 2 and n_raw % 2 == 0)):
+        out.append(r'чётность $ (сырьё %d, стало %d, новых \$ %d)' % (n_raw, n_conv, escaped))
+    if r'\$' not in raw and re.search(r'\\\$[.,;:]?\s*\Z', converted):
+        out.append(r'в конце \$, которого в сырье не было')
+    math = _math(raw)
+    for command in _GUARDED_COMMANDS:
+        want = sum(seg.count(command) for seg in math)
+        if converted.count(command) < want:
+            out.append('%s в формулах сырья %d, стало %d' % (command, want, converted.count(command)))
+    for seg in math:
+        for m in _MINUS_RE.finditer(seg):
+            if re.search(re.escape(m.group(1)) + r'\s*—\s*' + re.escape(m.group(2)), converted):
+                out.append('минус формулы стал тире: %r' % m.group(0))
+                break
+        else:
+            continue
+        break
+    return out
+
+
+def convert_piece(text, answer='', solution='', resolve=None, raw=None):
+    """Один кусок через конвейер импорта, без поиска а)/б) внутри.
+    Последний элемент — искажения конвертера (`conversion_defects`) против
+    `raw` (сырьё с меткой; по умолчанию — сам `text`)."""
     figures = []
+    raw = text if raw is None else raw
     if resolve is not None:
         text, found = replace_images(text, resolve)
         figures += found
         solution, found = replace_images(solution, resolve)
         figures += found
+        raw = replace_images(raw, resolve)[0]
     result = convert_for_import(statement=text, answer=answer, solution=solution,
                                 existing_parts=[])
-    return result['statement_md'], result['answer_md'], result['solution_md'], figures
+    defects = conversion_defects(raw, result['statement_md'])
+    defects += ['решение: ' + d for d in conversion_defects(solution, result['solution_md'])]
+    return result['statement_md'], result['answer_md'], result['solution_md'], figures, defects
 
 
-def record_part(rec, text, resolve):
-    """Подпункт из записи SolveHub: текст + варианты (у выбора), ответ, решение."""
+def record_part(rec, text, resolve, raw=None):
+    """Подпункт из записи SolveHub: текст + варианты (у выбора), ответ, решение.
+    `raw` — тот же текст вместе с меткой, для гейта конвертации."""
     opts = parse_options(rec.get('check_options'))
     answer = format_answer(rec.get('correct_answer'), opts, [])
     block = options_block(rec.get('check_type'), opts)
     src = f'{text}\n\n{block}' if block else text
-    return convert_piece(src, answer, rec.get('answer_md') or '', resolve)
+    if raw is not None and block:
+        raw = f'{raw}\n\n{block}'
+    return convert_piece(src, answer, rec.get('answer_md') or '', resolve, raw=raw)
 
 
 def image_urls(*texts):
     return [u for t in texts for u in MD_IMAGE_RE.findall(t or '')
-            if not u.startswith('data:')]
+            if not is_data_image(u)]
+
+
+def data_image_problems(*texts):
+    """Причины, по которым data:-картинку из текстов не взять (пусто — все годны)."""
+    out = []
+    for url in (u for t in texts for u in MD_IMAGE_RE.findall(t or '') if is_data_image(u)):
+        try:
+            decode_data_image(url)
+        except ValueError as exc:
+            out.append(str(exc))
+    return out
+
+
+class Images:
+    """Картинки записи: файл выгрузки по `image_map.json` или data:-адрес в
+    самом тексте (байты в ссылке). Битый data:-адрес не разрешается — он
+    остаётся в тексте, а задача уходит вручную (`data_image_problems`)."""
+
+    def __init__(self, files):
+        self.files = files
+
+    def __call__(self, reference):
+        if is_data_image(reference):
+            try:
+                decode_data_image(reference)
+            except ValueError:
+                return False
+            return True
+        return self.files(reference)
+
+    def read(self, reference):
+        if is_data_image(reference):
+            return decode_data_image(reference)[0]
+        return Path(self.files.path_for(reference)).read_bytes()
 
 
 def part_digest(rows):
@@ -281,7 +389,7 @@ class Command(BaseCommand):
             only = {int(x) for x in Path(options['ids_file']).read_text(encoding='utf-8').split()
                     if x.strip().isdigit()}
         self.old_records = solvehub_records(str(old_dir), only=set(lost))
-        self.resolve = solvehub_resolver(str(old_dir))
+        self.resolve = Images(solvehub_resolver(str(old_dir)))
         self.include_edited = options['include_edited']
         plans = []
         for group in groups:
@@ -380,7 +488,11 @@ class Command(BaseCommand):
             for url in image_urls(rest, rec.get('answer_md')):
                 if not self.resolve(url):
                     missing_images.append(url)
-            text, answer, solution, figs = record_part(rec, rest, self.resolve)
+            for why in data_image_problems(rest, rec.get('answer_md')):
+                reasons.append('картинка пункта %s): %s' % (tok, why))
+            text, answer, solution, figs, defects = record_part(
+                rec, rest, self.resolve, raw=(rec.get('md') or '').strip())
+            reasons += ['конвертация исказила пункт %s): %s' % (tok, d) for d in defects]
             new_parts.append({'label': tok, 'statement': text, 'answer': answer,
                               'solution': solution, 'figures': figs})
 
@@ -400,6 +512,10 @@ class Command(BaseCommand):
             statement, fresh, parts = None, [], None
         else:
             statement, fresh, parts = target
+            written = [statement or ''] + [p[k] or '' for p in fresh
+                                           for k in ('statement', 'answer', 'solution')]
+            if any('data:image' in t for t in written):
+                return manual('в тексте осталась картинка data:image (не стала рисунком)')
 
         # Стала бы задача «тестом-игрой» (подпункты — варианты ответа)?
         if parts is not None:
@@ -449,8 +565,7 @@ class Command(BaseCommand):
                 if digest in have_figs:
                     continue
                 have_figs.add(digest)
-                path = self.resolve.path_for(url)
-                data = Path(path).read_bytes()
+                data = self.resolve.read(url)
                 plan.result['children']['figures']['create'].append({
                     'problem': pid, 'key': digest,
                     'row': {'source_field': 'import', 'tikz_source': url, 'svg': '',
@@ -494,8 +609,15 @@ class Command(BaseCommand):
             return None
         header_raw = md[:m.start()].rstrip()
         a_tok, a_rest = split_label(md[m.start():])
-        header, _a, _s, _f = convert_piece(header_raw, resolve=self.resolve)
-        a_text, a_answer, a_solution, a_figs = record_part(old, a_rest, self.resolve)
+        header, _a, _s, _f, defects = convert_piece(header_raw, resolve=self.resolve)
+        reasons += ['конвертация исказила шапку: %s' % d for d in defects]
+        reasons += ['картинка записи 1: %s' % why
+                    for why in data_image_problems(md, old.get('answer_md'))]
+        a_text, a_answer, a_solution, a_figs, defects = record_part(
+            old, a_rest, self.resolve, raw=md[m.start():].strip())
+        reasons += ['конвертация исказила пункт %s): %s' % (a_tok, d) for d in defects]
+        if reasons:
+            return None
         parts = [{'label': a_tok, 'statement': a_text, 'answer': a_answer,
                   'solution': a_solution, 'figures': a_figs}] + new_parts
         if db_parts:

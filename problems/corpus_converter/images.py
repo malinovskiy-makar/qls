@@ -24,6 +24,8 @@ r"""Ссылки на картинки в СЫРОМ материале → ма
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import re
 
@@ -147,6 +149,46 @@ _MAGIC = (
     (b'GIF89a', 'image/gif'),
     (b'BM', 'image/bmp'),
 )
+
+
+#: Картинка прямо в тексте: `![](data:image/png;base64,…)`. Так SolveHub
+#: хранит 5 картинок в 6 121 задаче (замер 13.10.2026) — файла на диске у
+#: них нет, байты лежат в самой ссылке.
+DATA_IMAGE_RE = re.compile(r'\s*data:image/([A-Za-z0-9.+-]+);base64,(.*)\Z', re.S)
+#: Объявленный тип → MIME. Список закрытый: иное — в ручной разбор.
+DATA_IMAGE_TYPES = {'png': 'image/png', 'jpeg': 'image/jpeg',
+                    'gif': 'image/gif', 'webp': 'image/webp'}
+#: Больше — не картинка к задаче, а что-то не то: в ручной разбор.
+MAX_DATA_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def is_data_image(reference):
+    return (reference or '').lstrip().lower().startswith('data:')
+
+
+def decode_data_image(reference):
+    """`(байты, MIME)` из data:-адреса или `ValueError` с причиной.
+
+    Тип берётся из адреса, но байты обязаны с ним совпасть по сигнатуре
+    (`sniff_content_type`): объявленное и настоящее не расходятся молча."""
+    match = DATA_IMAGE_RE.match(reference or '')
+    if not match:
+        raise ValueError('data:-адрес не вида data:image/<тип>;base64,…')
+    content_type = DATA_IMAGE_TYPES.get(match.group(1).lower())
+    if content_type is None:
+        raise ValueError('неизвестный тип картинки data:image/%s' % match.group(1))
+    body = re.sub(r'\s+', '', match.group(2))
+    if len(body) * 3 // 4 > MAX_DATA_IMAGE_BYTES:
+        raise ValueError('картинка data: больше 5 МБ')
+    try:
+        data = base64.b64decode(body, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError('некорректный base64 в картинке data:') from None
+    if not data or len(data) > MAX_DATA_IMAGE_BYTES:
+        raise ValueError('картинка data: пустая или больше 5 МБ')
+    if sniff_content_type(data[:16]) != content_type:
+        raise ValueError('байты картинки data: не похожи на %s' % content_type)
+    return data, content_type
 
 
 def sniff_content_type(data):

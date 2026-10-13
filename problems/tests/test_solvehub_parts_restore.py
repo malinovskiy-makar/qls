@@ -5,6 +5,7 @@
 создаёт тот же `create_problem` из текста того же конвейера, что настоящий
 импорт, — значит, база в тесте устроена как дома, а не как удобно тесту.
 """
+import base64
 import csv
 import hashlib
 import json
@@ -137,6 +138,14 @@ class _Data(TestCase):
     def parts(self, p):
         return list(ProblemPart.objects.filter(problem=p).order_by('order', 'pk'))
 
+    def assert_untouched(self, p, reason_part, *args):
+        """Не прошла гейт: не меняется и попадает в список с причиной."""
+        before = self.state(p)
+        self.run_cmd('--apply', *args)
+        self.assertEqual(self.state(p), before)
+        self.assertIn(p.pk, self.manual())
+        self.assertIn(reason_part, self.manual()[p.pk])
+
 
 class GroupATests(_Data):
     def test_adds_missing_parts_and_touches_nothing_else(self):
@@ -220,13 +229,6 @@ class IdempotenceTests(_Data):
 
 class GateTests(_Data):
     """Задача, не прошедшая гейт, не меняется и попадает в список с причиной."""
-
-    def assert_untouched(self, p, reason_part, *args):
-        before = self.state(p)
-        self.run_cmd('--apply', *args)
-        self.assertEqual(self.state(p), before)
-        self.assertIn(p.pk, self.manual())
-        self.assertIn(reason_part, self.manual()[p.pk])
 
     def test_broken_chain(self):
         p = self.add('A1', A_RECORDS)
@@ -431,3 +433,100 @@ class LabelTests(TestCase):
 
     def test_no_label(self):
         self.assertEqual(cmd.split_label('Сколько денег')[0], None)
+
+    def test_formula_after_label_keeps_its_dollar(self):
+        """Дефект 13.10: `$` формулы после `б) ` съедался как «закрывающий»
+        метки (185 записей в 61 задаче полного прогона)."""
+        cases = {
+            'б) $x_1 = 2$': ('б', '$x_1 = 2$'),
+            'б)$x$': ('б', '$x$'),
+            '$б)$ текст': ('б', 'текст'),
+            '**б)** $x$': ('б', '$x$'),
+            '(б) $x$': ('б', '$x$'),
+            'Задание $2.$ условие': ('2', 'условие'),
+            '1. $a$': ('1', '$a$'),
+            'б) $$\\begin{cases} a \\end{cases}$$': ('б', '$$\\begin{cases} a \\end{cases}$$'),
+        }
+        for md, expected in cases.items():
+            self.assertEqual(cmd.split_label(md), expected, md)
+
+    def test_closing_dollar_only_after_opening(self):
+        for md in ('б) $x$', 'b) $x$', '2. $x$', '(в) $x$'):
+            m = cmd.LABEL_RE.match(md)
+            self.assertIsNone(m.group('d2'), md)
+        self.assertIsNotNone(cmd.LABEL_RE.match('$б)$ x').group('d2'))
+
+
+class ConversionGateUnitTests(TestCase):
+    def test_lost_dollar_and_dash_are_defects(self):
+        raw = r'б) $y_1 = 12 - 2x_1, \quad y_2 = 6 - 2x_2$'
+        broken = r'y_1 = 12 — 2x_1,  y_2 = 6 — 2x_2\$'
+        found = ' | '.join(cmd.conversion_defects(raw, broken))
+        for part in ('чётность', r'\$', r'\quad', 'минус'):
+            self.assertIn(part, found)
+
+    def test_formula_followed_by_text(self):
+        """`б) $6$ минут` → `6\\$ минут`: `\\$` не в конце, команд нет — ловит чётность."""
+        self.assertTrue(cmd.conversion_defects('б) $6$ минут', r'6\$ минут'))
+
+    def test_clean_conversion_and_currency_pass(self):
+        self.assertEqual(cmd.conversion_defects(r'б) $a \quad b - c$', r'$a \quad b - c$'), [])
+        # Валюта: одинокий `$` сырья законно становится `\$`.
+        self.assertEqual(cmd.conversion_defects('subsidy s = $5,000.', r'subsidy s = \$5,000.'), [])
+        self.assertEqual(cmd.conversion_defects('до $ $2457$ ;', r'до \$ $2457$ ;'), [])
+
+
+#: Настоящий PNG 1×1.
+PNG_1x1_B64 = ('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
+
+
+class ConversionPipelineTests(_Data):
+    """Сквозь всю команду: сырьё → база."""
+
+    def test_formula_part_survives_unchanged(self):
+        records = [dict(r) for r in A_RECORDS]
+        records[1] = dict(records[1], md='б) $a \\quad b - c$')
+        p = self.add('A1', records)
+        self.run_cmd('--apply')
+        part = self.parts(p)[1]
+        self.assertEqual(part.label, 'б')
+        self.assertEqual(part.statement, '$a \\quad b - c$')
+        self.assertNotIn('\\$', part.statement)
+        self.assertNotIn('—', part.statement)
+
+    def test_broken_conversion_goes_to_manual_not_to_base(self):
+        records = [dict(r) for r in A_RECORDS]
+        records[1] = dict(records[1], md='б) $a - b$')
+        p = self.add('A1', records)
+        real = cmd.convert_for_import
+
+        def spoiled(**kw):
+            result = real(**kw)
+            if 'a - b' in result['statement_md']:
+                result['statement_md'] = 'a — b\\$'
+            return result
+
+        with mock.patch.object(cmd, 'convert_for_import', spoiled):
+            self.assert_untouched(p, 'конвертация исказила пункт б)')
+
+    def test_data_image_becomes_figure(self):
+        uri = 'data:image/png;base64,' + PNG_1x1_B64
+        records = [dict(r) for r in A_RECORDS]
+        records[1] = dict(records[1], answer_md='Выручка 20. ![](%s)' % uri)
+        p = self.add('A1', records)
+        self.run_cmd('--apply')
+        digest = hashlib.sha256(uri.encode()).hexdigest()
+        part = self.parts(p)[1]
+        self.assertIn('[[FIGURE:%s]]' % digest, part.solution)
+        self.assertNotIn('data:image', part.solution)
+        fig = ProblemFigure.objects.get(problem=p)
+        self.assertEqual(fig.tikz_hash, digest)
+        self.assertEqual(bytes(fig.image_data), base64.b64decode(PNG_1x1_B64))
+        self.assertEqual(fig.content_type, 'image/png')
+
+    def test_broken_data_image_goes_to_manual(self):
+        records = [dict(r) for r in A_RECORDS]
+        records[1] = dict(records[1], answer_md='Выручка 20. ![](data:image/png;base64,@@@@)')
+        p = self.add('A1', records)
+        self.assert_untouched(p, 'некорректный base64')
+        self.assertEqual(ProblemFigure.objects.filter(problem=p).count(), 0)
