@@ -297,7 +297,9 @@ function answerKeyPoints(spec, seg) {
 
 /* ОКНО ПО ФУНКЦИИ («Построение графиков»: старт, «Вписать», «Вернуть
    исходный вид»). Полный план, все четыре четверти:
-     · по x — отрезок ответа; шире, если ключевая точка не помещается с запасом;
+     · по x — отрезок, подобранный ПО ФОРМУЛЕ (autoSeg), и ключевые точки ответа
+       с запасом. Ручной отрезок ответа сам окно не растягивает (ADR 0146): x² − 4
+       на отрезке −5…200 давал окно 200 × 40 000, корни и вершина сливались с осью;
      · по y — ключевые точки, ноль (ось x видна) и основная масса значений
        кривых на этом отрезке (5–95 %: полюс 1/x не раздувает окно);
      · запас 10 % с каждой стороны: у любой ключевой точки до края ≥ 8 %.
@@ -305,9 +307,9 @@ function answerKeyPoints(spec, seg) {
 function graphFitWindow() {
   const spec = answerSpec();
   if (!spec) return { x0: -10, x1: 10, y0: -10, y1: 10 };
-  const seg = answerSeg();
-  const pts = answerKeyPoints(spec, seg);
-  let x0 = seg.a, x1 = seg.b;
+  const auto = autoSegOf(spec);
+  const pts = answerKeyPoints(spec, answerSeg());
+  let x0 = auto.a, x1 = auto.b;
   for (let k = 0; k < 3; k++) {                  // ключевые точки по x — с запасом
     const m = (x1 - x0) * 0.1;
     pts.forEach(p => { x0 = Math.min(x0, p.x - m); x1 = Math.max(x1, p.x + m); });
@@ -332,17 +334,60 @@ function setGraphWindow(w) {
   CONFIG.Qmin = w.x0; CONFIG.Qmax = w.x1; CONFIG.Pmin = w.y0; CONFIG.Pmax = w.y1;
   syncViewFields();
 }
-// Раздвинуть, но не сжать (правило ADR 0087): новая функция вышла за край —
-// окно растёт до неё; окно, выбранное человеком (zoomLock), не трогаем.
-function growGraphWindow() {
-  if (STATE.zoomLock) return;
-  const w = graphFitWindow();
-  const n = { x0: Math.min(CONFIG.Qmin, w.x0), x1: Math.max(CONFIG.Qmax, w.x1),
-              y0: Math.min(CONFIG.Pmin, w.y0), y1: Math.max(CONFIG.Pmax, w.y1) };
-  if (n.x0 < CONFIG.Qmin - 1e-9 || n.x1 > CONFIG.Qmax + 1e-9 || n.y0 < CONFIG.Pmin - 1e-9 || n.y1 > CONFIG.Pmax + 1e-9) {
-    setGraphWindow(n);
-    redrawAll();
+
+/* ОКНО ИДЁТ ЗА КЛЮЧЕВЫМИ ТОЧКАМИ, А НЕ ЗА КРАЯМИ ОТРЕЗКА (ADR 0146, решение
+   владельца 13.10). После изменения входов модели (формула, параметр, отрезок
+   ответа) все ключевые точки ответа — корни, пересечение с осью y, экстремумы,
+   пересечения кривых — видны с запасом от края. Невидимая точка: окно
+   сдвигается (если по размеру точки помещаются) или расширяется ровно до неё
+   с запасом, а не до краёв отрезка. Срабатывает и после ручного сдвига или
+   масштаба (zoomLock здесь не помеха). Все точки видны — окно не трогается.
+   Сам сдвиг или масштаб человеком окно не возвращает: проверка идёт, только
+   когда набор ключевых точек сменился (_graphKeySig).
+   Прежнее правило «рост без сжатия до окна по функции» растягивало окно до
+   краёв ручного отрезка: −5…200 у x² − 4 давало 200 × 40 000. */
+const KEY_IN = 0.08;     // точка считается видной, если до края не меньше 8 % размаха
+const KEY_PAD = 0.1;     // подтянутое окно оставляет до точки 10 % размаха
+let _graphKeySig = null;
+
+function keyPointsSig(pts) {
+  return pts.map(p => p.x.toPrecision(10) + ',' + p.y.toPrecision(10)).sort().join(';');
+}
+// Одна ось окна [lo; hi] так, чтобы значения vals были внутри с запасом.
+function axisShowing(lo, hi, vals) {
+  if (!vals.length) return [lo, hi];
+  const span = hi - lo;
+  if (vals.every(v => v >= lo + KEY_IN * span && v <= hi - KEY_IN * span)) return [lo, hi];
+  const a = Math.min.apply(null, vals), b = Math.max.apply(null, vals);
+  if ((b - a) <= span * (1 - 2 * KEY_PAD)) {          // по размеру помещаются — сдвиг
+    let n0 = lo;
+    if (a < n0 + KEY_IN * span) n0 = a - KEY_PAD * span;
+    if (b > n0 + span - KEY_IN * span) n0 = b + KEY_PAD * span - span;
+    return [n0, n0 + span];
   }
+  // Не помещаются — расширение до них; окно далеко от точек — на точки целиком.
+  let n0 = (hi < a || lo > b) ? a : Math.min(lo, a), n1 = (hi < a || lo > b) ? b : Math.max(hi, b);
+  for (let k = 0; k < 4; k++) {
+    const m = (n1 - n0) * KEY_PAD;
+    n0 = Math.min(n0, a - m); n1 = Math.max(n1, b + m);
+  }
+  return [n0, n1];
+}
+function graphShowKeyPoints() {
+  const spec = answerSpec();
+  if (!spec) { _graphKeySig = null; return; }
+  const pts = answerKeyPoints(spec, answerSeg());
+  const sig = keyPointsSig(pts);
+  if (sig === _graphKeySig) return;               // входы не менялись: окно — дело человека
+  _graphKeySig = sig;
+  if (!pts.length) return;
+  let [x0, x1] = axisShowing(CONFIG.Qmin, CONFIG.Qmax, pts.map(p => p.x));
+  let [y0, y1] = axisShowing(CONFIG.Pmin, CONFIG.Pmax, pts.map(p => p.y));
+  if (STATE.firstQuad) { x0 = Math.max(0, x0); y0 = Math.max(0, y0); }
+  const same = (u, v) => Math.abs(u - v) <= 1e-9 * Math.max(1, Math.abs(v));
+  if (same(x0, CONFIG.Qmin) && same(x1, CONFIG.Qmax) && same(y0, CONFIG.Pmin) && same(y1, CONFIG.Pmax)) return;
+  setGraphWindow({ x0, x1, y0, y1 });
+  redrawAll();
 }
 
 // Отрезок ответа текущей модели: свой у человека или подобранный по формуле.
@@ -351,9 +396,13 @@ function answerSeg() {
   if (STATE.ansHand && STATE.ansA != null && STATE.ansB != null && isFinite(a) && isFinite(b) && b > a) return { a, b, hand: true };
   const spec = answerSpec();
   if (!spec) return { a: -5, b: 5, hand: false };
-  const sig = 's|' + spec.keyFns.map(fnSig).join('/') + '|' + spec.diffFns.map(fnSig).join('/');
-  const s = ansCached(sig, () => autoAnswerSeg(spec.keyFns, spec.diffFns));
+  const s = autoSegOf(spec);
   return { a: s.a, b: s.b, hand: false };
+}
+// Отрезок, подобранный по формуле (кэш по подписи функций), — без ручного.
+function autoSegOf(spec) {
+  const sig = 's|' + spec.keyFns.map(fnSig).join('/') + '|' + spec.diffFns.map(fnSig).join('/');
+  return ansCached(sig, () => autoAnswerSeg(spec.keyFns, spec.diffFns));
 }
 
 /* Две главные строки «Ответа» любой модели вида y = f(x): локальные

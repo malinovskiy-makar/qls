@@ -17,6 +17,12 @@
      Д. Окно «Построения графиков» на старте и по «Вписать» — вокруг ключевых
         точек во всех четырёх четвертях (фаза 3).
      Е. Локальные максимум и минимум — главные ячейки (фаза 4).
+     Ж. Смена отрезка набором (Enter, Tab, «Вернуть по формуле»): после каждого
+        шага текст колонки «Ответ» тот же, что после перезагрузки по ссылке, — и в
+        обычной, и в фоновой вкладке (починка 13.10).
+     З. Окно идёт за ключевыми точками ответа, а не за краями отрезка (ADR 0146):
+        −5…200 у x² − 4 окна не трогает, новая кривая и новый параметр показывают
+        свои точки и после ручного сдвига, сдвиг и масштаб человека окно не возвращают.
 
    ⚠️ Прибор стережёт ПРАВИЛО: ответ — свойство функции и отрезка, а не кадра.
    Числа окна (−10…10 и т. п.) не закреплены, кроме требований к запасу.
@@ -294,6 +300,148 @@ if (want('Е')) {
     if (mx) ok(key + ': максимум в формате «(x; y)» или «нет»', fmtOk(mx.val), mx.val);
     if (mn) ok(key + ': минимум в формате «(x; y)» или «нет»', fmtOk(mn.val), mn.val);
   }
+}
+
+/* ── Ж. Смена отрезка: «Ответ» сразу тот же, что после перезагрузки ── */
+if (want('Ж')) {
+  head('Ж. Смена отрезка набором: «Ответ» тот же, что после перезагрузки');
+  /* Карточка 13.10: «от» −60, потом −80, а ответ остался прежним (у h одна
+     точка 70,711), после перезагрузки — верный. Две найденные причины:
+       1. колонка «Ответ» собиралась ТОЛЬКО на кадре (requestAnimationFrame), а в
+          фоновой вкладке кадров нет — проверка шла скриптом из фоновой вкладки;
+       2. Tab из «от» в «до» не применял отрезок, пока фокус не покинет строку.
+     Прогон дважды: обычная вкладка и фоновая (document.hidden, кадров нет —
+     так ведёт себя Chrome со вкладкой не на переднем плане). */
+  const CURVES = "__ma.setGraph(['x^2-4', 'x^2-a', '5000-x^2'])";
+  /* Видимый текст колонки «Ответ» (#params-panel целиком: строки, заголовки,
+     строка отрезка, «Разбор»). Невидимая копия KaTeX для чтецов экрана и
+     пробелы не в счёт: одна и та же точка бывает набрана формулой или текстом
+     (последняя ячейка после загрузки — отдельная карточка), смысл один. */
+  const COLTEXT = () => {
+    const st = document.createElement('style');
+    st.textContent = '.katex-mathml{display:none!important}';
+    document.head.appendChild(st);
+    const t = document.getElementById('params-panel').innerText.replace(/[\s\u00a0\u202f\u2009\u200b]+/g, '');
+    st.remove();
+    return t;
+  };
+  const colText = () => page.evaluate(COLTEXT);
+  const reloadText = async () => {
+    const link = await ev(async () => shareLinkOf());
+    const p2 = await ctx.newPage();
+    await p2.goto(link, { waitUntil: 'networkidle' });
+    await p2.waitForTimeout(1500);
+    const t = await p2.evaluate(COLTEXT);
+    await p2.close();
+    return t;
+  };
+  const typeSeg = async (id, v, key) => {
+    await page.click('#' + id, { clickCount: 3 });
+    await page.keyboard.type(v);
+    await page.keyboard.press(key || 'Enter');
+    await page.waitForTimeout(400);
+  };
+  const hTexts = () => ev(() => ({ hx: __ma.find(/^Пересекаетосьx,криваяh/), fh: __ma.find(/fиh$/), gh: __ma.find(/gиh$/) }));
+  const SCEN = [
+    ['−5…200, «от» −60, «от» −80', [['ans-a', '-5'], ['ans-b', '200'], ['ans-a', '-60'], ['ans-a', '-80']]],
+    ['−80…200, «до» 30', [['ans-a', '-80'], ['ans-b', '200'], ['ans-b', '30']]],
+    ['Tab между полями: «от» −60, Tab, «от» −80, Tab', [['ans-a', '-5'], ['ans-b', '200'], ['ans-a', '-60', 'Tab'], ['ans-a', '-80', 'Tab']]],
+    ['ручной отрезок, «Вернуть по формуле»', [['ans-a', '-80'], ['ans-b', '200'], ['#auto']]],
+  ];
+  for (const bg of [false, true]) {
+    for (const [name, steps] of SCEN) {
+      await ev(async ({ setup, bg }) => {
+        await __ma.open('m-graph', new Function(setup));
+        if (bg) {   // фоновая вкладка: страница скрыта, кадров нет
+          Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+          window.__rafHeld = [];
+          window.requestAnimationFrame = (fn) => { __rafHeld.push(fn); return __rafHeld.length; };
+        }
+      }, { setup: CURVES, bg });
+      let bad1 = [];
+      for (const st of steps) {
+        if (st[0] === '#auto') { await page.click('#ans-seg-auto'); await page.waitForTimeout(400); }
+        else await typeSeg(st[0], st[1], st[2]);
+        // Ответ посчитан на том отрезке, что стоит в полях (Tab не оставляет прежний).
+        const fs = await ev(() => [ansSegParse(document.getElementById('ans-a').value), ansSegParse(document.getElementById('ans-b').value), _ansSeg.a, _ansSeg.b]);
+        if (fs[0] !== fs[2] || fs[1] !== fs[3]) bad1.push(st.join(' ') + ': в полях ' + fs[0] + '…' + fs[1] + ', ответ на ' + fs[2] + '…' + fs[3]);
+        const here = await colText();
+        const there = await reloadText();
+        if (here !== there) {
+          let i = 0; while (i < here.length && here[i] === there[i]) i++;
+          const cut = (t) => t.slice(Math.max(0, i - 60), i + 120);
+          bad1.push(st.join(' ') + ': «…' + cut(here) + '» ≠ после перезагрузки «…' + cut(there) + '»');
+        }
+      }
+      ok((bg ? '[фоновая вкладка] ' : '') + name + ': после каждого шага «Ответ» = после перезагрузки', !bad1.length, bad1.join(' | '));
+      if (name.startsWith('−5…200')) {
+        const r = await hTexts();
+        eq((bg ? '[фон] ' : '') + '−80…200: у h ось x', r.hx, '−70,711;70,711');
+        ok((bg ? '[фон] ' : '') + '−80…200: у «f и h» две точки', (r.fh || '').split(';(').length === 2, r.fh);
+        ok((bg ? '[фон] ' : '') + '−80…200: у «g и h» две точки', (r.gh || '').split(';(').length === 2, r.gh);
+      }
+    }
+    if (bg) await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' }).then(() => page.waitForTimeout(900)).then(() => page.addScriptTag({ content: INPAGE }));
+  }
+  await ev(() => resetSceneMemory());
+}
+
+/* ── З. Окно — по ключевым точкам ответа, а не по краям отрезка ────── */
+if (want('З')) {
+  head('З. Окно «Построения графиков» идёт за ключевыми точками (ADR 0146)');
+  const W = () => ev(() => [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax]);
+  const seen = (w, pts) => pts.every(([x, y]) => {
+    const sx = w[1] - w[0], sy = w[3] - w[2];
+    return x >= w[0] + 0.08 * sx - 1e-9 && x <= w[1] - 0.08 * sx + 1e-9 && y >= w[2] + 0.08 * sy - 1e-9 && y <= w[3] - 0.08 * sy + 1e-9;
+  });
+  const typeSeg = async (a, b) => {
+    for (const [id, v] of [['ans-a', a], ['ans-b', b]]) {
+      await page.click('#' + id, { clickCount: 3 }); await page.keyboard.type(v); await page.keyboard.press('Enter'); await page.waitForTimeout(350);
+    }
+  };
+  await ev(async () => { await __ma.open('m-graph'); await __ma.wait(400); });
+  const w0 = await W();
+  eq('старт: окно x', w0[0].toFixed(3) + '…' + w0[1].toFixed(3), '-5.000…5.000');
+  eq('старт: окно y', w0[2].toFixed(3) + '…' + w0[3].toFixed(3), '-6.256…20.819');
+  await typeSeg('-5', '200');
+  const w1 = await W();
+  eq('x²−4, отрезок −5…200: окно не меняется', JSON.stringify(w1), JSON.stringify(w0));
+  await typeSeg('-80', '200');
+  const w1b = await W();
+  eq('x²−4, отрезок −80…200: окно не меняется', JSON.stringify(w1b), JSON.stringify(w0));
+  // Добавили h = 5000 − x² набором в пустую строку списка.
+  const mfs = await page.$$('#graph-rows math-field');
+  await mfs[mfs.length - 1].click(); await page.waitForTimeout(400);
+  await page.keyboard.type('5000-x^2'); await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(900);
+  const w2 = await W();
+  const hPts = [[-70.711, 0], [70.711, 0], [0, 5000], [-50.02, 2498], [50.02, 2498], [0, -4], [-2, 0], [2, 0]];
+  ok('добавили h: видны ±70,711, (0; 5000), пересечения с f, корни и вершина f', seen(w2, hPts), JSON.stringify(w2.map(v => +v.toFixed(2))));
+  ok('добавили h: правый край окна не больше 100', w2[1] <= 100, String(w2[1]));
+  // Сдвиг человеком: (0; −4) за краем — окно стоит; новые входы — окно показывает всё.
+  await ev(async () => { const { mx } = mainScales(); panByPixels(-Math.abs(mx.range()[1] - mx.range()[0]) * 2, 0); await __ma.wait(300); });
+  const w3 = await W();
+  ok('сдвинули: вершина f за краем', !seen(w3, [[0, -4]]), JSON.stringify(w3.map(v => +v.toFixed(1))));
+  await page.waitForTimeout(600);
+  const w3b = await W();
+  eq('без изменения входов окно стоит', JSON.stringify(w3b), JSON.stringify(w3));
+  // Масштаб человеком тоже окно не возвращает.
+  await ev(async () => { const { mx, my } = mainScales(); zoomBy(0.5, mx(0), my(0)); await __ma.wait(300); });
+  const w4 = await W(); await page.waitForTimeout(500); const w4b = await W();
+  eq('масштаб человеком: окно стоит', JSON.stringify(w4b), JSON.stringify(w4));
+  // Параметр a: добавили g = x² − a и сменили a ползунком — окно показывает все точки.
+  await ev(async () => {
+    addCurve('x^2-a'); renderGraphRows(); redrawAll(); await __ma.wait(300);
+    const { mx } = mainScales(); panByPixels(-Math.abs(mx.range()[1] - mx.range()[0]) * 3, 0); await __ma.wait(300);
+  });
+  const w5 = await W();
+  ok('перед сменой a вершина f снова за краем', !seen(w5, [[0, -4]]), JSON.stringify(w5.map(v => +v.toFixed(1))));
+  await ev(async () => { STATE.params.a.value = 3; redrawAll(); await __ma.wait(400); });
+  const w6 = await W();
+  ok('сменили a: видны все ключевые точки (корни f и g, вершины, ±70,711, (0; 5000))',
+    seen(w6, hPts.concat([[-1.732, 0], [1.732, 0], [0, -3]])), JSON.stringify(w6.map(v => +v.toFixed(2))));
+  await ev(() => resetSceneMemory());
 }
 
 ok('ошибок страницы нет', !errs.length, errs.slice(0, 3).join(' | '));

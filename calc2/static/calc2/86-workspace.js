@@ -1847,6 +1847,17 @@ function wireWrench() {
         if (ev.key !== 'Enter') return;
         ev.preventDefault(); dirty = false; applyAnsSegInputs();
       });
+      /* Ушли из поля во второе поле той же строки (Tab, щелчок): верная пара
+         применяется сразу (13.10). Иначе поля показывали «−60…200», а «Ответ»
+         оставался для прежнего отрезка, пока фокус не покинет строку. Неверная
+         пара («от 7» при прежнем «до 5») по-прежнему ждёт ухода из строки. */
+      e.addEventListener('change', () => {
+        if (!dirty) return;
+        const a = ansSegParse((document.getElementById('ans-a') || {}).value);
+        const b = ansSegParse((document.getElementById('ans-b') || {}).value);
+        if (a == null || b == null || !(b > a)) return;
+        dirty = false; applyAnsSegInputs();
+      });
     });
     segRow.addEventListener('focusout', (ev) => {
       if (ev.relatedTarget && segRow.contains(ev.relatedTarget)) return;   // перешли во второе поле

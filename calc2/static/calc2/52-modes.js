@@ -535,11 +535,12 @@ function growWindowToModel() {
   if (sceneTook) return;
   if (_rangeAnimating) return;            // кадром анимации распоряжается сама анимация
   if (STATE.mode === 'math') return;
+  /* «Построение графиков» — полный план и окно по ключевым точкам ответа
+     (ADR 0146), а не экономический запас 100 × 100 от нуля вправо-вверх: тот
+     прижимал параболу x² − 4 к левому краю. Раньше zoomLock: новые точки
+     показываются и после ручного сдвига или масштаба (решение 13.10). */
+  if (STATE.mode === 'graph') { graphShowKeyPoints(); return; }
   if (STATE.zoomLock) return;
-  /* «Построение графиков» — полный план и окно по функции (ADR 0143), а не
-     экономический запас 100 × 100 от нуля вправо-вверх: тот прижимал параболу
-     x² − 4 к левому краю. */
-  if (STATE.mode === 'graph') { growGraphWindow(); return; }
   const w = wantedRanges();
   growRanges(w.qmax, w.pmax);
 }
