@@ -187,6 +187,18 @@ class Command(BaseCommand):
     def _save_scores(self, data_dir, rows):
         write_jsonl(os.path.join(data_dir, 'scores.jsonl'), [rows[k] for k in sorted(rows)])
 
+    def _page_crop(self, data_dir, rec, flip=False):
+        """Вырез полосы таблицы с первой страницы (`flip` — страница вверх ногами)."""
+        image = scans.first_page_image(
+            os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150,
+            page=rec.get('first_page_index') or 0, year=rec['year'])
+        if flip:
+            image = image.rotate(180)
+        crop = scans.crop_band(image)
+        if crop.width > 1600:
+            crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
+        return crop
+
     def _make_crop(self, data_dir, rec, rotate=False, release=()):
         """Вырез таблицы баллов → (путь, причина_удержания).
 
@@ -209,14 +221,15 @@ class Command(BaseCommand):
         if os.path.exists(out):
             crop = Image.open(out).convert('RGB')
         else:
-            image = scans.first_page_image(
-                os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150,
-                page=rec.get('first_page_index') or 0, year=rec['year'])
-            crop = scans.crop_band(image)
-            if crop.width > 1600:
-                crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
+            crop = self._page_crop(data_dir, rec)
         if rec['year'] != 2021 and rec['work_id'] not in release:
             ok, why, metrics = scans.table_shield(crop)
+            if not ok:
+                # Скан вверх ногами: в полосе — верх страницы. Пробуем страницу,
+                # повёрнутую на 180°; прошёл щит — берём этот вырез.
+                flipped = self._page_crop(data_dir, rec, flip=True)
+                if scans.table_shield(flipped)[0]:
+                    crop, ok = flipped, True
             if not ok:
                 held = 'held/%d/%s.png' % (rec['year'], rec['work_id'])
                 os.makedirs(os.path.join(data_dir, os.path.dirname(held)), exist_ok=True)

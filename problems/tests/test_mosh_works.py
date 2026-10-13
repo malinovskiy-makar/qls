@@ -899,6 +899,18 @@ class ScoresCommandTests(TempDirMixin, TestCase):
                           rows['70001100']['runs']), ('review', 'merged_unverified', 1))
 
     @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
+    def test_upside_down_scan_is_flipped_and_then_passes_the_shield(self):
+        rec = make_record('70001200', year=2023, total=81)
+        upside = make_zip({'mosh-econ-01-0001.jpg': jpeg(page_image(red=True).rotate(180)),
+                           'mosh-econ-01-0002.jpg': jpeg(page_image(work=True))})
+        fetch.download_all([rec], self.dir, FakeClient(default=upside), log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), [rec])
+        rows = self.scores('--yes')
+        self.assertEqual(rows['70001200']['scores_status'], 'ok')
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'crops', '2023', '70001200.png')))
+        self.assertFalse(os.path.exists(os.path.join(self.dir, 'held', '2023', '70001200.png')))
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
     def test_limit_is_stratified_by_year(self):
         self.prepare_years(per_year=4, red=True)
         rows = self.scores('--yes', '--limit', '8')
