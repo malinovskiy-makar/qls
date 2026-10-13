@@ -149,6 +149,14 @@ class PageOverlay:
         if status == RESCORE_OK:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status in PATCH_OK:
+            if ((status == 'fixed' or 'blocks' in patch) and 'blocks' in patch
+                    and not numbers_kept(base.get('blocks'), patch['blocks'])):
+                # Перечитывание поправило текст, но потеряло номера блоков
+                # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
+                # номера): старая разметка, страница — человеку.
+                out.update(needs_eyes=True, status=SKELETON_LOST,
+                           needs_eyes_reasons=['перечитывание потеряло номера'])
+                return out
             if status == 'fixed' or 'blocks' in patch:
                 for key in PATCH_FIELDS:
                     if key in patch:
@@ -169,6 +177,16 @@ class PageOverlay:
 
 
 STRUCTURE_TYPES = ('task', 'task_continuation', 'solution', 'criteria')
+SKELETON_LOST = 'human_skeleton'
+
+
+def numbers_kept(base_blocks, new_blocks):
+    """Все номера блоков заданий/решений/критериев исходной расшифровки есть и в
+    новой (номера, а не порядок: перечитывание вправе поменять тип блока)."""
+    def numbers(blocks):
+        return {str(b.get('number') or '').strip() for b in blocks or []
+                if b.get('type') in STRUCTURE_TYPES and str(b.get('number') or '').strip()}
+    return numbers(base_blocks) <= numbers(new_blocks)
 
 
 def skeleton(blocks):

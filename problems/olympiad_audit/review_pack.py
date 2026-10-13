@@ -24,7 +24,8 @@ from problems.olympiad_audit.judge import judge_transcript
 
 SPLIT_OVER = 150
 HUMAN_STATUSES = ('human', 'judge_error', 'needs_fix')
-STATUS_LABELS = {'human': 'перечитана, судья всё ещё видит расхождения',
+STATUS_LABELS = {'human_skeleton': 'перечитанная потеряла номера блоков — показана прежняя',
+                 'human': 'перечитана, судья всё ещё видит расхождения',
                  'judge_error': 'судья не ответил валидным JSON',
                  'needs_fix': 'не перечитана'}
 CSV_COLUMNS = ['пакет', 'страница', 'файл', 'комплекты', 'задания', 'срочность',
@@ -63,10 +64,14 @@ def build_items(plan_rows, patches, v2_records):
     plan = {r['страница']: r for r in plan_rows}
     items = []
     for key, patch in patches.items():
-        if patch.get('status') not in HUMAN_STATUSES:
-            continue
-        row = plan.get(key, {})
         record = v2_records.get(key) or {}
+        lost = (patch.get('status') == 'fixed' and 'blocks' in patch
+                and not triage.numbers_kept(record.get('blocks'), patch['blocks']))
+        if patch.get('status') not in HUMAN_STATUSES and not lost:
+            continue
+        if lost:
+            patch = dict(patch, status=triage.SKELETON_LOST, chosen='v2')
+        row = plan.get(key, {})
         items.append({
             'key': key, 'patch': patch, 'record': record,
             'file': row.get('файл') or record.get('file', ''),

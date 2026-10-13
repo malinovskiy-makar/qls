@@ -556,3 +556,34 @@ class SplitGluedTests(SimpleTestCase):
         tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
         self.assertEqual([t.number for t in tasks], ['4'])
         self.assertIn('20.11.2013 Бизнес', '\n'.join(tasks[0].statement))
+
+
+class OverlayTests(SimpleTestCase):
+    def test_25_fixed_reread_that_lost_numbers_not_applied(self):
+        import json
+        import os
+        import shutil
+        import tempfile
+
+        from problems.olympiad_audit import triage
+        root = tempfile.mkdtemp(prefix='finbiz2_ovl_')
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        base = {'page_dir': 'pages/x', 'page': 1, 'needs_eyes': True, 'blocks': [
+            {'type': 'solution', 'number': str(n), 'text': f'Ответ {n}', 'answer': 'А'}
+            for n in (1, 2, 3)]}
+        os.makedirs(os.path.join(root, 'pages_v2', 'x'))
+        patch = {'status': 'fixed', 'blocks': [{'type': 'solution', 'number': '',
+                                                'text': 'Ответы 1–3 одним блоком'}]}
+        with open(os.path.join(root, 'pages_v2', 'x', 'p1.json'), 'w', encoding='utf-8') as h:
+            json.dump(patch, h)
+        out = triage.PageOverlay(root, patches='pages_v2').apply('pages/x', 1, base)
+        self.assertEqual(out['blocks'], base['blocks'])
+        self.assertEqual(out['status'], triage.SKELETON_LOST)
+        self.assertTrue(out['needs_eyes'])
+        # Номера сохранились (тип сменился) — перечитанное применяется.
+        patch['blocks'] = [{'type': 'task', 'number': str(n), 'text': f'Вопрос {n}'} for n in (1, 2, 3)]
+        with open(os.path.join(root, 'pages_v2', 'x', 'p1.json'), 'w', encoding='utf-8') as h:
+            json.dump(patch, h)
+        out = triage.PageOverlay(root, patches='pages_v2').apply('pages/x', 1, base)
+        self.assertEqual(out['blocks'], patch['blocks'])
+        self.assertFalse(out['needs_eyes'])
