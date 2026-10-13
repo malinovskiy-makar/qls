@@ -9,12 +9,16 @@
    код запрещено: числа выверены и приняты владельцем.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 950 } })).newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
@@ -26,6 +30,7 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
 let bad = 0, total = 0;
+{ const sh = await answerShown(page); total++; if (!sh) bad++; console.log('  ' + (sh ? 'OK  ' : 'FAIL') + ' предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
 const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
 function head(s) { console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 62 - s.length))); }
 function cmp(label, got, want, tol) {

@@ -14,12 +14,16 @@
 // KaTeX-предпросмотр, сборка .tex и ответ PDF-эндпоинта, вложенность
 // «Что изучаем», геометрия иконок, ширина ленты-пульта, тексты без длинных тире.
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
@@ -39,6 +43,7 @@ const ready = await page.evaluate(() => typeof redrawAll === 'function' && typeo
 if (!ready) { console.error('SKIP: функции calc2 не загрузились'); await browser.close(); process.exit(3); }
 
 const checks = [];
+checks.push([(await answerShown(page)) ? 'OK' : 'FAIL', 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', '']);
 const t = async (name, fn) => {
   // Пишем результат сразу: по обрыву прогона видно, на чём он встал.
   let row;

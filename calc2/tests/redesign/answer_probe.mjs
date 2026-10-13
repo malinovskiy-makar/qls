@@ -14,6 +14,7 @@
    node calc2/tests/redesign/answer_probe.mjs [--keys a,b]
    Код 0 — всё сошлось.                                                     */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from '../answer_open.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
@@ -21,6 +22,9 @@ const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const ONLY = (arg('keys', '') || '').split(',').filter(Boolean);
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 const errors = [];
@@ -31,6 +35,7 @@ const keys = (await page.evaluate(() => Object.keys(SCENE_ROUTE))).filter(k => !
 
 let bad = 0;
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
+if (!(await answerShown(page))) fail('предусловие: «Ответ» закрыт (#params-panel > .side-inner не видна)'); else console.log('  OK   предусловие: «Ответ» открыт (#params-panel > .side-inner видна)');
 for (const key of keys) {
   const e0 = errors.length;
   await page.evaluate((k) => { resetSceneMemory(); pickScene(k); closePicker(); redrawAll(); }, key);

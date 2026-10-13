@@ -14,7 +14,8 @@
         (набор 100-2Q меняет кривую); площадь 100 стоит в «Ответе» в группе
         «Свои площади» и на холсте; «Сначала сам» прячет её число; 390 и
         760 px: панель режима открывается и закрывается, прокрутки вбок нет;
-     В  «Ответ» прячется в полоску: 1440 — «Спрятать ›» → правая колонка 44 px,
+     В  «Ответ» прячется в полоску (с 14.10 по умолчанию закрыт, ADR 0150): 1440 —
+        пустая память → полоска, полоска открывает; стрелка → правая колонка 44 px,
         карточка холста шире не меньше чем на 300 px, SVG под новую ширину,
         перерисовок за переключение не больше 3, ошибок 0; после перезагрузки
         спрятан; «Показать ответ» возвращает; шаги истории и ссылка «Поделиться»
@@ -350,17 +351,23 @@ if (want('В')) {
   await page.evaluate(() => { const r = document.querySelector('#sec-tax input[type=range]'); if (r) { r.value = 30; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); } });
   await page.mouse.click(5, 5);
   await page.waitForTimeout(900);
+  /* Решение владельца 14.10 (Notion …81de…, ADR 0150) пересмотрело «по умолчанию открыт»: на первом заходе
+     «Ответ» ЗАКРЫТ, стрелка #ans-hide стоит на левом краю полоски; открывают стрелкой или полоской. */
+  const gc = await geo(page);
+  ok('по умолчанию (пустая память) «Ответ» закрыт: полоска 44, стрелка видна (ADR 0150)', gc.hidden && gc.hide && gc.rail && Math.abs(gc.ans - 44) <= 1, JSON.stringify(gc));
+  await clickAny(page, '#ans-rail'); await page.waitForTimeout(900);
   const g0 = await geo(page);
-  ok('по умолчанию «Ответ» открыт, «Спрятать ›» видна, полоски нет', !g0.hidden && g0.hide && !g0.rail && g0.ans > 300, JSON.stringify(g0));
+  ok('полоска открывает «Ответ»: колонка > 300, стрелка видна, полоски нет', !g0.hidden && g0.hide && !g0.rail && g0.ans > 300, JSON.stringify(g0));
   const h0 = await histInfo(page);
   const n1 = await countRedraws(page, () => clickAny(page, '#ans-hide'));
   const g1 = await geo(page);
-  ok('«Спрятать ›» → правая колонка 44 px (± 1)', Math.abs(g1.ans - 44) <= 1 && g1.rail && !g1.inner, JSON.stringify(g1));
+  ok('стрелка «›» → правая колонка 44 px (± 1)', Math.abs(g1.ans - 44) <= 1 && g1.rail && !g1.inner, JSON.stringify(g1));
   ok('карточка холста шире не меньше чем на 300 px', g1.card - g0.card >= 300, (g1.card - g0.card) + ' px');
   ok('SVG перерисован под новую ширину', Math.abs(g1.svg - g1.wrap) <= 2 && Math.abs(g1.svgAttr - g1.svg) <= 2 && g1.svg > g0.svg + 290, JSON.stringify({ was: g0.svg, now: g1.svg, wrap: g1.wrap, attr: g1.svgAttr }));
   ok('перерисовок за переключение не больше 3', n1 >= 1 && n1 <= 3, String(n1));
   const rlab = await page.evaluate(() => { const b = document.getElementById('ans-rail'); return { aria: b.getAttribute('aria-label'), text: b.textContent.replace(/\s+/g, '') }; });
-  ok('полоска — кнопка «Показать ответ» с надписью «Ответ‹»', rlab.aria === 'Показать ответ' && rlab.text === 'Ответ‹', JSON.stringify(rlab));
+  // Полоска — только вертикальное «Ответ», своей «‹» нет: её заменяет стрелка (ADR 0150, README пакета 4).
+  ok('полоска — кнопка «Показать «Ответ»» с надписью «Ответ»', rlab.aria === 'Показать «Ответ»' && rlab.text === 'Ответ', JSON.stringify(rlab));
   await page.reload({ waitUntil: 'load' });
   await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 30000 });
   await page.waitForTimeout(1200);

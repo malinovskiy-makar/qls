@@ -13,6 +13,7 @@
 // Коды выхода: 0 — все тесты прошли; 1 — есть провалы; 3 — calc2 не загрузился
 //   (нет CDN Math.js/D3 или сервер не отдал страницу) → вызывающий тест пропускает.
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
@@ -6076,6 +6077,9 @@ function approx(got, want, tol) {
 }
 
 const browser = await chromium.launch({ args: ['--force-color-profile=srgb'] });
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его, как у
+   человека, однажды открывшего «Ответ» (зазор .ans-ghead меряется на открытой колонке). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
 
@@ -6103,6 +6107,9 @@ if (!ready) {
 
 let pass = 0, fail = 0;
 const failures = [];
+// Предусловие: колонка «Ответ» открыта — иначе замеры видимого в ней зеленеют вхолостую (ADR 0150).
+if (await answerShown(page)) { pass++; console.log('✓ предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
+else { fail++; failures.push('предусловие: «Ответ» закрыт'); console.log('✗ предусловие: «Ответ» закрыт (#params-panel > .side-inner не видна)'); }
 /* Отбор случаев по куску имени: `CALC2_ONLY='(е)' node calc2/tests/calc2_math.mjs`.
    Нужен для проверки зубастости — временно вернул дефект и хочешь увидеть
    ИМЕННО тот случай, который его ловит, не дожидаясь полутора сотен других.

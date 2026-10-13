@@ -11,9 +11,13 @@
 
    node calc2/tests/redesign/layout_probe.mjs     Код 0 — всё в норме.        */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from '../answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 let bad = 0;
 const ok = (cond, name, got) => { if (!cond) bad++; console.log((cond ? 'OK   ' : 'FAIL ') + name + (got !== undefined ? '  → ' + got : '')); };
 const near = (a, b, t = 1.01) => Math.abs(a - b) <= t;
@@ -24,6 +28,7 @@ async function open(w, h, key, mobile) {
   await page.goto(BASE + '/calc2/' + (key ? '?m=' + key : ''), { waitUntil: 'load' });
   await page.waitForFunction(() => typeof pickScene === 'function', null, { timeout: 30000 });
   await page.waitForTimeout(1200);
+  if (w >= 1240) ok(await answerShown(page), w + ': предусловие: «Ответ» открыт (#params-panel > .side-inner видна)');
   return { ctx, page };
 }
 const box = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }, sel);

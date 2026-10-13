@@ -56,3 +56,28 @@ README пакета. Ветка `feat/calc2-redesign`. Приборы — сер
 - Жирное внутри фразы «Разбора» — класс `ex-inline` (перед ним есть текст), строчное; свой заголовок врезки
   (жирное в начале) остаётся блоком. Вступление «Налогов» — текст прямо в `.sb-note`, не `<p>`.
 - Новый прибор `calc2/tests/redesign/answer_panel_probe.mjs` (разделы А, А2, Б; `ENGINES`, `KEYS`).
+
+### А3. Приборы (сделано)
+
+Общий помощник `calc2/tests/answer_open.mjs`: `keepAnswerOpen(browser)` ставит ключ памяти `'0'` до каждой загрузки во
+всех контекстах браузера (свои `localStorage.clear()` приборов перехвачены и ключ возвращают); `answerShown(page)` —
+предусловие «`#params-panel > .side-inner` видна» (ниже 1 240 истинно). Итоги «до» — копия кода `9b2c3e54` (8098),
+«после» — 8099; ⚠️ у части приборов замер «до» пошёл уже с добавленным предусловием (файлы правились во время
+фонового прогона) — там на базе оно истинно, число проверок «до» и «после» одно.
+
+| Прибор | Что поменяли | До → после |
+|---|---|---|
+| `redesign/parity_quick.mjs` (CI) | `keepAnswerOpen`, предусловие | 1 944 проверок, 0 → 1 945, 0 |
+| `calc2_math.mjs` (CI) | `keepAnswerOpen`, предусловие | 239 / 0 → 240 / 0 |
+| `canon_checks.mjs` (CI) | `expandAll` открывает «Ответ» (`setAnswerHidden(false, true)`) и «Разбор» (`#ex-bar`); ключ `answer_closed` без потолка (+ имя в `test_design_canon.py`) | все ключи 0, `label_shake` 1 (старый) → то же, `answer_closed` 0 |
+| `redesign/answer_probe.mjs` | `keepAnswerOpen`, предусловие | 44 модели → 44 |
+| `redesign/answer_rows_probe.mjs` | `keepAnswerOpen` (и WebKit), предусловие при первой странице ≥ 1 240 | 119 → 120 |
+| `redesign/modes_probe.mjs` | раздел В: «по умолчанию открыт» → «закрыт, полоска открывает» (+1 проверка), подпись «Спрятать ›» → «стрелка «›»», полоска «Ответ‹» → «Ответ» с `aria-label` «Показать «Ответ»» — со ссылкой на …81de… | 54 → 55 |
+| `redesign/layout_probe.mjs` | `keepAnswerOpen`, предусловие на 1 440 и 1 280 | норма → норма |
+| `self_probe.mjs`, `math_answer_probe.mjs`, `mc_drag_probe.mjs`, `webkit_probe.mjs` | `keepAnswerOpen`, предусловие | 82, 117, 38, 136 → те же |
+| `control_numbers.mjs`, `input_probe.mjs`, `calc2_ui.mjs`, `priyomka_probe.mjs`, `final_fn_probe.mjs`, `calc2_blocks.mjs`, `sum_visual_probe.mjs` | `keepAnswerOpen`, предусловие своим способом отчёта | 516; всё; 159; 3 провала (старые, на базе те же); 5 провалов (старые); 67; всё → те же |
+| `audit_matrix.mjs`, `night2_font_audit.mjs`, `math_shots.mjs` (аудиты и снимки) | `keepAnswerOpen`, предусловие (`process.exitCode = 1`) | без провалов → то же |
+| вне «Ответа»: `state_probe` 44/44, `session_probe` 0 провалов, `picker_probe` 87, `memory_probe` 30, `tex/ci_quick` цела, `check_font_scale` чисто, `nodrag` 0 сдвинутых | — | те же |
+
+`priyomka_probe` (3) и `final_fn_probe` (5) красные и на базе `9b2c3e54` теми же строками (ожидания 25–26.08,
+переписанные позже решениями о записи КПВ и суммарном предложении без верхней границы) — не эта сессия.

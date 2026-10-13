@@ -25,6 +25,7 @@
    приезжают из другого места.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -39,6 +40,9 @@ const need = (name) => !want.length || want.includes(name);
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 950 } });
 const page = await ctx.newPage();
 const errs = [];
@@ -53,6 +57,7 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
 let bad = 0;
+{ const sh = await answerShown(page); if (!sh) bad++; console.log((sh ? 'OK   ' : 'FAIL ') + 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
 const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
 function show(label, got, wanted, tol) {
   if (wanted == null) { console.log('     ' + label + ' = ' + num(got)); return; }

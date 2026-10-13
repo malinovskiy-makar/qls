@@ -5,6 +5,7 @@
    3-self-after-answer.png — после верного «2; −2»: «(2; 0)», закрепка доступна.
    Нужен сервер на 8099 (settings_check). */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import fs from 'node:fs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
@@ -12,6 +13,9 @@ const DIR = process.argv[2] || 'reports/calc2_math';
 fs.mkdirSync(DIR, { recursive: true });
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
@@ -20,6 +24,7 @@ await page.waitForTimeout(900);
 await page.evaluate(() => { if (typeof setCalcTheme === 'function') setCalcTheme('light'); resetSceneMemory(); });
 await page.goto(`${BASE}/calc2/?m=m-graph`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);   // окно «Построения графиков» успевает устояться
+if (!(await answerShown(page))) { console.log('FAIL предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); process.exitCode = 1; }
 await page.screenshot({ path: `${DIR}/1-graph-start.png` });
 
 // «Сначала сам»: взвести кривую щелчком и навести на корень (2; 0).

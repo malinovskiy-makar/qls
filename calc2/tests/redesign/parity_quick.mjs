@@ -22,6 +22,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { fateOf } from './fates.mjs';
 import * as layerNew from './layer_new.mjs';
+import { keepAnswerOpen, answerShown } from '../answer_open.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
@@ -32,6 +33,9 @@ const t0 = Date.now();
 
 let browser;
 try { browser = await chromium.launch(); } catch (e) { console.error('Playwright не запустился: ' + e.message); process.exit(4); }
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ», и первой проверкой убеждается, что колонка видна. */
+keepAnswerOpen(browser);
 /* Ширина окна: 1440 (по умолчанию), 1024, 390 — паритет органов проверяется на
    всех трёх (задание редизайна, инварианты). На узких ширинах орган может
    жить в выезжающем «Ответе» или на другой вкладке телефона: «достижим»
@@ -65,6 +69,9 @@ const REDEFINED = {
 };
 let bad = 0, checks = 0;
 const issues = [];
+// Предусловие: колонка «Ответ» открыта (иначе проверки видимого зеленеют вхолостую).
+checks++;
+if (!(await answerShown(page))) { bad++; issues.push('предусловие: «Ответ» закрыт (#params-panel > .side-inner не видна)'); }
 for (const key of keys) {
   const rec = JSON.parse(fs.readFileSync(path.join(BL, key + '.json'), 'utf8'));
   const e0 = errors.length;

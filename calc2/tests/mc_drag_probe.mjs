@@ -16,6 +16,7 @@
       и субсидий» — прежний текст про S (карточка …8134…).
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const ONLY = process.env.ONLY || '';
@@ -29,15 +30,20 @@ function ok(label, cond, detail) {
 const near = (a, b, e) => Math.abs(a - b) <= (e || 0.01);
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
 
+let _preDone = false;
 async function open(p, model) {
   await p.goto(`${BASE}/calc2/?m=${model}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1200);
+  if (!_preDone) { _preDone = true; ok('предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', await answerShown(p)); }
   if (!(await p.evaluate(() => typeof pickScene === 'function'))) { console.log('calc2 не загрузился'); process.exit(3); }
 }
 // Точка модели (q; p) → экран.

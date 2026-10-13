@@ -35,6 +35,7 @@
    node calc2/tests/redesign/answer_rows_probe.mjs [--only Р,К] [--keys a,b]
    Код 0 — всё сошлось.                                                     */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from '../answer_open.mjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -65,6 +66,10 @@ const wasNew = (w) => {
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ​]+/g, '').replace(/[−–]/g, '-');
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
+let _preDone = false;
 async function openPage(w, h, opts, br) {
   const ctx = await (br || browser).newContext(Object.assign({ viewport: { width: w, height: h }, reducedMotion: 'reduce', locale: 'ru-RU' }, opts || {}));
   await ctx.addInitScript(() => { try { localStorage.setItem('theme', 'light'); } catch (e) {} });
@@ -75,6 +80,7 @@ async function openPage(w, h, opts, br) {
   await page.waitForFunction(() => typeof pickScene === 'function', null, { timeout: 30000 });
   await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
   await page.addScriptTag({ content: INPAGE });
+  if (w >= 1240 && !_preDone) { _preDone = true; ok('предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', await answerShown(page)); }
   return { ctx, page, errors };
 }
 const settle = async (page) => {
@@ -569,7 +575,7 @@ if (want('Н')) {
      (Safari) — нет, и обрезка из карточки видна только в нём. */
   const { webkit } = await import('playwright');
   let wk = null;
-  try { wk = await webkit.launch(); } catch (e) { ok('WebKit запускается', false, 'НЕ ПРОВЕРЕНО в WebKit: ' + e.message.split('\n')[0]); }
+  try { wk = keepAnswerOpen(await webkit.launch()); } catch (e) { ok('WebKit запускается', false, 'НЕ ПРОВЕРЕНО в WebKit: ' + e.message.split('\n')[0]); }
   for (const [eng, W, H] of [['chromium', 1280, 800], ['chromium', 1440, 900], ['chromium', 390, 844], ['webkit', 1280, 800], ['webkit', 1440, 900], ['webkit', 390, 844]]) {
     if (eng === 'webkit' && !wk) continue;
     const { ctx, page, errors } = await openPage(W, H, Object.assign(W < 760 ? { hasTouch: true } : {}, W < 760 && eng === 'chromium' ? { isMobile: true } : {}), eng === 'webkit' ? wk : null);

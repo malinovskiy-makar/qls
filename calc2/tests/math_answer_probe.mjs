@@ -28,11 +28,15 @@
    Числа окна (−10…10 и т. п.) не закреплены, кроме требований к запасу.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const ONLY = process.env.ONLY || '';     // буква раздела: ONLY=Б — только он
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 const errs = [];
@@ -42,6 +46,7 @@ await page.waitForTimeout(900);
 if (!(await page.evaluate(() => typeof pickScene === 'function'))) { console.log('calc2 не загрузился'); process.exit(3); }
 
 let bad = 0, total = 0;
+ok('предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', await answerShown(page));
 function head(s) { console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 62 - s.length))); }
 function ok(label, cond, detail) {
   total++; if (!cond) bad++;

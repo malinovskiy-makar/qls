@@ -70,6 +70,10 @@ async function expandAll(page) {
        прячет обе колонки — замер идёт при выключенном режиме и со всеми телами
        секций раскрытыми. */
     if (typeof setFocusMode === 'function') setFocusMode(false);
+    /* Тихие панели (решение 14.10, Notion …81de…, ADR 0150): «Ответ» от 1240 px и «Разбор» закрыты по
+       умолчанию. Замер идёт по открытым — так экран выглядит у человека, который их открыл. */
+    if (typeof setAnswerHidden === 'function') setAnswerHidden(false, true);
+    if (!document.body.classList.contains('ex-shown')) { const xb = document.getElementById('ex-bar'); if (xb) xb.click(); }
     document.querySelectorAll('.app .fold-body').forEach(b => { if (!b.classList.contains('open')) { n += 1; b.classList.add('open'); } });
     if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
     return n;
@@ -483,9 +487,17 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
     const ready = await page.evaluate(() => typeof pickScene === 'function').catch(() => false);
     if (!ready) { console.error('calc2 не загрузился'); await browser.close(); process.exit(3); }
 
+    seen('answer_closed');
     for (const theme of THEMES) {
       for (const key of SCENES) {
         await openScene(page, key, theme);
+        /* Предусловие: колонка «Ответ» открыта, иначе проверки видимого в ней зеленеют вхолостую.
+           Ключ без потолка в CEILING: любое нарушение красное. */
+        const shown = await page.evaluate(() => {
+          const e = document.querySelector('#params-panel > .side-inner');
+          return window.innerWidth < 1240 || !!(e && e.getClientRects().length);
+        });
+        if (!shown) put('answer_closed', theme + '/' + key, '«Ответ» закрыт: #params-panel > .side-inner не видна');
         const found = await page.evaluate(inPage, theme);
         found.forEach(([k, what]) => put(k, theme + '/' + key, what));
       }

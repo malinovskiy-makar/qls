@@ -19,6 +19,7 @@
       видна. В Safari 13.10 левая рамка, скругление и кольцо поля были срезаны краем блока #scoreboard.
 */
 import { webkit, chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const ONLY = process.env.ONLY || '';
@@ -39,6 +40,7 @@ async function open(ctx, model) {
   await page.goto(`${BASE}/calc2/?m=${model}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   if (!(await page.evaluate(() => typeof pickScene === 'function'))) { console.log('calc2 не загрузился'); process.exit(3); }
+  ok(model + ' ' + page.viewportSize().width + ': предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', await answerShown(page));
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
   return page;
 }
@@ -166,7 +168,7 @@ async function sectionB(browser, eng) {
 for (const eng of ENGINES) {
   const bt = eng === 'webkit' ? webkit : chromium;
   let browser;
-  try { browser = await bt.launch(); }
+  try { browser = keepAnswerOpen(await bt.launch()); }   // «Ответ» открыт (ADR 0150, answer_open.mjs)
   catch (e) { console.log(`\n!!! ${eng} не запускается — НЕ ПРОВЕРЕНО в этом движке (npx playwright install ${eng})`); continue; }
   ran++;
   if (want('А')) {
