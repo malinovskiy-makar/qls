@@ -235,6 +235,10 @@ class CriteriaTableTests(SimpleTestCase):
         data = {'type': 'task_continuation', 'number': '',
                 'text': '| Q | P |\n| --- | --- |\n| 1 | 100 |\n| 2 | 90 |'}
         self.assertEqual(assemble.explode_table_rows(data, 'solution'), [data])
+        # Нумерованная таблица данных («№ | Q | P») — тоже не критерии.
+        numbered = {'type': 'task_continuation', 'number': '',
+                    'text': '| № | Q | P |\n| --- | --- | --- |\n| 1 | 10 | 100 |\n| 2 | 20 | 90 |'}
+        self.assertEqual(assemble.explode_table_rows(numbered, 'solution'), [numbered])
 
     def test_8_criteria_table_attaches_to_task_in_assembly(self):
         from problems.olympiad_audit import assemble
