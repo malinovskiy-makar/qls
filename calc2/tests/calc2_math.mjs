@@ -6437,36 +6437,11 @@ await gesture('(е) добавленная кривая не меняет рав
                  + `кривых на холсте ${r.drawn}, формула «${r.expr}»` };
 });
 
-/* (ж) Сторож утечки 13.10 (полный прибор — memory_probe.mjs). Шаг ползунка
-   сдвига пересобирал список функций с полями MathLive, а очереди ожидания
-   библиотек держали каждую старую строку: +580 узлов DOM на шаг, Safari ронял
-   вкладку. 150 шагов «Сдвига MC», затем затишье и сборка мусора через CDP:
-   прирост узлов не больше 2 000 (до правки было около +87 000), и очереди
-   ожидания KaTeX и MathLive после загрузки пусты. */
-await gesture('(ж) 150 шагов «Сдвига MC» не копят узлы DOM', async () => {
-  await page.goto(`${BASE}/calc2/?m=mono`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1200);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('HeapProfiler.enable');
-  const count = async () => { await page.waitForTimeout(1500); await cdp.send('HeapProfiler.collectGarbage'); return cdp.send('Memory.getDOMCounters'); };
-  const c0 = await count();
-  const n = await page.evaluate(() => {
-    const c = STATE.curves.find(x => x.role === 'mc');
-    const sl = c && document.querySelector('.pchip[data-pult-box="params-curves"][data-cid="' + c.id + '"] input[type=range]');
-    if (!sl) return 0;
-    let k = 0;
-    for (let i = 0; i < 150; i++) { sl.value = (i % 75) - 37; sl.dispatchEvent(new Event('input', { bubbles: true })); k++; }
-    return k;
-  });
-  const c1 = await count();
-  await cdp.detach();
-  // Очереди ожидания библиотек после загрузки пусты: в них не кладут (82-input.js).
-  const q = await page.evaluate(() => ({ tex: _texPending.length, mf: _mfPending.length, ready: (typeof katex !== 'undefined') && MATHLIVE_READY }));
-  const dn = c1.nodes - c0.nodes, dl = c1.jsEventListeners - c0.jsEventListeners;
-  return { ok: n === 150 && dn <= 2000 && dl <= 400 && q.ready && q.tex === 0 && q.mf === 0,
-           detail: `шагов ${n}; узлов ${c0.nodes} → ${c1.nodes} (+${dn}), обработчиков ${c0.jsEventListeners} → ${c1.jsEventListeners} (+${dl}); `
-                 + `очереди KaTeX ${q.tex}, MathLive ${q.mf} (библиотеки загружены: ${q.ready})` };
-});
+/* (ж) Сторож утечки 13.10 ВЫНЕСЕН (13.10, часть 3) в свой Django-тест
+   calc2/tests/test_calc2_memory.py → `SHORT=1 node calc2/tests/memory_probe.mjs`
+   (150 шагов «Сдвига MC», те же пороги +2 000 узлов и +400 обработчиков, очереди
+   KaTeX и MathLive). Здесь он стоил ~15 с, и calc2_math шёл 125–131 с при пределе
+   180 с: на медленной машине CI весь прибор с контрольными числами пропускался. */
 
 /* (з) «Разбор» «Дискриминации 3-й степени» без чужого абзаца про налог (13.10).
    Модель запирает карточку вмешательства (лок L_INTERV), но признак
