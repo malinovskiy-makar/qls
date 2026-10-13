@@ -3650,3 +3650,34 @@ body.pts-on .cv-esc { display: inline; }
   body.pts-on #tools-panel.col-cond, body.pts-on #params-panel.col-answer, body.pts-on .ph-tabs { display: none; }
   .pts-done, .pts-head .pts-back, .pts-clear { min-height: 44px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   «ОТВЕТ» ПРЯЧЕТСЯ В ПОЛОСКУ (13.10.2026, ADR 0148; 93-shell.js)
+   Только от 1240 px, где «Ответ» — колонка. Спрятанный оставляет справа
+   полоску 44 px (#ans-rail: «Ответ» вертикально и «‹»), холст занимает
+   место. Это вид: класс body.ans-hidden; на 760–1239 и на телефоне ни
+   «Спрятать», ни полоски нет. «Развернуть график» (cv-focus) сильнее.
+   ═══════════════════════════════════════════════════════════════════ */
+.ans-hide, .ans-rail { display: none; }
+.ans-rail {
+  flex: 1 1 auto; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 16px 0;
+  border: 0; background: var(--surface); color: var(--text2); cursor: pointer; font: inherit;
+}
+.ans-rail:hover { background: var(--chip-bg); color: var(--text); }
+.ans-rail:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+.ans-rail-lab { writing-mode: vertical-rl; font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: var(--text); }
+.ans-rail-arr { font-size: 18px; line-height: 1; }
+@media (min-width: 1240px) {
+  .ans-hide { display: inline-flex; flex: 0 0 auto; margin-left: 6px; }
+  /* Заголовок «Ответ» не сжимается и не переносится по буквам рядом с «Спрятать ›». */
+  #params-panel .col-head h2 { flex: 0 0 auto; white-space: nowrap; }
+  #params-panel .col-head .col-note { flex: 1 1 auto; min-width: 0; text-align: right; white-space: nowrap; }
+  body.ans-hidden:not(.cv-focus) .app { grid-template-columns: 337px minmax(0, 1fr) 44px; }
+  body.ans-hidden #params-panel > .side-inner { display: none; }
+  body.ans-hidden #params-panel > .ans-rail { display: flex; }
+}
+@media (min-width: 1240px) and (max-width: 1399px) {
+  body.ans-hidden:not(.cv-focus) .app { grid-template-columns: 305px minmax(0, 1fr) 44px; }
+  /* Колонка 317: «пересчитывается сразу» рядом с «Спрятать ›» не помещается. */
+  #params-panel .col-head .col-note { visibility: hidden; }
+}

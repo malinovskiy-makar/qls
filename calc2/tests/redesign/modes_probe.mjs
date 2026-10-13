@@ -14,7 +14,14 @@
         (набор 100-2Q меняет кривую); площадь 100 стоит в «Ответе» в группе
         «Свои площади» и на холсте; «Сначала сам» прячет её число; 390 и
         760 px: панель режима открывается и закрывается, прокрутки вбок нет;
-     В  «Ответ» прячется в полоску (появится в фазе 3).
+     В  «Ответ» прячется в полоску: 1440 — «Спрятать ›» → правая колонка 44 px,
+        карточка холста шире не меньше чем на 300 px, SVG под новую ширину,
+        перерисовок за переключение не больше 3, ошибок 0; после перезагрузки
+        спрятан; «Показать ответ» возвращает; шаги истории и ссылка «Поделиться»
+        побайтно те же после двух переключений; «Развернуть график» и обратно —
+        запомненное состояние; «Сначала сам» при спрятанном открывает «Ответ»;
+        1100 — кнопки «Спрятать» нет, #btn-answer выдвигает «Ответ» как раньше
+        (и при запомненном «спрятан»); 390 — без изменений.
 
    CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/modes_probe.mjs [--only А]
    Код 0 — всё сошлось.                                                     */
@@ -272,6 +279,126 @@ if (want('Б')) {
     ok(w + ' px: ошибок страницы нет', !P.errors.length, P.errors.slice(0, 3).join(' | '));
     await P.ctx.close();
   }
+}
+
+/* ── В: «Ответ» прячется в полоску ─────────────────────────────────── */
+async function geo(page) {
+  return page.evaluate(() => {
+    const w = (sel) => { const e = document.querySelector(sel); return e ? Math.round(e.getBoundingClientRect().width * 10) / 10 : -1; };
+    const shown = (sel) => { const e = document.querySelector(sel); return !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'); };
+    return { ans: w('#params-panel'), card: w('.cv-card'), wrap: w('#graph-wrap'), svg: w('#chart'),
+      svgAttr: +(document.getElementById('chart').getAttribute('width') || 0),
+      hidden: document.body.classList.contains('ans-hidden'), rail: shown('#ans-rail'), hide: shown('#ans-hide'),
+      inner: shown('#params-panel > .side-inner') };
+  });
+}
+async function countRedraws(page, fn) {
+  await page.evaluate(() => {
+    if (!window.__rdOrig) { window.__rdOrig = window.redrawAll; window.redrawAll = function () { window.__rdN = (window.__rdN || 0) + 1; return window.__rdOrig.apply(this, arguments); }; }
+    window.__rdN = 0;
+  });
+  await fn();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  return page.evaluate(() => window.__rdN);
+}
+const histInfo = (page) => page.evaluate(async () => {
+  const h = histOf();
+  return { undo: h.undo.length, redo: h.redo.length, link: await shareLinkOf() };
+});
+if (want('В')) {
+  head('В. «Ответ» прячется в полоску');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  await page.evaluate(() => { try { localStorage.removeItem('calc2.v1.answerHidden'); } catch (e) {} });
+  await openKey(page, 'taxes');
+  // Правка человека, чтобы в истории был шаг и ссылка несла состояние.
+  await page.evaluate(() => { const r = document.querySelector('#sec-tax input[type=range]'); if (r) { r.value = 30; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); } });
+  await page.mouse.click(5, 5);
+  await page.waitForTimeout(900);
+  const g0 = await geo(page);
+  ok('по умолчанию «Ответ» открыт, «Спрятать ›» видна, полоски нет', !g0.hidden && g0.hide && !g0.rail && g0.ans > 300, JSON.stringify(g0));
+  const h0 = await histInfo(page);
+  const n1 = await countRedraws(page, () => page.click('#ans-hide'));
+  const g1 = await geo(page);
+  ok('«Спрятать ›» → правая колонка 44 px (± 1)', Math.abs(g1.ans - 44) <= 1 && g1.rail && !g1.inner, JSON.stringify(g1));
+  ok('карточка холста шире не меньше чем на 300 px', g1.card - g0.card >= 300, (g1.card - g0.card) + ' px');
+  ok('SVG перерисован под новую ширину', Math.abs(g1.svg - g1.wrap) <= 2 && Math.abs(g1.svgAttr - g1.svg) <= 2 && g1.svg > g0.svg + 290, JSON.stringify({ was: g0.svg, now: g1.svg, wrap: g1.wrap, attr: g1.svgAttr }));
+  ok('перерисовок за переключение не больше 3', n1 >= 1 && n1 <= 3, String(n1));
+  const rlab = await page.evaluate(() => { const b = document.getElementById('ans-rail'); return { aria: b.getAttribute('aria-label'), text: b.textContent.replace(/\s+/g, '') }; });
+  ok('полоска — кнопка «Показать ответ» с надписью «Ответ‹»', rlab.aria === 'Показать ответ' && rlab.text === 'Ответ‹', JSON.stringify(rlab));
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 30000 });
+  await page.waitForTimeout(1200);
+  const g2 = await geo(page);
+  ok('после перезагрузки «Ответ» по-прежнему спрятан', g2.hidden && Math.abs(g2.ans - 44) <= 1 && g2.rail, JSON.stringify(g2));
+  const n3 = await countRedraws(page, () => page.click('#ans-rail'));
+  /* Замер «до» — в той же раскладке, что «после»: пересечения (STATE.crosses,
+     ключ вида, в истории не участвует) ищутся по сетке пикселей, и на холсте
+     другой ширины их координаты другие в двенадцатом знаке. */
+  await page.waitForTimeout(600);
+  const h2a = await histInfo(page);
+  const g3 = await geo(page);
+  ok('«Показать ответ» → колонка вернулась', !g3.hidden && Math.abs(g3.ans - g0.ans) <= 1 && g3.inner && !g3.rail, JSON.stringify(g3));
+  ok('перерисовок за обратное переключение не больше 3', n3 >= 1 && n3 <= 3, String(n3));
+  await page.click('#ans-hide'); await page.waitForTimeout(300);
+  await page.click('#ans-rail'); await page.waitForTimeout(900);
+  const h2b = await histInfo(page);
+  ok('шаги истории и ссылка «Поделиться» те же до и после двух переключений',
+    h2a.undo === h2b.undo && h2a.redo === h2b.redo && h2a.link === h2b.link && h2a.link.length > 20,
+    JSON.stringify({ before: [h2a.undo, h2a.redo, h2a.link.length], after: [h2b.undo, h2b.redo, h2b.link.length], same: h2a.link === h2b.link }));
+  ok('(и первый замер до перезагрузки: ссылка не несёт «спрятан»)', !/answerHidden|ans-hidden|ans-rail|ans-hide/.test(JSON.stringify(await page.evaluate(() => collectModelState()))) && h0.undo >= 1, 'шагов ' + h0.undo);
+  // «Развернуть график» и обратно — запомненное состояние.
+  await page.click('#ans-hide'); await page.waitForTimeout(300);
+  await page.click('#btn-focus'); await page.waitForTimeout(400);
+  const g4 = await geo(page);
+  await page.click('#btn-focus'); await page.waitForTimeout(500);
+  const g5 = await geo(page);
+  ok('«Развернуть график» прячет обе колонки, обратно — снова полоска 44', g4.ans <= 1 && Math.abs(g5.ans - 44) <= 1 && g5.rail, JSON.stringify({ focus: g4.ans, back: g5.ans }));
+  await page.click('#ans-rail'); await page.waitForTimeout(300);
+  await page.click('#btn-focus'); await page.waitForTimeout(400);
+  await page.click('#btn-focus'); await page.waitForTimeout(500);
+  const g6 = await geo(page);
+  ok('открытый «Ответ» после «Развернуть» и обратно открыт', !g6.hidden && Math.abs(g6.ans - g0.ans) <= 1, JSON.stringify(g6));
+  // «Сначала сам» при спрятанном «Ответе».
+  await page.click('#ans-hide'); await page.waitForTimeout(300);
+  await page.click('#btn-self'); await page.waitForTimeout(600);
+  const g7 = await geo(page);
+  const selfOn = await page.evaluate(() => SELF.on && !!document.querySelector('#ans-hero .self-inp'));
+  ok('«Сначала сам» при спрятанном «Ответе» → «Ответ» открыт, поля на месте', !g7.hidden && g7.inner && selfOn, JSON.stringify({ g7, selfOn }));
+  await page.click('#btn-self'); await page.waitForTimeout(300);
+  ok('ошибок страницы нет (1440)', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+
+  // 1100: выезжающий «Ответ», и при запомненном «спрятан» тоже.
+  for (const stored of ['0', '1']) {
+    const P = await openPage(1100, 800);
+    await P.page.evaluate((v) => { try { localStorage.setItem('calc2.v1.answerHidden', v); } catch (e) {} }, stored);
+    await P.page.reload({ waitUntil: 'load' });
+    await P.page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 30000 });
+    await openKey(P.page, 'taxes');
+    const a = await geo(P.page);
+    const btn = await P.page.evaluate(() => { const b = document.getElementById('btn-answer'); return !!(b && b.getClientRects().length); });
+    await P.page.click('#btn-answer'); await P.page.waitForTimeout(450);
+    const open = await P.page.evaluate(() => ({ cls: document.body.classList.contains('ans-open'),
+      tr: getComputedStyle(document.getElementById('params-panel')).transform, vis: getComputedStyle(document.getElementById('params-panel')).visibility,
+      inner: !!document.querySelector('#params-panel > .side-inner').getClientRects().length }));
+    ok('1100 (запомнено ' + stored + '): «Спрятать» и полоски нет, #btn-answer выдвигает «Ответ»',
+      !a.hide && !a.rail && btn && open.cls && open.vis === 'visible' && open.tr === 'none' && open.inner, JSON.stringify({ a, open }));
+    ok('1100 (запомнено ' + stored + '): ошибок нет', !P.errors.length, P.errors.slice(0, 3).join(' | '));
+    await P.ctx.close();
+  }
+  // 390: без изменений — вкладки, ни «Спрятать», ни полоски.
+  const T = await openPage(390, 844, { isMobile: true, hasTouch: true });
+  await T.page.evaluate(() => { try { localStorage.setItem('calc2.v1.answerHidden', '1'); } catch (e) {} });
+  await T.page.reload({ waitUntil: 'load' });
+  await T.page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 30000 });
+  await openKey(T.page, 'taxes');
+  await T.page.click('#ph-tabs .ph-tab[data-tab="ans"]'); await T.page.waitForTimeout(300);
+  const t = await geo(T.page);
+  const hs = await T.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok('390: вкладка «Ответ» открыта, «Спрятать» и полоски нет, прокрутки вбок нет', t.inner && !t.hide && !t.rail && hs <= 0, JSON.stringify({ t, hs }));
+  ok('390: ошибок нет', !T.errors.length, T.errors.slice(0, 3).join(' | '));
+  await T.ctx.close();
 }
 
 await browser.close();

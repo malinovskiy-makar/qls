@@ -2033,9 +2033,14 @@
        27.09: ползунок стоит рядом со своим смыслом). Здесь табло расчётов и
        разбор; сцены по-прежнему пишут свои #info-*, вид «Ответа» собирается
        поверх них (фаза 6). -->
+  <!-- От 1240 px «Ответ» прячется в полоску 44 px (решение владельца 13.10,
+       ADR 0148; 93-shell.js, setAnswerHidden): «Спрятать ›» в шапке, полоска
+       #ans-rail возвращает. Это ВИД (класс body.ans-hidden, память браузера
+       calc2.v1.answerHidden), не модель: кнопки вне формы (FORM_SKIP_IDS). -->
   <aside class="side side-right col-answer" id="params-panel" aria-label="Ответ">
+    <button type="button" class="ans-rail" id="ans-rail" aria-label="Показать ответ" data-tip="Показать «Ответ»"><span class="ans-rail-lab">Ответ</span><span class="ans-rail-arr" aria-hidden="true">‹</span></button>
     <div class="side-inner">
-      <div class="side-head col-head"><h2>Ответ</h2><span class="col-note">пересчитывается сразу</span><button type="button" id="self-showall" hidden>Показать всё</button><button type="button" class="btn-icon ans-x" id="ans-x" aria-label="Закрыть «Ответ»"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="side-head col-head"><h2>Ответ</h2><span class="col-note">пересчитывается сразу</span><button type="button" id="self-showall" hidden>Показать всё</button><button type="button" class="col-quiet ans-hide" id="ans-hide" data-tip="Спрятать «Ответ», графику больше места">Спрятать ›</button><button type="button" class="btn-icon ans-x" id="ans-x" aria-label="Закрыть «Ответ»"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <div class="side-scroll">
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
         <section class="side-part" id="scoreboard">

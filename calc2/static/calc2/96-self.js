@@ -94,6 +94,8 @@ function setSelfMode(on) {
   document.body.classList.toggle('self-on', SELF.on);
   const b = document.getElementById('btn-self');
   if (b) b.setAttribute('aria-pressed', SELF.on ? 'true' : 'false');
+  // Поля ответа живут в «Ответе»: спрятанная колонка открывается (ADR 0148).
+  if (SELF.on && typeof showAnswerForSelf === 'function') showAnswerForSelf();
   applySelf();
   if (typeof redrawAll === 'function') redrawAll();
 }

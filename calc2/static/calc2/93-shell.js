@@ -102,6 +102,40 @@ function setTool(which) {
   if (which === 'vert' && !STATE.vertArm && typeof setAreaCalcMode === 'function') setAreaCalcMode('poly');
 }
 
+/* «Ответ» прячется в полоску (решение владельца 13.10, ADR 0148). Только от
+   1240 px, где «Ответ» — колонка: класс body.ans-hidden действует лишь там
+   (calc2.css), на 760–1239 «Ответ» выезжает по #btn-answer, на телефоне —
+   вкладка, и там ничего не меняется. По умолчанию открыт; выбор помнит браузер
+   (storeGet / storeSet, ключ calc2.v1.answerHidden). Это ВИД, а не модель: не
+   шаг истории, не автосохранение модели, не ссылка «Поделиться». Ширина холста
+   меняется — перерисовку делает ResizeObserver со своими предохранителями
+   (86-workspace.js); «Развернуть график» прячет обе колонки поверх этого. */
+const ANS_HIDDEN_KEY = 'answerHidden';
+const ANS_COLUMN_MQ = '(min-width: 1240px)';
+function answerHidden() { return document.body.classList.contains('ans-hidden'); }
+function setAnswerHidden(on, quiet) {
+  on = !!on;
+  document.body.classList.toggle('ans-hidden', on);
+  if (!quiet && typeof storeSet === 'function') storeSet(ANS_HIDDEN_KEY, on ? '1' : '0');
+  if (!on) afterColumnShown();
+}
+// «Сначала сам» вписывает ответы в «Ответе»: спрятанная колонка открывается сама.
+function showAnswerForSelf() {
+  if (answerHidden() && window.matchMedia && window.matchMedia(ANS_COLUMN_MQ).matches) setAnswerHidden(false);
+}
+function wireAnswerHide() {
+  setAnswerHidden(typeof storeGet === 'function' && storeGet(ANS_HIDDEN_KEY) === '1', true);
+  const hide = document.getElementById('ans-hide'), rail = document.getElementById('ans-rail');
+  if (hide) hide.addEventListener('click', () => {
+    setAnswerHidden(true);
+    if (rail && rail.offsetParent) rail.focus({ preventScroll: true });
+  });
+  if (rail) rail.addEventListener('click', (e) => {
+    setAnswerHidden(false);
+    if (e.detail === 0 && hide && hide.offsetParent) hide.focus({ preventScroll: true });
+  });
+}
+
 function wireShell() {
   const tc = document.getElementById('tool-cursor'), tp = document.getElementById('tool-pts');
   if (tc) tc.addEventListener('click', () => setPtsMode(false));
@@ -172,6 +206,7 @@ function wireShell() {
   window.addEventListener('calc2:changing', syncZoomLevel);
   syncModelHead();
   wirePhoneMore();
+  wireAnswerHide();
 }
 
 /* ── Телефон: лист «Действия» за кнопкой «⋯» (README макета, раздел 3) ─────

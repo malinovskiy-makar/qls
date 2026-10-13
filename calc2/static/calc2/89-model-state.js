@@ -69,7 +69,8 @@ function plainCopy(v, depth) {
 /* Кнопки режима холста и панели режима «Точки и площади» (ADR 0148) — тоже вид:
    нажатость «Курсор» / «Точки и площади» в форме делала бы вход в режим шагом
    истории и несла бы режим в ссылку. */
-const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc']);
+// «Спрятать ›» и полоска «Ответ» — тоже вид (ADR 0148): ни истории, ни ссылки.
+const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc', 'ans-hide', 'ans-rail']);
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];
