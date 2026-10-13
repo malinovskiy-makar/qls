@@ -378,6 +378,8 @@ class AssembleSectionsTests(SimpleTestCase):
         glued.statement = ['Выберите изображения, иллюстрирующие вид мошенничества.\n\n' + q4]
         tasks = OrderedDict({('3', ''): glued})
         self.assertIsNone(assemble.match_by_text(tasks, q4 + '\n\n- А. звонок', '4'))
+        # Блок с ЦЕЛЫМ условием 3 (склейка) под номером 4 — тоже не на 3.
+        self.assertIsNone(assemble.match_by_text(tasks, glued.statement[0] + '\n\n- А. звонок', '4'))
         self.assertIs(assemble.match_by_text(tasks, glued.statement[0] + ' Ответ: 2', '3'), glued)
         self.assertTrue(assemble.compatible_number('тест-2.5', '5'))
         self.assertFalse(assemble.compatible_number('16', '18'))
@@ -390,6 +392,8 @@ class AssembleSectionsTests(SimpleTestCase):
         self.assertEqual(assemble.parse_answer_grid('| 1 | В |\n| 2 | Б, В |\n| 3 | А |'),
                          {'1': 'В', '2': 'Б, В', '3': 'А'})
         self.assertEqual(assemble.parse_answer_grid('| 1 | 100 |\n| 2 | 90 |\n| 3 | 80 |'), {})
+        self.assertEqual(assemble.parse_answer_grid(
+            '| 1 | высокий доход |\n| 2 | низкий доход |\n| 3 | средний доход |'), {})
         for v, n in (('1', 1), ('2', 2)):
             self.page('pages/t', n, [{'type': 'header', 'variant': v}] + [
                 {'type': 'task', 'number': str(k), 'text': _q(k + 10 * n, 'вариант')}
@@ -641,8 +645,9 @@ class PagesV2RunnerTests(RunnerBase):
 
         from problems.olympiad_audit import judge
         old = self.write_v2()
-        status = self.runner(judge.JudgeRunner, StubProvider([verdict_json(['пропущена строка'])])
-                             ).transcribe_page(self.job())
+        # Число слоя «100» судья проверил (на картинке нет) — мешает только замечание.
+        status = self.runner(judge.JudgeRunner, StubProvider([verdict_json(
+            ['пропущена строка'], numbers=[('100', False, False)])])).transcribe_page(self.job())
         self.assertEqual(status, 'needs_fix')
         self.assertEqual(self.v2patch()['status'], 'needs_fix')
         self.assertFalse(os.path.exists(os.path.join(self.root, 'pages_v3')))
