@@ -170,6 +170,9 @@ class Command(BaseCommand):
             if name == 'judge':
                 runner.add_argument('--only-control', action='store_true',
                                     help='Только выборка контроля ярусов B/C (смотреть первой).')
+                runner.add_argument('--only-auto', action='store_true',
+                                    help='Только B/C вне контроля у заданий к импорту '
+                                         '(уверенность для автопубликации).')
                 runner.add_argument('--redo-answer-artifact', action='store_true',
                                     help='Пересудить страницы с замечанием про «Ответ» '
                                          '(судья теперь не видит поле answer).')
@@ -560,7 +563,8 @@ class Command(BaseCommand):
         else:
             keys = judge.judge_todo(
                 triage.pages_to_judge(setup[0],
-                                      only='control' if options.get('only_control') else None),
+                                      only='control' if options.get('only_control') else
+                                      'auto' if options.get('only_auto') else None),
                 str(self.digitized), self.patches)
         self._run_phase(options, judge.JudgeRunner, keys, setup, estimate=0.0016,
                         per_page=0.0012, label='judge')

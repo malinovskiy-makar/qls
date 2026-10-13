@@ -428,3 +428,83 @@ class AssembleSectionsTests(SimpleTestCase):
         # Длинный блок с «вариантом» не в начальных строках — не метка.
         self.assertEqual(assemble._variant_marker(
             {'type': 'task', 'number': '', 'text': 'Условие.\nЕщё строка.\nТретья.\nВариант 2'}), '')
+
+
+class TriageTiersTests(SimpleTestCase):
+    """Ярусы разбора: B не становится A, ярус D для автопубликации, выбор судье."""
+
+    def rec(self, key, **kw):
+        page_dir, _, page = key.rpartition('/p')
+        base = {'page_dir': page_dir, 'page': int(page), 'file': 'raw/pdf/t.pdf',
+                'has_layer': True, 'status': 'ok', 'needs_eyes': False, 'layer_ratio': 0.99,
+                'numbers_ok': True, 'numbers_missing': [], 'numbers_extra': []}
+        base.update(kw)
+        return base
+
+    def test_19_tiers_b_stays_b_d_for_auto_publish(self):
+        from problems.olympiad_audit import triage
+        records = [
+            self.rec('pages/a/p1', needs_eyes=True, layer_ratio=0.97, numbers_ok=False,
+                     numbers_extra=['7'], needs_eyes_reasons=['расходится со слоем PDF']),
+            self.rec('pages/a/p2', needs_eyes=True, layer_ratio=0.80,
+                     needs_eyes_reasons=['расходится со слоем PDF']),
+            self.rec('pages/a/p3', layer_ratio=0.93),         # не в очереди, слой < 0,95
+            self.rec('pages/a/p4'),                            # чистая
+        ]
+        rows = [{'event_id': 'e', 'number': str(n), 'statement_md': 'Условие задания номер '
+                 f'{n} про вклады и кредиты.', 'solution_md': 'Ответ.',
+                 'source_pages': [f'raw/pdf/t.pdf#p{n}']} for n in (1, 2, 3, 4)]
+        plan = triage.build_plan(records, rows, {'raw/pdf/t.pdf': 'pages/a'}, set(),
+                                 auto_publish=True)
+        tiers = {r['страница']: r['ярус'] for r in plan}
+        self.assertEqual(tiers, {'pages/a/p1': 'B', 'pages/a/p2': 'A', 'pages/a/p3': 'D'})
+        judged = set(triage.pages_to_judge(plan))
+        self.assertIn('pages/a/p3', judged)
+        self.assertIn('pages/a/p2', judged)
+        # p1 — B в выборке контроля (ярус меньше 20 — весь ярус) — к судье как контроль.
+        self.assertEqual(triage.pages_to_judge(plan, only='control'), ['pages/a/p1'])
+        # Задачная причина поднимает страницу в A, но B без неё остаётся B.
+        risks = triage.task_risks([dict(rows[0], solution_md='')], {'e'}, {'raw/pdf/t.pdf': 'pages/a'})
+        plan = triage.build_plan(records, rows, {'raw/pdf/t.pdf': 'pages/a'}, set(), risks=risks)
+        self.assertEqual({r['страница']: r['ярус'] for r in plan}['pages/a/p1'], 'A')
+
+
+class SplitGluedTests(SimpleTestCase):
+    def test_20_glued_questions_split_only_on_number_gap(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from problems.olympiad_audit import assemble, transcribe
+        root = Path(tempfile.mkdtemp(prefix='finbiz2_glue_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        glued = ('**Выберите верное утверждение:**\n\n**1. Частное лицо — участник товарищества.**\n\n'
+                 '1) верно\n\n2) неверно\n\n**2. Уставный капитал равен сумме акций.**\n\n1) верно\n\n'
+                 '2) неверно\n\n**3. Вкладчик становится полным товарищем.**\n\n1) верно\n\n2) неверно')
+        legit = 'Ответьте на вопросы:\n\n1. Что такое вклад?\n2. Что такое кредит?'
+        transcribe.Transcriber._write(str(root / 'pages/t/p1.json'), {'status': 'ok', 'blocks': [
+            {'type': 'task', 'number': '1', 'text': glued},
+            {'type': 'task', 'number': '4', 'text': 'Четвёртый вопрос.'},
+            {'type': 'task', 'number': '5', 'text': legit},
+            {'type': 'task', 'number': '6', 'text': 'Шестой вопрос.'}]})
+        event = {'event_id': 'mosh-entrepreneurship-2010-final-8-11-v1', 'grade': '8-11',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 1}]}
+        tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
+        by = {t.number: t for t in tasks}
+        self.assertEqual([t.number for t in tasks], ['1', '2', '3', '4', '5', '6'])
+        self.assertIn('Частное лицо', by['1'].statement[0])
+        self.assertNotIn('Уставный', by['1'].statement[0])
+        self.assertTrue(by['2'].statement[0].startswith('**2. Уставный'))
+        self.assertIn('неверно', by['3'].statement[0])
+        # Подпункты задания 5 без пропуска номеров — не режутся.
+        self.assertEqual(by['5'].statement, [legit])
+        self.assertEqual(report['склейка заданий разрезана по пропуску номеров'], 2)
+
+    def test_21_number_gap_is_tier_a_risk(self):
+        from problems.olympiad_audit import triage
+        rows = [{'event_id': 'e', 'number': n, 'statement_md': f'Условие задания {n} о вкладах и '
+                 'кредитах в банке.', 'source_pages': [f'raw/pdf/t.pdf#p{i}']}
+                for i, n in enumerate(('1', '9', '10'), 1)]
+        risks = triage.task_risks(rows, set(), {'raw/pdf/t.pdf': 'pages/t'})
+        self.assertEqual(list(risks), ['pages/t/p1'])
+        self.assertIn('пропуск номеров до 9', risks['pages/t/p1'][0])

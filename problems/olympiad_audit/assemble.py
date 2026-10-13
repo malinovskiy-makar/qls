@@ -213,6 +213,55 @@ def match_by_text(tasks, text, number=''):
     return scored[0][2]
 
 
+_ITEM_LINES = (re.compile(r'^\W*(\d{1,2})\.\s+\S'), re.compile(r'^\W*(\d{1,2})\)\s+\S'))
+
+
+def _tail(number):
+    """«тест-1.7» → («тест-1.», 7); «12» → («», 12); иначе (None, None)."""
+    match = re.match(r'^(.*?)(\d+)$', number or '')
+    return (match.group(1), int(match.group(2))) if match else (None, None)
+
+
+def split_glued(tasks, report):
+    """Склейка заданий (МОШ-предпринимательство 2009/10: вопросы теста 1–8
+    одним блоком «1»): если следующий номер того же варианта и вида прыгает
+    (1 → 9), а в условии построчно стоят пункты «2.», «3.» … «8.» — это
+    слипшиеся задания, режутся по этим строкам. Без пропуска номеров
+    нумерованный список — подпункты задания, не трогается."""
+    order = list(tasks.values())
+    out = OrderedDict()
+    for i, task in enumerate(order):
+        out[task.key] = task
+        prefix, own = _tail(task.number)
+        nxt = next((t for t in order[i + 1:] if t.task_variant == task.task_variant
+                    and _tail(t.number)[0] == prefix), None)
+        if own is None or nxt is None or _tail(nxt.number)[1] - own < 2:
+            continue
+        want = list(range(own + 1, _tail(nxt.number)[1]))
+        lines = join_pieces(task.statement).split('\n')
+        # Сначала «2.», потом «2)»: у теста вопросы «2.», а варианты ответа «2)».
+        for item in _ITEM_LINES:
+            cuts, k = [], 0
+            for j, line in enumerate(lines):
+                match = item.match(line)
+                if match and k < len(want) and int(match.group(1)) == want[k]:
+                    cuts.append(j)
+                    k += 1
+            if k == len(want):
+                break
+        if k != len(want) or not cuts:
+            continue
+        task.statement = ['\n'.join(lines[:cuts[0]]).strip()]
+        for n, (a, b) in zip(want, zip(cuts, cuts[1:] + [len(lines)])):
+            new = Task(task.event_id, f'{prefix}{n}', task.task_variant)
+            new.statement = ['\n'.join(lines[a:b]).strip()]
+            new.pages, new.quality = list(task.pages), list(task.quality)
+            out[new.key] = new
+            report['склейка заданий разрезана по пропуску номеров'] += 1
+    tasks.clear()
+    tasks.update(out)
+
+
 def _block_number(block):
     return norm_number(block.get('number')) if block.get('number') not in (None, '') else ''
 
@@ -571,6 +620,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 current.quality.append(record)
                 report['задание только блоком решения'] += 1
             _attach_answer(tasks, current, block, kind, entry, page, report)
+
+    split_glued(tasks, report)
 
     # 2. Решения и 3. критерии из своих файлов.
     grades = parse_grades(event.get('grade') or '')

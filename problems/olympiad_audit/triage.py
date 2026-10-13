@@ -215,9 +215,24 @@ def task_risks(rows, events_with_answers, file_to_dir):
     при файле решений у комплекта, внутри условия заголовок ДРУГОГО задания
     (склейка), условие — служебный блок."""
     out = defaultdict(list)
+    # Пропуск номеров внутри комплекта (1 → 9): задание перед пропуском —
+    # подозрение на склейку, если сборка не смогла его разрезать.
+    tails = defaultdict(set)
+    for row in rows:
+        match = re.match(r'^(.*?)(\d+)$', str(row.get('number') or ''))
+        if match:
+            tails[(row['event_id'], row.get('task_variant') or '', match.group(1))].add(
+                int(match.group(2)))
     for row in rows:
         statement = row.get('statement_md') or ''
         reasons = []
+        match = re.match(r'^(.*?)(\d+)$', str(row.get('number') or ''))
+        if match:
+            ints = tails[(row['event_id'], row.get('task_variant') or '', match.group(1))]
+            n = int(match.group(2))
+            later = [m for m in ints if m > n]
+            if later and min(later) > n + 1:
+                reasons.append(f'после задания пропуск номеров до {min(later)} (склейка?)')
         if not statement.strip():
             reasons.append('пустое условие')
         elif len(_plain(statement)) < SHORT_STATEMENT:
@@ -425,6 +440,11 @@ def pages_to_judge(plan_rows, only=None):
     «дефектов» > 30 % — судья ненадёжен, остальное не судится)."""
     if only == 'control':
         return [r['страница'] for r in plan_rows if r['ярус'] in (TIER_B, TIER_C) and r['контроль']]
+    if only == 'auto':
+        # Для автопубликации: B/C вне выборки контроля у заданий к импорту —
+        # «норма» для сборки, но не уверенность для публикации без человека.
+        return [r['страница'] for r in plan_rows if r['ярус'] in (TIER_B, TIER_C)
+                and not r['контроль'] and r['срочность'] == URGENT_NEW]
     return [r['страница'] for r in plan_rows
             if r['ярус'] in (TIER_A, TIER_D) or (r['ярус'] in (TIER_B, TIER_C) and r['контроль'])]
 
