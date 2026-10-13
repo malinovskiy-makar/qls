@@ -253,6 +253,13 @@ if (want('Б')) {
   ok('«← Условие» → «Условие»', p3.cond && !p3.pts, JSON.stringify(p3));
   const expr2 = await typeD(page, '100-Q');
   ok('и снова живое поле D (100-Q)', /^100-Q$/.test(expr2), expr2);
+  // В «Курсоре» группа собирается и с нуля: перезагрузка поднимает автосохранение модели.
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  const re = await page.evaluate(() => ({ pts: CANVAS.pts, list: (STATE.areaCalcList || []).length,
+    rows: [...document.querySelectorAll('#ans-hero .ans-own .ans-cell')].length }));
+  ok('после перезагрузки («Курсор») группа «Свои площади» собрана заново', !re.pts && re.list === 1 && re.rows === 1, JSON.stringify(re));
   await page.click('#btn-self');
   await settle(page);
   const self = await page.evaluate(() => {
@@ -262,6 +269,29 @@ if (want('Б')) {
   ok('«Сначала сам» прячет число своей площади', self.hidden && self.field, JSON.stringify(self));
   await page.click('#btn-self');
   await settle(page);
+  /* Поле, спрятанное АТРИБУТОМ hidden, fieldActive считает мёртвым (82-input.js), и
+     буквы формул сцен (КПВ, издержки — не STATE.curves, а живые поля) пропадали бы
+     на первой же перерисовке в режиме: ползунок a и его значение. Классом — нет. */
+  await openKey(page, 'ppf');
+  await page.evaluate(() => {
+    const inp = document.getElementById('inp-ppf');
+    setFormulaFieldQuiet(inp, 'y = 100 - a*x');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await settle(page);
+  await page.evaluate(() => { if (STATE.params.a) { STATE.params.a.value = 2; updatePult(); redrawAll(); } });
+  await settle(page);
+  const a0 = await page.evaluate(() => STATE.params.a ? STATE.params.a.value : null);
+  await page.click('#tool-pts');
+  await settle(page);
+  await clickModel(page, 10, 80);
+  await settle(page);
+  await page.click('#pts-done');
+  await settle(page);
+  const a1 = await page.evaluate(() => ({ a: STATE.params.a ? STATE.params.a.value : null,
+    chip: !!document.querySelector('#tools-panel [data-param="a"], #tools-panel .param-chip') }));
+  ok('КПВ с буквой a = 2: точка в режиме и возврат не теряют ползунок и значение a', a0 === 2 && a1.a === 2, JSON.stringify({ a0, a1 }));
   ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
   for (const w of [390, 760]) {
@@ -282,6 +312,11 @@ if (want('Б')) {
 }
 
 /* ── В: «Ответ» прячется в полоску ─────────────────────────────────── */
+// Кнопка не на экране (поломка) — щелчок кодом: провал скажет проверка, а не таймаут прибора.
+async function clickAny(page, sel) {
+  const shown = await page.evaluate((q) => { const e = document.querySelector(q); return !!(e && e.getClientRects().length); }, sel);
+  if (shown) await page.click(sel); else await page.evaluate((q) => { const e = document.querySelector(q); if (e) e.click(); }, sel);
+}
 async function geo(page) {
   return page.evaluate(() => {
     const w = (sel) => { const e = document.querySelector(sel); return e ? Math.round(e.getBoundingClientRect().width * 10) / 10 : -1; };
@@ -318,7 +353,7 @@ if (want('В')) {
   const g0 = await geo(page);
   ok('по умолчанию «Ответ» открыт, «Спрятать ›» видна, полоски нет', !g0.hidden && g0.hide && !g0.rail && g0.ans > 300, JSON.stringify(g0));
   const h0 = await histInfo(page);
-  const n1 = await countRedraws(page, () => page.click('#ans-hide'));
+  const n1 = await countRedraws(page, () => clickAny(page, '#ans-hide'));
   const g1 = await geo(page);
   ok('«Спрятать ›» → правая колонка 44 px (± 1)', Math.abs(g1.ans - 44) <= 1 && g1.rail && !g1.inner, JSON.stringify(g1));
   ok('карточка холста шире не меньше чем на 300 px', g1.card - g0.card >= 300, (g1.card - g0.card) + ' px');
@@ -331,7 +366,7 @@ if (want('В')) {
   await page.waitForTimeout(1200);
   const g2 = await geo(page);
   ok('после перезагрузки «Ответ» по-прежнему спрятан', g2.hidden && Math.abs(g2.ans - 44) <= 1 && g2.rail, JSON.stringify(g2));
-  const n3 = await countRedraws(page, () => page.click('#ans-rail'));
+  const n3 = await countRedraws(page, () => clickAny(page, '#ans-rail'));
   /* Замер «до» — в той же раскладке, что «после»: пересечения (STATE.crosses,
      ключ вида, в истории не участвует) ищутся по сетке пикселей, и на холсте
      другой ширины их координаты другие в двенадцатом знаке. */
@@ -340,27 +375,33 @@ if (want('В')) {
   const g3 = await geo(page);
   ok('«Показать ответ» → колонка вернулась', !g3.hidden && Math.abs(g3.ans - g0.ans) <= 1 && g3.inner && !g3.rail, JSON.stringify(g3));
   ok('перерисовок за обратное переключение не больше 3', n3 >= 1 && n3 <= 3, String(n3));
-  await page.click('#ans-hide'); await page.waitForTimeout(300);
-  await page.click('#ans-rail'); await page.waitForTimeout(900);
+  await clickAny(page, '#ans-hide'); await page.waitForTimeout(300);
+  await clickAny(page, '#ans-rail'); await page.waitForTimeout(900);
   const h2b = await histInfo(page);
   ok('шаги истории и ссылка «Поделиться» те же до и после двух переключений',
     h2a.undo === h2b.undo && h2a.redo === h2b.redo && h2a.link === h2b.link && h2a.link.length > 20,
     JSON.stringify({ before: [h2a.undo, h2a.redo, h2a.link.length], after: [h2b.undo, h2b.redo, h2b.link.length], same: h2a.link === h2b.link }));
-  ok('(и первый замер до перезагрузки: ссылка не несёт «спрятан»)', !/answerHidden|ans-hidden|ans-rail|ans-hide/.test(JSON.stringify(await page.evaluate(() => collectModelState()))) && h0.undo >= 1, 'шагов ' + h0.undo);
+  // Подпись истории (вход модели без ключей вида) — одна при открытом и спрятанном «Ответе».
+  const sigOpen = await page.evaluate(() => histSig(collectModelState()));
+  await clickAny(page, '#ans-hide'); await page.waitForTimeout(600);
+  const sigHid = await page.evaluate(() => histSig(collectModelState()));
+  await clickAny(page, '#ans-rail'); await page.waitForTimeout(600);
+  ok('состояние модели (история, автосохранение, ссылка) не несёт «спрятан»: подпись одна в обоих видах',
+    sigOpen === sigHid && h0.undo >= 1, 'шагов ' + h0.undo + ', подписи ' + (sigOpen === sigHid ? 'равны' : 'разные'));
   // «Развернуть график» и обратно — запомненное состояние.
-  await page.click('#ans-hide'); await page.waitForTimeout(300);
+  await clickAny(page, '#ans-hide'); await page.waitForTimeout(300);
   await page.click('#btn-focus'); await page.waitForTimeout(400);
   const g4 = await geo(page);
   await page.click('#btn-focus'); await page.waitForTimeout(500);
   const g5 = await geo(page);
   ok('«Развернуть график» прячет обе колонки, обратно — снова полоска 44', g4.ans <= 1 && Math.abs(g5.ans - 44) <= 1 && g5.rail, JSON.stringify({ focus: g4.ans, back: g5.ans }));
-  await page.click('#ans-rail'); await page.waitForTimeout(300);
+  await clickAny(page, '#ans-rail'); await page.waitForTimeout(300);
   await page.click('#btn-focus'); await page.waitForTimeout(400);
   await page.click('#btn-focus'); await page.waitForTimeout(500);
   const g6 = await geo(page);
   ok('открытый «Ответ» после «Развернуть» и обратно открыт', !g6.hidden && Math.abs(g6.ans - g0.ans) <= 1, JSON.stringify(g6));
   // «Сначала сам» при спрятанном «Ответе».
-  await page.click('#ans-hide'); await page.waitForTimeout(300);
+  await clickAny(page, '#ans-hide'); await page.waitForTimeout(300);
   await page.click('#btn-self'); await page.waitForTimeout(600);
   const g7 = await geo(page);
   const selfOn = await page.evaluate(() => SELF.on && !!document.querySelector('#ans-hero .self-inp'));
