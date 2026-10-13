@@ -543,6 +543,11 @@ span.pp--src:active { transform: none; }
 .sol-body .part { display: flex; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border); }
 .sol-body .part:first-child { border-top: 0; }
 .sol-body .part b { color: var(--accent-ink); min-width: 22px; }
+/* Текст пункта решения — элемент флекса: без `min-width: 0` он не сжимается
+   уже своей самой длинной строки, и длинная строка (base64 у 61555, 13.10.2026)
+   или широкая картинка распирают панель помощи и всю страницу вбок. */
+.sol-body .part > .math-content { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.sol-body .math-content img, .help-feed .math-content img { max-width: 100%; height: auto; }
 
 /* ── Результат проверки ИИ: полоса слева, значок и слово; панель не
    заливается (правило 9); балл табличными цифрами; итог предварительный. ── */
