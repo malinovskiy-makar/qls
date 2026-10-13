@@ -3074,7 +3074,18 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .pk-when { font-size: 13px; font-weight: 400; color: var(--text3); }
 .pk-continue .pk-when { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
 .pk-cname { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: normal; }
+/* Длинное слово названия («Дискриминация», «Производственная») переносится по слогам
+   (lang="ru" у страницы), а не режется краем карточки (13.10, карточка Notion …81ec…):
+   ряд недавних, «Продолжить», сетка блока, переключатель модели. */
+.pk-cname, .pk-screen .scard-name, .sw-row > span { -webkit-hyphens: auto; hyphens: auto; }
 .pk-recent { gap: 12px; padding: 10px; }
+/* Недавние в ряду 2 : 1 : 1 : 1 узкие: при 1280 миниатюра 120 px оставляла тексту 71 px.
+   Миниатюра меньше, кегль 14 — как у недавних на узких экранах ниже. */
+.pk-recent .pk-thumb { width: 84px; height: 56px; }
+.pk-recent .pk-cname { font-size: 14px; }
+/* «Продолжить» в том же ряду до 1440 px: кнопка «Продолжить →» и миниатюра 150 px
+   оставляли названию 106 px — «Функция и её производная наглядно» шла в 4 строки. */
+@media (max-width: 1439px) { .pk-continue .pk-thumb { width: 112px; height: 70px; } }
 .pk-continue .pk-cname { font-size: 17px; }
 .pk-go {
   flex: 0 0 auto; display: inline-flex; align-items: center; height: 40px; padding: 0 14px;

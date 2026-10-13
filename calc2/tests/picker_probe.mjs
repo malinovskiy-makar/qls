@@ -322,6 +322,86 @@ for (const [w, h] of [[390, 844], [760, 900], [1440, 900]]) {
 }
 await browser.close();
 
+/* ── 7. Длинные названия не обрезаны (13.10, карточка Notion …81ec…) ──────
+   «Дискриминация 3-й степени» в ряду недавних резалась до «Дискриминаци».
+   Каждая рабочая модель по разу в «Продолжить» и трижды в недавних, все
+   карточки сетки каждого блока, все строки переключателя модели: у самого
+   заголовка и у каждой его строки scrollWidth ≤ clientWidth + 1, заголовок не
+   длиннее трёх строк, страница не едет вбок. Chromium и WebKit (Safari),
+   1000 / 1280 / 1440 / 390. ENGINES=chromium — без WebKit. */
+const ENGINES = (process.env.ENGINES || 'chromium,webkit').split(',');
+for (const eng of ENGINES) {
+  const pw = await import('playwright');
+  let br;
+  try { br = await pw[eng].launch(); } catch (e) { ok(eng + ': движок запускается', false, 'НЕ ПРОВЕРЕНО: ' + e.message.split('\n')[0]); continue; }
+  for (const [W, H] of [[1000, 800], [1280, 800], [1440, 900], [390, 844]]) {
+    const ctx = await br.newContext({ viewport: { width: W, height: H }, reducedMotion: 'reduce', locale: 'ru-RU', isMobile: eng === 'chromium' && W < 760, hasTouch: W < 760 });
+    await ctx.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('theme', 'dark'); } catch (e) {} });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/calc2/', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForFunction(() => typeof pickScene === 'function' && document.querySelector('#scene-picker .pk-pv'), null, { timeout: 25000 });
+    const tag = eng + ' ' + W;
+    const MEASURE = (sel) => {
+      const vis = (el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+      const out = [];
+      document.querySelectorAll(sel).forEach(el => {
+        if (!vis(el)) return;
+        const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.3;
+        const lines = Math.round(el.getBoundingClientRect().height / lh);
+        // Строки заголовка: прямоугольники текста по строкам против коробки.
+        const box = el.getBoundingClientRect();
+        const r = document.createRange(); r.selectNodeContents(el);
+        const over = [...r.getClientRects()].some(x => x.width && (x.right > box.right + 1 || x.left < box.left - 1));
+        if (el.scrollWidth > el.clientWidth + 1 || over || lines > 3) out.push('«' + el.textContent.trim() + '» ' + el.scrollWidth + '>' + el.clientWidth + (lines > 3 ? ', строк ' + lines : ''));
+      });
+      return out;
+    };
+    const keys = await page.evaluate(() => [...new Set([...document.querySelectorAll('#scene-picker .scard:not([disabled])')].map(c => modelKeyOf(c.dataset.scene)))]);
+    const cut = [];
+    for (let i = 0; i < keys.length; i++) {
+      const four = [0, 1, 2, 3].map(j => keys[(i + j) % keys.length]);
+      await page.evaluate((ks) => {
+        resetSceneMemory();
+        const now = Date.now();
+        localStorage.setItem('calc2.v1.recent', JSON.stringify(ks.map((k, j) => ({ k, t: now - (j + 1) * 600e3 }))));
+        closePicker(); STATE.sceneKey = null; openPicker();
+      }, four);
+      await page.waitForTimeout(60);
+      (await page.evaluate(MEASURE, '#picker-cont .pk-cname')).forEach(x => cut.push(x));
+    }
+    ok(tag + ': «Продолжить» и недавние — названия целиком (' + keys.length + ' моделей)', !cut.length, [...new Set(cut)].slice(0, 6).join(' | '));
+    const grid = [];
+    const tabs = await page.evaluate(() => document.querySelectorAll('#picker-tabs .pk-tab').length);
+    for (let t = 0; t < tabs; t++) {
+      await page.evaluate((t) => document.querySelectorAll('#picker-tabs .pk-tab')[t].click(), t);
+      await page.waitForTimeout(60);
+      (await page.evaluate(MEASURE, '#scene-picker .scard-name')).forEach(x => grid.push(x));
+    }
+    ok(tag + ': сетка блоков — названия целиком', !grid.length, [...new Set(grid)].slice(0, 6).join(' | '));
+    const hs = await page.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+    ok(tag + ': страница не едет вбок', hs <= 0, '+' + hs + ' px');
+    if (W >= 760) {
+      await page.evaluate(() => { closePicker(); pickScene('mono-d3'); openSwitcher(document.getElementById('model-name') || document.body); });
+      await page.waitForTimeout(150);
+      const sw = await page.evaluate(MEASURE, '#switch-cols .sw-row > span');
+      const n = await page.evaluate(() => document.querySelectorAll('#switch-cols .sw-row').length);
+      ok(tag + ': переключатель модели — названия целиком (' + n + ' строк)', n > 0 && !sw.length, sw.slice(0, 6).join(' | '));
+      await page.evaluate(() => { if (typeof closePop === 'function') closePop(); });
+    }
+    if (SHOTS && W === 1000) {
+      await page.evaluate(() => {
+        resetSceneMemory(); const now = Date.now();
+        localStorage.setItem('calc2.v1.recent', JSON.stringify([{ k: 'sd', t: now - 60e3 }, { k: 'mono-d3', t: now - 960e3 }, { k: 'taxes', t: now - 3 * 3600e3 }, { k: 'trade', t: now - 26 * 3600e3 }]));
+        closePicker(); STATE.sceneKey = null; openPicker();
+      });
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: path.join(OUT, 'picker_1000_' + eng + '_recents.png') });
+    }
+    await ctx.close();
+  }
+  await br.close();
+}
+
 let bad = 0;
 for (const [st, name, why] of checks) { if (st !== 'OK') bad++; console.log(`${st.padEnd(4)} ${name}${why ? '  — ' + why : ''}`); }
 console.log(`\nЭКРАН ВЫБОРА: проверок ${checks.length}, провалов ${bad}`);
