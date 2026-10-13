@@ -911,6 +911,16 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.dir, 'held', '2023', '70001200.png')))
 
     @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
+    def test_database_error_from_core_run_is_one_failed_work_not_a_crash(self):
+        from django.db import OperationalError
+
+        self.prepare(n=2, red=True)
+        with mock.patch('problems.ai.core.run', side_effect=OperationalError('no such table')):
+            rows = self.scores('--yes')
+        self.assertEqual({r['reason'] for r in rows.values()}, {'ai_error'})
+        self.assertEqual(len(rows), 2)
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
     def test_limit_is_stratified_by_year(self):
         self.prepare_years(per_year=4, red=True)
         rows = self.scores('--yes', '--limit', '8')

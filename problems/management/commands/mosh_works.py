@@ -16,6 +16,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import DatabaseError
 from PIL import Image
 
 from problems.mosh_works import fetch, listing, scans, scores
@@ -380,8 +381,10 @@ class Command(BaseCommand):
                         check_budget=False, cache_seconds=0, timeout=120,
                         parse=scores.tolerant_parse, max_tokens=4000)
                 return rec, rel, result.data, result.usage.get('cost_usd', 0.0), None
-            except core.AiUnavailable as error:
-                return rec, rel, None, 0.0, str(error)[:200]
+            except (core.AiUnavailable, DatabaseError) as error:
+                # DatabaseError — пишущая AiUsageLog ветка отказа `core.run` (известный
+                # баг, карточка в Notion) на базе без таблиц: это сбой одной работы, а не прогона.
+                return rec, rel, None, 0.0, '%s: %s' % (type(error).__name__, str(error)[:180])
             finally:
                 connection.close()
 
