@@ -41,7 +41,7 @@ jobs:
   # ---------------------------------------------------------------------
   lint:
     name: Стиль (ruff)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -77,7 +77,7 @@ jobs:
   # ---------------------------------------------------------------------
   security:
     name: Безопасность (bandit, pip-audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -130,7 +130,7 @@ jobs:
   # ---------------------------------------------------------------------
   migrations:
     name: Миграции с нуля
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -181,7 +181,7 @@ jobs:
   # ---------------------------------------------------------------------
   tests:
     name: Тесты на PostgreSQL 17
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Полному набору хватает часа с запасом; ставим 45 минут, чтобы зависший
     # браузерный тест не жёг раннер шесть часов по умолчанию.
@@ -310,7 +310,7 @@ jobs:
   # ---------------------------------------------------------------------
   deploy-check:
     name: Продакшен-настройки
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       DJANGO_SETTINGS_MODULE: config.settings_production

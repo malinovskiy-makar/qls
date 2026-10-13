@@ -52,7 +52,13 @@ async function sig(page) {
        историю не входит (журнал, «Принято без вопроса», п. 7): после отмены
        оно остаётся раздвинутым, и производное от него сверять нечего. Окно
        «Математики» (mathXmin…mathYmax) — то же окно, только своими полями. */
-    ['crosses', 'zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'mcFlat', 'sceneKey', 'mathRes', 'mathXmin', 'mathXmax', 'mathYmin', 'mathYmax'].forEach(k => delete s[k]);
+    /* legendSpot — место легенды: выбирается по геометрии холста и плавающих
+       блоков и «держится, пока свободно» (п. 40, 60-overlays.js). Старт прибор
+       снимает, когда легенда встала ещё до раскрытия карточек, а «Сбросить»
+       выбирает место заново при раскрытых — 3 против 2 при тех же входах
+       модели (разбор 13.10, пункт 4 «сброс» был красным с 07.10). Это вид, а не
+       модель; в пункте 8 оно исключено по той же причине. */
+    ['crosses', 'zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'mcFlat', 'sceneKey', 'mathRes', 'mathXmin', 'mathXmax', 'mathYmin', 'mathYmax', 'legendSpot'].forEach(k => delete s[k]);
     Object.keys(s).forEach(k => { if (/Sig$/.test(k)) delete s[k]; });
     // Границы ползунка сдвига — ±Pmax/2, то есть тоже от окна (88-params.js).
     const c = window.__RD.controls().filter(x => /^input|math-field|select|exact|edval|switch/.test(x.kind)).map(x => {
@@ -171,7 +177,8 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
   ok(n2 === 2, 'склейка: две правки с паузой 1,3 с дали шагов ' + n2 + ' вместо 2');
   // «Сбросить»: один шаг и «Вернуть».
   await f.page.evaluate(() => resetCurrentScene()); await L.settle(f.page);
-  ok((await sig(f.page)) === s0, 'сброс: не стартовое состояние');
+  const sr = await sig(f.page);
+  ok(sr === s0, 'сброс: не стартовое состояние — ' + (sr !== s0 ? firstDiff(s0, sr) : ''));
   const t = await f.page.evaluate(() => { const x = document.querySelector('#calc2-toast .toast-act'); return x ? x.textContent : null; });
   ok(t === 'Вернуть', 'сброс: в тосте нет «Вернуть»');
   await f.page.click('#calc2-toast .toast-act'); await L.settle(f.page);

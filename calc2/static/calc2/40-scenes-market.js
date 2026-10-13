@@ -2872,6 +2872,13 @@ function intervHintHtml() {
      вмешательства нет вовсе. Класс `hint-current` при этом переживает смену
      сцены, и без второй проверки абзац про налог всплывал в сцене «Сложение
      КПВ» и вытеснял оттуда её собственный разбор. */
+  /* ⚠️ И ТРЕТИЙ — САМ МАРШРУТ МОДЕЛИ (13.10). `scoped-off` ставит
+     applyCardScope в КОНЦЕ перерисовки, а «Разбор» собирается раньше и потом
+     не пересобирается, пока табло не изменится. «Дискриминация 3-й степени»
+     (лок L_INTERV) первым кадром получала абзац «Потоварный налог на стороне
+     производителя: кривая предложения S…» — без S и без налога в модели. */
+  const route = (typeof SCENE_ROUTE !== 'undefined') ? SCENE_ROUTE[STATE.sceneKey] : null;
+  if (route && route.lock && route.lock.indexOf(L_INTERV) >= 0) return '';
   const sec = document.getElementById(L_INTERV);
   if (!sec || sec.classList.contains('scoped-off') || sec.style.display === 'none') return '';
   const cur = document.querySelector('#sec-tax .hint-current');

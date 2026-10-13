@@ -35,7 +35,7 @@ function selfNum(t) {
    Вернёт { pts: bool, items: [[x], …] | [[x, y], …] } или null — не разобрали. */
 const SELF_NUM = '-?\\d+(?:[.,]\\d+)?';
 function selfParse(t) {
-  let s = String(t == null ? '' : t).replace(/[\s\u00a0\u202f\u2009\u200b]+/g, '').replace(/[−–—]/g, '-').toLowerCase();
+  let s = String(t == null ? '' : t).replace(/[\s\u00a0\u202f\u2009\u200b]+/g, '').replace(/[−–\u2014]/g, '-').toLowerCase();
   if (!s) return null;
   if (s === 'нет') return { pts: null, items: [] };
   s = s.replace(/;$/, '');

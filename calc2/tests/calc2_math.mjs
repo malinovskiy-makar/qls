@@ -6459,6 +6459,28 @@ await gesture('(ж) 150 шагов «Сдвига MC» не копят узлы 
            detail: `шагов ${n}; узлов ${c0.nodes} → ${c1.nodes} (+${dn}), обработчиков ${c0.jsEventListeners} → ${c1.jsEventListeners} (+${dl})` };
 });
 
+/* (з) «Разбор» «Дискриминации 3-й степени» без чужого абзаца про налог (13.10).
+   Модель запирает карточку вмешательства (лок L_INTERV), но признак
+   `scoped-off` ставится в конце перерисовки, а «Разбор» собирался раньше: первым
+   абзацем шёл «Потоварный налог на стороне производителя: кривая предложения S…». */
+await gesture('(з) «Разбор» дискриминации 3-й степени без абзаца про налог', async () => {
+  const tax = () => page.evaluate(() => /Потоварн/.test((document.getElementById('ex-body') || {}).textContent || ''));
+  await page.goto(`${BASE}/calc2/?m=mono-d3`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const fresh = await tax();
+  await page.goto(`${BASE}/calc2/?m=mono`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => { const s = document.querySelector('#sec-tax input[type=range]'); s.value = 20; s.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(500);
+  const mono = await tax();
+  await page.evaluate(() => openModelByUser('mono-d3'));
+  await page.waitForTimeout(900);
+  const after = await tax();
+  return { ok: !fresh && mono && !after,
+           detail: `?m=mono-d3: абзац про налог ${fresh ? 'ЕСТЬ' : 'нет'}; ?m=mono со ставкой: ${mono ? 'есть' : 'НЕТ'}; `
+                 + `mono → mono-d3: ${after ? 'ЕСТЬ' : 'нет'}` };
+});
+
 await browser.close();
 console.log(`\n=== calc2 регрессия: ${pass} прошло, ${fail} провалено `
   + `(всего ${CASES.length + gestureCount}: ${CASES.length} случаев + ${gestureCount} жестов)`
