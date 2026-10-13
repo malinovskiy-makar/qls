@@ -3530,7 +3530,7 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .ans-not, .ans-eq, .ans-val { font-size: 1em; color: var(--text); }
 .ans-not .katex, .ans-val .katex, #params-panel .sb-body .stat > b .katex { font-size: 1em; }
 .ans-val { min-width: 0; white-space: nowrap; }
-.ans-val:has(> .ans-item) { white-space: normal; }
+.ans-val.ans-val--list { white-space: nowrap; }   /* список точек: перенос между ними (answerValueInto) */
 .ans-item { display: inline-block; white-space: nowrap; }
 .ans-sep { margin-right: .3em; }
 .ans-val--none { color: var(--text3); }

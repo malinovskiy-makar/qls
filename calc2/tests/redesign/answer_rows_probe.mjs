@@ -65,8 +65,8 @@ const wasNew = (w) => {
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ​]+/g, '').replace(/[−–]/g, '-');
 
 const browser = await chromium.launch();
-async function openPage(w, h, opts) {
-  const ctx = await browser.newContext(Object.assign({ viewport: { width: w, height: h }, reducedMotion: 'reduce', locale: 'ru-RU' }, opts || {}));
+async function openPage(w, h, opts, br) {
+  const ctx = await (br || browser).newContext(Object.assign({ viewport: { width: w, height: h }, reducedMotion: 'reduce', locale: 'ru-RU' }, opts || {}));
   await ctx.addInitScript(() => { try { localStorage.setItem('theme', 'light'); } catch (e) {} });
   const page = await ctx.newPage();
   const errors = [];
@@ -565,15 +565,21 @@ if (want('Н')) {
     });
     return out;
   };
-  for (const [W, H] of [[1280, 800], [1440, 900], [390, 844]]) {
-    const { ctx, page, errors } = await openPage(W, H, W < 760 ? { isMobile: true, hasTouch: true } : undefined);
+  /* Оба движка: Chromium переносит по <wbr> даже при white-space: nowrap, WebKit
+     (Safari) — нет, и обрезка из карточки видна только в нём. */
+  const { webkit } = await import('playwright');
+  let wk = null;
+  try { wk = await webkit.launch(); } catch (e) { ok('WebKit запускается', false, 'НЕ ПРОВЕРЕНО в WebKit: ' + e.message.split('\n')[0]); }
+  for (const [eng, W, H] of [['chromium', 1280, 800], ['chromium', 1440, 900], ['chromium', 390, 844], ['webkit', 1280, 800], ['webkit', 1440, 900], ['webkit', 390, 844]]) {
+    if (eng === 'webkit' && !wk) continue;
+    const { ctx, page, errors } = await openPage(W, H, Object.assign(W < 760 ? { hasTouch: true } : {}, W < 760 && eng === 'chromium' ? { isMobile: true } : {}), eng === 'webkit' ? wk : null);
     await openKey(page, 'm-graph', SETUP);
     if (W < 760) { await page.click('#ph-tabs .ph-tab[data-tab="ans"]').catch(() => null); await page.waitForTimeout(300); }
     const f = await page.evaluate(FIT);
-    ok(W + ': есть строка с тремя точками', f.maxItems >= 3, 'пунктов в строке ' + f.maxItems);
-    ok(W + ': у каждой .ans-val scrollWidth ≤ clientWidth', !f.vals.length, f.vals.join(' | '));
-    ok(W + ': значение в пределах колонки', !f.over.length, f.over.join(' | '));
-    ok(W + ': каждая точка в одной строке', !f.items.length, f.items.join(' | '));
+    ok(eng + ' ' + W + ': есть строка с тремя точками', f.maxItems >= 3, 'пунктов в строке ' + f.maxItems);
+    ok(eng + ' ' + W + ': у каждой .ans-val scrollWidth ≤ clientWidth', !f.vals.length, f.vals.join(' | '));
+    ok(eng + ' ' + W + ': значение в пределах колонки', !f.over.length, f.over.join(' | '));
+    ok(eng + ' ' + W + ': каждая точка в одной строке', !f.items.length, f.items.join(' | '));
     // Колонка до низа: круглая кнопка чата не лежит на строках ответа.
     const fab = await page.evaluate(() => {
       const col = document.querySelector('#params-panel .side-scroll');
@@ -590,11 +596,12 @@ if (want('Н')) {
       return { hit };
     });
     await page.waitForTimeout(100);
-    ok(W + ': кнопка чата не накрывает строк ответа (колонка прокручена до низа)', fab.none || !fab.hit.length, fab.none ? 'кнопки нет' : fab.hit.join(' | '));
-    if (process.env.SHOTS && W === 1280) await page.screenshot({ path: process.env.SHOTS + '/long_points_1280.png', clip: { x: W - 360, y: 0, width: 360, height: H } });
-    ok(W + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    ok(eng + ' ' + W + ': кнопка чата не накрывает строк ответа (колонка прокручена до низа)', fab.none || !fab.hit.length, fab.none ? 'кнопки нет' : fab.hit.join(' | '));
+    if (process.env.SHOTS && W === 1280 && eng === 'chromium') await page.screenshot({ path: process.env.SHOTS + '/long_points_1280.png', clip: { x: W - 360, y: 0, width: 360, height: H } });
+    ok(eng + ' ' + W + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
+  if (wk) await wk.close();
 }
 
 /* ── З: заголовки групп не повторяются (карточка …819f…) ───────────── */

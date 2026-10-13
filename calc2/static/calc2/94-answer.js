@@ -227,6 +227,10 @@ function answerValueInto(v, srcEl, srcText) {
   if (items.length > 1 && typeof katexInto === 'function' && typeof statToTex === 'function'
       && items.every(it => ANS_ITEM.test(it.replace(/;\s+/g, ';')))) {
     v.innerHTML = '';
+    /* Перенос только между точками: класс, а не :has() — и WebKit, в отличие от
+       Chromium, при nowrap по <wbr> НЕ переносит (Safari резал строку краем
+       колонки, 13.10, карточка …8100…). */
+    v.classList.add('ans-val--list');
     items.forEach((it, k) => {
       const u = document.createElement('span'); u.className = 'ans-item';
       katexInto(u, statToTex(it));
