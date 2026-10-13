@@ -192,7 +192,8 @@ class Command(BaseCommand):
         if not os.path.exists(out):
             os.makedirs(os.path.dirname(out), exist_ok=True)
             image = scans.first_page_image(
-                os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150)
+                os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150,
+                page=rec.get('first_page_index') or 0, year=rec['year'])
             crop = scans.crop_band(image)
             if crop.width > 1600:
                 crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
@@ -201,6 +202,21 @@ class Command(BaseCommand):
             with open(out, 'wb') as fh:
                 fh.write(scores.png_bytes(crop))
         return rel
+
+    @staticmethod
+    def _stratified(recs, limit):
+        """Случайная воспроизводимая проба: `limit` работ поровну на каждый год."""
+        import random
+
+        by_year = {}
+        for r in recs:
+            by_year.setdefault(r['year'], []).append(r)
+        quota = max(1, -(-limit // max(len(by_year), 1)))
+        picked = []
+        for year in sorted(by_year):
+            pool = sorted(by_year[year], key=lambda r: r['work_id'])
+            picked += random.Random(20261009 + year).sample(pool, min(quota, len(pool)))
+        return picked
 
     def do_scores(self, data_dir, opts, provider=None):
         import random
@@ -224,12 +240,17 @@ class Command(BaseCommand):
             hidden = []
         else:
             todo = [r for r in eligible if r['work_id'] not in rows]
-            # Закрашено маркером — баллов не видно: не review и не деньги.
-            hidden = [r for r in todo
-                      if (r.get('band_stickers_pct') or 0) >= scans.HIDDEN_BAND_PCT]
+            if opts.get('limit'):
+                # Проба стратифицирована: поровну на каждый год (скрытые тоже в счёте).
+                todo = self._stratified(todo, opts['limit'])
+            # Закрашено маркером — баллов не видно: не review и не деньги. У бланка
+            # 2021 пятна закрывают лишь часть клеток: пока закрыто не почти всё,
+            # модель читает видимое (всё закрыто — hidden и после вызова).
+            hidden = [r for r in todo if (r.get('band_stickers_pct') or 0) >= (
+                scores.HIDDEN_ALL_BAND_PCT if r['year'] == 2021 else scans.HIDDEN_BAND_PCT)]
             todo = [r for r in todo if r not in hidden]
-        if opts.get('limit'):
-            todo = random.Random(20261009).sample(todo, min(opts['limit'], len(todo)))
+        if retry and opts.get('limit'):
+            todo = self._stratified(todo, opts['limit'])
 
         self.say('работ в index: %d; подходят (ok, годы %s): %d; закрашено маркером: %d; '
                  'в модель: %d' % (len(index), sorted(years), len(eligible), len(hidden), len(todo)))
@@ -273,9 +294,12 @@ class Command(BaseCommand):
                 # даже с log=False (известный баг, карточка в Notion). Исключение
                 # откатывает её — сессия в базу не пишет.
                 with transaction.atomic():
+                    rows_form = rec['year'] == 2021
                     result = core.run(
-                        'mosh_works_scores', user_text, scores.SCHEMA, None,
-                        provider=provider, model=scores.MODEL, system=scores.SYSTEM,
+                        'mosh_works_scores', user_text,
+                        scores.SCHEMA_ROWS if rows_form else scores.SCHEMA, None,
+                        provider=provider, model=scores.MODEL,
+                        system=scores.SYSTEM_ROWS if rows_form else scores.SYSTEM,
                         images=[('image/png', png)], log=False, check_limit=False,
                         check_budget=False, cache_seconds=0, timeout=120,
                         parse=scores.tolerant_parse, max_tokens=4000)
@@ -293,6 +317,9 @@ class Command(BaseCommand):
                    'total_listed': rec['total_listed'], 'appeal_delta': details.get('appeal_delta'),
                    'verified_by': details.get('verified_by'),
                    'merged_1_5': details.get('merged_1_5'), 'missing': details.get('missing'),
+                   'closed': details.get('closed'), 'blank': details.get('blank'),
+                   'rows': details.get('rows'), 'form': details.get('form'),
+                   'sum_matches_listed': details.get('sum_matches_listed'),
                    'source': 'model', 'runs': (prev.get('runs') or 0) + 1, 'crop': rel,
                    'cost': round((prev.get('cost') or 0) + cost, 6),
                    'raw': None if status == 'ok' else data}
@@ -326,7 +353,8 @@ class Command(BaseCommand):
                         stopped = '10 сбоев модели подряд'
                 else:
                     errors_in_row = 0
-                    status, details = scores.verdict(data, rec['total_listed'])
+                    judge = scores.verdict_rows if rec['year'] == 2021 else scores.verdict
+                    status, details = judge(data, rec['total_listed'])
                     if retry and status != 'ok' and not rec.get('_rot'):
                         # Тот же вырез не помог — один раз повёрнутый на 180°.
                         record(rec, rel, data, cost, 'review', details, {'retried': False})
@@ -349,6 +377,14 @@ class Command(BaseCommand):
             self.say('ОСТАНОВЛЕНО: %s' % stopped)
         self.say('вызовов %d из %d плановых, потрачено $%.4f' % (done, total_calls, spent))
         self.say('итого в scores.jsonl: %s' % dict(got))
+        batch_ids = {r['work_id'] for r in todo} | {r['work_id'] for r in hidden}
+        by_year = Counter((r['year'], r['scores_status']) for r in rows.values()
+                          if r['work_id'] in batch_ids)
+        for year in sorted({y for y, _ in by_year}):
+            n = sum(c for (y, _), c in by_year.items() if y == year)
+            parts = ', '.join('%s %d (%.0f %%)' % (st, c, 100.0 * c / n)
+                              for (y, st), c in sorted(by_year.items()) if y == year)
+            self.say('  %d: работ %d — %s' % (year, n, parts))
         with open(os.path.join(data_dir, 'scores_runs.jsonl'), 'a', encoding='utf-8') as fh:
             fh.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'calls': done,
                                  'spent_usd': round(spent, 6), 'stopped': stopped,

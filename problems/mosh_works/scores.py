@@ -155,3 +155,107 @@ def verdict(data, total_listed):
 
 def _num(value):
     return int(value) if float(value).is_integer() else round(value, 2)
+
+
+# ------------------------------------------------------------------ 2021
+
+#: Бланк 2021: две проверки («Баллы» сверху и снизу) или одна («Балл» у бланка
+#: «Задание №1…№5»); часть клеток закрыта жёлтыми пятнами. Правила владельца
+#: (13.10.2026): строки читаются ОТДЕЛЬНО, закрытое пятном — null; итог по
+#: задаче — последняя непустая из строк; `ok` — только если значение есть у
+#: ВСЕХ задач и сумма == total_listed; иначе `partial` (найденное хранится);
+#: закрыто всё — `hidden_by_stickers`.
+SCHEMA_ROWS = {
+    'type': 'object',
+    'required': ['rows', 'total', 'readable'],
+    'properties': {
+        'form': {'type': ['string', 'null']},
+        'rows': {'type': 'array', 'items': {
+            'type': 'object', 'required': ['cells'],
+            'properties': {'label': {'type': ['string', 'null']},
+                           'cells': {'type': 'array', 'items': {'type': ['string', 'null']}}}}},
+        'total': {'type': ['string', 'null']},
+        'readable': {'type': 'boolean'},
+    },
+}
+
+SYSTEM_ROWS = [
+    'Ты переписываешь числа с картинки. На картинке — таблица баллов олимпиадной '
+    'работы. Бывает два вида. Вид «tasks4»: заголовок «Задача | 1 | 2 | 3 | 4 | Сумма» '
+    'и строки «Баллы», «Член жюри», «Баллы», «Член жюри» (две проверки; вторая '
+    'может быть пустой). Вид «tasks5»: заголовок «Задание | №1 | №2 | №3 | №4 | №5 | '
+    'Сумма» и одна строка «Балл». Поле form — «tasks4», «tasks5» или «other».',
+    'Верни rows — ТОЛЬКО строки «Баллы»/«Балл», сверху вниз, каждую отдельно: label '
+    'как напечатано, cells — по одному значению на КАЖДЫЙ столбец задачи слева '
+    'направо (столбец «Сумма» в cells не входит). Строки «Член жюри» (инициалы) '
+    'не переписывай никогда. Если проверок две, а вторая строка пустая, всё равно '
+    'верни обе (пустую — как строку из "").',
+    'Значение клетки — число строкой (дробь через точку: «7.5»; ведущий ноль, как '
+    '«05», убери). Пустая клетка, где ничего не написано, — "" (пустая строка). '
+    'Клетка закрыта жёлтой заливкой (маркер) или цифру прочитать нельзя — null. '
+    'Часть клеток закрыта жёлтым — это нормально: закрытое — null, остальное '
+    'читай как обычно. Ничего не считай, не складывай, не исправляй и не угадывай. '
+    'Половину балла жюри часто пишет маленькой цифрой 5 вверху справа: «20⁵» — '
+    'это 20.5, а не 205.',
+    'Поле total — число из клетки столбца «Сумма» (в любой из строк); пусто — "", '
+    'закрыто или нечитаемо — null. readable=false, если таблицу прочитать нельзя вовсе.',
+]
+
+#: Закрытие полосы таблицы, выше которого работа 2021 считается закрытой целиком
+#: без вызова модели; ниже — модель читает видимое (закрытая вся — тоже hidden).
+HIDDEN_ALL_BAND_PCT = 8.0
+
+
+def verdict_rows(data, total_listed):
+    """Бланк 2021: строки «Баллы» отдельно → итог по задаче → статус.
+
+    Итог по задаче — последняя непустая (число) из строк сверху вниз; клетка
+    null (закрыта) в расчёте не участвует. details как у `verdict`, плюс
+    `rows` (что прочитано по строкам), `closed` и `blank` — номера задач,
+    `form`, `sum_matches_listed`.
+    """
+    empty = {'tasks': None, 'tasks_sum': None, 'total_read': None, 'appeal_delta': None,
+             'verified_by': None, 'merged_1_5': False, 'missing': [], 'closed': [],
+             'blank': [], 'rows': None, 'form': None, 'sum_matches_listed': None}
+    if not isinstance(data, dict) or data.get('_format_error'):
+        return 'review', dict(empty, reason='format')
+    if data.get('readable') is False:
+        return 'review', dict(empty, reason='unreadable')
+    raw_rows = data.get('rows')
+    rows = [r.get('cells') for r in raw_rows if isinstance(r, dict)
+            and isinstance(r.get('cells'), list)] if isinstance(raw_rows, list) else []
+    if not rows or not max(len(r) for r in rows):
+        return 'review', dict(empty, reason='no_tasks')
+    width = max(len(r) for r in rows)
+    tasks, closed, blank = [], [], []
+    for j in range(width):
+        kinds = [cell(r[j] if j < len(r) else '') for r in rows]
+        nums = [v for k, v in kinds if k == 'num']
+        value = nums[-1] if nums else None
+        if value is None:
+            (closed if any(k == 'bad' for k, _ in kinds) else blank).append(j + 1)
+        tasks.append({'n': j + 1, 'label': None, 'score': value,
+                      'rows': [v if k == 'num' else ('' if k == 'blank' else None)
+                               for k, v in kinds]})
+    found = [t['score'] for t in tasks if t['score'] is not None]
+    total_kind, total_value = cell(data.get('total'))
+    details = dict(empty, tasks=tasks, closed=closed, blank=blank, form=data.get('form'),
+                   rows=[[c for c in r] for r in rows],
+                   tasks_sum=sum(found) if found else None,
+                   total_read=total_value if total_kind == 'num' else None)
+    if not found:
+        if closed:
+            return 'hidden_by_stickers', dict(details, reason='all_closed')
+        return 'review', dict(details, reason='empty_table')
+    if total_listed is not None and details['tasks_sum'] is not None:
+        details['sum_matches_listed'] = abs(details['tasks_sum'] - total_listed) <= TOLERANCE
+    if closed or blank:
+        details['missing'] = closed + blank
+        return 'partial', dict(details, reason='tasks_closed' if closed else 'tasks_blank')
+    if details['total_read'] is not None \
+            and abs(details['tasks_sum'] - details['total_read']) > TOLERANCE:
+        return 'review', dict(details, reason='sum_mismatch')
+    if total_listed is None or not details['sum_matches_listed']:
+        delta = None if total_listed is None else _num(total_listed - details['tasks_sum'])
+        return 'review', dict(details, reason='sum_mismatch', appeal_delta=delta)
+    return 'ok', dict(details, reason='', verified_by='listed', appeal_delta=0)

@@ -46,13 +46,23 @@ def table_html(year=2024, with_zip=True):
 
 # ------------------------------------------------------------ сканы и zip
 
-def page_image(red=False, yellow=False, work=False, size=(600, 850)):
+def page_image(red=False, yellow=False, work=False, cover=False, size=(600, 850)):
     """Выдуманная страница: «титул» с таблицей в полосе или лист с решением."""
     from PIL import Image, ImageDraw
 
     img = Image.new('RGB', size, 'white')
     d = ImageDraw.Draw(img)
     w, h = size
+    if cover:
+        # Обложка «Уважаемые участники олимпиады!»: фамилия, имя, отчество и рамка
+        # школы там, где у титула пусто (выдуманные чернила вместо текста).
+        d.rectangle((20, 60, 200, 140), fill='black')
+        d.rectangle((w - 160, 60, w - 40, 180), fill='black')
+        for k, y in enumerate((0.385, 0.415, 0.445)):
+            d.rectangle((0.55 * w, y * h, 0.55 * w + 150 + 20 * k, y * h + 14), fill='black')
+        d.rectangle((0.52 * w, 0.49 * h, 0.95 * w, 0.60 * h), outline='black', width=3)
+        d.text((0.56 * w, 0.52 * h), 'SCHOOL NAME', fill='black')
+        return img
     if work:
         for y in range(40, h - 40, 14):
             d.line((50, y, w - 50, y + (y % 5)), fill='black', width=2)
@@ -81,13 +91,14 @@ def jpeg(img):
     return buf.getvalue()
 
 
-def fake_pdf_bytes(pages=2, **kw):
+def fake_pdf_bytes(pages=2, specs=None, **kw):
     import fitz
 
     doc = fitz.open()
-    for i in range(pages):
+    specs = specs or [kw if i == 0 else {'work': True} for i in range(pages)]
+    for spec in specs:
         buf = io.BytesIO()
-        page_image(work=i > 0, **kw).save(buf, format='PNG')
+        page_image(**spec).save(buf, format='PNG')
         page = doc.new_page(width=595, height=842)
         page.insert_image(page.rect, stream=buf.getvalue())
     data = doc.tobytes()
@@ -417,7 +428,7 @@ class ExtractTests(TempDirMixin, SimpleTestCase):
         fetch.download_all([rec], self.dir, client, log=no_log)
         sdir = os.path.join(self.dir, fetch.scan_relpath(rec))
         os.remove(os.path.join(sdir, 'mosh-econ-01-0002.jpg'))
-        rec.pop('stickers_pct')
+        rec.pop('analysis_version')
         fetch.download_all([rec], self.dir, client, log=no_log)
         self.assertEqual(len(os.listdir(sdir)), 2)
         self.assertEqual(client.requests, 1)
@@ -465,6 +476,63 @@ class ScansTests(TempDirMixin, SimpleTestCase):
         info = scans.analyze(d)
         self.assertFalse(info['has_stickers'])
         self.assertEqual(info['band_stickers_pct'], 0.0)
+
+    def test_pdf_with_a_cover_first_uses_the_next_page(self):
+        """Обложка с ФИО (2021) никогда не становится «первой страницей»."""
+        d = self.folder({'w.pdf': fake_pdf_bytes(specs=[{'cover': True}, {'red': True},
+                                                        {'work': True}])})
+        info = scans.analyze(d)
+        self.assertEqual((info['first_page'], info['first_page_index'], info['cover_skipped']),
+                         ('w.pdf', 1, 1))
+        self.assertGreater(info['band_red_pct'], 0.05)
+
+    def test_only_covers_means_no_safe_page(self):
+        """Обложка без настоящего титула следом: для 2021 ловит зона ФИО."""
+        d = self.folder({'w.pdf': fake_pdf_bytes(specs=[{'cover': True}, {'cover': True},
+                                                        {'cover': True}, {'work': True}])})
+        info = scans.analyze(d, 2021)
+        self.assertIsNone(info['first_page'])
+        self.assertEqual(info['cover_skipped'], 3)
+
+    def test_jpg_cover_is_never_chosen(self):
+        d = self.folder({'1.jpg': jpeg(page_image(cover=True)),
+                         '2.jpg': jpeg(page_image(red=True)),
+                         '3.jpg': jpeg(page_image(work=True))})
+        info = scans.analyze(d)
+        self.assertEqual((info['first_page'], info['cover_skipped']), ('2.jpg', 1))
+        d2 = os.path.join(self.dir, 'only_cover')
+        os.makedirs(d2)
+        with open(os.path.join(d2, 'a.jpg'), 'wb') as fh:
+            fh.write(jpeg(page_image(cover=True)))
+        self.assertIsNone(scans.analyze(d2, 2021)['first_page'])
+
+    def test_crop_refuses_a_cover_even_if_it_was_chosen_by_hand(self):
+        """Дефект 10: вырез обложки с ФИО не создаётся."""
+        d = self.folder({'c.jpg': jpeg(page_image(cover=True)),
+                         'p.pdf': fake_pdf_bytes(specs=[{'cover': True}])})
+        with self.assertRaises(scans.UnsafePage):
+            scans.first_page_image(d, 'c.jpg', year=2021)
+        with self.assertRaises(scans.UnsafePage):
+            scans.first_page_image(d, 'p.pdf', page=0, year=2021)
+
+    def test_cover_in_front_of_a_title_is_caught_by_the_shared_header(self):
+        """Правило 1 работает для любого года: шапка обложки = шапка следующей страницы."""
+        d = self.folder({'w.pdf': fake_pdf_bytes(specs=[{'cover': True}, {'red': True},
+                                                        {'work': True}])})
+        info = scans.analyze(d, 2023)
+        self.assertEqual((info['first_page_index'], info['cover_skipped']), (1, 1))
+        d2 = os.path.join(self.dir, 'jpg')
+        os.makedirs(d2)
+        for name, spec in (('1.jpg', {'cover': True}), ('2.jpg', {'red': True}),
+                           ('3.jpg', {'work': True})):
+            with open(os.path.join(d2, name), 'wb') as fh:
+                fh.write(jpeg(page_image(**spec)))
+        with self.assertRaises(scans.UnsafePage):
+            scans.first_page_image(d2, '1.jpg', year=2023)
+
+    def test_cover_zone_is_clean_on_a_real_title_and_dirty_on_a_cover(self):
+        self.assertLess(scans.cover_ink_pct(page_image(red=True)), scans.COVER_INK_PCT)
+        self.assertGreater(scans.cover_ink_pct(page_image(cover=True)), scans.COVER_INK_PCT)
 
     def test_band_cuts_off_header_with_participant_number(self):
         from PIL import Image
@@ -540,6 +608,59 @@ class VerdictTests(SimpleTestCase):
         fenced = '```json\n{"tasks": [], "total": "1", "readable": true}\n```'
         self.assertEqual(scores.tolerant_parse(fenced)['total'], '1')
         self.assertTrue(scores.tolerant_parse('чепуха')['_format_error'])
+
+
+def rows_reply(*rows, total='', form='tasks4'):
+    return {'form': form, 'rows': [{'label': 'Баллы', 'cells': list(r)} for r in rows],
+            'total': total, 'readable': True}
+
+
+class Verdict2021Tests(SimpleTestCase):
+    def test_last_non_empty_row_wins_and_sum_must_equal_listed(self):
+        status, d = scores.verdict_rows(
+            rows_reply(['7', '9', '25', '25'], ['7', '9.5', '25', '25']), 66.5)
+        self.assertEqual((status, d['verified_by'], d['appeal_delta']), ('ok', 'listed', 0))
+        self.assertEqual([t['score'] for t in d['tasks']], [7, 9.5, 25, 25])
+        self.assertEqual(d['tasks'][1]['rows'], [9, 9.5])
+
+    def test_closed_cell_falls_back_to_the_other_row(self):
+        status, d = scores.verdict_rows(rows_reply(['7', None, '25'], ['', '9', None]), 41)
+        self.assertEqual((status, [t['score'] for t in d['tasks']]), ('ok', [7, 9, 25]))
+
+    def test_part_closed_is_partial_with_found_values_and_nulls(self):
+        status, d = scores.verdict_rows(
+            rows_reply(['7', None, '25', None], ['', None, '', None]), 80)
+        self.assertEqual((status, d['reason'], d['closed']), ('partial', 'tasks_closed', [2, 4]))
+        self.assertEqual([t['score'] for t in d['tasks']], [7, None, 25, None])
+        self.assertEqual((d['tasks_sum'], d['sum_matches_listed']), (32, False))
+
+    def test_all_closed_is_hidden_by_stickers(self):
+        status, d = scores.verdict_rows(rows_reply([None] * 4, [None] * 4), 80)
+        self.assertEqual((status, d['reason']), ('hidden_by_stickers', 'all_closed'))
+
+    def test_nothing_written_is_review_not_hidden(self):
+        status, d = scores.verdict_rows(rows_reply(['', '', '', '']), 80)
+        self.assertEqual((status, d['reason']), ('review', 'empty_table'))
+
+    def test_blank_cells_are_missing_not_zero(self):
+        """Бланк «Задание №1…№5»: одна строка «Балл», пустое — не вписано."""
+        status, d = scores.verdict_rows(rows_reply(['5', '', '22', '', ''], form='tasks5'), 27)
+        self.assertEqual((status, d['blank'], d['sum_matches_listed']),
+                         ('partial', [2, 4, 5], True))
+        self.assertEqual(len(d['tasks']), 5)
+
+    def test_all_found_but_sum_differs_is_review(self):
+        status, d = scores.verdict_rows(rows_reply(['5', '6', '7', '8']), 30)
+        self.assertEqual((status, d['reason'], d['appeal_delta']), ('review', 'sum_mismatch', 4))
+
+    def test_total_cell_that_disagrees_is_review(self):
+        status, d = scores.verdict_rows(rows_reply(['5', '6', '7', '8'], total='30'), 26)
+        self.assertEqual((status, d['reason']), ('review', 'sum_mismatch'))
+
+    def test_format_and_no_rows(self):
+        self.assertEqual(scores.verdict_rows({'_format_error': True}, 5)[1]['reason'], 'format')
+        self.assertEqual(
+            scores.verdict_rows({'rows': [], 'readable': True}, 5)[1]['reason'], 'no_tasks')
 
 
 GOOD = json.dumps(reply(['40', '34'], '74'))
@@ -636,6 +757,59 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         rot = [f for f in os.listdir(os.path.join(self.dir, 'crops', '2024'))
                if f.endswith('_rot180.png')]
         self.assertEqual(len(rot), 2)
+
+    def prepare_years(self, per_year=4, years=(2022, 2023, 2024, 2025), **page):
+        recs = []
+        for y in years:
+            for i in range(per_year):
+                recs.append(make_record(str(70000000 + y * 10 + i), year=y, total=81))
+        client = FakeClient(default=zip_with_title(**page))
+        fetch.download_all(recs, self.dir, client, log=no_log, sleep=lambda s: None)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
+        return recs
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
+    def test_limit_is_stratified_by_year(self):
+        self.prepare_years(per_year=4, red=True)
+        rows = self.scores('--yes', '--limit', '8')
+        by_year = {}
+        for r in rows.values():
+            by_year[r['year']] = by_year.get(r['year'], 0) + 1
+        self.assertEqual(by_year, {2022: 2, 2023: 2, 2024: 2, 2025: 2})
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake')
+    def test_2021_reads_rows_and_marks_partial_and_hidden(self):
+        recs = [make_record(str(70000600 + i), year=2021, total=66) for i in range(3)]
+        fetch.download_all(recs, self.dir, FakeClient(default=zip_with_title(red=True)),
+                           log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
+        replies = iter([rows_reply(['7', '9', '25', '25'], ['7', '9', '25', '25']),
+                        rows_reply(['7', None, '25', None]),
+                        rows_reply([None] * 4, [None] * 4)])
+        seen = []
+
+        def answer(system, user_text):
+            seen.append(system)
+            return next(replies)
+        with override_settings(AI_FAKE_REPLY=answer):
+            rows = self.scores('--yes', '--years', '2021')
+        self.assertEqual(sorted(r['scores_status'] for r in rows.values()),
+                         ['hidden_by_stickers', 'ok', 'partial'])
+        self.assertTrue(all('tasks4' in str(s) for s in seen))
+        partial = [r for r in rows.values() if r['scores_status'] == 'partial'][0]
+        self.assertEqual([t['score'] for t in partial['tasks']], [7, None, 25, None])
+        self.assertEqual(partial['closed'], [2, 4])
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
+    def test_2021_closed_almost_everywhere_never_goes_to_the_model(self):
+        recs = [make_record('70000700', year=2021, total=66)]
+        fetch.download_all(recs, self.dir, FakeClient(default=zip_with_title(red=True)),
+                           log=no_log)
+        recs[0]['band_stickers_pct'] = scores.HIDDEN_ALL_BAND_PCT + 1
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
+        with mock.patch('problems.ai.core.run', side_effect=AssertionError('в модель')):
+            rows = self.scores('--yes', '--years', '2021')
+        self.assertEqual(rows['70000700']['scores_status'], 'hidden_by_stickers')
 
     def test_data_dir_inside_repo_is_refused(self):
         from django.core.management.base import CommandError

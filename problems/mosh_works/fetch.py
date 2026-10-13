@@ -174,9 +174,9 @@ def _fill(rec, data_dir, analyze=True, log=None):
     except (OSError, zipfile.BadZipFile) as error:
         rec.update({'zip_path': zrel, 'status': 'failed', 'reason': str(error)[:300]})
         return
-    if analyze and 'stickers_pct' not in rec:
+    if analyze and rec.get('analysis_version') != scans.ANALYSIS_VERSION:
         try:
-            info = scans.analyze(sdir)
+            info = scans.analyze(sdir, rec['year'])
             rec.update(info)
             rec.pop('analysis_error', None)
         except Exception as error:  # noqa: BLE001 — анализ не должен ронять скачивание
@@ -202,7 +202,7 @@ def download_all(records, data_dir, client, *, limit=0, log=print, sleep=time.sl
                 continue
             if zip_ok(zpath):
                 stats['skipped_existing'] += 1
-                if rec.get('status') != 'ok' or 'stickers_pct' not in rec:
+                if rec.get('status') != 'ok' or rec.get('analysis_version') != scans.ANALYSIS_VERSION:
                     _fill(rec, data_dir, log=log)
                 continue
             if limit and attempted >= limit:
