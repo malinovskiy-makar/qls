@@ -268,3 +268,18 @@ class CriteriaTableTests(SimpleTestCase):
         self.assertTrue(strict.system_prompt.endswith(transcribe.STRICT_SUFFIX))
         for rule in ('Вступление комплекта', 'Логотипы', '`criteria`'):
             self.assertIn(rule, transcribe.STRICT_SUFFIX)
+
+
+class AssembleNumberTests(SimpleTestCase):
+    def test_10_dates_are_not_task_numbers_and_header_variants(self):
+        from problems.olympiad_audit import assemble
+        self.assertFalse(assemble._real_number('06.11'))
+        self.assertFalse(assemble._real_number('08.12'))
+        self.assertTrue(assemble._real_number('1.1'))
+        self.assertTrue(assemble._real_number('10'))
+        block = {'type': 'criteria', 'number': '',
+                 'text': '| № задания | Формулировка задания | Критерии оценки и примеры | '
+                         'Максимальная сумма баллов |\n| --- | --- | --- | --- |\n'
+                         '| 1 | Объясните термины. | За каждый — 3 балла | 15 |'}
+        parts = assemble.explode_table_rows(block, 'criteria')
+        self.assertEqual((parts[-1]['number'], parts[-1]['points']), ('1', 15))

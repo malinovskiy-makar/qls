@@ -394,7 +394,7 @@ def explode_table_rows(block, role, header_hint=None):
         head_first, header = header_hint[0], list(header_hint[1])
     # Только таблица КРИТЕРИЕВ: шапка «№ | … Критерии/Формулировка/Ответ …».
     # Таблица данных с целыми в первом столбце (Q, P, год) — не трогаем.
-    if not rows or not header or not re.fullmatch(r'\**\s*(№|N|No\.?|№ п/п)\s*\**',
+    if not rows or not header or not re.match(r'\**\s*(№|N\b|No\.?|Номер)',
                                                     head_first or '', re.I) or not any(
             re.search(r'критери|формулиров|ответ|решени', h, re.I) for h in header):
         return [block]
@@ -466,8 +466,11 @@ def _leading_int(number):
 
 
 def _real_number(number):
-    """Номер задания — с цифрой и не «0» (вступление/подпункт — нет)."""
-    return bool(number) and any(ch.isdigit() for ch in number) and number != '0'
+    """Номер задания — с цифрой и не «0» (вступление/подпункт — нет). Номер
+    с ведущим нулём («06.11», «08.12») — дата записи в тексте кейса (ВП,
+    основы бизнеса 2019/20), а не номер задания."""
+    return (bool(number) and any(ch.isdigit() for ch in number) and number != '0'
+            and not re.match(r'0\d', number))
 
 
 def _find_task(tasks, number, title, variant=''):
@@ -727,7 +730,9 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
               encoding='utf-8') as handle:
         handle.write('\n'.join(unmatched) + '\n')
     summary[f'заданий {suffix}'] = len(out_rows)
-    summary['заданий v1'] = sum(v1_counts.values())
+    # Ключ сверки с нарезкой v1 — не «заданий v1»: при --suffix v1 он затёр бы
+    # число собранных заданий.
+    summary['заданий в нарезке v1'] = sum(v1_counts.values())
     summary['комплектов'] = len(out_events)
     summary['комплектов с другим числом заданий'] = len(compare)
     summary['решений не сопоставлено'] = len(unmatched)
