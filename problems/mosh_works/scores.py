@@ -22,6 +22,11 @@ from problems.vp_works.scores import (  # noqa: F401 — общий код ВП,
     estimate_usd, png_bytes, tolerant_parse)
 
 MODEL = 'glm-5.3-flash'
+#: Второе чтение — другая модель той же семьи с картинкой. GLM-5.3 (полная) картинки
+#: не принимает (замер 15.09 и повтор 13.10.2026: 400, код 1210), поэтому — vision-модель
+#: `glm-5v-turbo`; `core.run` цены для неё не знает и считает по умолчанию ($1/$5 за млн —
+#: с запасом).
+MODEL_SECOND = 'glm-5v-turbo'
 TOLERANCE = 0.5
 
 #: Схема ответа модели (GLM получает её текстом в системном блоке).
@@ -62,6 +67,8 @@ SYSTEM = [
 ]
 
 #: Подсказка для повторного прохода (`--retry-review`).
+SECOND_HINT = ('Читай каждую клетку отдельно и независимо от соседних. Маленькая цифра 5 '
+               'сверху справа от числа — это половина балла («20⁵» = 20.5).')
 RETRY_HINT = ('Внимательнее с цифрами: «1» и «7», «4» и «9», «0» и «6» путают. '
               'Половины баллов — маленькая цифра 5 справа вверху.')
 
@@ -280,7 +287,7 @@ def double_read(first, second, total_listed):
     `first` — details первого чтения (review/no_total_cell), `second` — details
     чтения повёрнутого выреза. `ok` (verified_by=double_read) — только если ОБА
     чтения дали одни и те же баллы по задачам И `appeal_delta` = total_listed −
-    сумма скана больше нуля и не больше 10 % `total_listed`; иначе review с
+    сумма скана не меньше нуля и не больше 10 % `total_listed`; иначе review с
     причиной. Совпавшие чтения сами по себе не доказательство — нужна ещё
     правдоподобная апелляция.
     """
@@ -295,8 +302,8 @@ def double_read(first, second, total_listed):
         return 'review', dict(details, reason='double_read_no_listed')
     delta = _num(total_listed - tasks_sum)
     details['appeal_delta'] = delta
-    if delta <= 0:
-        return 'review', dict(details, reason='double_read_delta_not_positive')
+    if delta < 0:
+        return 'review', dict(details, reason='double_read_delta_negative')
     if delta > DOUBLE_READ_MAX_SHARE * total_listed:
         return 'review', dict(details, reason='double_read_delta_large')
     return 'ok', dict(details, reason='', verified_by='double_read')

@@ -861,12 +861,31 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         first = reply(['20', '20', '20', '20'], '')       # сумма 80, «Сумма» пуста, в таблице 85
 
         def answer(system, user_text):
-            if '(вырез повёрнут' not in user_text:
+            if scores.SECOND_HINT not in user_text:
                 return first
             # Второе чтение — у каждой работы свой ответ: у первой то же, у второй иное.
             return first if '70001000' in user_text else reply(['20', '20', '20', '21'], '')
-        with override_settings(AI_FAKE_REPLY=answer):
+        calls = []
+        real_run = __import__('problems.ai.core', fromlist=['run']).run
+
+        def spy(*args, **kwargs):
+            from PIL import Image
+            calls.append((kwargs.get('model'), user_of(args),
+                          Image.open(io.BytesIO(kwargs['images'][0][1])).size))
+            return real_run(*args, **kwargs)
+
+        def user_of(args):
+            return args[1]
+        with override_settings(AI_FAKE_REPLY=answer), \
+                mock.patch('problems.ai.core.run', side_effect=spy):
             rows = self.scores('--yes')
+        # Второе чтение — другая модель, НЕ повёрнутый вырез, увеличенный вдвое.
+        firsts = [c for c in calls if scores.SECOND_HINT not in c[1]]
+        seconds = [c for c in calls if scores.SECOND_HINT in c[1]]
+        self.assertEqual({c[0] for c in firsts}, {scores.MODEL})
+        self.assertEqual({c[0] for c in seconds}, {scores.MODEL_SECOND})
+        self.assertTrue(all('повёрнут' not in c[1] for c in seconds))
+        self.assertEqual(seconds[0][2], (firsts[0][2][0] * 2, firsts[0][2][1] * 2))
         good, bad = rows['70001000'], rows['70001001']
         self.assertEqual((good['scores_status'], good['verified_by'], good['appeal_delta']),
                          ('ok', 'double_read', 5))
@@ -877,8 +896,8 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         first = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}], 'tasks_sum': 40}
         same = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}]}
         self.assertEqual(scores.double_read(first, same, 44)[0], 'ok')
-        for listed, reason in ((40, 'double_read_delta_not_positive'),
-                               (39, 'double_read_delta_not_positive'),
+        self.assertEqual(scores.double_read(first, same, 40)[0], 'ok')      # delta = 0 допустима
+        for listed, reason in ((39, 'double_read_delta_negative'),
                                (50, 'double_read_delta_large')):
             status, d = scores.double_read(first, same, listed)
             self.assertEqual((status, d['reason']), ('review', reason))

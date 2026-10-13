@@ -82,6 +82,9 @@ class Command(BaseCommand):
                                help='только эти годы; по умолчанию все, кроме 2021 (пятна)')
                 p.add_argument('--preview', type=int, default=5,
                                help='в плане: сколько случайных вырезов показать для осмотра')
+                p.add_argument('--second-pass', action='store_true',
+                               help='только второе чтение (ровный вырез ×2, другая модель) '
+                                    'для review double_read_disagree и no_total_cell')
                 p.add_argument('--release', default='',
                                help='work_id (через запятую или @файл), чьи удержанные щитом '
                                     'вырезы владелец посмотрел и разрешил')
@@ -200,7 +203,7 @@ class Command(BaseCommand):
             crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
         return crop
 
-    def _make_crop(self, data_dir, rec, rotate=False, release=()):
+    def _make_crop(self, data_dir, rec, rotate=False, release=(), upscale=False):
         """Вырез таблицы баллов → (путь, причина_удержания).
 
         Вырез проходит ЩИТ (`scans.table_shield`): рамка таблицы и её шапка. Не
@@ -211,7 +214,18 @@ class Command(BaseCommand):
         """
         base = 'crops/%d/%s.png' % (rec['year'], rec['work_id'])
         rel = base[:-4] + '_rot180.png' if rotate else base
+        if upscale:
+            rel = base[:-4] + '_x2.png'
         out = os.path.join(data_dir, rel)
+        if upscale:
+            # Второе чтение: тот же ровный вырез (уже прошедший щит), увеличенный вдвое.
+            if not os.path.exists(out):
+                with Image.open(os.path.join(data_dir, base)) as src:
+                    big = src.convert('RGB').resize((src.width * 2, src.height * 2),
+                                                    Image.LANCZOS)
+                with open(out, 'wb') as fh:
+                    fh.write(scores.png_bytes(big))
+            return rel, None
         if rotate:
             if not os.path.exists(out):
                 with Image.open(os.path.join(data_dir, base)) as src:
@@ -297,12 +311,19 @@ class Command(BaseCommand):
         if retry and opts.get('limit'):
             todo = self._stratified(todo, opts['limit'])
 
-        # Прежние review «клетка Сумма пуста» (проба 13.10): второе чтение без повторного первого.
+        # Второе чтение без первого: review «клетка Сумма пуста» (проба 13.10) и, с
+        # `--second-pass`, несовпавшие чтения прежнего прогона с поворотом 180°.
         second_only = []
+        redo = ('no_total_cell', 'double_read_disagree') if opts.get('second_pass') \
+            else ('no_total_cell',)
+        if opts.get('second_pass'):
+            todo, hidden = [], []
         if not retry:
             for r in eligible:
                 row = rows.get(r['work_id'], {})
-                if r['year'] == 2021 or row.get('reason') != 'no_total_cell'                         or row.get('scores_status') != 'review' or 'tasks_read2' in row:
+                if r['year'] == 2021 or row.get('reason') not in redo \
+                        or row.get('scores_status') != 'review' \
+                        or row.get('read2_model') == scores.MODEL_SECOND:
                     continue
                 if row.get('merged_1_5'):
                     row.update({'reason': 'merged_unverified'})
@@ -359,11 +380,14 @@ class Command(BaseCommand):
             raise CommandError('Модель недоступна: %s' % provider.unavailable_reason())
 
         def call(rec):
-            rotate = bool(rec.get('_rot')) or bool(rec.get('_second'))
-            rel, _ = self._make_crop(data_dir, rec, rotate=rotate, release=release)
+            second = bool(rec.get('_second'))
+            rotate = bool(rec.get('_rot'))
+            rel, _ = self._make_crop(data_dir, rec, rotate=rotate, release=release,
+                                     upscale=second)
             with open(os.path.join(data_dir, rel), 'rb') as fh:
                 png = fh.read()
-            hint = (' ' + scores.RETRY_HINT) if (retry or rec.get('_second')) else ''
+            hint = ' ' + (scores.SECOND_HINT if second else scores.RETRY_HINT) \
+                if (retry or second) else ''
             user_text = 'Работа %s. Перепиши баллы из таблицы.%s%s' % (
                 rec['work_id'], hint, ' (вырез повёрнут на 180°)' if rotate else '')
             try:
@@ -375,7 +399,7 @@ class Command(BaseCommand):
                     result = core.run(
                         'mosh_works_scores', user_text,
                         scores.SCHEMA_ROWS if rows_form else scores.SCHEMA, None,
-                        provider=provider, model=scores.MODEL,
+                        provider=provider, model=scores.MODEL_SECOND if second else scores.MODEL,
                         system=scores.SYSTEM_ROWS if rows_form else scores.SYSTEM,
                         images=[('image/png', png)], log=False, check_limit=False,
                         check_budget=False, cache_seconds=0, timeout=120,
@@ -440,7 +464,8 @@ class Command(BaseCommand):
                         first = rec.pop('_second')
                         status, details = scores.double_read(first, details, rec['total_listed'])
                         record(rec, rel, data, cost, status, details,
-                               {'tasks_read2': details.get('tasks_read2')})
+                               {'tasks_read2': details.get('tasks_read2'),
+                                'read2_model': scores.MODEL_SECOND})
                     elif retry and status != 'ok' and not rec.get('_rot'):
                         # Тот же вырез не помог — один раз повёрнутый на 180°.
                         record(rec, rel, data, cost, 'review', details, {'retried': False})
