@@ -96,7 +96,7 @@ function drawMonopolyAreas() {
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
       const a = d3.area().x(d => sx(d)).y0(sy(m.Pm)).y1(d => sy(evalCurve(STATE.D, d)));
-      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
         { from: 0, to: m.Qm, lo: m.Pm, hi: STATE.D });
     }
   }
@@ -298,7 +298,7 @@ function drawMonoCeilingAreas() {
     const s1 = samp(0, Qs);
     if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'), { from: 0, to: Qs, lo: 0, hi: mcFormula(), floor0: 'hi' }); }
     if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(P)); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'), { from: 0, to: Qs, lo: mcFormula(), hi: P, floor0: 'lo' }); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: Qs, lo: P, hi: D }); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: Qs, lo: P, hi: D }); }
   }
   if (m.Qc != null) {                            // DWL — между D и MC от Qstar до Qc
     const lo = Math.min(Qs, m.Qc), hi = Math.max(Qs, m.Qc);
@@ -484,7 +484,7 @@ function drawMonoQuotaAreas() {
     const s1 = samp(0, qt.Q);
     if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'), { from: 0, to: qt.Q, lo: 0, hi: mcFormula(), floor0: 'hi' }); }
     if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(qt.price)); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'), { from: 0, to: qt.Q, lo: mcFormula(), hi: qt.price, floor0: 'lo' }); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(qt.price)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: qt.Q, lo: qt.price, hi: D }); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(qt.price)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: qt.Q, lo: qt.price, hi: D }); }
   }
   if (m.Qc != null) {
     const lo = Math.min(qt.Q, m.Qc), hi = Math.max(qt.Q, m.Qc);
@@ -754,7 +754,7 @@ function drawMonoTaxAreas() {
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pt (низ) и спросом (верх)
       const a = d3.area().x(d => sx(d)).y0(sy(t.Pt)).y1(d => sy(evalCurve(D, d)));
-      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: t.Qt, lo: t.Pt, hi: D });
+      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: t.Qt, lo: t.Pt, hi: D });
     }
     // Деньги бюджета — полоса между MC и MC±ставка на [0,Qt]; её площадь = ставка·Qt = бюджет.
     const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(mcFloor(mcEff(d))));
@@ -817,7 +817,7 @@ function drawMonoFloorAreas() {
     const s1 = samp(0, fl.Q);
     if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'), { from: 0, to: fl.Q, lo: 0, hi: mcFormula(), floor0: 'hi' }); }
     if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(fl.price)); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'), { from: 0, to: fl.Q, lo: mcFormula(), hi: fl.price, floor0: 'lo' }); }
-    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: fl.Q, lo: fl.price, hi: D }); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: fl.Q, lo: fl.price, hi: D }); }
   }
   if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d))); markArea(g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'), { from: lo, to: hi, lo: mcFormula(), hi: D, floor0: 'lo' }); } }
 }
@@ -1605,7 +1605,7 @@ function drawKinkedFull() {
     }
     if (STATE.showMonoCS) {
       const a = d3.area().x(d => sx(d)).y0(sy(k.Pstar)).y1(d => sy(k.Dfn(d)));
-      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
         { from: 0, to: k.Qstar, lo: k.Pstar, hi: dE });
     }
     if (k.Qc != null && k.Qc > k.Qstar + 1e-9) {

@@ -305,7 +305,7 @@ function syncShowSection() {
     svg.selectAll('[data-legend]').each(function () {
       const raw = this.getAttribute('data-legend');
       const full = (typeof areaKey === 'function') ? areaKey(raw) : raw;
-      const k = (typeof areaShort === 'function') ? areaShort(full) : full;   // «Излишек покупателя (CS)» → «CS»
+      const k = (typeof areaShort === 'function') ? areaShort(full) : full;   // «Излишек потребителя (CS)» → «CS»
       if (!k || colors[k]) return;
       colors[k] = this.getAttribute('fill') || '';
     });

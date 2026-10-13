@@ -623,12 +623,12 @@ function drawOpenAreas() {
   const qS = (o.Qs1 != null) ? o.Qs1 : o.Qs;
   if (STATE.showCS && qD > 0) {
     const a = d3.area().x(d => sx(d)).y0(sy(Pdom)).y1(d => sy(evalCurve(D, d)));
-    markArea(g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+    markArea(g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
       { from: 0, to: qD, lo: Pdom, hi: D });
   }
   if (STATE.showPS && qS > 0) {
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Pdom));
-    markArea(g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
+    markArea(g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (PS)'),
       { from: 0, to: qS, lo: S, hi: Pdom });
   }
   if (o.P1 == null) return;
@@ -765,7 +765,7 @@ function updateOpenPanel() {
   /* Вырожденные края — словами, а не нулём в скобках. Мировая цена выше того,
      что готов заплатить внутренний покупатель, это не поломка модели: внутри
      не покупают, и всё, что произведено, уходит за границу. */
-  if (o.noBuyers) html += '<div class="hint">Внутри не покупают: мировая цена выше той, которую готов заплатить покупатель. Весь выпуск уходит на экспорт, излишек покупателя равен нулю.</div>';
+  if (o.noBuyers) html += '<div class="hint">Внутри не покупают: мировая цена выше той, которую готов заплатить покупатель. Весь выпуск уходит на экспорт, излишек потребителя равен нулю.</div>';
   else if (o.noSellers) html += '<div class="hint">Внутри не производят: мировая цена ниже той, с которой предложение только начинается. Всё, что куплено, ввезено из-за границы.</div>';
   html += `<div class="stat"><span>(CS; PS) при своб. торговле</span><b>(${fmt(o.csFree)}; ${fmt(o.psFree)})</b></div>`;
   if (o.gain != null) html += `<div class="stat"><span>Выигрыш от торговли</span><b>${(o.gain >= 0 ? '+' : '') + fmt(o.gain)}</b></div>`;
@@ -1604,7 +1604,7 @@ function sumLinearRecord(groups, side) {
    Запись начиналась там, где первая группа выходит на рынок. У предложения
    Q − 100 это Q = 100: сама группа при нулевой цене уже готова отдать сто
    штук, но участка «от нуля до ста» в записи не было вовсе, и на нём функция
-   давала NaN. Дальше этот NaN уходил в интеграл излишка продавца — и вместо
+   давала NaN. Дальше этот NaN уходил в интеграл излишка производителя — и вместо
    числа на табло стояло «PS = NaN», а рядом краснело предупреждение о
    расхождении.
 
@@ -1660,7 +1660,7 @@ function sumLinearRecord(groups, side) {
 
 /* ⚠️ ИНТЕГРАЛ ПОД ЛОМАНОЙ СЧИТАЕТСЯ ПО УЧАСТКАМ, А НЕ ОДНОЙ СЕТКОЙ.
    Метод трапеций точен на прямой, но только если излом попал в УЗЕЛ сетки.
-   Замер 24.08: излишек покупателей под суммарным спросом выходил 1625,0003
+   Замер 24.08: излишек потребителей под суммарным спросом выходил 1625,0003
    вместо 1625 — излом при Q = 40 лёг внутрь трапеции (шаг 70/1000 = 0,07,
    узла в 40 нет). Три десятитысячных — это не округление, а промах метода, и
    на сверке двух путей с допуском 1e-6 он виден сразу. Разбиваем отрезок
@@ -2147,13 +2147,13 @@ function drawAreas() {
   // CS — между ценой P* (низ) и кривой спроса (верх).
   if (STATE.showCS && STATE.D) {
     const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(quadPrice(STATE.D, d)));
-    markArea(g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+    markArea(g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
       { from: 0, to: Q, lo: P, hi: STATE.D, floor0: true });
   }
   // PS — между кривой предложения (низ) и ценой P* (верх).
   if (STATE.showPS && STATE.S) {
     const psArea = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(P));
-    markArea(g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
+    markArea(g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (PS)'),
       { from: 0, to: Q, lo: STATE.S, hi: P, floor0: true });
   }
 }
@@ -2352,12 +2352,12 @@ function drawTaxAreas() {
 
   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
     const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(quadPrice(STATE.D, d)));
-    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
       { from: 0, to: Q, lo: Pb, hi: STATE.D, floor0: true });
   }
   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
     const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Ps));
-    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
+    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (PS)'),
       { from: 0, to: Q, lo: STATE.S, hi: Ps, floor0: true });
   }
   // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
@@ -3436,12 +3436,12 @@ function drawPcAreas() {
   const s1 = samp(0, Qtrade);
   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
     const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(quadPrice(STATE.D, d)));
-    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
+    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'),
       { from: 0, to: Qtrade, lo: Preg, hi: STATE.D, floor0: true });
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
     const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Preg));
-    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
+    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (PS)'),
       { from: 0, to: Qtrade, lo: STATE.S, hi: Preg, floor0: true });
   }
   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
@@ -3608,12 +3608,12 @@ function drawQuotaAreas() {
   if (STATE.showCS) {   // CS — между выбранной ценой (низ) и спросом (верх)
     const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
     markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16)
-      .attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: Qq, lo: P, hi: STATE.D });
+      .attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: Qq, lo: P, hi: STATE.D });
   }
   if (STATE.showPS) {   // PS — между предложением (низ) и выбранной ценой (верх)
     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
     markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16)
-      .attr('data-legend', 'Излишек продавца (PS)'), { from: 0, to: Qq, lo: STATE.S, hi: P });
+      .attr('data-legend', 'Излишек производителя (PS)'), { from: 0, to: Qq, lo: STATE.S, hi: P });
   }
   // Потери — площадь между D и S от квоты до равновесного объёма.
   const lo = Math.min(Qq, STATE.eq.Q), hi = Math.max(Qq, STATE.eq.Q);

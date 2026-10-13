@@ -90,12 +90,16 @@ const ANSWER_GROUP = {
   'info-ppft': 'Торговля', 'info-tb': 'Торговля двух стран', 'info-graph': 'Функция',
 };
 
+/* Имя группы главных строк, когда остаток её блока идёт ниже ОТДЕЛЬНО, со своим
+   заголовком (buildAnswer): два «Монополия» подряд читались как ошибка (13.10). */
+const ANSWER_GROUP_MAIN = { 'info-mono': 'Оптимум монополиста', 'info-costs': 'Оптимум фирмы' };
+
 /* Подпись строки табло → подпись ячейки и обозначение. «Q* (количество)» →
    «Количество», «Q*»; «Равновесный выпуск Y» → «Равновесный выпуск», «Y»;
    иначе подпись целиком и без обозначения. */
 /* Голое сокращение в подписи табло («DWL») — в ячейке словами и обозначением,
    как в макете: «Потери общества», «DWL = 225» (README 8.3). */
-const HERO_WORDS = { DWL: 'Потери общества', CS: 'Излишек покупателя', PS: 'Излишек продавца' };
+const HERO_WORDS = { DWL: 'Потери общества', CS: 'Излишек потребителя', PS: 'Излишек производителя' };
 function heroLabel(t) {
   const s = String(t || '').replace(/\u200b/g, '').trim();
   if (HERO_WORDS[s]) return { caption: HERO_WORDS[s], not: s };
@@ -366,6 +370,15 @@ function buildAnswer() {
     }
     groups.push(g);
   });
+  /* Остаток блока табло, чьи главные строки стали ПОСЛЕДНЕЙ группой «Ответа», —
+     продолжение этой группы: второй заголовок с тем же словом («Издержки»,
+     «Монополия», «Равновесие») ему не нужен (13.10, карточка Notion …819f…). */
+  const lastKey = groups.length ? groups[groups.length - 1].key : '';
+  /* Не последняя группа: остаток её блока стоит ниже отдельно, под своим заголовком
+     («Монополия» у «Естественной монополии»), и группа берёт своё имя. */
+  groups.forEach(g => { const id = g.key.slice(2); if (g.key !== lastKey && /^b:/.test(g.key) && ANSWER_GROUP_MAIN[id]) g.title = ANSWER_GROUP_MAIN[id]; });
+  const sbb = document.getElementById('sb-body');
+  if (sbb) [...sbb.children].forEach(b => { if (b.id) b.classList.toggle('ans-cont', lastKey === 'b:' + b.id); });
   groups.forEach(g => {
     const box = document.createElement('div');
     box.className = 'ans-group';
@@ -414,7 +427,7 @@ function buildAnswer() {
   if (typeof applySelf === 'function') applySelf();
 }
 
-/* Строка «Ответа»: подпись слева, значение справа, «было · Δ» под значением.
+/* Строка «Ответа»: подпись слева, значение справа, изменение «50 − 10» под значением.
    Классы .ans-cell / .ans-lab / .ans-not / .ans-val / .ans-was и data-src —
    прежние (меняется вид, а не смысл): по ним работают паритет и «Сначала сам».
    data-not — обозначение величины («x», «Q*»): по нему «Сначала сам» узнаёт
@@ -450,9 +463,13 @@ function answerRow(c, isMath) {
   answerValueInto(v, c.val || null, c.valText);
   line.appendChild(v);
   d.append(l, line);
-  if (c.tx && c.tx.before) {
+  /* Изменение — арифметикой «50 − 10»: число до и изменение со знаком, и само
+     выражение равно значению в строке (решение владельца 13.10, Notion …81a2…;
+     прежде «было 50 · −10», ADR 0144). Знак — настоящий минус U+2212. */
+  const delta = c.tx ? /^([+−-])\s*(.+)$/.exec(String(c.tx.delta || '').trim()) : null;
+  if (c.tx && c.tx.before && (delta || /^0([,.]0*)?$/.test(String(c.tx.delta || '').trim()))) {
     const w = document.createElement('div'); w.className = 'ans-was';
-    w.textContent = 'было ' + c.tx.before + (c.tx.delta ? ' · ' + c.tx.delta.replace(/^-/, '−') : '');
+    w.textContent = c.tx.before + (delta ? (delta[1] === '+' ? ' + ' : ' − ') + delta[2] : ' + 0');
     d.appendChild(w);
   }
   return d;
@@ -487,7 +504,7 @@ function buildBurden() {
   const col = (cls, name, v, p) => {
     const c = document.createElement('div'); c.className = 'burden-col ' + cls;
     const n = document.createElement('div'); n.className = 'burden-name'; n.textContent = name;
-    const x = document.createElement('div'); x.className = 'burden-val'; x.textContent = fmt(Math.abs(v)) + ' · ' + pct(p);
+    const x = document.createElement('div'); x.className = 'burden-val'; x.textContent = fmt(Math.abs(v)) + ' (' + pct(p) + ')';   // «10 (50 %)»: точка читалась умножением (13.10)
     c.append(n, x); return c;
   };
   cols.append(col('is-buyer', 'Покупатели', b, pb), col('is-seller', 'Продавцы', s, ps));

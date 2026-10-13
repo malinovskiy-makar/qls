@@ -22,6 +22,15 @@
      Э  окно «Скачать»: заголовок и имя файла — по текущей модели; правка
         заголовка помнится в своей модели и не идёт в историю; подсказка TeX
         честная; в начале .tex — две строки о сборке и проверка движка.
+   Часть 3 (13.10.2026, полировка):
+     Ж  изменение «50 − 10» вместо «было 50 · −10» (taxes), нигде нет «было»;
+     Ч  разряды через пробел: sd и ceil «1 250», обход моделей — нет 4+ цифр подряд;
+     И  «Излишек потребителя / производителя»: код calc2 и экран всех моделей;
+     Н  три точки в строке: перенос только между точками, ничего за колонкой,
+        кнопка чата не накрывает строк (1280, 1440, 390);
+     З  заголовки групп «Ответа» разные (costs и обход моделей);
+     С  после ссылки и перезагрузки нет сырой ячейки (через 0,5 и 3 с);
+     Б  «Кто несёт налог»: «10 (50 %)» без «·».
 
    node calc2/tests/redesign/answer_rows_probe.mjs [--only Р,К] [--keys a,b]
    Код 0 — всё сошлось.                                                     */
@@ -46,6 +55,13 @@ function ok(label, cond, detail) {
 }
 function eq0(label, got, want) { ok(label, got === want, 'ожидалось «' + want + '», получилось «' + got + '»'); }
 const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 60 - s.length)));
+/* Эталон 09.10 записан строкой «было 50 · −10»; с решения 13.10 (Notion …81a2…) та же
+   разность пишется «50 − 10»: число до и изменение со знаком. */
+const wasNew = (w) => {
+  const m = /^было\s+(\S+)(?:\s+·\s+([+−-])(\S+))?$/.exec(String(w || '').trim());
+  if (!m) return w;
+  return m[2] ? m[1] + ' ' + (m[2] === '+' ? '+' : '−') + ' ' + m[3] : m[1];
+};
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ​]+/g, '').replace(/[−–]/g, '-');
 
 const browser = await chromium.launch();
@@ -206,7 +222,7 @@ if (want('Р') || want('К') || want('П')) {
              подписи (restatWide). Строгую сверку строки с её источником в табло
              держит answer_probe.mjs. */
           if (norm(c.val) !== norm(b.val)) par.push(key + ': «' + b.cap + '» ' + b.val + ' → ' + c.val);
-          if (norm(c.was) !== norm(b.was)) par.push(key + ': «' + b.cap + '» было ' + b.was + ' → ' + c.was);
+          if (norm(c.was) !== norm(wasNew(b.was))) par.push(key + ': «' + b.cap + '» было ' + b.was + ' → ' + c.was);
         });
         (await page.evaluate(() => __ar.dups())).forEach(d => dups.push(key + ': ' + d));
       }
@@ -426,6 +442,246 @@ if (want('Э')) {
   eq0('назад в trade — «Мой график»', s3.title, 'Мой график');
   eq0('…и файл «Мой график.tex»', s3.file + '.tex', 'Мой график.tex');
   await close();
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ══ Часть 3 (13.10.2026): полировка «Ответа» ══════════════════════════ */
+const SETGRAPH = (exprs, seg) => "STATE.curves = []; curveCounter = 0; " + JSON.stringify(exprs) + ".forEach(e => addCurve(e)); renderGraphRows();"
+  + (seg ? ` STATE.ansHand = true; STATE.ansA = ${seg[0]}; STATE.ansB = ${seg[1]};` : '');
+const SURPLUS_OLD = /[Ии]злиш\S*\s+(покупател|продав)/;
+
+/* ── Ж: изменение «50 − 10» вместо «было 50 · −10» (Notion …81a2…) ─── */
+if (want('Ж')) {
+  head('Ж. Изменение строкой «50 − 10»');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  await openKey(page, 'taxes');
+  const cells = await page.evaluate(() => __ar.cells());
+  const byNot = (n) => cells.find(c => c.not.replace(/\s+/g, '') === n) || {};
+  const WANT = [['Q', '40', '50 − 10'], ['Pb', '60', '50 + 10'], ['Ps', '40', '50 − 10'], ['DWL', '100', '0 + 100']];
+  WANT.forEach(([n, v, w]) => {
+    const c = byNot(n);
+    ok(`taxes: ${n} = ${v}, под ним «${w}»`, c.val === v && c.was === w, `${n} = ${c.val}, «${c.was}»`);
+  });
+  ok('taxes: знак разности — минус U+2212, не дефис и не тире', cells.every(c => !/[-–—]/.test(c.was)), cells.map(c => c.was).join(' | '));
+  const withWas = [];
+  for (const key of MODELS) {
+    await openKey(page, key);
+    (await page.evaluate(() => [...document.querySelectorAll('#ans-hero .ans-was')].map(w => __ar.t(w))))
+      .forEach(t => { if (/было|·/.test(t)) withWas.push(key + ': «' + t + '»'); });
+  }
+  ok('ни в одной модели в .ans-was нет «было» и «·»', !withWas.length, withWas.slice(0, 6).join(' | '));
+  await openKey(page, 'taxes');
+  await page.evaluate(() => setSelfMode(true));
+  await settle(page);
+  const shownWas = await page.evaluate(() => [...document.querySelectorAll('#ans-hero .ans-was')].filter(__ar.vis).map(w => __ar.t(w)));
+  ok('«Сначала сам» прячет эти числа', !shownWas.length, shownWas.join(' | '));
+  await page.evaluate(() => setSelfMode(false));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── Ч: пробел тысяч (карточка …81b4…) ─────────────────────────────── */
+if (want('Ч')) {
+  head('Ч. Разряды через пробел в «Ответе» и табло');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  await openKey(page, 'sd');
+  const sd = await page.evaluate(() => __ar.cells());
+  const v = (n) => (sd.find(c => c.not === n) || {}).val;
+  ok('sd: CS «1 250», PS «1 250», SW «2 500»', v('CS') === '1 250' && v('PS') === '1 250' && v('SW') === '2 500', `CS ${v('CS')}, PS ${v('PS')}, SW ${v('SW')}`);
+  const VALS = () => {
+    const out = [];
+    document.querySelectorAll('#ans-hero .ans-val, #ans-hero .ans-was, #params-panel #sb-body .stat > b, #params-panel #sb-body .tx-table td, #ans-burden .burden-val').forEach(el => {
+      if (__ar.vis(el)) out.push(__ar.t(el));
+    });
+    return out;
+  };
+  await openKey(page, 'ceil');
+  const cv = await page.evaluate(VALS);
+  ok('ceil: излишки «1 250» и «2 500» с пробелом', cv.includes('1 250') && cv.includes('2 500') && !cv.some(t => /(^|[^\d,])(1250|2500)(?!\d)/.test(t)), cv.filter(t => /\d{3}/.test(t)).slice(0, 8).join(' | '));
+  const glued = [];
+  for (const key of MODELS) {
+    await openKey(page, key);
+    (await page.evaluate(VALS)).forEach(t => { const m = /(^|[^\d,.])(\d{4,})(?!\d)/.exec(t); if (m) glued.push(key + ': «' + t.slice(0, 30) + '»'); });
+  }
+  ok('обход 44 моделей: целой части из 4+ цифр без пробела нет', !glued.length, glued.length + ': ' + glued.slice(0, 8).join(' | '));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── И: «Излишек потребителя / производителя» (решение …8110…) ──────── */
+if (want('И')) {
+  head('И. Излишки одной парой слов');
+  const ROOT = path.resolve(HERE, '../../..');
+  const files = fs.readdirSync(path.join(ROOT, 'calc2/static/calc2')).filter(f => /\.(js|css)$/.test(f)).map(f => 'calc2/static/calc2/' + f)
+    .concat(['calc2/templates/calc2/calc2.html']);
+  const hits = [];
+  files.forEach(f => fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n').forEach((l, i) => { if (SURPLUS_OLD.test(l)) hits.push(f + ':' + (i + 1)); }));
+  ok('в коде calc2 и шаблоне нет «Излишек покупателя / продавца»', !hits.length, hits.slice(0, 8).join(' | '));
+  const { ctx, page, errors } = await openPage(1440, 900);
+  const seen = [];
+  for (const key of MODELS) {
+    await openKey(page, key);
+    const t = await page.evaluate(() => {
+      const st = document.createElement('style'); st.textContent = '.katex-mathml{display:none!important}';
+      document.head.appendChild(st);
+      const s = document.querySelector('.app').innerText + ' ' + [...document.querySelectorAll('#chart text, [data-legend]')].map(x => x.textContent + ' ' + (x.getAttribute('data-legend') || '')).join(' ');
+      st.remove(); return s;
+    });
+    const m = SURPLUS_OLD.exec(t);
+    if (m) seen.push(key + ': «' + t.slice(Math.max(0, m.index - 10), m.index + 30).replace(/\s+/g, ' ') + '»');
+  }
+  ok('обход 44 моделей: на экране нет «покупателя / продавца» у излишков', !seen.length, seen.slice(0, 6).join(' | '));
+  await openKey(page, 'sd');
+  const words = await page.evaluate(() => {
+    const st = document.createElement('style'); st.textContent = '.katex-mathml{display:none!important}';
+    document.head.appendChild(st);
+    const s = document.querySelector('.app').innerText; st.remove(); return s;
+  });
+  ok('sd: «Излишек потребителя» и «Излишек производителя» на экране', /Излишек потребителя/.test(words) && /Излишек производителя/.test(words));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── Н: перенос длинного значения только между точками (карточка …8100…) ── */
+if (want('Н')) {
+  head('Н. Три точки в строке: перенос между точками, ничего за колонкой');
+  const SETUP = SETGRAPH(['0.001*x^3', '7*x', '100-x^2']);
+  const FIT = () => {
+    const col = document.querySelector('#params-panel .side-scroll');
+    const cr = col.getBoundingClientRect();
+    const out = { vals: [], items: [], maxItems: 0, over: [] };
+    document.querySelectorAll('#ans-hero .ans-val').forEach(v => {
+      if (!__ar.vis(v)) return;
+      const n = v.querySelectorAll('.ans-item').length;
+      out.maxItems = Math.max(out.maxItems, n);
+      if (v.scrollWidth > v.clientWidth + 1) out.vals.push(__ar.t(v).slice(0, 40) + ' ' + v.scrollWidth + '>' + v.clientWidth);
+      const r = v.getBoundingClientRect();
+      if (r.right > cr.right - parseFloat(getComputedStyle(col).paddingRight) + 1 || r.left < cr.left) out.over.push(__ar.t(v).slice(0, 40));
+      v.querySelectorAll('.ans-item').forEach(it => {
+        const lh = __ar.lineH(v);
+        if (it.getBoundingClientRect().height > lh * 1.4) out.items.push(__ar.t(it));
+      });
+    });
+    return out;
+  };
+  for (const [W, H] of [[1280, 800], [1440, 900], [390, 844]]) {
+    const { ctx, page, errors } = await openPage(W, H, W < 760 ? { isMobile: true, hasTouch: true } : undefined);
+    await openKey(page, 'm-graph', SETUP);
+    if (W < 760) { await page.click('#ph-tabs .ph-tab[data-tab="ans"]').catch(() => null); await page.waitForTimeout(300); }
+    const f = await page.evaluate(FIT);
+    ok(W + ': есть строка с тремя точками', f.maxItems >= 3, 'пунктов в строке ' + f.maxItems);
+    ok(W + ': у каждой .ans-val scrollWidth ≤ clientWidth', !f.vals.length, f.vals.join(' | '));
+    ok(W + ': значение в пределах колонки', !f.over.length, f.over.join(' | '));
+    ok(W + ': каждая точка в одной строке', !f.items.length, f.items.join(' | '));
+    // Колонка до низа: круглая кнопка чата не лежит на строках ответа.
+    const fab = await page.evaluate(() => {
+      const col = document.querySelector('#params-panel .side-scroll');
+      col.scrollTop = col.scrollHeight;
+      // Телефон: колонка не прокручивается сама, прокручивается её предок (body).
+      for (let p = col.parentElement; p; p = p.parentElement) p.scrollTop = p.scrollHeight;
+      const b = document.querySelector('.tg-fab');
+      if (!b || !__ar.vis(b)) return { none: true };
+      const br = b.getBoundingClientRect();
+      const hit = [...document.querySelectorAll('#ans-hero .ans-cell, #params-panel #sb-body .stat, #ex-body p')].filter(__ar.vis).filter(c => {
+        const r = c.getBoundingClientRect();
+        return r.right > br.left && r.left < br.right && r.bottom > br.top && r.top < br.bottom && r.height > 0;
+      }).map(c => __ar.t(c).slice(0, 30));
+      return { hit };
+    });
+    await page.waitForTimeout(100);
+    ok(W + ': кнопка чата не накрывает строк ответа (колонка прокручена до низа)', fab.none || !fab.hit.length, fab.none ? 'кнопки нет' : fab.hit.join(' | '));
+    if (process.env.SHOTS && W === 1280) await page.screenshot({ path: process.env.SHOTS + '/long_points_1280.png', clip: { x: W - 360, y: 0, width: 360, height: H } });
+    ok(W + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
+/* ── З: заголовки групп не повторяются (карточка …819f…) ───────────── */
+if (want('З')) {
+  head('З. Заголовки групп «Ответа» разные');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  const dup = [];
+  let costs = [];
+  for (const key of MODELS) {
+    await openKey(page, key);
+    /* Заголовки колонки: группы «Ответа» и заголовки блоков табло ниже — свои
+       (.section-title) и нарисованные стилем (::before у #info-*, calc2.css). */
+    const hs = await page.evaluate(() => {
+      const out = [...document.querySelectorAll('#ans-hero .ans-ghead')].filter(__ar.vis).map(h => __ar.t(h));
+      [...document.querySelectorAll('#sb-body > *')].filter(__ar.vis).forEach(b => {
+        const bs = getComputedStyle(b, '::before'), c = bs.content;
+        if (bs.display !== 'none' && c && c !== 'none' && c !== 'normal' && b.textContent.trim()) out.push(c.replace(/^["']|["']$/g, ''));
+        const st = b.querySelector(':scope > .section-title');
+        if (st && __ar.vis(st)) out.push(__ar.t(st));
+      });
+      return out;
+    });
+    if (key === 'costs') costs = hs;
+    const seen = new Set();
+    hs.forEach(h => { if (seen.has(h)) dup.push(key + ': «' + h + '»'); seen.add(h); });
+  }
+  ok('costs: заголовки групп разные', costs.length >= 1 && new Set(costs).size === costs.length, costs.join(' | '));
+  ok('обход моделей: двух .ans-ghead с одним текстом нет', !dup.length, dup.join(' | '));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── С: после загрузки ячейка набрана формулой (карточка …815c…) ─────── */
+if (want('С')) {
+  head('С. После загрузки ни одной сырой ячейки');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  await openKey(page, 'm-graph', SETGRAPH(['x^2-4', 'x^2-a', '5000-x^2'], [-5, 200]));
+  const RAW = () => {
+    const bad = [];
+    document.querySelectorAll('#ans-hero .ans-val').forEach(v => {
+      if (!__ar.vis(v) || v.classList.contains('ans-val--none')) return;
+      if (!v.querySelector('.katex')) bad.push('«Ответ»: ' + __ar.t(v.closest('.ans-cell')).slice(0, 50));
+    });
+    document.querySelectorAll('#info-graph .stat > b').forEach(b => {
+      const t = __ar.t(b);
+      if (/^[(−\-\d]/.test(t) && !b.querySelector('.katex')) bad.push('табло: ' + __ar.t(b.parentElement).slice(0, 50));
+    });
+    return bad;
+  };
+  const before = await page.evaluate(RAW);
+  ok('до загрузки: все значения набраны', !before.length, before.join(' | '));
+  const lastOne = await page.evaluate(() => { const v = [...document.querySelectorAll('#ans-hero .ans-val')].pop(); return v ? v.querySelectorAll('.ans-item').length + ':' + __ar.t(v) : ''; });
+  console.log('  ИНФО последняя ячейка: ' + lastOne);
+  const link = await page.evaluate(async () => shareLinkOf());
+  for (const how of ['ссылка «Поделиться»', 'перезагрузка']) {
+    const p2 = await ctx.newPage();
+    if (how === 'перезагрузка') {
+      await page.evaluate(() => { historyMark('probe'); redrawAll(); });
+      await page.waitForTimeout(800);
+      await p2.goto(BASE + '/calc2/?m=m-graph', { waitUntil: 'load' });
+    } else await p2.goto(link, { waitUntil: 'load' });
+    await p2.addScriptTag({ content: INPAGE });
+    for (const ms of [500, 3000]) {
+      await p2.waitForTimeout(ms === 500 ? 500 : 2500);
+      const r = await p2.evaluate(RAW);
+      const n = await p2.evaluate(() => document.querySelectorAll('#ans-hero .ans-val').length);
+      ok(`${how}: через ${ms / 1000} с сырых ячеек нет (${n} значений)`, n > 0 && !r.length, r.join(' | '));
+    }
+    await p2.close();
+  }
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+/* ── Б: «Кто несёт налог» — «10 (50 %)» ────────────────────────────── */
+if (want('Б')) {
+  head('Б. «Кто несёт налог»: «10 (50 %)»');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  await openKey(page, 'taxes');
+  const b = await page.evaluate(() => ({
+    vals: [...document.querySelectorAll('#ans-burden .burden-col')].map(c => [__ar.t(c.querySelector('.burden-name')), __ar.t(c.querySelector('.burden-val'))]),
+    aria: (document.querySelector('#ans-burden .burden-bar') || { getAttribute: () => '' }).getAttribute('aria-label'),
+  }));
+  const get = (n) => (b.vals.find(x => x[0] === n) || [])[1];
+  ok('taxes: «Покупатели» «10 (50 %)», «Продавцы» «10 (50 %)»', get('Покупатели') === '10 (50 %)' && get('Продавцы') === '10 (50 %)', JSON.stringify(b.vals));
+  ok('ни в одном .burden-val нет «·»', b.vals.every(x => !/·/.test(x[1] || '')));
+  ok('aria-label полосы прежний', /^Покупатели 50\s%, продавцы 50\s%$/.test(String(b.aria).replace(/[  ]/g, ' ')), b.aria);
   ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
 }
