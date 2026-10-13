@@ -187,6 +187,8 @@ function redrawScene() {
     // Равновесия нет, а пересечение есть — показываем, куда оно уехало.
     if (typeof drawOffQuadIntersection === 'function') drawOffQuadIntersection();
   }
+  // MC в монополии тянется мышью (ADR 0149): полоса поверх всего, что нарисовано выше.
+  if (STATE.market === 'monopoly' && typeof drawMcDragHandle === 'function') drawMcDragHandle();
   updateInfoPanel();
   updateAreasPanel();
   // Табло «По группам» сюжета сложения: в остальных сценах оно молчит само.

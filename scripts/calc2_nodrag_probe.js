@@ -10,6 +10,10 @@
    grab (клин налога, потолок цены, МРОТ, мировая цена). Их правило не трогает,
    и они обязаны по-прежнему тащиться.
 
+   С 13.10 (часть 3) исключение одно: MC в монополии тянется своим манипулятором
+   (ADR 0149). Любая другая сдвинутая кривая — по полосе попадания или через
+   манипулятор — печатается списком, код выхода 1.
+
    Запуск: node scripts/calc2_nodrag_probe.js <порт> <файл.json> [сцены] */
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -36,8 +40,16 @@ async function openScene(page, key) {
 }
 
 // Отпечаток: видимые линии кривых + все записи формул, какие есть на экране.
+/* ⚠️ ЛИНИИ СРАВНИВАЮТСЯ В КООРДИНАТАХ МОДЕЛИ, А НЕ В ПИКСЕЛЯХ (13.10, часть 3).
+   Щелчок по полосе взводит кривую, у осей загораются числа её ключевых точек, и
+   левое поле холста становится шире: у «Эффекта Слуцкого» все пять линий съезжали
+   по x на 4,7–4,9 px, хотя формулы и сами кривые те же («U новая», curveMoved: true
+   при formulaChanged: false). Пиксели переводятся обратно шкалами sx/sy кадра. */
 const SHOT = () => {
-  const round = d => String(d || '').replace(/-?\d+\.\d+/g, m => (+m).toFixed(1));
+  const xs = sx.domain(), ys = sy.domain();
+  const kx = 1000 / ((xs[1] - xs[0]) || 1), ky = 1000 / ((ys[1] - ys[0]) || 1);
+  const round = d => String(d || '').replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g, (m, x, y) =>
+    Math.round(sx.invert(+x) * kx) + ',' + Math.round(sy.invert(+y) * ky));
   const curves = [...document.querySelectorAll('#chart path')].filter(p => {
     if (p.getAttribute('data-skip-export') === '1') return false;
     const c = getComputedStyle(p);
@@ -139,6 +151,8 @@ const SHOT = () => {
         const x = r.x + r.width / 2, y = r.y + r.height / 2;
         const nums = {};
         Object.keys(STATE).forEach(k => { if (typeof STATE[k] === 'number') nums[k] = STATE[k]; });
+        // Кривые списка — тоже «число сцены»: протяжка MC в монополии меняет только их.
+        (STATE.curves || []).forEach(c => { nums['curve:' + (typeof curveShortName === 'function' ? curveShortName(c) : c.id)] = c.expr; });
         return { x, y, hit: document.elementFromPoint(x, y) === el, nums: JSON.stringify(nums),
                  tag: el.tagName.toLowerCase() + (el.getAttribute('class') ? '.' + el.getAttribute('class') : '') };
       }, gi);
@@ -150,16 +164,31 @@ const SHOT = () => {
       await page.waitForTimeout(350);
       const nums2 = await page.evaluate(() => {
         const n = {}; Object.keys(STATE).forEach(k => { if (typeof STATE[k] === 'number') n[k] = STATE[k]; });
+        (STATE.curves || []).forEach(c => { n['curve:' + (typeof curveShortName === 'function' ? curveShortName(c) : c.id)] = c.expr; });
         return JSON.stringify(n);
       });
-      rec.grabs.push({ tag: aim.tag, hit: aim.hit, stillDrags: nums2 !== aim.nums });
+      const n1 = JSON.parse(aim.nums), n2 = JSON.parse(nums2);
+      const curvesMoved = Object.keys(n2).filter(k => /^curve:/.test(k) && k in n1 && n1[k] !== n2[k]).map(k => k.slice(6));
+      rec.grabs.push({ tag: aim.tag, hit: aim.hit, stillDrags: nums2 !== aim.nums, curvesMoved });
       if (nums2 !== aim.nums) await openScene(page, key);
     }
     out[key] = rec;
     process.stdout.write('.');
   }
   console.log('');
-  fs.writeFileSync(OUT, JSON.stringify({ scenes: out, pageErrors: errs }, null, 1), 'utf8');
+  /* ⚠️ ПРИБОР ОБЯЗАН КРАСНЕТЬ (13.10, часть 3): любая сдвинутая кривая — код 1.
+     Разрешено одно: MC в монополии (решение владельца 13.10, ADR 0149) — её тянет
+     свой манипулятор, полоса попадания MC под ним щелчок не ловит. */
+  const MONO = ['mono', 'mono-nat', 'mono-d1', 'mono-d3', 'mono-kink', 'monoexport'];
+  const allowed = (key, name) => MONO.indexOf(key) >= 0 && name === 'MC';
+  const offenders = [];
+  Object.entries(out).forEach(([key, rec]) => {
+    rec.moved.forEach(m => { if ((m.curveMoved || m.formulaChanged) && !allowed(key, m.name)) offenders.push(key + ': «' + m.name + '»' + (m.curveMoved ? ' линия' : '') + (m.formulaChanged ? ' формула' : '')); });
+    rec.grabs.forEach(g => { (g.curvesMoved || []).forEach(n => { if (!allowed(key, n)) offenders.push(key + ': манипулятор ' + g.tag + ' двигает кривую «' + n + '»'); }); });
+  });
+  fs.writeFileSync(OUT, JSON.stringify({ scenes: out, offenders, pageErrors: errs }, null, 1), 'utf8');
   await browser.close();
   console.log('записано:', OUT, '· ошибок страницы:', errs.length);
+  console.log('сдвинутых кривых:', offenders.length + (offenders.length ? '\n  ' + offenders.join('\n  ') : ''));
+  process.exit(offenders.length ? 1 : 0);
 })();

@@ -19,6 +19,7 @@
         «27»); «Отменить» после затишья возвращает «20» одним шагом;
         автосохранение пишет «27».
      Е. Очереди ожидания библиотек после загрузки пусты (_texPending, _mfPending).
+     Ж. ?m=mono: 100 протяжек линии MC мышью (ADR 0149) — тот же порог, что в А.
 
    ⚠️ Узлы считает Memory.getDOMCounters: он видит и оторванные от страницы, но
    живые узлы — ровно то, что держали замыкания.
@@ -149,6 +150,33 @@ if (want('В') && !SHORT) {
   c1 = await counters();
   ok('цена: протяжка состоялась', n === 100, 'шагов ' + n);
   growth('линия цены, ' + n + ' шагов мыши', c0, c1, 5000, 1000);
+}
+
+/* ── Ж. 100 протяжек MC мышью (часть 3, ADR 0149) ──────────────────── */
+if (want('Ж') && !SHORT) {
+  head('Ж. ?m=mono: 100 протяжек линии MC мышью');
+  await open('mono');
+  const c0 = await counters();
+  let k = 0;
+  for (let i = 0; i < 100; i++) {
+    // Линия сейчас там, где её оставила прошлая протяжка: берём её место заново.
+    const at = await page.evaluate(() => {
+      const mc = STATE.curves.find(c => c.role === 'mc');
+      const s = document.getElementById('chart'), r = s.getBoundingClientRect(), vb = s.viewBox.baseVal;
+      const kx = vb && vb.width ? r.width / vb.width : 1, ky = vb && vb.height ? r.height / vb.height : 1;
+      return { x: r.x + sx(60) * kx, y: r.y + sy(evalCurve(mc, 60)) * ky, band: !!document.querySelector('#chart [data-mc-drag]') };
+    });
+    if (!at.band) break;
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await page.mouse.move(at.x, at.y + (i % 2 ? 24 : -24), { steps: 4 });
+    await page.mouse.up();
+    k++;
+  }
+  const c1 = await counters();
+  const mcNow = await page.evaluate(() => STATE.curves.find(c => c.role === 'mc').expr);
+  ok('протяжек MC: 100', k === 100, 'вышло ' + k + ', MC = ' + mcNow);
+  growth('MC мышью, ' + k + ' протяжек', c0, c1, 5000, 1000);
 }
 
 /* ── Г. Ни одного нового поля и ни одной пересборки ────────────────── */

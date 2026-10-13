@@ -475,6 +475,16 @@ function curveShiftBase(c) {
   return c.shiftBase;
 }
 
+/* Половина размаха ползунков сдвига: запоминается при первой сборке после входа
+   в модель (pickScene обнуляет) и держится, пока модель та же. applyModelState
+   ставит её сразу после pickScene — по стартовому окну, ДО окна из состояния. */
+let _pultShiftHalf = null;
+function pultShiftHalf() {
+  if (_pultShiftHalf == null) _pultShiftHalf = Math.max(1, CONFIG.Pmax / 2);
+  return _pultShiftHalf;
+}
+function resetPultShiftHalf() { _pultShiftHalf = null; }
+
 // Построить (пересобрать) слайдеры кривых в контейнере #params-curves.
 function buildPultCurveChips(list) {
   const body = document.getElementById('params-body');
@@ -529,7 +539,11 @@ function buildPultCurveChips(list) {
        и сразу видно, что двигать можно в обе стороны. Размах прежний (Pmax),
        просто он теперь отсчитывается от текущего положения кривой, а не от
        нуля оси цен. */
-    const half = Math.max(1, CONFIG.Pmax / 2);
+    /* Размах — от окна, с которым МОДЕЛЬ ОТКРЫЛАСЬ (pultShiftHalf), а не от
+       текущего: после ссылки, «Отменить» и протяжки MC мышью ползунок
+       пересобирается при окне, которое модель успела раздвинуть, и границы
+       −50…50 становились −75…75 (13.10, state_probe, карточка …81ef…). */
+    const half = pultShiftHalf();
     sl.type = 'range'; sl.min = -half; sl.max = half; sl.step = 'any';
     // Ручка встаёт на ФАКТИЧЕСКИЙ сдвиг: у нетронутой кривой это ноль, то есть
     // середина дорожки, а у сдвинутой — её настоящее положение. Жёсткий ноль

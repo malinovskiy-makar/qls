@@ -549,6 +549,7 @@ function pickScene(key) {
      Чинить надо не конкретный переход, а жизненный цикл: маршрут, которому
      кривые нужны, строит их сам сразу после этой строки. */
   STATE.curves = []; curveCounter = 0;
+  if (typeof resetPultShiftHalf === 'function') resetPultShiftHalf();   // размах ползунков сдвига — заново (88-params.js)
   const r = SCENE_ROUTE[key] || SCENE_ROUTE.sd;
   r.run();
   // Стартовые записи кривых — для «Вернуть стартовую запись» в меню «…».

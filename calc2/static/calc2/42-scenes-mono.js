@@ -136,6 +136,68 @@ function drawMonopoly() {
   }
 }
 
+/* ⚠️ MC В МОНОПОЛИИ ТЯНЕТСЯ МЫШЬЮ — ЕДИНСТВЕННОЕ ИСКЛЮЧЕНИЕ ИЗ ПРАВИЛА 20.08
+   (решение владельца 13.10, Notion …811c…, ADR 0149). Остальные кривые мышью не
+   двигаются (30-curves.js): спрос D, MR, MC, выведенная из TC.
+
+   Протяжка — ровно тот же параллельный сдвиг, что ползунок «Сдвиг MC»: одна дверь
+   setCurveFreeTerm (строка списка обновляется на месте, ползунок едет следом,
+   история — по затишью). Поэтому тянется только MC, у которой ЕСТЬ этот ползунок:
+   прямая из списка кривых (pultCurveList). Вид захвата — как у линии цены в
+   «Издержках фирмы» (drawLongRunHandle): прозрачная полоса вдоль линии, курсор
+   grab, кружок-рукоятка у края; на сенсорном экране полоса 44 px. В режиме
+   «Точки и площади» полосы нет (canvasArmed): щелчок по MC ставит точку.
+   Сдвиг идёт шагом 1-2-5 от размаха окна по P (окно 0…100 — шаг 1): пиксель
+   холста грубее сотой, а «MC = 39,87» вместо 40 было бы шумом руки. */
+function mcDragCurve() {
+  if (STATE.market !== 'monopoly' || typeof pultCurveList !== 'function') return null;
+  const mc = mcSourceCurve();
+  return mc && mc.linear && pultCurveList().indexOf(mc) >= 0 ? mc : null;
+}
+function mcDragStep() {
+  const span = Math.abs(CONFIG.Pmax - CONFIG.Pmin) || 100;
+  return Math.pow(10, Math.round(Math.log10(span / 100)));
+}
+function drawMcDragHandle() {
+  const mc = mcDragCurve();
+  if (!mc || canvasArmed()) return;
+  const [q0, q1] = sx.domain();
+  const pts = [];
+  for (let i = 0; i <= 120; i++) {
+    const q = Math.max(0, q0) + (q1 - Math.max(0, q0)) * i / 120;
+    const p = evalCurve(mc, q);
+    if (isFinite(p)) pts.push([sx(q), sy(p)]);
+  }
+  if (pts.length < 2) return;
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const g = svg.append('g').attr('class', 'mc-drag').attr('data-skip-export', '1').attr('clip-path', 'url(#plot-clip)');
+  const band = g.append('path').attr('d', d3.line()(pts)).attr('fill', 'none').attr('stroke', 'transparent')
+    .attr('stroke-width', coarse ? 44 : 24).attr('data-skip-export', '1').attr('data-mc-drag', '1').style('cursor', 'grab');
+  const k = Math.max(0, Math.min(pts.length - 1, Math.round(pts.length * 0.9)));
+  g.append('circle').attr('cx', pts[k][0]).attr('cy', pts[k][1]).attr('r', 7)
+    .attr('fill', mc.color || COL.S).attr('stroke', COL.halo).attr('stroke-width', 2)
+    .attr('data-skip-export', '1').style('pointer-events', 'none');
+  // Щелчок без протяжки по-прежнему взводит ключевые точки MC (полоса попадания под этой).
+  band.on('click', (ev) => { ev.stopPropagation(); armCurve(curveShortName(mc)); });
+  let y0 = 0, b0 = 0, id = null, on = false;
+  band.call(d3.drag().container(() => svg.node())
+    .on('start', (e) => {
+      on = !canvasArmed();
+      if (!on) return;
+      id = mc.id; b0 = mc.linear.b; y0 = sy.invert(e.y);
+      document.body.style.cursor = 'grabbing';
+    })
+    .on('drag', (e) => {
+      if (!on) return;
+      const cur = STATE.curves.find(c => c.id === id);
+      if (!cur || !cur.linear) return;
+      const step = mcDragStep();
+      const b = b0 + Math.round((sy.invert(e.y) - y0) / step) * step;
+      if (Math.abs(b - cur.linear.b) > 1e-9) setCurveFreeTerm(cur, b);
+    })
+    .on('end', () => { on = false; document.body.style.cursor = ''; }));
+}
+
 // Точки оптимума, проекции и конкурентный ориентир (бледный, по галочке «было → стало»).
 function drawMonopolyPoints() {
   if (!STATE.mono) return;

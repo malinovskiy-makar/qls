@@ -319,6 +319,8 @@ function applyModelState(s) {
   const route = (s.route && SCENE_ROUTE[s.route] && modelKeyOf(s.route) === s.key) ? s.route : s.key;
   forgetSceneSnapshot(route);
   pickScene(route);
+  // Размах ползунков сдвига — по стартовому окну модели, до окна из состояния (88-params.js).
+  if (typeof pultShiftHalf === 'function') pultShiftHalf();
   applyForm(s.form);
   Object.keys(s.state).forEach(k => {
     if (k === 'curves') return;
