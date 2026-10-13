@@ -41,6 +41,14 @@
         30 случайных страниц яруса A со статусом ok_judge (обе олимпиады, seed
         зафиксирован) → human_review_control\\ без пометок судьи.
 
+    --base vN (triage, judge, reread, report, review-pack): эталон, чью очередь
+        разбираем, — reference_problems_vN.jsonl; заплатки — pages_v<N+1>\\
+        (по умолчанию v2 → pages_v3; финграмотность и бизнес: --base v1 →
+        pages_v2). assemble --suffix v2 --overlay — сборка v2 с заплатками
+        pages_v2 (v1 не трогается). triage --auto-publish — ещё ярус D
+        (страницы заданий к импорту ниже автопроверки) к судье; judge
+        --only-control — сначала только выборка контроля B/C.
+
 Корень данных: `--data-root`, иначе переменная `OLYMPIAD_DATA_ROOT`,
 иначе `<родитель BASE_DIR>\\weconomics-data\\olympiads`.
 
@@ -93,6 +101,9 @@ class Command(BaseCommand):
         def common(p):
             p.add_argument('--olympiad', choices=sorted(registry.REGISTRY),
                            help='Слаг олимпиады из реестра аудита (обязателен).')
+            p.add_argument('--base', default='v2', metavar='vN',
+                           help='Эталон разбора: reference_problems_vN.jsonl, заплатки '
+                                'pages_v<N+1> (по умолчанию v2 → pages_v3).')
             p.add_argument('--data-root', metavar='DIR',
                            help='Корень данных олимпиад (по умолчанию '
                                 'OLYMPIAD_DATA_ROOT или ..\\weconomics-data\\olympiads).')
@@ -131,7 +142,16 @@ class Command(BaseCommand):
         asm.add_argument('--v3', action='store_true',
                          help='Собрать в НОВУЮ папку v3\\ с заплатками pages_v3 '
                               '(v2 не трогается).')
-        common(sub.add_parser('triage', help='Очередь «на глаза» → ярусы, срочность.'))
+        asm.add_argument('--overlay', action='store_true',
+                         help='С --suffix vM: заплатки pages_vM поверх страниц и plan '
+                              'triage_plan.csv; сверка с v<M-1> (тот не трогается).')
+        tri = common(sub.add_parser('triage', help='Очередь «на глаза» → ярусы, срочность.'))
+        tri.add_argument('--rows', default=None, metavar='vK',
+                         help='Задания для срочности и задачных причин — из '
+                              'reference_problems_vK.jsonl (по умолчанию --base).')
+        tri.add_argument('--auto-publish', action='store_true',
+                         help='Ещё ярус D: страницы заданий к импорту, не прошедшие '
+                              'автопроверку (слой < 0,95, числа, скан), — к судье.')
         for name, text in (('judge', 'Судья «картинка против расшифровки» (деньги!).'),
                            ('reread', 'Перечитывание needs_fix (деньги!).')):
             runner = common(sub.add_parser(name, help=text))
@@ -148,6 +168,8 @@ class Command(BaseCommand):
                                     help='Не перечитывать, а пересудить human-страницы с '
                                          'замечанием про ответ (обе расшифровки).')
             if name == 'judge':
+                runner.add_argument('--only-control', action='store_true',
+                                    help='Только выборка контроля ярусов B/C (смотреть первой).')
                 runner.add_argument('--redo-answer-artifact', action='store_true',
                                     help='Пересудить страницы с замечанием про «Ответ» '
                                          '(судья теперь не видит поле answer).')
@@ -175,6 +197,8 @@ class Command(BaseCommand):
             raise CommandError(f'Нет папки raw\\ аудита: {self.audit_dir}')
         self.digitized = self.audit_dir / 'digitized'
         self.root = root
+        self.base = options.get('base') or 'v2'
+        self.patches = triage.patches_for(self.base)
         return getattr(self, _SUBCOMMANDS[name])(options)
 
     def _say(self, text=''):
@@ -364,6 +388,13 @@ class Command(BaseCommand):
         extra = {}
         if options.get('suffix') and not options.get('v3'):
             extra = {'suffix': options['suffix']}
+        if options.get('overlay'):
+            if not options.get('suffix'):
+                raise CommandError('--overlay — только с --suffix vM (заплатки pages_vM).')
+            plan_path = self.digitized / 'triage_plan.csv'
+            norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
+            extra['overlay'] = triage.PageOverlay(str(self.digitized), norm=norm,
+                                                  patches=f'pages_{options["suffix"]}')
         if options.get('v3'):
             plan_path = self.digitized / 'triage_plan.csv'
             norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
@@ -378,6 +409,17 @@ class Command(BaseCommand):
         self._say(f'Сборка {self.olympiad.slug} → {out_dir / f"reference_problems_{suffix}.jsonl"}')
         for key, value in sorted(summary.items()):
             self._say(f'  {key}: {value}')
+        if options.get('overlay'):
+            previous = f'v{int(options["suffix"].lstrip("v")) - 1}'
+            report = triage.compare_versions(
+                digitize.read_jsonl(self.digitized / f'reference_problems_{previous}.jsonl'),
+                digitize.read_jsonl(out_dir / f'reference_problems_{suffix}.jsonl'))
+            name = f'compare_{previous}_{suffix}_overlay.json'
+            (out_dir / name).write_text(json.dumps(report, ensure_ascii=False, indent=1),
+                                        encoding='utf-8')
+            self._say(f'\nСверка {suffix} с {previous} → {name}:')
+            for key, value in report.items():
+                self._say(f'  {key}: {len(value) if isinstance(value, list) else value}')
         if options.get('v3'):
             report = triage.compare_versions(
                 digitize.read_jsonl(self.digitized / 'reference_problems_v2.jsonl'),
@@ -404,9 +446,42 @@ class Command(BaseCommand):
 
     def _triage(self, options):
         inventory = digitize.read_jsonl(self.digitized / 'inventory.jsonl')
-        v2_rows = digitize.read_jsonl(self.digitized / 'reference_problems_v2.jsonl')
+        rows_version = options.get('rows') or self.base
+        v2_rows = digitize.read_jsonl(self.digitized / f'reference_problems_{rows_version}.jsonl')
         records = list(triage.iter_page_records(str(self.digitized)))
         file_to_dir = {r['file']: r['page_dir'] for r in inventory if r.get('page_dir')}
+        risks, rescored = None, Counter()
+        if self.base != 'v2':
+            # Сессия 2 (финграмотность и бизнес): мерило слоя пересчитывается
+            # без модели (точность против всего слоя). Страница, прошедшая порог,
+            # — заплатка ok_rescore; новые поля мерила — в заплатке, старый
+            # p<N>.json не меняется. Плюс задачные причины яруса A.
+            jobs = {job.key: job for job in transcribe.build_jobs(
+                inventory, str(self.digitized), self.olympiad.olympiad_name)}
+            fresh = []
+            for record in records:
+                key = triage.page_key(record)
+                new, fields = triage.rescore_record(record, jobs.get(key))
+                if fields is not None:
+                    path = triage.v3_path(str(self.digitized), record['page_dir'],
+                                          record['page'], self.patches)
+                    patch = triage.read_json(path) or {}
+                    if not patch:
+                        patch = {'file': record.get('file'), 'page_dir': record['page_dir'],
+                                 'page': record['page'], 'phase': 'rescore',
+                                 'status': (triage.RESCORE_OK if record.get('needs_eyes')
+                                            and not new.get('needs_eyes') else 'rescored')}
+                    patch['rescore'] = fields
+                    triage.write_json_atomic(path, patch)
+                    rescored['мерило изменилось'] += 1
+                    if record.get('needs_eyes') and not new.get('needs_eyes'):
+                        rescored['«на глаза» снято пересчётом мерила'] += 1
+                fresh.append(new)
+            records = fresh
+            events = digitize.read_jsonl(self.digitized / 'events_files.jsonl')
+            with_answers = {e['event_id'] for e in events
+                            if e.get('solution_files') or e.get('criteria_files')}
+            risks = triage.task_risks(v2_rows, with_answers, file_to_dir)
         events_by_file = {r['file']: r.get('event_ids') or [] for r in inventory}
         check_rows = []
         for session in ('session2', 'session1'):
@@ -420,10 +495,12 @@ class Command(BaseCommand):
             olympiad_slug=self.olympiad.slug, source_site='official'
         ).values_list('record_id', flat=True))
         bank = triage.bank_keys(check_rows, official_ids)
-        rows = triage.build_plan(records, v2_rows, file_to_dir, bank, events_by_file)
+        rows = triage.build_plan(records, v2_rows, file_to_dir, bank, events_by_file,
+                                 risks=risks, auto_publish=bool(options.get('auto_publish')))
         triage.write_plan(self.digitized / 'triage_plan.csv', rows)
         summary = triage.summarize_plan(rows)
         summary['ключей «в банке есть» (таблица проверки + привязки official)'] = len(bank)
+        summary.update(dict(rescored))
         (self.digitized / 'triage_summary.json').write_text(
             json.dumps(summary, ensure_ascii=False, indent=1), encoding='utf-8')
         self._say(f'Разбор очереди {self.olympiad.slug} → {self.digitized / "triage_plan.csv"}')
@@ -468,7 +545,7 @@ class Command(BaseCommand):
             root=str(self.digitized), provider=provider,
             budget=transcribe.Budget(options['max_usd'], estimate), cost_log=cost_log,
             workers=options['workers'], stdout=self.stdout,
-            plan={r['страница']: r for r in plan_rows})
+            plan={r['страница']: r for r in plan_rows}, patches=self.patches)
         stats = runner.run(todo)
         self._say(f'ГОТОВО: {dict(stats)}; потрачено в прогоне ${runner.budget.spent:.4f} '
                   f'({runner.budget.calls} вызовов).')
@@ -478,34 +555,41 @@ class Command(BaseCommand):
     def _judge(self, options):
         setup = self._runner_setup(options)
         if options.get('redo_answer_artifact'):
-            keys = judge.answer_artifact_pages(judge.v3_statuses(str(self.digitized)))
+            keys = judge.answer_artifact_pages(judge.v3_statuses(str(self.digitized),
+                                                                 self.patches))
         else:
-            keys = judge.judge_todo(triage.pages_to_judge(setup[0]), str(self.digitized))
+            keys = judge.judge_todo(
+                triage.pages_to_judge(setup[0],
+                                      only='control' if options.get('only_control') else None),
+                str(self.digitized), self.patches)
         self._run_phase(options, judge.JudgeRunner, keys, setup, estimate=0.0016,
                         per_page=0.0012, label='judge')
 
     def _reread(self, options):
         setup = self._runner_setup(options)
         if options.get('rejudge_answers'):
-            keys = judge.answer_rejudge_pages(judge.v3_statuses(str(self.digitized)))
+            keys = judge.answer_rejudge_pages(judge.v3_statuses(str(self.digitized),
+                                                                self.patches))
             self._run_phase(options, judge.AnswerRejudgeRunner, keys, setup, estimate=0.004,
                             per_page=0.0025, label='rejudge-answers')
             return
-        keys = judge.select_for_reread(sorted(judge.v3_statuses(str(self.digitized))),
-                                       str(self.digitized))
+        keys = judge.select_for_reread(
+            sorted(judge.v3_statuses(str(self.digitized), self.patches)), str(self.digitized),
+            self.patches)
         self._run_phase(options, judge.RereadRunner, keys, setup, estimate=0.005,
                         per_page=0.0035, label='reread')
 
     def _report(self, options):
         plan_rows = triage.read_plan(self.digitized / 'triage_plan.csv')
-        report = judge.judge_report(plan_rows, judge.v3_statuses(str(self.digitized)))
+        report = judge.judge_report(plan_rows, judge.v3_statuses(str(self.digitized),
+                                                                 self.patches))
         self._say(json.dumps(report, ensure_ascii=False, indent=1))
 
     # ── review-pack ─────────────────────────────────────────────────────
 
     def _review_pack(self, options):
         plan_rows = triage.read_plan(self.digitized / 'triage_plan.csv')
-        patches = judge.v3_statuses(str(self.digitized))
+        patches = judge.v3_statuses(str(self.digitized), self.patches)
         records = {triage.page_key(r): r for r in triage.iter_page_records(str(self.digitized))}
         items = review_pack.build_items(plan_rows, patches, records)
         result = review_pack.build_pack(str(self.digitized), items)

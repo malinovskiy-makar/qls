@@ -352,3 +352,79 @@ class AssembleSectionsTests(SimpleTestCase):
             '**5. Задача 5**\n\nЧто относится к природным ресурсам Земли?\n\n4. **торф** (отмечено)',
             'Что относится к природным ресурсам Земли?\n\n1. рыба\n4. торф'),
             '4. **торф** (отмечено)')
+
+    def test_15_same_story_other_question_not_matched_by_text(self):
+        """МОШ-финграм 2021/22: «Задания 19-20» — тот же сюжет, что задание 17,
+        но другой вопрос; по тексту на 17 не ложатся."""
+        from collections import OrderedDict
+
+        from problems.olympiad_audit import assemble
+        story = ('В текущем году инвестору предлагают вложить деньги в проект, который будет '
+                 'приносить доход в течение трёх лет; ставка по депозиту в банке 10 % годовых. ')
+        task = assemble.Task('e', '17')
+        task.statement = [story + 'Сопоставьте показатели проекта и их значения: 1) NPV 2) IRR.']
+        tasks = OrderedDict({('17', ''): task})
+        other = 'Задания 19-20. ' + story + 'Найдите чистую приведённую стоимость проекта в рублях.'
+        self.assertIsNone(assemble.match_by_text(tasks, other))
+        self.assertIs(assemble.match_by_text(tasks, task.statement[0] + '\n\nОтвет: 1-Б; 2-В.'), task)
+
+    def test_16_text_match_only_to_compatible_number(self):
+        from collections import OrderedDict
+
+        from problems.olympiad_audit import assemble
+        glued = assemble.Task('e', '3')
+        q4 = ('Выберите среди приведённых признаков те, которые, помимо указанных в тексте, '
+              'тоже характеризуют вид мошенничества, о котором шла речь выше.')
+        glued.statement = ['Выберите изображения, иллюстрирующие вид мошенничества.\n\n' + q4]
+        tasks = OrderedDict({('3', ''): glued})
+        self.assertIsNone(assemble.match_by_text(tasks, q4 + '\n\n- А. звонок', '4'))
+        self.assertIs(assemble.match_by_text(tasks, glued.statement[0] + ' Ответ: 2', '3'), glued)
+        self.assertTrue(assemble.compatible_number('тест-2.5', '5'))
+        self.assertFalse(assemble.compatible_number('16', '18'))
+
+    def test_17_variant_marker_in_text_and_number_answer_table(self):
+        """МОШ-финграм, отбор 2019/20: ответы варианта 2 начинаются блоком
+        «Правильные ответы / 2 вариант» (не шапкой), ответы теста 1–6 — одной
+        таблицей «1 | В / 2 | В …» в блоке с номером 1."""
+        from problems.olympiad_audit import assemble
+        self.assertEqual(assemble.parse_answer_grid('| 1 | В |\n| 2 | Б, В |\n| 3 | А |'),
+                         {'1': 'В', '2': 'Б, В', '3': 'А'})
+        self.assertEqual(assemble.parse_answer_grid('| 1 | 100 |\n| 2 | 90 |\n| 3 | 80 |'), {})
+        for v, n in (('1', 1), ('2', 2)):
+            self.page('pages/t', n, [{'type': 'header', 'variant': v}] + [
+                {'type': 'task', 'number': str(k), 'text': _q(k + 10 * n, 'вариант')}
+                for k in range(1, 5)])
+        self.page('pages/s', 1, [
+            {'type': 'header', 'variant': '1'},
+            {'type': 'solution', 'number': '1', 'text': '| 1 | В |\n| 2 | Г |\n| 3 | А |'},
+            {'type': 'solution', 'number': '4', 'text': 'Решение 4 варианта 1.'},
+            {'type': 'task', 'number': '', 'text': '**Правильные ответы**\n\n**2 вариант**'},
+            {'type': 'task', 'number': '1', 'text': '| 1 | А, Б |\n| 2 | Б |\n| 3 | В |'},
+            {'type': 'solution', 'number': '4', 'text': 'Решение 4 варианта 2.'}])
+        event = {'event_id': 'mosh-fingram-2020-qualifying-6-7-v1', 'grade': '6-7',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 2}],
+                 'solution_files': [{'file': 'raw/pdf/s.pdf', 'page_dir': 'pages/s', 'pages': 1}]}
+        tasks, report, _ = self.build(event)
+        by = {(t.number, t.task_variant): t for t in tasks}
+        self.assertEqual(len(tasks), 8)
+        self.assertEqual(by[('2', '1')].answer, 'Г')
+        self.assertEqual(by[('1', '2')].answer, 'А, Б')
+        self.assertEqual(by[('3', '2')].answer, 'В')
+        self.assertEqual(by[('4', '2')].solution, ['Решение 4 варианта 2.'])
+        self.assertEqual(by[('4', '1')].solution, ['Решение 4 варианта 1.'])
+
+    def test_18_answer_key_as_list_and_answer_field(self):
+        from problems.olympiad_audit import assemble
+        key = 'КЛЮЧИ С ПРАВИЛЬНЫМИ ОТВЕТАМИ\nВариант 1\n\n1. Нет, не является\n2. В\n3. А, Б'
+        self.assertEqual(assemble.parse_answer_list(key),
+                         {'1': 'Нет, не является', '2': 'В', '3': 'А, Б'})
+        self.assertEqual(assemble._variant_marker({'type': 'task', 'number': '', 'text': key}), '1')
+        self.assertEqual(assemble.parse_answer_list('Ключи', '1 — А, Б, В; 2 — Г; 3 — А, В, Г'),
+                         {'1': 'А, Б, В', '2': 'Г', '3': 'А, В, Г'})
+        # Обычное решение списком длинных пунктов — не ключ.
+        self.assertEqual(assemble.parse_answer_list(
+            '1. Из всех продуктов банка самый высокий доход приносит вклад.\n'
+            '2. Кредитная карта выгодна при беспроцентном периоде.\n3. Итог: 600 рублей.'), {})
+        # Длинный блок с «вариантом» не в начальных строках — не метка.
+        self.assertEqual(assemble._variant_marker(
+            {'type': 'task', 'number': '', 'text': 'Условие.\nЕщё строка.\nТретья.\nВариант 2'}), '')

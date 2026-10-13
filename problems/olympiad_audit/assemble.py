@@ -172,19 +172,39 @@ TEXT_OTHER = 0.60
 TEXT_MIN = 40
 
 
+#: Условие сравнивается целиком (до стольких знаков): у МОШ-финграма 2021/22
+#: «Задания 19-20» начинаются тем же сюжетом, что задание 17, — по началу
+#: условия они слились бы.
+TEXT_SPAN = 600
+#: Блок должен вмещать условие почти целиком: обрывок условия — не повтор.
+TEXT_COVER = 0.8
+
+
 def text_score(task, text):
-    head = _plain(join_pieces(task.statement))[:200]
+    statement = _plain(join_pieces(task.statement))[:TEXT_SPAN]
     plain = _plain(text)
-    if len(head) < TEXT_MIN or len(plain) < TEXT_MIN:
+    if len(statement) < TEXT_MIN or len(plain) < max(TEXT_MIN, TEXT_COVER * len(statement)):
         return 0.0
-    return fuzz.partial_ratio(head, plain) / 100
+    return fuzz.partial_ratio(statement, plain) / 100
 
 
-def match_by_text(tasks, text):
-    """Задание, чьё условие однозначно повторено в блоке, или None."""
+def compatible_number(task_number, number):
+    """Номер блока файла решений совместим с заданием: тот же, «тест-N»,
+    «тест-k.N», «4.N». Блок без номера совместим с любым."""
+    if not _real_number(number):
+        return True
+    return (task_number == number or task_number.endswith('-' + number)
+            or task_number.endswith('.' + number))
+
+
+def match_by_text(tasks, text, number=''):
+    """Задание с совместимым номером, чьё условие однозначно повторено в блоке,
+    или None. Номер ограничивает выбор: МОШ-финграм 2024/25, отбор 5-6 —
+    задание 4, склеенное моделью в условии 3, иначе «нашлось» бы внутри 3."""
     if len(_plain(text)) < TEXT_MIN:
         return None
-    scored = sorted(((text_score(task, text), i, task) for i, task in enumerate(tasks.values())),
+    scored = sorted(((text_score(task, text), i, task) for i, task in enumerate(tasks.values())
+                     if compatible_number(task.number, number)),
                     key=lambda x: (-x[0], x[1]))
     if not scored or scored[0][0] < TEXT_MATCH:
         return None
@@ -226,6 +246,9 @@ def _variant_of_header(block):
 
 
 _MARKED = re.compile(r'\(отмечено\)')
+#: Ответ теста в таблице «номер | ответ»: буквы вариантов или да/нет/верно/неверно.
+_CHOICE = re.compile(r'^(?:[А-ЕA-Eа-еa-e](?:\s*[,;/]\s*[А-ЕA-Eа-еa-e])*|да|нет|верно|неверно)$',
+                     re.IGNORECASE)
 _PLUS = re.compile(r'^[+xх×✓]$', re.IGNORECASE)
 
 
@@ -243,6 +266,28 @@ def _tables(text):
     if rows:
         tables.append(rows)
     return tables
+
+
+_KEY_LINE = re.compile(r'^\W*(\d{1,2})\s*[.)]\s+(.{1,25})$')
+_KEY_PAIR = re.compile(r'(\d{1,2})\s*[—–-]\s*([^;]{1,25})')
+
+
+def parse_answer_list(text, answer=''):
+    """Ключ ответов без таблицы (МОШ-финграм 2019/20): строки «1. Нет, не
+    является / 2. В / 3. А, Б» (≥ 3 подряд с 1, ответ до 25 знаков) или поле
+    answer «1 — А, Б, В; 2 — Г; …». {номер: ответ} или {}."""
+    out = {}
+    for line in _plain_lines(text):
+        match = _KEY_LINE.match(line)
+        if match:
+            out[match.group(1)] = match.group(2).strip(' *')
+    if len(out) < 3 or [int(n) for n in out] != list(range(1, len(out) + 1)):
+        out = {}
+    if not out and answer:
+        pairs = _KEY_PAIR.findall(answer)
+        if len(pairs) >= 3 and [int(n) for n, _a in pairs] == list(range(1, len(pairs) + 1)):
+            out = {n: a.strip(' .') for n, a in pairs}
+    return out
 
 
 def parse_answer_grid(text):
@@ -263,6 +308,15 @@ def parse_answer_grid(text):
                 if len(marked) == 1:
                     out[number] = _MARKED.sub('', marked[0]).strip(' *')
             continue
+        pairs = [row for row in rows if len([c for c in row if c]) == 2]
+        if (len(rows) >= 3 and len(pairs) == len(rows)
+                and all(row[0].isdigit() and _CHOICE.match(row[1].strip(' *')) for row in rows)
+                and [int(row[0]) for row in rows] == list(range(int(rows[0][0]),
+                                                                int(rows[0][0]) + len(rows)))):
+            # в) «1 | В / 2 | Б, В / 3 | А» — номер подряд и ответ (МОШ-финграм 2019/20).
+            for row in rows:
+                out[row[0]] = row[1].strip(' *')
+            continue
         groups = [j for j, c in enumerate(head) if c in ('№', 'N')]
         for row in rows[1:] if groups else ():
             for k, start in enumerate(groups):
@@ -274,6 +328,24 @@ def parse_answer_grid(text):
                 if len(hits) == 1:
                     out[row[start]] = hits[0]
     return out
+
+
+_VARIANT_MARK = re.compile(r'(?:^|\s)(\d)\s*вариант\b|\bвариант\s*№?\s*(\d)\b', re.IGNORECASE)
+
+
+def _variant_marker(block):
+    """Метка варианта текстом безномерного блока («**Правильные ответы** /
+    **2 вариант**», МОШ-финграм 2019/20): короткий блок без номера — как шапка."""
+    if block.get('type') not in ('task', 'solution', 'criteria') or \
+            _real_number(_block_number(block)):
+        return ''
+    # Метка — отдельной короткой строкой в первых трёх строках блока
+    # («КЛЮЧИ С ПРАВИЛЬНЫМИ ОТВЕТАМИ / Вариант 1 / …»).
+    for line in list(_plain_lines(block.get('text') or ''))[:3]:
+        match = _VARIANT_MARK.search(line) if len(line) <= 60 else None
+        if match:
+            return match.group(1) or match.group(2)
+    return ''
 
 
 def _header_variants(items):
@@ -294,8 +366,9 @@ def _header_variants(items):
             by_file[entry['file']].append(i)
     items = list(items)
     for _name, idxs in by_file.items():
-        headers = [(i, _variant_of_header(items[i][3])) for i in idxs
-                   if items[i][3].get('type') == 'header']
+        headers = [(i, _variant_of_header(items[i][3]) or _variant_marker(items[i][3]))
+                   for i in idxs if items[i][3].get('type') == 'header'
+                   or _variant_marker(items[i][3])]
         digits = []
         for _i, v in headers:
             if v and v not in digits:
@@ -326,10 +399,14 @@ def _header_variants(items):
         for i in idxs:
             entry, page, record, block = items[i]
             kind = block.get('type')
-            if kind == 'header':
-                v = _variant_of_header(block) or ('1' if multi and '1' not in digits else '')
+            marker = _variant_marker(block)
+            if kind == 'header' or marker:
+                v = (_variant_of_header(block) or marker
+                     or ('1' if multi and '1' not in digits else ''))
                 if v:
                     block = dict(block, _variant_switch=current not in (None, v))
+                    if marker and not block.get('task_variant'):
+                        block['task_variant'] = v      # ключ ответов внутри блока-метки
                     current, last_int, seen = v, 0, 0
             elif kind in ('task', 'task_continuation', 'solution', 'criteria', 'figure'):
                 head = _leading_int(_block_number(block)) if kind in ('task', 'solution',
@@ -543,12 +620,20 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 report['задание только из решений (условий нет)'] += 1
             if kind in ('footer', 'noise', 'header'):
                 continue
-            if kind != 'figure' and not _real_number(_block_number(block)):
+            if kind in ('task', 'solution', 'criteria', 'task_continuation'):
                 grid = parse_answer_grid(block.get('text') or '')
-                hits = [(tasks.get((f'тест-1.{n}', '')) or tasks.get((f'тест-{n}', '')), a)
+                own = _block_number(block)
+                if _real_number(own) and own not in grid:
+                    grid = {}          # таблица с номером блока — только если с него и начинается
+                if not grid and not _real_number(own):
+                    grid = parse_answer_list(block.get('text') or '', block.get('answer') or '')
+                variant = block.get('task_variant') or ''
+                hits = [(tasks.get((f'тест-1.{n}', variant)) or tasks.get((f'тест-{n}', variant))
+                         or tasks.get((f'тест-{n}', '')) or tasks.get((n, variant)), a)
                         for n, a in grid.items()] if len(grid) >= 3 else []
                 if any(t is not None for t, _a in hits):
-                    # Бланк ответов теста (сетка «вопрос → отмеченный вариант»).
+                    # Бланк ответов теста (сетка «вопрос → отмеченный вариант»)
+                    # или таблица «номер | ответ».
                     for target, answer in hits:
                         if target is not None and not target.answer:
                             target.answer = answer
@@ -579,7 +664,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 # Текст повторённого вопроса надёжнее номера: в файле ответов
                 # МОШ-предпринимательства вопрос теста «1» — это «тест-1», а
                 # не задача 1 комплекта (номера в файле ответов идут с 1).
-                by_text = match_by_text(tasks, block.get('text') or '')
+                by_text = match_by_text(tasks, block.get('text') or '', number)
                 follow = None
                 if by_text is not None and by_text is not target and (
                         target is None or text_score(target, block.get('text') or '')
@@ -853,7 +938,7 @@ def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
         if test_target is not None:
             target, how = test_target, 'номер → тест-N'
     if force is None:
-        by_text = match_by_text(tasks, block.get('text') or '')
+        by_text = match_by_text(tasks, block.get('text') or '', number)
         if by_text is not None and by_text is not target and (
                 target is None or text_score(target, block.get('text') or '') < TEXT_OTHER):
             target, how = by_text, 'по тексту условия'

@@ -219,13 +219,14 @@ def _now():
 class JudgeBase(Transcriber):
     """Общее: вызов судьи с одним повтором на невалидный ответ."""
 
-    def __init__(self, *, plan=None, **kwargs):
+    def __init__(self, *, plan=None, patches=triage.DEFAULT_PATCHES, **kwargs):
         super().__init__(**kwargs)
         self.plan = plan or {}
         self.digitized = self.root
+        self.patches = patches
 
     def v3(self, job):
-        return triage.v3_path(self.digitized, job.page_dir, job.page)
+        return triage.v3_path(self.digitized, job.page_dir, job.page, self.patches)
 
     def judge_blocks(self, job, blocks, expected_numbers, kind):
         """(вердикт | None, ошибка, расход). Невалидный ответ — один повтор."""
@@ -267,6 +268,8 @@ class JudgeRunner(JudgeBase):
         patch['status'] = decide_status(verdict) if verdict else 'judge_error'
         if previous.get('judge'):          # пересуд: прежнее заключение — рядом
             patch['judge_prev'] = previous['judge']
+        if previous.get('rescore'):        # пересчёт мерила без модели — сохраняется
+            patch['rescore'] = previous['rescore']
         triage.write_json_atomic(self.v3(job), patch)
         return patch['status']
 
@@ -356,9 +359,9 @@ class AnswerRejudgeRunner(JudgeBase):
 JUDGE_DONE = ('ok_judge', 'needs_fix', 'fixed', 'human')
 
 
-def judge_todo(keys, digitized):
+def judge_todo(keys, digitized, patches=triage.DEFAULT_PATCHES):
     """Страницы, у которых судья ещё не отработал (`judge_error` — повторить)."""
-    return [key for key in keys if (triage.read_json(_patch_path(digitized, key)) or {})
+    return [key for key in keys if (triage.read_json(_patch_path(digitized, key, patches)) or {})
             .get('status') not in JUDGE_DONE]
 
 
@@ -383,21 +386,21 @@ def answer_rejudge_pages(patches):
                           for i in (verdict or {}).get('issues') or []))
 
 
-def select_for_reread(keys, digitized):
+def select_for_reread(keys, digitized, patches=triage.DEFAULT_PATCHES):
     """Страницы на перечитывание: судья дал `needs_fix`, перечитывания ещё не
     было. `ok_judge`, `judge_error`, `fixed`, `human` — мимо (одна попытка)."""
-    return [key for key in keys if (triage.read_json(_patch_path(digitized, key)) or {})
+    return [key for key in keys if (triage.read_json(_patch_path(digitized, key, patches)) or {})
             .get('status') == 'needs_fix']
 
 
-def _patch_path(digitized, key):
+def _patch_path(digitized, key, patches=triage.DEFAULT_PATCHES):
     page_dir, _, page = key.rpartition('/p')
-    return triage.v3_path(digitized, page_dir, page)
+    return triage.v3_path(digitized, page_dir, page, patches)
 
 
-def v3_statuses(digitized):
-    """Статусы всех заплаток v3: {ключ страницы: запись}."""
-    root = os.path.join(digitized, 'pages_v3')
+def v3_statuses(digitized, patches=triage.DEFAULT_PATCHES):
+    """Статусы всех заплаток (`pages_v3` или `pages_v2`): {ключ страницы: запись}."""
+    root = os.path.join(digitized, patches)
     out = {}
     if not os.path.isdir(root):
         return out

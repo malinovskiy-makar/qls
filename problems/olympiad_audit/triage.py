@@ -24,12 +24,21 @@ import json
 import math
 import os
 import random
+import re
 from collections import Counter, defaultdict
 
-from problems.olympiad_audit.assemble import norm_number
-from problems.olympiad_audit.transcribe import LAYER_THRESHOLD
+from problems.olympiad_audit.assemble import _plain, is_service_text, norm_number
+from problems.olympiad_audit.transcribe import (LAYER_THRESHOLD, clean_blocks, layer_metrics,
+                                                passes)
 
 TIER_A, TIER_B, TIER_C = 'A', 'B', 'C'
+#: Ярус D (сессия 2, финграмотность и бизнес): страница НЕ в очереди «на глаза»,
+#: но питает задание к импорту и не дотягивает до автопубликации (слой < 0,95,
+#: числа не сошлись, скан без слоя) — к судье, чтобы задание не ушло человеку
+#: только из-за мерила. Решение 13.10: публикуем без ручной проверки, если
+#: строгая автопроверка уверена.
+TIER_D = 'D'
+AUTO_LAYER = 0.95
 
 REASON_LAYER = 'расходится со слоем PDF'
 REASON_JUDGE = 'судья нашёл расхождения'
@@ -56,10 +65,22 @@ def page_key(record):
     return f'{record["page_dir"]}/p{record["page"]}'
 
 
-def v3_path(digitized, page_dir, page):
-    """`pages/<sha16>` → `pages_v3/<sha16>/p<N>.json` (рядом, не поверх)."""
+#: Папка заплаток по умолчанию (ВП/МОШ по экономике: эталон v2 → заплатки v3).
+#: Финграмотность и бизнес (сессия 2, 13.10.2026): эталон v1 → `pages_v2`
+#: (`--base v1` у команд разбора).
+DEFAULT_PATCHES = 'pages_v3'
+
+
+def patches_for(base):
+    """`v1` → `pages_v2`, `v2` → `pages_v3`: заплатки — следующая версия."""
+    return f'pages_v{int(str(base).lstrip("v")) + 1}'
+
+
+def v3_path(digitized, page_dir, page, patches=DEFAULT_PATCHES):
+    """`pages/<sha16>` → `<patches>/<sha16>/p<N>.json` (рядом, не поверх)."""
     head, _, tail = page_dir.partition('/')
-    return os.path.join(digitized, 'pages_v3' if head == 'pages' else head + '_v3',
+    suffix = patches.rpartition('_')[2]
+    return os.path.join(digitized, patches if head == 'pages' else f'{head}_{suffix}',
                         tail, f'p{page}.json')
 
 
@@ -94,6 +115,10 @@ def iter_page_records(digitized):
 
 #: Статусы заплатки, при которых страница считается разобранной.
 PATCH_OK = ('ok_judge', 'fixed')
+#: Мерило слоя пересчитано без модели (сессия 2: точность против всего слоя) —
+#: страница прошла порог; поля мерила в заплатке.
+RESCORE_OK = 'ok_rescore'
+METRIC_FIELDS = ('layer_ratio', 'layer_fuzz', 'numbers_ok', 'numbers_missing', 'numbers_extra')
 
 
 class PageOverlay:
@@ -107,16 +132,23 @@ class PageOverlay:
     * страница из `norm` (ярусы B/C вне выборки контроля) — норма.
     """
 
-    def __init__(self, digitized, norm=()):
-        self.digitized, self.norm = digitized, set(norm)
+    def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES):
+        self.digitized, self.norm, self.patches = digitized, set(norm), patches
 
     def apply(self, page_dir, page, base):
         if base is None:
             return None
-        patch = read_json(v3_path(self.digitized, page_dir, page))
+        patch = read_json(v3_path(self.digitized, page_dir, page, self.patches))
         status = (patch or {}).get('status')
         out = dict(base)
-        if status in PATCH_OK:
+        if patch and patch.get('rescore'):
+            # Мерило пересчитано без модели: поля мерила — из заплатки (до блоков).
+            for key in METRIC_FIELDS:
+                if key in patch['rescore']:
+                    out[key] = patch['rescore'][key]
+        if status == RESCORE_OK:
+            out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
+        elif status in PATCH_OK:
             if status == 'fixed' or 'blocks' in patch:
                 for key in PATCH_FIELDS:
                     if key in patch:
@@ -152,6 +184,71 @@ PATCH_FIELDS = ('blocks', 'flags', 'layer_ratio', 'layer_fuzz', 'numbers_ok',
 
 
 # ── Ярусы ────────────────────────────────────────────────────────────────
+
+def rescore_record(record, job):
+    """Пересчитать мерило слоя по блокам записи (без модели, без записи на
+    диск): (новая запись, поля мерила | None, если не изменились). Страница
+    «на глаза» только из-за расхождения со слоем, прошедшая порог по новому
+    мерилу, больше не «на глаза»."""
+    if job is None or not job.has_layer or record.get('status') not in ('ok', 'needs_eyes'):
+        return record, None
+    m = layer_metrics(clean_blocks(record.get('blocks')), job.layer, job.footers, job.page)
+    fields = {'layer_ratio': m[0], 'numbers_ok': m[1], 'numbers_missing': m[2][:50],
+              'numbers_extra': m[3][:50], 'layer_fuzz': m[4]}
+    if all(record.get(k) == v for k, v in fields.items()):
+        return record, None
+    out = dict(record, **fields)
+    reasons = record.get('needs_eyes_reasons') or []
+    if record.get('needs_eyes') and set(reasons) <= {REASON_LAYER} and passes(m):
+        out.update(needs_eyes=False, needs_eyes_reasons=[])
+    return out, fields
+
+
+_HEADING = re.compile(r'(?m)^\W*(?:задача|задание)\s*№?\s*(\d+)\b', re.IGNORECASE)
+SHORT_STATEMENT = 30
+
+
+def task_risks(rows, events_with_answers, file_to_dir):
+    """Задачные причины яруса A по эталону: {ключ страницы условия: [причины]}.
+
+    Пустое или слишком короткое условие (разрыв), нет ответа/решения/критериев
+    при файле решений у комплекта, внутри условия заголовок ДРУГОГО задания
+    (склейка), условие — служебный блок."""
+    out = defaultdict(list)
+    for row in rows:
+        statement = row.get('statement_md') or ''
+        reasons = []
+        if not statement.strip():
+            reasons.append('пустое условие')
+        elif len(_plain(statement)) < SHORT_STATEMENT:
+            reasons.append('короткое условие (разрыв?)')
+        if row['event_id'] in events_with_answers and not (
+                row.get('solution_md') or row.get('answer') or row.get('criteria_md')):
+            reasons.append('нет ответа/решения при файле решений')
+        own = re.match(r'\d+', str(row.get('number') or ''))
+        others = {n for n in _HEADING.findall(statement) if own and n != own.group()}
+        if others:
+            reasons.append(f'внутри условия заголовок задания {", ".join(sorted(others))} (склейка?)')
+        if statement.strip() and is_service_text(statement):
+            reasons.append('служебный блок как задание')
+        if not reasons:
+            continue
+        for ref in row.get('source_pages') or []:
+            file, _, page = ref.rpartition('#p')
+            page_dir = file_to_dir.get(file)
+            if page_dir and page.isdigit():
+                for reason in reasons:
+                    tag = f'{row["event_id"]}#{row["number"]}: {reason}'
+                    if tag not in out[f'{page_dir}/p{page}']:
+                        out[f'{page_dir}/p{page}'].append(tag)
+    return dict(out)
+
+
+def auto_publish_page_ok(record):
+    """Страница проходит автопроверку без судьи: слой ≥ 0,95 и числа сошлись."""
+    return bool(record.get('has_layer') and (record.get('layer_ratio') or 0) >= AUTO_LAYER
+                and record.get('numbers_ok') and not record.get('needs_eyes'))
+
 
 def classify(record):
     """Запись страницы v2 → (ярус, причина) или None, если не «на глаза»."""
@@ -241,14 +338,40 @@ def urgency(tasks, bank):
 
 # ── План ─────────────────────────────────────────────────────────────────
 
-def build_plan(records, v2_rows, file_to_dir, bank, events_by_file=None):
-    """Строки `triage_plan.csv` по записям страниц «на глаза»."""
+def build_plan(records, v2_rows, file_to_dir, bank, events_by_file=None, risks=None,
+               auto_publish=False):
+    """Строки `triage_plan.csv` по записям страниц «на глаза».
+
+    `risks` — задачные причины яруса A (`task_risks`): страница поднимается в A
+    или добавляется. `auto_publish` — ярус D: страницы заданий «в банке нет»,
+    не прошедшие автопроверку (`auto_publish_page_ok`), к судье."""
     tasks_by_page = page_tasks(v2_rows, file_to_dir)
     queue = {}
+    by_key = {}
     for record in records:
+        by_key[page_key(record)] = record
         verdict = classify(record)
         if verdict:
             queue[page_key(record)] = (record, *verdict)
+    for key, reasons in (risks or {}).items():
+        if key not in by_key:
+            continue
+        text = 'задание: ' + '; '.join(reasons)
+        if key in queue:
+            record, _tier, reason = queue[key]
+            queue[key] = (record, TIER_A, f'{reason}; {text}')
+        else:
+            queue[key] = (by_key[key], TIER_A, text)
+    if auto_publish:
+        for key, tasks in tasks_by_page.items():
+            record = by_key.get(key)
+            if key in queue or record is None or urgency(tasks, bank)[0] != URGENT_NEW:
+                continue
+            if not auto_publish_page_ok(record):
+                why = ('скан без слоя' if not record.get('has_layer') else
+                       f'слой {record.get("layer_ratio")} < {AUTO_LAYER}'
+                       if (record.get('layer_ratio') or 0) < AUTO_LAYER else 'числа не сошлись')
+                queue[key] = (record, TIER_D, f'для автопубликации: {why}')
     by_tier = defaultdict(list)
     for key, (_r, tier, _reason) in queue.items():
         by_tier[tier].append(key)
@@ -296,10 +419,14 @@ def summarize_plan(rows):
     return summary
 
 
-def pages_to_judge(plan_rows):
-    """Что идёт к судье: весь ярус A + выборка контроля ярусов B и C."""
+def pages_to_judge(plan_rows, only=None):
+    """Что идёт к судье: ярусы A и D + выборка контроля ярусов B и C.
+    `only='control'` — только выборка контроля (её смотрят первой: доля
+    «дефектов» > 30 % — судья ненадёжен, остальное не судится)."""
+    if only == 'control':
+        return [r['страница'] for r in plan_rows if r['ярус'] in (TIER_B, TIER_C) and r['контроль']]
     return [r['страница'] for r in plan_rows
-            if r['ярус'] == TIER_A or (r['ярус'] in (TIER_B, TIER_C) and r['контроль'])]
+            if r['ярус'] in (TIER_A, TIER_D) or (r['ярус'] in (TIER_B, TIER_C) and r['контроль'])]
 
 
 def norm_pages(plan_rows):
