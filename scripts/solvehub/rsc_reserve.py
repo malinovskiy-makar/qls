@@ -30,7 +30,9 @@ api.prod.solvehub.app когда-нибудь перестанет отвеча�
         Эти байты НЕ JSON-экранированы и могут буквально содержать что угодно,
         включая переводы строк, — поэтому резать по "\n" нельзя, только по
         объявленной длине.
-  Объект задачи — в initialData.problems[0] внутри одного из JSON-чанков.
+  Задача и её пункты — в initialData.problems (СПИСОК: [0] — сама задача, остальные —
+  пункты б), в)…) внутри одного из JSON-чанков. До 13.10.2026 брался только [0], и
+  пункты терялись; теперь сохраняется весь список (поле `_parts`).
   Некоторые строковые поля этого объекта (замечено на "md") — не сам текст,
   а ссылка-токен "$<id>" на отдельный текстовый чанк; чтобы получить
   настоящее содержимое, ссылку нужно резолвить через словарь чанков.
@@ -58,6 +60,7 @@ resolve_refs разворачивает такой ведущий "$$" обра�
 ISO-8859-1, и кириллица превращается в кракозябры при обращении к `.text`.
 Здесь это обойдено через `r.content.decode("utf-8")` — байты на деле utf-8.
 """
+import copy
 import json
 import re
 import time
@@ -119,7 +122,10 @@ def parse_chunks(text):
 
 
 def extract_balanced_json(text, start_idx):
-    assert text[start_idx] == "{", text[start_idx:start_idx + 30]
+    """Вырезает сбалансированный JSON-объект {...} или массив [...], начиная с start_idx."""
+    opener = text[start_idx]
+    assert opener in "{[", text[start_idx:start_idx + 30]
+    closer = "}" if opener == "{" else "]"
     depth = 0
     in_string = False
     escape = False
@@ -137,9 +143,9 @@ def extract_balanced_json(text, start_idx):
         else:
             if c == '"':
                 in_string = True
-            elif c == "{":
+            elif c == opener:
                 depth += 1
-            elif c == "}":
+            elif c == closer:
                 depth -= 1
                 if depth == 0:
                     return text[start_idx:i + 1]
@@ -171,28 +177,52 @@ def resolve_refs(obj, chunks):
     return obj
 
 
-def find_problem_object(chunks):
-    """Ищет среди json-чанков тот, что содержит initialData.problems, и вырезает problems[0]."""
+def find_problem_objects(chunks):
+    """Ищет среди json-чанков тот, что содержит initialData.problems, и вырезает ВЕСЬ список.
+
+    Первая запись — сама задача, остальные — её пункты (б), в)…). Возвращает
+    (id чанка, список записей) или (None, None), если массива нет.
+    """
     for cid, (kind, raw) in chunks.items():
         if kind == "json" and '"initialData"' in raw and '"problems":[' in raw:
-            marker = '"problems":['
+            marker = '"problems":'
             idx = raw.find(marker)
-            obj_start = raw.find("{", idx + len(marker))
-            if obj_start == -1:
-                continue
-            problem_raw = extract_balanced_json(raw, obj_start)
-            return cid, json.loads(problem_raw)
+            arr_start = idx + len(marker)  # это «[»
+            problems = json.loads(extract_balanced_json(raw, arr_start))
+            return cid, problems
     return None, None
 
 
+def find_problem_object(chunks):
+    """Только первая запись списка (сама задача, без пунктов). Оставлено для совместимости."""
+    cid, problems = find_problem_objects(chunks)
+    if not problems:
+        return None, None
+    return cid, problems[0]
+
+
+def build_record(problems):
+    """Как build_record в fetch_problems.py: поля первой записи + `_parts` + `_parts_count`.
+
+    Нарочно продублировано (6 строк), чтобы резерв оставался автономным модулем.
+    """
+    record = dict(problems[0])
+    record["_parts"] = copy.deepcopy(problems)
+    record["_parts_count"] = len(problems)
+    return record
+
+
 def fetch_problem_via_rsc(hash_):
-    """Публичная точка входа резерва: возвращает объект задачи (как fetch_problem в fetch_problems.py)."""
+    """Публичная точка входа резерва: возвращает запись задачи (как fetch_problem в fetch_problems.py).
+
+    Содержит все пункты в `_parts`, а не только problems[0].
+    """
     _url, _status, text = fetch_raw(hash_)
     chunks = parse_chunks(text)
-    _src_cid, problem = find_problem_object(chunks)
-    if problem is None:
+    _src_cid, problems = find_problem_objects(chunks)
+    if not problems:
         raise RuntimeError(f"{hash_}: не нашёл initialData.problems в RSC-потоке")
-    return resolve_refs(problem, chunks)
+    return build_record(resolve_refs(problems, chunks))
 
 
 if __name__ == "__main__":
