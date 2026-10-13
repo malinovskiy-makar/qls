@@ -283,3 +283,26 @@ class AssembleNumberTests(SimpleTestCase):
                          '| 1 | Объясните термины. | За каждый — 3 балла | 15 |'}
         parts = assemble.explode_table_rows(block, 'criteria')
         self.assertEqual((parts[-1]['number'], parts[-1]['points']), ('1', 15))
+
+    def test_11_list_item_number_beyond_tasks_continues_last(self):
+        from problems.olympiad_audit import assemble
+        root = Path(tempfile.mkdtemp(prefix='finbiz_asm2_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+
+        def page(page_dir, blocks):
+            transcribe.Transcriber._write(str(root / page_dir / 'p1.json'),
+                                          {'status': 'ok', 'blocks': blocks})
+        page('pages/t', [{'type': 'task', 'number': str(n), 'text': f'Условие {n}.'}
+                         for n in (1, 2)])
+        page('pages/s', [{'type': 'solution', 'number': '2', 'text': 'Решение 2.'},
+                         {'type': 'solution', 'number': '5', 'text': 'Пункт 5 решения 2.'},
+                         {'type': 'criteria', 'number': '1', 'text': 'Критерии 1.'}])
+        event = {'event_id': 'vp-fingram-2022-final-9-10-v1', 'grade': '9-10',
+                 'task_files': [{'file': 't.pdf', 'page_dir': 'pages/t', 'pages': 1}],
+                 'solution_files': [{'file': 's.pdf', 'page_dir': 'pages/s', 'pages': 1}]}
+        tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
+        by = {t.number: t for t in tasks}
+        self.assertEqual(set(by), {'1', '2'})
+        self.assertIn('Пункт 5 решения 2.', by['2'].solution)
+        self.assertEqual(by['1'].criteria, ['Критерии 1.'])
+        self.assertEqual(report['solution: не сопоставлено'], 0)

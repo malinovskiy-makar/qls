@@ -505,6 +505,15 @@ def _attach_answer(tasks, last, block, kind, entry, page, report):
     how = 'по номеру' if target is not None and number else 'по названию'
     if target is None and not _real_number(number) and last is not None:
         target, how = last, 'продолжение'
+    head = _leading_int(number)
+    if target is None and last is not None and head is not None and tasks and             head > max((_leading_int(t.number) or 0) for t in tasks.values()):
+        # Номер больше любого задания комплекта СРАЗУ за блоком того же вида
+        # (решение за решением, критерии за критериями, тот же файл, та же или
+        # предыдущая страница) — пункт списка внутри него («5)…14)» при
+        # четырёх заданиях; ВП, финграмотность). Иначе — в несопоставленные.
+        pages = last.criteria_pages if kind == 'criteria' else last.solution_pages
+        if pages and pages[-1][0] == entry['file'] and page - pages[-1][1] in (0, 1):
+            target, how = last, 'номер вне заданий → продолжение'
     if target is None:
         report[f'{kind}: не сопоставлено'] += 1
         report.setdefault('_unmatched', [])
