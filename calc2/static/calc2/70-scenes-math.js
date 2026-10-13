@@ -460,7 +460,9 @@ function syncAnsSegUI(seg) {
   const show = graph || (STATE.mode === 'math' && STATE.mathSub !== 'constraint');
   const after = document.getElementById(graph ? 'graph-rows'
     : (STATE.mathSub === 'minmax' ? 'mm-rows' : 'math-error'));
-  if (show && after && after.nextElementSibling !== row) after.after(row);
+  /* Перенос узла с полем в фокусе снимает фокус (Safari, 13.10: набор «50»
+     обрывался после «5»). Пока человек в строке, она стоит, где стоит. */
+  if (show && after && after.nextElementSibling !== row && !row.contains(document.activeElement)) after.after(row);
   if (row.style.display !== (show ? '' : 'none')) row.style.display = show ? '' : 'none';
   if (!show) return;
   [['ans-a', seg.a], ['ans-b', seg.b]].forEach(([id, v]) => {

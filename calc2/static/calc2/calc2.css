@@ -2835,6 +2835,11 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 #params-panel .side-part, #params-panel .side-part.open-card {
   margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none;
 }
+/* ⚠️ Карточка выше оставляет блоку overflow: hidden, а поле «Сначала сам» и кнопка
+   «Проверить» стоят вплотную к его краям: кольцо фокуса (2 px + отступ 2 px) срезалось
+   слева и справа, в Safari — вместе с рамкой поля (13.10). Запас 6 px внутрь отступа
+   колонки: обрезка отодвинута, содержимое стоит на прежнем месте. */
+#params-panel .side-part { margin-left: -6px; margin-right: -6px; padding-left: 6px; padding-right: 6px; }
 #params-panel #sb-fold { display: flex; flex-direction: column; gap: 18px; padding: 0; }
 #params-panel #explain { margin-top: 18px; }
 

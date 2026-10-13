@@ -1859,10 +1859,16 @@ function wireWrench() {
         dirty = false; applyAnsSegInputs();
       });
     });
+    /* WebKit отдаёт relatedTarget = null чаще Chromium (щелчок по кнопке, временная
+       потеря фокуса окном), поэтому решение — после того, как фокус осел: фокус снова
+       в строке — человек ещё набирает (Safari, 13.10). */
     segRow.addEventListener('focusout', (ev) => {
       if (ev.relatedTarget && segRow.contains(ev.relatedTarget)) return;   // перешли во второе поле
       if (!dirty) return;
-      dirty = false; applyAnsSegInputs();
+      setTimeout(() => {
+        if (!dirty || segRow.contains(document.activeElement)) return;
+        dirty = false; applyAnsSegInputs();
+      }, 0);
     });
   }
   const segAuto = document.getElementById('ans-seg-auto');
