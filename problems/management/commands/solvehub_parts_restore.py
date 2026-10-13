@@ -13,6 +13,10 @@
 * **B** (подпунктов нет): условие → шапка (текст записи 1 до метки а)), все
   записи 1..N — подпункты. Ответ и решение задачи не меняются.
 
+В обеих группах тестовый `problem_type` (`problem_types.is_test`) становится
+«несколько_подвопросов»: у задачи есть пункты, тестом она не является
+(решение владельца 13.10.2026). Старый тип — в снимке, `--revert` его вернёт.
+
 Тексты собираются ТЕМ ЖЕ конвейером, что положил в базу импорт и
 `reconvert_new_sources` (`reconvert.solvehub_records`): варианты ответа
 дописываются в текст, ссылки на картинки → маркеры `[[FIGURE:…]]` по
@@ -41,7 +45,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from catalog import testplay
-from problems import bank_sync
+from problems import bank_sync, problem_types
 from problems.corpus_converter.images import MD_IMAGE_RE, replace_images, sniff_content_type
 from problems.corpus_converter.ingest import convert_for_import, data_root
 from problems.corpus_converter.reconvert import solvehub_records, solvehub_resolver
@@ -52,6 +56,21 @@ from ._bank_edit import invalidate_search, revert_and_report, summary
 
 #: Всегда вручную: 17 записей, разбор по правилу не доверяем (решение 13.10).
 ALWAYS_MANUAL = {61281}
+#: Тип многопунктовой задачи вместо теста (решение владельца 13.10.2026): тест —
+#: один вопрос без пунктов, а у задачи SolveHub с ≥ 2 записями пункты есть.
+#: Тип задачи брался по виду проверки ПЕРВОЙ записи или моделью по обрезанному
+#: тексту. Какие значения — тест, решает только `problem_types.is_test`.
+MULTI_QUESTION_TYPE = 'несколько_подвопросов'
+
+
+def retype_to(problem_type, records):
+    """Новый тип задачи или `None`, если тип не меняется. Без модели:
+    тестовый тип при ≥ 2 записях SolveHub → «несколько_подвопросов»."""
+    if records >= 2 and problem_types.is_test(problem_type):
+        return MULTI_QUESTION_TYPE
+    return None
+
+
 #: Правка позже создания больше чем на столько — «правили после импорта»
 #: (то же правило, что у анализа 13.10, `analyze_v2.py`).
 EDIT_GAP_SECONDS = 5
@@ -193,6 +212,7 @@ class Plan:
         self.group = group
         self.result = bank_sync.empty_plan(children=('parts', 'figures'))
         self.applicable, self.manual, self.blocked, self.done = [], [], [], []
+        self.retyped = []     # pid, у которых тест → «несколько_подвопросов»
         self.examples = []
         self.state = {}       # pid → полное состояние ДО (для отката и сверки)
 
@@ -371,23 +391,30 @@ class Command(BaseCommand):
                                  new_parts, reasons)
         if reasons:
             return manual(*reasons)
+        new_type = retype_to(problem['problem_type'], n)
         if target == 'done':
-            plan.done.append(pid)
-            return None
+            if new_type is None:
+                plan.done.append(pid)
+                return None
+            # Пункты уже на месте (записаны до перетипизации) — меняется только тип.
+            statement, fresh, parts = None, [], None
+        else:
+            statement, fresh, parts = target
 
-        statement, fresh, parts = target
         # Стала бы задача «тестом-игрой» (подпункты — варианты ответа)?
-        fake_parts = [SimpleNamespace(label=p['label'], statement=p['statement'],
-                                      answer=p['answer'], pk=i)
-                      for i, p in enumerate(parts)]
-        fake = SimpleNamespace(problem_type=problem['problem_type'], answer=problem['answer'],
-                               parts=SimpleNamespace(all=lambda: fake_parts))
-        try:
-            game = testplay.game_of(fake, fake_parts)
-        except Exception:  # noqa: BLE001 — сомнение = вручную
-            game = 'ошибка'
-        if game is not None:
-            return manual('с новыми подпунктами задача стала бы тестом-игрой (подпункты = варианты)')
+        if parts is not None:
+            fake_parts = [SimpleNamespace(label=p['label'], statement=p['statement'],
+                                          answer=p['answer'], pk=i)
+                          for i, p in enumerate(parts)]
+            fake = SimpleNamespace(problem_type=new_type or problem['problem_type'],
+                                   answer=problem['answer'],
+                                   parts=SimpleNamespace(all=lambda: fake_parts))
+            try:
+                game = testplay.game_of(fake, fake_parts)
+            except Exception:  # noqa: BLE001 — сомнение = вручную
+                game = 'ошибка'
+            if game is not None:
+                return manual('с новыми подпунктами задача стала бы тестом-игрой (подпункты = варианты)')
 
         if missing_images:
             plan.blocked.append({'group': plan.group, 'problem_id': pid, 'hash': h,
@@ -399,12 +426,18 @@ class Command(BaseCommand):
         state_parts = [{k: (str(v) if k == 'points' and v is not None else v)
                         for k, v in p.items()} for p in db_parts]
         plan.state[str(pid)] = {'statement': problem['statement'], 'answer': problem['answer'],
-                                'solution': problem['solution'], 'parts': state_parts,
+                                'solution': problem['solution'], 'problem_type': problem['problem_type'],
+                                'parts': state_parts,
                                 'digest': part_digest([problem['statement'], problem['answer'],
                                                        problem['solution'], state_parts])}
+        old_fields, new_fields = {}, {}
         if statement is not None:
-            plan.result['problems'].append({'id': pid, 'old': {'statement': problem['statement']},
-                                            'new': {'statement': statement}})
+            old_fields['statement'], new_fields['statement'] = problem['statement'], statement
+        if new_type is not None:
+            old_fields['problem_type'], new_fields['problem_type'] = problem['problem_type'], new_type
+            plan.retyped.append(pid)
+        if new_fields:
+            plan.result['problems'].append({'id': pid, 'old': old_fields, 'new': new_fields})
         start = (max(p['order'] for p in db_parts) + 1) if db_parts else 0
         have_figs = set(ProblemFigure.objects.filter(problem_id=pid).values_list('tikz_hash', flat=True))
         for i, part in enumerate(fresh):
@@ -426,7 +459,8 @@ class Command(BaseCommand):
         plan.applicable.append({'group': plan.group, 'problem_id': pid, 'hash': h, 'records': n,
                                 'parts_new': len(fresh), 'statement_changes': int(statement is not None),
                                 'edited': int(edited), 'images': sum(len(p.get('figures', ())) for p in fresh),
-                                'problem_type': problem['problem_type']})
+                                'problem_type': problem['problem_type'],
+                                'type_after': new_type or problem['problem_type']})
         if len(plan.examples) < 3:
             plan.examples.append({'id': pid, 'old_statement': problem['statement'],
                                   'new_statement': statement, 'old_parts': db_parts, 'new_parts': fresh})
@@ -497,8 +531,13 @@ class Command(BaseCommand):
                 'applicable': len(plan.applicable), 'manual': len(plan.manual),
                 'blocked_images': len(plan.blocked), 'already_done': len(plan.done),
                 'parts_to_create': len(ops['parts']['create']),
-                'statements_to_change': len(plan.result['problems']),
+                'statements_to_change': sum(1 for item in plan.result['problems']
+                                            if 'statement' in item['new']),
                 'figures_to_create': len(ops['figures']['create']),
+                'types_to_change': len(plan.retyped),
+                'types_from': Counter(item['old']['problem_type'] for item in plan.result['problems']
+                                      if 'problem_type' in item['old']),
+                'retype_side_effects': side_effects(plan.retyped),
                 'manual_reasons': Counter(_reason_key(m['reason']) for m in plan.manual),
             }
             if plan.group in snapshots:
@@ -509,12 +548,17 @@ class Command(BaseCommand):
             blocked_rows += plan.blocked
             _write_csv(report_dir / ('%sapplicable_%s.csv' % (prefix, plan.group)), plan.applicable,
                        ['group', 'problem_id', 'hash', 'records', 'parts_new', 'statement_changes',
-                        'edited', 'images', 'problem_type'])
+                        'edited', 'images', 'problem_type', 'type_after'])
             self.stdout.write('Группа %s: применимо %d, вручную %d, ждут картинок %d, уже сделано %d; '
-                              'подпунктов добавить %d, условий изменить %d, картинок добавить %d'
+                              'подпунктов добавить %d, условий изменить %d, картинок добавить %d, '
+                              'тип сменить %d'
                               % (plan.group, g['applicable'], g['manual'], g['blocked_images'],
                                  g['already_done'], g['parts_to_create'], g['statements_to_change'],
-                                 g['figures_to_create']))
+                                 g['figures_to_create'], g['types_to_change']))
+            for old_type, n in g['types_from'].most_common():
+                self.stdout.write('    тип «%s» → «%s»: %d' % (old_type, MULTI_QUESTION_TYPE, n))
+            if plan.retyped:
+                self.stdout.write('    смена типа, побочно: %s' % g['retype_side_effects'])
             for reason, n in g['manual_reasons'].most_common():
                 self.stdout.write('    вручную: %s — %d' % (reason, n))
             if plan.group in snapshots:
@@ -542,6 +586,29 @@ class Command(BaseCommand):
         (report_dir / name).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
         (report_dir / ('REPORT_%s.md' % stamp)).write_text('\n'.join(lines) + '\n', encoding='utf-8')
         self.stdout.write('Отчёт: %s' % (report_dir / ('REPORT_%s.md' % stamp)))
+
+
+def side_effects(ids):
+    """Что зависит от тестового типа у перетипизируемых задач. Только чтение:
+    ничего здесь не чинится, это строки отчёта для владельца."""
+    from game.models import GameQuestion
+    from problems.models_platform import AssignmentItem
+    if not ids:
+        return {}
+    game_rows = list(GameQuestion.objects.filter(problem_id__in=ids).values_list('problem_id', flat=True))
+    widgets = sum(1 for p in Problem.objects.filter(id__in=ids).prefetch_related('parts')
+                  if testplay.game_of(p) is not None)
+    return {
+        # Пул игры строится только из тестовых типов (`build_game_pool.GAME_TYPES`):
+        # при следующей пересборке пула эти вопросы из игры уйдут.
+        'игра: вопросов в пуле сейчас': len(game_rows),
+        'игра: задач с вопросами в пуле': len(set(game_rows)),
+        'домашки: позиций с этими задачами': AssignmentItem.objects.filter(catalog_problem_id__in=ids).count(),
+        # Фильтр каталога «тест» и подбор тестов в домашку (`hw_generator.is_test_problem`)
+        # смотрят на тот же `is_test` — уходят все перетипизируемые.
+        'фильтр каталога «тест» и подбор тестов домашки: уйдут задач': len(ids),
+        'виджет теста в каталоге (game_of) сейчас у задач': widgets,
+    }
 
 
 def _reason_key(reason):

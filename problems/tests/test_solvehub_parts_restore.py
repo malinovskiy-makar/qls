@@ -128,7 +128,7 @@ class _Data(TestCase):
         rows = []
         for p in problems:
             p = Problem.objects.get(pk=p.pk)
-            rows.append([p.statement, p.answer, p.solution, p.content_hash,
+            rows.append([p.statement, p.answer, p.solution, p.content_hash, p.problem_type,
                          list(ProblemPart.objects.filter(problem=p).order_by('pk').values_list(
                              'pk', 'label', 'statement', 'answer', 'solution', 'points', 'order'))])
         rows.append([Problem.objects.count(), ProblemPart.objects.count(), ProblemFigure.objects.count()])
@@ -330,6 +330,89 @@ class DryRunTests(_Data):
         self.assertIn('сухой прогон', (self.report / next(
             n for n in sorted(p.name for p in self.report.glob('REPORT_*.md')))).read_text(encoding='utf-8'))
         self.assertIn('Группа A: применимо 1', out)
+
+
+TEST_TYPE = 'тест: короткий ответ'
+OPEN_TYPE = 'задача с развёрнутым ответом'
+
+
+class RetypeTests(_Data):
+    """Тестовый тип у задачи с пунктами → «несколько_подвопросов» (решение 13.10.2026)."""
+
+    def typed(self, h, records, problem_type):
+        p = self.add(h, records)
+        Problem.objects.filter(pk=p.pk).update(problem_type=problem_type)
+        return p
+
+    def ptype(self, p):
+        return Problem.objects.get(pk=p.pk).problem_type
+
+    def test_test_type_with_parts_becomes_multi_question_in_both_groups(self):
+        a = self.typed('A1', A_RECORDS, TEST_TYPE)
+        b = self.typed('B1', B_RECORDS, 'единственный_выбор')
+        self.run_cmd('--apply')
+        self.assertEqual(self.ptype(a), cmd.MULTI_QUESTION_TYPE)
+        self.assertEqual(self.ptype(b), cmd.MULTI_QUESTION_TYPE)
+        self.assertEqual(len(self.parts(a)), 3)
+        self.assertEqual(len(self.parts(b)), 4)
+
+    def test_open_type_is_not_changed(self):
+        a = self.typed('A1', A_RECORDS, OPEN_TYPE)
+        self.run_cmd('--apply')
+        self.assertEqual(self.ptype(a), OPEN_TYPE)
+        self.assertEqual(len(self.parts(a)), 3)
+
+    def test_single_record_test_is_not_changed(self):
+        self.assertIsNone(cmd.retype_to(TEST_TYPE, 1))
+        self.assertEqual(cmd.retype_to(TEST_TYPE, 2), cmd.MULTI_QUESTION_TYPE)
+        self.assertIsNone(cmd.retype_to(OPEN_TYPE, 3))
+        p = self.typed('S1', A_RECORDS[:1], TEST_TYPE)
+        self.run_cmd('--apply')
+        self.assertEqual(self.ptype(p), TEST_TYPE)
+
+    def test_revert_restores_old_type(self):
+        a = self.typed('A1', A_RECORDS, TEST_TYPE)
+        b = self.typed('B1', B_RECORDS, 'верно_неверно')
+        before = self.state(a, b)
+        self.run_cmd('--apply')
+        snaps = {s.name.split('_')[1]: json.loads(s.read_text(encoding='utf-8')) for s in self.snapshots()}
+        self.assertEqual(snaps['A']['problems'][0]['old']['problem_type'], TEST_TYPE)
+        self.assertEqual(snaps['B']['problems'][0]['old']['problem_type'], 'верно_неверно')
+        for snap in self.snapshots():
+            call_command('solvehub_parts_restore', '--revert', str(snap), stdout=StringIO())
+        self.assertEqual(self.ptype(a), TEST_TYPE)
+        self.assertEqual(self.ptype(b), 'верно_неверно')
+        self.assertEqual(self.state(a, b), before)
+
+    def test_dry_run_keeps_type(self):
+        a = self.typed('A1', A_RECORDS, TEST_TYPE)
+        self.run_cmd()
+        self.assertEqual(self.ptype(a), TEST_TYPE)
+        self.assertEqual(self.summary()['groups']['A']['types_to_change'], 1)
+
+    def test_idempotent(self):
+        a = self.typed('A1', A_RECORDS, TEST_TYPE)
+        b = self.typed('B1', B_RECORDS, TEST_TYPE)
+        self.run_cmd('--apply')
+        state = self.state(a, b)
+        self.run_cmd()
+        for g in ('A', 'B'):
+            self.assertEqual(self.summary()['groups'][g]['types_to_change'], 0)
+            self.assertEqual(self.summary()['groups'][g]['already_done'], 1)
+        snaps = len(self.snapshots())
+        self.run_cmd('--apply')
+        self.assertEqual(len(self.snapshots()), snaps)
+        self.assertEqual(self.state(a, b), state)
+
+    def test_parts_already_restored_only_type_changes(self):
+        """Пилот 13.10 записан до перетипизации: пункты есть, тип остался тестом."""
+        a = self.typed('A1', A_RECORDS, OPEN_TYPE)
+        self.run_cmd('--apply')
+        parts_before = [(x.pk, x.statement) for x in self.parts(a)]
+        Problem.objects.filter(pk=a.pk).update(problem_type=TEST_TYPE)
+        self.run_cmd('--apply')
+        self.assertEqual(self.ptype(a), cmd.MULTI_QUESTION_TYPE)
+        self.assertEqual([(x.pk, x.statement) for x in self.parts(a)], parts_before)
 
 
 class LabelTests(TestCase):
