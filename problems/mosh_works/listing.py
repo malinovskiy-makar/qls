@@ -15,6 +15,11 @@ from html.parser import HTMLParser
 
 YEARS = (2021, 2022, 2023, 2024, 2025)
 
+#: Предмет → слаг в адресах организатора. `econ` — экономика (по умолчанию,
+#: поведение прежнее), `fin` — финансовая грамотность (таблицы
+#: mosh-fingram-Y-prizewinners найдены 13.10.2026, та же вёрстка).
+SUBJECTS = {'econ': 'mosh-econ', 'fin': 'mosh-fingram'}
+
 PAGE_URL = ('https://reg.cpm.moscow/register/mosh-econ-%d-prizewinners/'
             'olympiad-protocol-static')
 
@@ -23,6 +28,20 @@ PAGE_URL = ('https://reg.cpm.moscow/register/mosh-econ-%d-prizewinners/'
 #: ссылка из таблицы выглядит именно так.
 ZIP_URL_RE = re.compile(
     r'^https://reg\.olimpiada\.ru/files/scans-public-by-oa/mosh-econ-(\d{4})/(\d{8})(\d{4})\.zip$')
+
+
+def page_url(year, subject='econ'):
+    """Адрес таблицы призёров года по предмету."""
+    return ('https://reg.cpm.moscow/register/%s-%d-prizewinners/olympiad-protocol-static'
+            % (SUBJECTS[subject], year))
+
+
+def zip_url_re(subject='econ'):
+    """Регулярка допустимого адреса zip предмета (у `econ` — ровно ZIP_URL_RE)."""
+    if subject == 'econ':
+        return ZIP_URL_RE
+    return re.compile(r'^https://reg\.olimpiada\.ru/files/scans-public-by-oa/%s-(\d{4})/(\d{8})(\d{4})\.zip$'
+                      % re.escape(SUBJECTS[subject]))
 
 #: Ровно эти поля и только они попадают в строку index при разборе таблицы.
 INDEX_FIELDS = ('work_id', 'year', 'season', 'grade_participation', 'grade',
@@ -125,7 +144,7 @@ def parse_int(text):
     return int(t) if t.isdigit() else None
 
 
-def parse_table(html_text, year, listed_at):
+def parse_table(html_text, year, listed_at, subject='econ'):
     """Страница призёров → список записей index (строка на работу).
 
     Заголовок обязан содержать все столбцы из HEADERS — иначе ValueError
@@ -158,20 +177,22 @@ def parse_table(html_text, year, listed_at):
             'total_listed': parse_number(cells[where['total']][0]),
             'result': result,
             'prize_degree': degree,
-            'zip_url': pick_zip_url(links, year, work_id),
+            'zip_url': pick_zip_url(links, year, work_id, subject),
             'listed_at': listed_at,
         }
         records.append({k: record[k] for k in INDEX_FIELDS})
     return records
 
 
-def pick_zip_url(links, year, work_id):
+def pick_zip_url(links, year, work_id, subject='econ'):
     """Ссылка на zip из ячейки «Номер работы» — как есть, если она ожидаемого вида.
 
-    Ничего не достраиваем: нет ссылки или вид не тот — None.
+    Ничего не достраиваем: нет ссылки или вид не тот (в т.ч. папка ДРУГОГО
+    предмета) — None.
     """
+    pattern = zip_url_re(subject)
     for href in links:
-        m = ZIP_URL_RE.match(href)
+        m = pattern.match(href)
         if m and int(m.group(1)) == year and m.group(2) == work_id:
             return href
     return None

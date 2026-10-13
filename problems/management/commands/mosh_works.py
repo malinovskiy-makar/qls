@@ -28,6 +28,14 @@ DEFAULT_DIR = r'C:\Users\shipu\weconomics-data\mosh_works'
 RECON_ROWS = {2021: 237, 2022: 253, 2023: 236, 2024: 257, 2025: 167}
 RECON_ZIPS = {2021: 237, 2022: 253, 2023: 236, 2024: 257, 2025: 165}
 
+#: Папка данных по предмету (`--subject`); `econ` — как было.
+DEFAULT_DIRS = {'econ': DEFAULT_DIR, 'fin': r'C:\Users\shipu\weconomics-data\mosh_fin_works'}
+#: Финграмотность: разведка 13.10.2026 (строки таблиц и ссылки на zip).
+RECON_ROWS_BY_SUBJECT = {'econ': RECON_ROWS,
+                         'fin': {2021: 106, 2022: 147, 2023: 176, 2024: 167, 2025: 44}}
+RECON_ZIPS_BY_SUBJECT = {'econ': RECON_ZIPS,
+                         'fin': {2021: 106, 2022: 147, 2023: 176, 2024: 167, 2025: 44}}
+
 
 def read_jsonl(path):
     if not os.path.exists(path):
@@ -61,7 +69,10 @@ class Command(BaseCommand):
         sub = parser.add_subparsers(dest='action', required=True)
         for name in ('index', 'download', 'scores', 'report'):
             p = sub.add_parser(name)
-            p.add_argument('--dir', default=DEFAULT_DIR, help='папка данных вне репозитория')
+            p.add_argument('--subject', default='econ', choices=sorted(listing.SUBJECTS),
+                           help='предмет: econ (экономика, по умолчанию) или fin (финграмотность)')
+            p.add_argument('--dir', default=None,
+                           help='папка данных вне репозитория (по умолчанию — своя у предмета)')
             if name == 'index':
                 p.add_argument('--years', default='', help='только эти годы: 2024,2025')
             if name in ('download', 'scores'):
@@ -94,7 +105,8 @@ class Command(BaseCommand):
         self.stdout.flush()
 
     def handle(self, *args, **opts):
-        data_dir = os.path.abspath(opts['dir'])
+        opts['subject'] = opts.get('subject') or 'econ'
+        data_dir = os.path.abspath(opts.get('dir') or DEFAULT_DIRS[opts['subject']])
         repo = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
         if data_dir.lower().startswith(repo.lower() + os.sep) or data_dir.lower() == repo.lower():
             raise CommandError('--dir внутри репозитория: данные храним только вне его.')
@@ -108,6 +120,7 @@ class Command(BaseCommand):
     def do_index(self, data_dir, opts, client=None):
         years = [int(y) for y in (opts.get('years') or '').split(',') if y.strip()] \
             or list(listing.YEARS)
+        subject = opts.get('subject') or 'econ'
         client = client or fetch.Client(log=self.say)
         path = os.path.join(data_dir, 'index.jsonl')
         old = {(r['year'], r['work_id']): r for r in read_jsonl(path)}
@@ -115,9 +128,10 @@ class Command(BaseCommand):
 
         records = []
         for year in years:
-            body = client.get(listing.PAGE_URL % year, expect='html')
+            body = client.get(listing.page_url(year, subject), expect='html')
             try:
-                rows = listing.parse_table(body.decode('utf-8', errors='replace'), year, listed_at)
+                rows = listing.parse_table(body.decode('utf-8', errors='replace'), year, listed_at,
+                                           subject)
             except ValueError as error:
                 raise CommandError('%d: таблицу не разобрать — %s' % (year, error))
             for rec in rows:
@@ -131,7 +145,9 @@ class Command(BaseCommand):
         kept = [r for key, r in old.items() if key[0] not in years]
         write_jsonl(path, kept + records)
 
-        expected = {y: RECON_ROWS[y] for y in years if y in RECON_ROWS}
+        recon_rows = RECON_ROWS_BY_SUBJECT[subject]
+        recon_zips = RECON_ZIPS_BY_SUBJECT[subject]
+        expected = {y: recon_rows[y] for y in years if y in recon_rows}
         check = listing.check_index(records, expected_rows=expected)
         self.say()
         self.say('index.jsonl: %d строк; по годам %s' % (check['rows'], dict(sorted(check['by_year'].items()))))
@@ -141,9 +157,9 @@ class Command(BaseCommand):
             len(check['no_zip']), (' (%s)' % ', '.join(check['no_zip'])) if check['no_zip'] else ''))
         for year in years:
             zips = sum(1 for r in records if r['year'] == year and r['zip_url'])
-            if year in RECON_ZIPS and zips != RECON_ZIPS[year]:
+            if year in recon_zips and zips != recon_zips[year]:
                 check['problems'].append('%d: ссылок на zip %d, при разведке было %d'
-                                         % (year, zips, RECON_ZIPS[year]))
+                                         % (year, zips, recon_zips[year]))
         for line in check['problems']:
             self.say('  нарушение: ' + line)
         self.say('запросов к сайту: %d' % client.requests)
@@ -191,14 +207,30 @@ class Command(BaseCommand):
     def _save_scores(self, data_dir, rows):
         write_jsonl(os.path.join(data_dir, 'scores.jsonl'), [rows[k] for k in sorted(rows)])
 
+    subject = 'econ'
+
+    def _rows_form(self, rec):
+        """Бланк с двумя строками «Баллы» и пятнами — только экономика 2021."""
+        return self.subject == 'econ' and rec['year'] == 2021
+
+    def _shielded(self, rec):
+        """Щит применяется: экономика — кроме 2021, финграм — всегда."""
+        return self.subject == 'fin' or rec['year'] != 2021
+
     def _page_crop(self, data_dir, rec, flip=False):
         """Вырез полосы таблицы с первой страницы (`flip` — страница вверх ногами)."""
-        image = scans.first_page_image(
-            os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150,
-            page=rec.get('first_page_index') or 0, year=rec['year'])
+        scan_dir = os.path.join(data_dir, fetch.scan_relpath(rec))
+        if self.subject == 'fin':
+            # титул финграма; файл-обложка с ФИО — UnsafePage (никогда в вырез)
+            image = scans.fin_title_image(scan_dir, rec['first_page'], dpi=150,
+                                          page=rec.get('first_page_index') or 0)
+        else:
+            image = scans.first_page_image(
+                scan_dir, rec['first_page'], dpi=150,
+                page=rec.get('first_page_index') or 0, year=rec['year'])
         if flip:
             image = image.rotate(180)
-        crop = scans.crop_band(image)
+        crop = scans.crop_band(image, scans.FIN_BAND if self.subject == 'fin' else scans.BAND)
         if crop.width > 1600:
             crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
         return crop
@@ -237,13 +269,14 @@ class Command(BaseCommand):
             crop = Image.open(out).convert('RGB')
         else:
             crop = self._page_crop(data_dir, rec)
-        if rec['year'] != 2021 and rec['work_id'] not in release:
-            ok, why, metrics = scans.table_shield(crop)
+        frac = scans.FIN_HEADER_FRAC if self.subject == 'fin' else 0.16
+        if self._shielded(rec) and rec['work_id'] not in release:
+            ok, why, metrics = scans.table_shield(crop, header_frac=frac)
             if not ok:
                 # Скан вверх ногами: в полосе — верх страницы. Пробуем страницу,
                 # повёрнутую на 180°; прошёл щит — берём этот вырез.
                 flipped = self._page_crop(data_dir, rec, flip=True)
-                if scans.table_shield(flipped)[0]:
+                if scans.table_shield(flipped, header_frac=frac)[0]:
                     crop, ok = flipped, True
             if not ok:
                 held = 'held/%d/%s.png' % (rec['year'], rec['work_id'])
@@ -277,11 +310,22 @@ class Command(BaseCommand):
         import random
         from concurrent.futures import ThreadPoolExecutor
 
+        self.subject = opts.get('subject') or 'econ'
         index = read_jsonl(os.path.join(data_dir, 'index.jsonl'))
         rows = self._read_scores(data_dir)
         spent_before = sum(r.get('cost') or 0 for r in rows.values())
         years = {int(y) for y in (opts.get('years') or '').split(',') if y.strip()} \
             or {y for y in listing.YEARS if y != 2021}
+        if self.subject == 'fin':
+            # Финграм: заполненная таблица баллов есть только у 2021–2022 (2023 — пустая,
+            # 2024–2025 — титула нет). Других лет в модель не отдаём при любом --years.
+            years = (years if opts.get('years') else set(scans.FIN_SCORE_YEARS)) \
+                & set(scans.FIN_SCORE_YEARS)
+            for r in index:
+                if r.get('status') == 'ok' and r.get('fin_analysis') != scans.ANALYSIS_VERSION:
+                    r.update(scans.fin_analyze(os.path.join(data_dir, fetch.scan_relpath(r)), r['year']))
+                    r['fin_analysis'] = scans.ANALYSIS_VERSION
+            write_jsonl(os.path.join(data_dir, 'index.jsonl'), index)
         wanted = only_ids(opts.get('only'))
         release = only_ids(opts.get('release'))
         retry = bool(opts.get('retry_review'))
@@ -306,7 +350,7 @@ class Command(BaseCommand):
             # 2021 пятна закрывают лишь часть клеток: пока закрыто не почти всё,
             # модель читает видимое (всё закрыто — hidden и после вызова).
             hidden = [r for r in todo if (r.get('band_stickers_pct') or 0) >= (
-                scores.HIDDEN_ALL_BAND_PCT if r['year'] == 2021 else scans.HIDDEN_BAND_PCT)]
+                scores.HIDDEN_ALL_BAND_PCT if self._rows_form(r) else scans.HIDDEN_BAND_PCT)]
             todo = [r for r in todo if r not in hidden]
         if retry and opts.get('limit'):
             todo = self._stratified(todo, opts['limit'])
@@ -321,7 +365,7 @@ class Command(BaseCommand):
         if not retry:
             for r in eligible:
                 row = rows.get(r['work_id'], {})
-                if r['year'] == 2021 or row.get('reason') not in redo \
+                if self._rows_form(r) or row.get('reason') not in redo \
                         or row.get('scores_status') != 'review' \
                         or row.get('read2_model') == scores.MODEL_SECOND:
                     continue
@@ -395,12 +439,13 @@ class Command(BaseCommand):
                 # даже с log=False (известный баг, карточка в Notion). Исключение
                 # откатывает её — сессия в базу не пишет.
                 with transaction.atomic():
-                    rows_form = rec['year'] == 2021
+                    rows_form = self._rows_form(rec)
+                    fin = self.subject == 'fin'
                     result = core.run(
                         'mosh_works_scores', user_text,
-                        scores.SCHEMA_ROWS if rows_form else scores.SCHEMA, None,
-                        provider=provider, model=scores.MODEL_SECOND if second else scores.MODEL,
-                        system=scores.SYSTEM_ROWS if rows_form else scores.SYSTEM,
+                        scores.SCHEMA_ROWS if rows_form else (scores.SCHEMA_FIN if fin else scores.SCHEMA),
+                        None, provider=provider, model=scores.MODEL_SECOND if second else scores.MODEL,
+                        system=scores.SYSTEM_ROWS if rows_form else (scores.SYSTEM_FIN if fin else scores.SYSTEM),
                         images=[('image/png', png)], log=False, check_limit=False,
                         check_budget=False, cache_seconds=0, timeout=120,
                         parse=scores.tolerant_parse, max_tokens=4000)
@@ -426,6 +471,9 @@ class Command(BaseCommand):
                    'source': 'model', 'runs': (prev.get('runs') or 0) + 1, 'crop': rel,
                    'cost': round((prev.get('cost') or 0) + cost, 6),
                    'raw': None if status == 'ok' else data}
+            if self.subject == 'fin':
+                # вариант комплекта, вписанный на титуле (2021–2022) — связка с эталоном
+                row['variant'] = scores.variant_of(data) if data else prev.get('variant')
             row.update(extra or {})
             rows[rec['work_id']] = row
 
@@ -463,7 +511,7 @@ class Command(BaseCommand):
                         stopped = '10 сбоев модели подряд'
                 else:
                     errors_in_row = 0
-                    judge = scores.verdict_rows if rec['year'] == 2021 else scores.verdict
+                    judge = scores.verdict_rows if self._rows_form(rec) else scores.verdict
                     status, details = judge(data, rec['total_listed'])
                     if rec.get('_second'):
                         # Второе чтение (поворот 180°): сверяем с первым.
@@ -477,7 +525,7 @@ class Command(BaseCommand):
                         record(rec, rel, data, cost, 'review', details, {'retried': False})
                         rec['_rot'] = True
                         queue.append(rec)
-                    elif (not retry and rec['year'] != 2021 and status == 'review'
+                    elif (not retry and not self._rows_form(rec) and status == 'review'
                           and details.get('reason') == 'no_total_cell'):
                         if details.get('merged_1_5'):
                             # «1-5» одним числом: без совпадения с таблицей — всегда review.

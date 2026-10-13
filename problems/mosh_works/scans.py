@@ -312,6 +312,86 @@ def first_page_image(scan_dir, first_page, dpi=150, page=0, year=None):
     return pdf_page(path, page, dpi=dpi) if is_pdf else Image.open(path).convert('RGB')
 
 
+# ------------------------------------------------------------ финграмотность
+
+#: Бланк МОШ по финансовой грамотности (разведка 13.10.2026, 9 работ глазами):
+#: 2021–2022 — титул «ECP» первым файлом: номер работы, «вариант», «аудитория» и
+#: таблица «Задание | №1 … №5 | Сумма» × строка «Балл» (одна проверка); 2023 —
+#: титул «МОШ» с той же таблицей, но ПУСТОЙ (3 из 3), и ОТДЕЛЬНЫЙ файл
+#: `…titul…` — обложка «Уважаемые участники олимпиады!» с фамилией, именем,
+#: отчеством и школой; 2024–2025 — только листы ответов («Задание 1. 1.1 …»),
+#: титула и таблицы баллов нет.
+#: Полоса выреза: от «вариант» до низа таблицы (у титула здесь нет ФИО).
+FIN_BAND = (0.02, 0.33, 0.98, 0.72)
+#: Годы, где на скане есть заполненная таблица баллов по задачам.
+FIN_SCORE_YEARS = (2021, 2022)
+#: Годы, где титул с таблицей есть, но таблица не заполнена.
+FIN_EMPTY_TABLE_YEARS = (2023,)
+#: Имя файла обложки с личными данными (2023): такой файл НИКОГДА не берётся.
+FIN_COVER_NAME = 'titul'
+#: Шапка таблицы финграма — верхняя строка из двух («Задание | №1 … | Сумма»).
+FIN_HEADER_FRAC = 0.45
+
+
+def fin_is_cover_name(name):
+    """Файл-обложка с ФИО (по имени): «mosh-fin-titul-000441.jpg» и подобные."""
+    return FIN_COVER_NAME in (name or '').lower()
+
+
+def fin_pages(scan_dir):
+    """Листы работы финграма по порядку (естественная сортировка имён), БЕЗ обложек.
+
+    JPG приоритетнее PDF (в 2023 PDF — тот же скан без обложки). Возвращает
+    [(имя файла, номер страницы в файле 0..)].
+    """
+    import re
+
+    def key(name):
+        return [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', name)]
+
+    images, pdfs = list_scan_files(scan_dir)
+    images = sorted((n for n in images if not fin_is_cover_name(n)), key=key)
+    if images:
+        return [(n, 0) for n in images]
+    out = []
+    for name in sorted((n for n in pdfs if not fin_is_cover_name(n)), key=key):
+        out += [(name, i) for i in range(pdf_page_count(os.path.join(scan_dir, name)))]
+    return out
+
+
+def fin_analyze(scan_dir, year):
+    """Финграм: где титул с таблицей баллов (только 2021–2023) → поля index.
+
+    `first_page` — первый лист НЕ-обложка, если у года есть титул; у 2024–2025
+    титула нет — `first_page=None`, `form='answer_sheets'`. `form`:
+    `title_scores` (таблица заполнена), `title_empty` (2023), `answer_sheets`.
+    """
+    info = _empty_info()
+    pages = fin_pages(scan_dir)
+    images, _pdfs = list_scan_files(scan_dir)
+    info['source_kind'] = 'jpg' if any(n.lower().endswith(IMAGE_EXT) for n, _ in pages) else (
+        'pdf' if pages else None)
+    info['cover_skipped'] = sum(1 for n in images if fin_is_cover_name(n))
+    if year in FIN_SCORE_YEARS or year in FIN_EMPTY_TABLE_YEARS:
+        info['form'] = 'title_scores' if year in FIN_SCORE_YEARS else 'title_empty'
+        if pages:
+            name, page = pages[0]
+            info['first_page'], info['first_page_index'], info['variants'] = name, page, 1
+    else:
+        info['form'] = 'answer_sheets'
+    return info
+
+
+def fin_title_image(scan_dir, first_page, dpi=150, page=0):
+    """Титул финграма для выреза; обложка по имени — UnsafePage (никогда в модель)."""
+    if fin_is_cover_name(first_page):
+        raise UnsafePage('файл-обложка с личными данными')
+    path = os.path.join(scan_dir, first_page)
+    if first_page.lower().endswith('.pdf'):
+        return pdf_page(path, page, dpi=dpi)
+    return Image.open(path).convert('RGB')
+
+
 # ------------------------------------------------------------ щит выреза
 
 #: Щит (13.10.2026): в модель уходит только вырез, где видна рамка таблицы баллов
@@ -338,8 +418,12 @@ def _groups(indices, gap):
     return out
 
 
-def table_shield(crop):
-    """Вырез — таблица с рамкой и шапкой? → (ok, reason, metrics)."""
+def table_shield(crop, header_frac=0.16):
+    """Вырез — таблица с рамкой и шапкой? → (ok, reason, metrics).
+
+    `header_frac` — доля высоты таблицы под шапку: у экономики 5–6 строк (0,16), у
+    финграма две строки «Задание / Балл» (0,45).
+    """
     import numpy as np
     from PIL import ImageFilter
 
@@ -379,7 +463,7 @@ def table_shield(crop):
     if not (SHIELD_H_LINES[0] <= len(hl) <= SHIELD_H_LINES[1]):
         return False, 'no_frame', metrics
     # Шапка — верхняя шестая часть таблицы (заголовок + пять строк).
-    y0, y1 = top + 4, top + max(12, int(0.16 * (bot - top)))
+    y0, y1 = top + 4, top + max(12, int(header_frac * (bot - top)))
     cells = 0
     for a, b in zip(xs, xs[1:]):
         cell = inkm[y0:y1, a + 4:b - 3]
