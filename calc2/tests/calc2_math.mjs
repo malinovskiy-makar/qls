@@ -6436,7 +6436,8 @@ await gesture('(е) добавленная кривая не меняет рав
    сдвига пересобирал список функций с полями MathLive, а очереди ожидания
    библиотек держали каждую старую строку: +580 узлов DOM на шаг, Safari ронял
    вкладку. 150 шагов «Сдвига MC», затем затишье и сборка мусора через CDP:
-   прирост узлов не больше 2 000 (до правки было около +87 000). */
+   прирост узлов не больше 2 000 (до правки было около +87 000), и очереди
+   ожидания KaTeX и MathLive после загрузки пусты. */
 await gesture('(ж) 150 шагов «Сдвига MC» не копят узлы DOM', async () => {
   await page.goto(`${BASE}/calc2/?m=mono`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
@@ -6454,9 +6455,12 @@ await gesture('(ж) 150 шагов «Сдвига MC» не копят узлы 
   });
   const c1 = await count();
   await cdp.detach();
+  // Очереди ожидания библиотек после загрузки пусты: в них не кладут (82-input.js).
+  const q = await page.evaluate(() => ({ tex: _texPending.length, mf: _mfPending.length, ready: (typeof katex !== 'undefined') && MATHLIVE_READY }));
   const dn = c1.nodes - c0.nodes, dl = c1.jsEventListeners - c0.jsEventListeners;
-  return { ok: n === 150 && dn <= 2000 && dl <= 400,
-           detail: `шагов ${n}; узлов ${c0.nodes} → ${c1.nodes} (+${dn}), обработчиков ${c0.jsEventListeners} → ${c1.jsEventListeners} (+${dl})` };
+  return { ok: n === 150 && dn <= 2000 && dl <= 400 && q.ready && q.tex === 0 && q.mf === 0,
+           detail: `шагов ${n}; узлов ${c0.nodes} → ${c1.nodes} (+${dn}), обработчиков ${c0.jsEventListeners} → ${c1.jsEventListeners} (+${dl}); `
+                 + `очереди KaTeX ${q.tex}, MathLive ${q.mf} (библиотеки загружены: ${q.ready})` };
 });
 
 /* (з) «Разбор» «Дискриминации 3-й степени» без чужого абзаца про налог (13.10).
