@@ -243,6 +243,12 @@ MANUAL_FILES = {
         ('raw/probe/mosecon.olimpiada.ru__upload__files__2025-2026__8-11__'
          'Kriterii_9-y_klass_2026.pdf'): ('criteria', ['mosh-2026-final-9-v1']),
     },
+    'vp-fingram': {
+        # 2022/23, 7-8 кл.: ранняя редакция задания и критериев (поздняя
+        # 825986512 / 825986519 добавила строку таблицы) — не оцифровывается.
+        'raw/pdf/olymp.hse.ru__mirror__pubs__share__816239832.pdf': ('other', []),
+        'raw/pdf/olymp.hse.ru__mirror__pubs__share__819410931.pdf': ('other', []),
+    },
 }
 
 

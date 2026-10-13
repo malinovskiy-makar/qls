@@ -196,3 +196,75 @@ class FinbizPipelineTests(SimpleTestCase):
         done = list((audit / 'digitized' / 'pages').rglob('p*.json'))
         self.assertLess(len(done), 3)
         self.assertTrue(os.path.isfile(audit / 'digitized' / 'transcribe_cost.jsonl'))
+
+
+# ── Пилот 13.10: таблица критериев одним блоком и усиленная инструкция ───
+
+CRITERIA_PAGE = (
+    '11 класс\n\n**КРИТЕРИИ ОЦЕНИВАНИЯ (всего 100 баллов)**\n\n'
+    '**Е.Ясакова. 2022 – РБК: Рост за счет двух сделок**\n\n'
+    '| № | Формулировка задания | Критерии оценки и примеры | Макс. сумма баллов '
+    '| Баллы и примечания |\n'
+    '| --- | --- | --- | --- | --- |\n'
+    '| 1 | Поясните, что означает снижение мультипликаторов? | Примеры верных '
+    'ответов:<br>1. Недооценка стоимости стартапа. | 25 | Макс. 15 баллов – пояснение |\n'
+    '|  |  | 2. EV/EBITDA – отношение стоимости бизнеса к прибыли. |  |  |\n'
+    '| 2 | Назовите два риска сделки. | Риск 1 и риск 2 | 20 | по 10 баллов |')
+
+
+class CriteriaTableTests(SimpleTestCase):
+    def test_7_criteria_table_rows_become_criteria_blocks(self):
+        from problems.olympiad_audit import assemble
+        block = {'type': 'task', 'number': '', 'text': CRITERIA_PAGE}
+        parts = assemble.explode_table_rows(block, 'criteria')
+        self.assertEqual([p['type'] for p in parts], ['task', 'criteria', 'criteria'])
+        self.assertIn('Ясакова', parts[0]['text'])              # источник кейса цел
+        self.assertEqual((parts[1]['number'], parts[1]['points']), ('1', 25))
+        self.assertIn('**Критерии оценки и примеры:**', parts[1]['text'])
+        self.assertIn('EV/EBITDA', parts[1]['text'])             # строка-продолжение
+        self.assertIn('Макс. 15 баллов', parts[1]['text'])
+        self.assertEqual((parts[2]['number'], parts[2]['points']), ('2', 20))
+        # Продолжение таблицы на следующей странице без шапки — по шапке-подсказке.
+        tail = {'type': 'task_continuation', 'number': '',
+                'text': '| 3 | Оцените сделку. | Верная оценка | 15 | — |'}
+        self.assertEqual(assemble.explode_table_rows(tail, 'criteria'), [tail])
+        cont = assemble.explode_table_rows(tail, 'criteria', parts[-1]['_header'])
+        self.assertEqual((cont[0]['type'], cont[0]['number'], cont[0]['points']),
+                         ('criteria', '3', 15))
+        # Таблица данных с целыми в первом столбце — не критерии.
+        data = {'type': 'task_continuation', 'number': '',
+                'text': '| Q | P |\n| --- | --- |\n| 1 | 100 |\n| 2 | 90 |'}
+        self.assertEqual(assemble.explode_table_rows(data, 'solution'), [data])
+
+    def test_8_criteria_table_attaches_to_task_in_assembly(self):
+        from problems.olympiad_audit import assemble
+        root = Path(tempfile.mkdtemp(prefix='finbiz_asm_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+
+        def page(page_dir, blocks):
+            transcribe.Transcriber._write(str(root / page_dir / 'p1.json'),
+                                          {'status': 'ok', 'blocks': blocks})
+        page('pages/t', [{'type': 'task', 'number': '1', 'points': 25,
+                          'text': 'Поясните, что означает снижение мультипликаторов?'},
+                         {'type': 'task', 'number': '2', 'text': 'Назовите два риска сделки.'}])
+        page('pages/k', [{'type': 'task', 'number': '', 'text': CRITERIA_PAGE}])
+        event = {'event_id': 'vp-ob-2023-final-11-v1', 'grade': '11',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 1}],
+                 'criteria_files': [{'file': 'raw/pdf/k.pdf', 'page_dir': 'pages/k',
+                                     'pages': 1}]}
+        tasks, report, _missing = assemble.build_event(str(root), event, str(root / 'fig'),
+                                                       crop=False)
+        by = {t.number: t for t in tasks}
+        self.assertEqual(set(by), {'1', '2'})
+        self.assertIn('EV/EBITDA', '\n'.join(by['1'].criteria))
+        self.assertEqual(by['2'].criteria_points, 20)
+        self.assertEqual(report['таблица критериев → по строкам'], 1)
+
+    def test_9_strict_prompt_only_with_flag(self):
+        base = transcribe.Transcriber(root='.', provider=None, budget=None, cost_log=None)
+        strict = transcribe.Transcriber(root='.', provider=None, budget=None, cost_log=None,
+                                        strict=True)
+        self.assertEqual(base.system_prompt, transcribe.SYSTEM_PROMPT)
+        self.assertTrue(strict.system_prompt.endswith(transcribe.STRICT_SUFFIX))
+        for rule in ('Вступление комплекта', 'Логотипы', '`criteria`'):
+            self.assertIn(rule, transcribe.STRICT_SUFFIX)

@@ -113,6 +113,9 @@ class Command(BaseCommand):
                         help='Одновременных вызовов (не больше 20; лимит Z.AI — 50).')
         tr.add_argument('--yes', action='store_true',
                         help='Действительно вызывать модель (без флага — только план).')
+        tr.add_argument('--strict-prompt', action='store_true',
+                        help='Усиленная инструкция: вступление комплекта, логотипы, строки '
+                             'таблиц критериев (transcribe.STRICT_SUFFIX).')
         tr.add_argument('--redo', action='store_true',
                         help='Расшифровать заново и готовые страницы (только с --pages-file).')
         common(sub.add_parser('rescore', help='Пересчитать мерило слоя у готовых страниц '
@@ -337,7 +340,8 @@ class Command(BaseCommand):
         runner = transcribe.Transcriber(
             root=str(self.digitized), provider=provider,
             budget=transcribe.Budget(options['max_usd'], per_page * 1.3),
-            cost_log=cost_log, workers=options['workers'], stdout=self.stdout)
+            cost_log=cost_log, workers=options['workers'], stdout=self.stdout,
+            strict=bool(options.get('strict_prompt')))
         stats = runner.run(todo)
         spent_after, calls_after = cost_log.total()
         self._say(f'ГОТОВО: {dict(stats)}; потрачено в прогоне '

@@ -225,7 +225,21 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                                       if f['page_dir'] not in seen_dirs])):
         last = None
         in_statement = False      # сразу после повторённого условия
+        stream, table_header = [], {}
         for entry, page, record, block in collect(root, files, role, overlay):
+            # Таблица критериев одним безномерным блоком (ВП, основы бизнеса:
+            # «№ | Формулировка | Критерии | Макс. | Баллы») — по строкам.
+            if (block is not None and block['type'] in ('task', 'task_continuation',
+                                                        'criteria', 'solution')
+                    and not _real_number(_block_number(block))):
+                parts = explode_table_rows(block, role, table_header.get(entry['file']))
+                if len(parts) > 1 or parts[0] is not block:
+                    report['таблица критериев → по строкам'] += 1
+                    table_header[entry['file']] = parts[-1]['_header']
+                stream.extend((entry, page, record, part) for part in parts)
+            else:
+                stream.append((entry, page, record, block))
+        for entry, page, record, block in stream:
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
                 continue
@@ -328,6 +342,81 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     break
     report['страниц без расшифровки'] = len(missing_pages)
     return list(tasks.values()), report, missing_pages
+
+
+_ROW_NUMBER = re.compile(r'^\**\s*(\d{1,2}(?:\.\d{1,2})?)\.?\s*\**$')
+
+
+def _cells(line):
+    body = line.strip()
+    if body.startswith('|'):
+        body = body[1:]
+    if body.endswith('|'):
+        body = body[:-1]
+    return [c.strip() for c in body.split('|')]
+
+
+def explode_table_rows(block, role, header_hint=None):
+    """Таблица критериев/ответов («№ | Формулировка задания | Критерии оценки
+    и примеры | Макс. сумма баллов | Баллы и примечания» — ВП, основы бизнеса)
+    в блоке БЕЗ номера → по блоку `role` (criteria/solution) на строку с
+    номером задания в первой ячейке; ячейки — абзацами «**Заголовок:** текст»,
+    балл — из столбца «Макс…». Текст до таблицы остаётся исходным блоком.
+    Строка без номера (продолжение объединённой ячейки) дописывается к
+    предыдущей. Продолжение таблицы на следующей странице без шапки —
+    с шапкой `header_hint` (то же «№», те же столбцы). Нет строк с номером
+    или шапка не критериев — блок как был ([block])."""
+    lines = (block.get('text') or '').splitlines()
+    header, rows, before, in_table, head_first = [], [], [], False, ''
+    for i, line in enumerate(lines):
+        if not line.strip().startswith('|'):
+            if not in_table:
+                before.append(line)
+            elif rows and line.strip():
+                rows[-1][1][-1] += '\n' + line.strip()
+            continue
+        in_table = True
+        cells = _cells(line)
+        if all(re.fullmatch(r':?-{3,}:?', c) for c in cells if c):
+            continue
+        number = _ROW_NUMBER.match(cells[0]) if cells else None
+        if number:
+            rows.append((number.group(1), cells[1:]))
+        elif rows and cells:
+            prev = rows[-1][1]
+            for k, cell in enumerate(cells[1:]):
+                if cell and k < len(prev):
+                    prev[k] = (prev[k] + '\n' + cell).strip()
+        elif not rows:
+            header = cells[1:]
+            head_first = cells[0] if cells else ''
+    if not header and header_hint:
+        head_first, header = header_hint[0], list(header_hint[1])
+    # Только таблица КРИТЕРИЕВ: шапка «№ | … Критерии/Формулировка/Ответ …».
+    # Таблица данных с целыми в первом столбце (Q, P, год) — не трогаем.
+    if not rows or not header or not re.fullmatch(r'\**\s*(№|N|No\.?|№ п/п)\s*\**',
+                                                    head_first or '', re.I) or not any(
+            re.search(r'критери|формулиров|ответ|решени', h, re.I) for h in header):
+        return [block]
+    out = []
+    head = '\n'.join(before).strip()
+    if head:
+        out.append(dict(block, text=head))
+    for number, cells in rows:
+        parts, points = [], None
+        for k, cell in enumerate(cells):
+            cell = cell.replace('<br>', '\n').strip()
+            name = header[k] if k < len(header) else ''
+            if not cell:
+                continue
+            if name.lower().startswith('макс') and re.fullmatch(r'\d{1,3}', cell):
+                points = int(cell)
+                continue
+            parts.append(f'**{name}:** {cell}' if name else cell)
+        out.append({'type': role, 'number': number, 'text': '\n\n'.join(parts),
+                    'points': points, '_from_table': True,
+                    '_header': (head_first, header)})
+    return out
 
 
 _GRADE_NUMBER = re.compile(r'(\d{1,2})\.(\d+)')

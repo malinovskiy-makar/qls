@@ -87,6 +87,17 @@ SYSTEM_PROMPT = """Ты переписываешь страницу олимпи
 
 Ответ — ОДИН JSON-объект: {"blocks": [...], "has_formulas": …, "has_table": …, "has_figure": …}."""
 
+#: Усиленная инструкция (`transcribe --strict-prompt`, финграмотность и основы
+#: бизнеса, пилот 13.10.2026): глазами нашлись пропуск вступления комплекта,
+#: логотип спонсора как «рисунок» задания и строка таблицы критериев,
+#: размеченная как `task` (при сборке такие критерии терялись бы).
+STRICT_SUFFIX = """
+
+ДОПОЛНИТЕЛЬНЫЕ ПРАВИЛА (обязательны):
+- Вступление комплекта — приветствие, время выполнения, максимальный балл, правила и требования к оформлению, источник кейса (автор, издание, название статьи, ссылка), заголовок «Критерии оценивания (всего N баллов)» — переписывай ДОСЛОВНО отдельным блоком `task` БЕЗ номера (`number` — пустая строка), до первого задания.
+- Логотипы, эмблемы и знаки спонсоров и организаторов — НЕ `figure`: блок `noise` без текста. `figure` — только рисунки, графики, диаграммы и таблицы-картинки, нужные для решения.
+- В файле решений или критериев строка или абзац с критериями, примерами ответов и баллами — блок `criteria` (решение — `solution`) с номером задания, даже если в нём повторена формулировка задания; формулировку в таком блоке перепиши в начале его `text`. Тип `task` в таком файле — только для отдельно стоящего условия перед решением."""
+
 RETRY_SUFFIX = """
 
 ВНИМАНИЕ: прошлая расшифровка этой страницы разошлась с текстом PDF. Перепиши страницу ДОСЛОВНО, ничего не пропускай: каждый абзац, каждый подпункт, каждую строку и ячейку таблицы, все числа. Колонтитулы и номера страниц — по-прежнему не переписывай."""
@@ -575,8 +586,9 @@ class Transcriber:
     запуск — GLMProvider), `stdout` — куда печатать ход."""
 
     def __init__(self, *, root, provider, budget, cost_log, workers=20,
-                 stdout=None, sleep=time.sleep):
+                 stdout=None, sleep=time.sleep, strict=False):
         self.root, self.provider, self.budget = root, provider, budget
+        self.system_prompt = SYSTEM_PROMPT + (STRICT_SUFFIX if strict else '')
         self.cost_log, self.workers = cost_log, max(1, min(int(workers), 20))
         self.stdout = stdout
         self.sleep = sleep
@@ -628,12 +640,12 @@ class Transcriber:
     def transcribe_page(self, job):
         """Страница → запись p<N>.json. Возвращает итоговый статус."""
         attempts = []
-        data, usage = self._call(job, SYSTEM_PROMPT, job.user_text(), SCHEMA,
+        data, usage = self._call(job, self.system_prompt, job.user_text(), SCHEMA,
                                  'page', PROFILE)
         attempts.append(self._attempt(job, data, usage, retry=False))
         if job.has_layer and not passes(attempts[0]['metrics']):
             self.stats['повтор по слою'] += 1
-            data, usage = self._call(job, SYSTEM_PROMPT, job.user_text(retry=True),
+            data, usage = self._call(job, self.system_prompt, job.user_text(retry=True),
                                      SCHEMA, 'page_retry', PROFILE)
             attempts.append(self._attempt(job, data, usage, retry=True))
         best = attempts[0] if len(attempts) == 1 else better(*attempts)
@@ -647,6 +659,7 @@ class Transcriber:
             'numbers_extra': best['metrics'][3][:50], 'retries': len(attempts) - 1,
             'parse_error': best.get('parse_error', ''),
             'cost_usd': round(sum(a['cost_usd'] for a in attempts), 6),
+            'prompt': 'strict' if self.system_prompt != SYSTEM_PROMPT else 'base',
             'model': MODEL, 'digitized_at': datetime.now().isoformat(timespec='seconds'),
         }
         reasons = []
