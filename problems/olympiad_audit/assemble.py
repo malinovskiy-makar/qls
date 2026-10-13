@@ -1209,7 +1209,7 @@ def completeness(records):
 
 
 def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop=True,
-             overlay=None, out_dir=None, suffix='v2'):
+             overlay=None, out_dir=None, suffix='v2', figures_subdir='figures'):
     """Собрать всё. Возвращает сводку; файлы пишет в `out_dir` (по умолчанию
     `digitized`) с именами `reference_problems_<suffix>.jsonl` и т. д.
     Страницы читаются из `digitized`, поверх них — заплатки `overlay`."""
@@ -1218,7 +1218,9 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
     events_files = {e['event_id']: e for e in _read_jsonl(
         os.path.join(digitized, 'events_files.jsonl'))}
     meta = {e['event_id']: e for e in reference_events}
-    figures_dir = os.path.join(out_dir, 'figures')
+    # Сборка с заплатками (--overlay) пишет вырезки в свою папку (figures_v2):
+    # общая figures\ у v1 и v2 затирала вырезки v1 (сессия 2, 14.10).
+    figures_dir = os.path.join(out_dir, figures_subdir)
     v1_counts = Counter(r['event_id'] for r in v1_rows)
     # Файлы решений, общие для нескольких комплектов (один PDF на 5–7 кл.).
     usage = Counter(f.get('page_dir') for e in events_files.values()

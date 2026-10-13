@@ -398,6 +398,7 @@ class Command(BaseCommand):
             norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
             extra['overlay'] = triage.PageOverlay(str(self.digitized), norm=norm,
                                                   patches=f'pages_{options["suffix"]}')
+            extra['figures_subdir'] = f'figures_{options["suffix"]}'
         if options.get('v3'):
             plan_path = self.digitized / 'triage_plan.csv'
             norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()

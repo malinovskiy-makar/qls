@@ -616,3 +616,84 @@ class OverlayTests(SimpleTestCase):
         out = triage.PageOverlay(root, patches='pages_v2').apply('pages/x', 1, base)
         self.assertEqual(out['blocks'], patch['blocks'])
         self.assertFalse(out['needs_eyes'])
+
+
+from problems.tests.test_olympiad_triage import (FULL, HintProvider,  # noqa: E402
+                                                 RunnerBase, StubProvider, page_reply,
+                                                 verdict_json)
+
+
+class PagesV2RunnerTests(RunnerBase):
+    """Судья и перечитывание с заплатками `pages_v2` (эталон v1, финграм/бизнес)."""
+
+    def runner(self, cls, provider):
+        return cls(root=self.root, provider=provider, budget=__import__(
+            'problems.olympiad_audit.transcribe', fromlist=['Budget']).Budget(1.0, 0.001),
+            cost_log=self.costs, workers=1, sleep=lambda _s: None,
+            plan={'pages/abc/p1': {'ярус': 'A', 'контроль': ''}}, patches='pages_v2')
+
+    def v2patch(self):
+        from problems.olympiad_audit import triage
+        return triage.read_json(triage.v3_path(self.root, 'pages/abc', 1, 'pages_v2'))
+
+    def test_27_judge_remark_is_not_ok_judge_and_goes_to_pages_v2(self):
+        import os
+
+        from problems.olympiad_audit import judge
+        old = self.write_v2()
+        status = self.runner(judge.JudgeRunner, StubProvider([verdict_json(['пропущена строка'])])
+                             ).transcribe_page(self.job())
+        self.assertEqual(status, 'needs_fix')
+        self.assertEqual(self.v2patch()['status'], 'needs_fix')
+        self.assertFalse(os.path.exists(os.path.join(self.root, 'pages_v3')))
+        self.assert_v2_untouched(old)
+
+    def test_28_reread_writes_pages_v2_old_json_untouched(self):
+        from problems.olympiad_audit import judge
+        old = self.write_v2()
+        self.runner(judge.JudgeRunner, StubProvider([verdict_json(
+            ['пропущены абзацы'], numbers=[('100', True, False)])])).transcribe_page(self.job())
+        provider = HintProvider([page_reply(FULL), verdict_json(numbers=[])])
+        status = self.runner(judge.RereadRunner, provider).transcribe_page(self.job())
+        self.assertEqual(status, 'fixed')
+        self.assertEqual(self.v2patch()['blocks'][0]['text'], FULL[0]['text'])
+        self.assert_v2_untouched(old)
+        self.assertEqual(judge.select_for_reread(['pages/abc/p1'], self.root, 'pages_v2'), [])
+
+
+class AssembleSuffixOverlayTests(SimpleTestCase):
+    def test_29_assemble_suffix_v2_overlay_keeps_v1(self):
+        import json
+        import shutil
+        import tempfile
+        from io import StringIO
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        from problems.olympiad_audit import registry, transcribe
+        root = Path(tempfile.mkdtemp(prefix='finbiz2_cmd_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        audit = root / registry.get('mosh-entrepreneurship').audit_dir
+        dig = audit / 'digitized'
+        (audit / 'raw').mkdir(parents=True)
+        transcribe.Transcriber._write(str(dig / 'pages/t/p1.json'), {'status': 'ok', 'blocks': [
+            {'type': 'task', 'number': '1', 'text': 'Условие 1.'}]})
+        transcribe.Transcriber._write(str(dig / 'pages_v2/t/p1.json'), {
+            'status': 'fixed', 'blocks': [{'type': 'task', 'number': '1', 'text': 'Условие 1 (исправлено).'}]})
+        event = {'event_id': 'mosh-entrepreneurship-2014-final-7-v1', 'grade': '7',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 1}],
+                 'solution_files': [], 'criteria_files': []}
+        (dig / 'events_files.jsonl').write_text(json.dumps(event, ensure_ascii=False) + '\n',
+                                                encoding='utf-8')
+        v1 = dig / 'reference_problems_v1.jsonl'
+        v1.write_text('{"event_id": "x", "number": "1", "statement_md": "старое"}\n', encoding='utf-8')
+        before = v1.read_bytes()
+        call_command('olympiad_digitize', 'assemble', '--olympiad', 'mosh-entrepreneurship',
+                     '--suffix', 'v2', '--overlay', '--no-crop', '--data-root', str(root),
+                     stdout=StringIO())
+        self.assertEqual(v1.read_bytes(), before)
+        rows = [json.loads(x) for x in open(dig / 'reference_problems_v2.jsonl', encoding='utf-8')]
+        self.assertEqual(rows[0]['statement_md'], 'Условие 1 (исправлено).')
+        self.assertTrue((dig / 'compare_v1_v2_overlay.json').is_file())
+        self.assertFalse((dig / 'figures').exists())     # вырезки v2 — не в общую figures\\
