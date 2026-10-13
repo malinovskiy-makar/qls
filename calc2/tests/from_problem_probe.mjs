@@ -154,12 +154,15 @@ const fromInUrl = (page) => page.evaluate(() => new URLSearchParams(location.sea
   await ctx.close();
 }
 
-// 5. Подпись отрезка площади (sd → «Свои точки и площади» → «Под кривой» → «D»).
+// 5. Подпись отрезка площади (sd → «Точки и площади» → «+ Под кривой» → «D»).
+/* С 13.10 (ADR 0148) раздел «Площади» живёт в панели режима: без входа в режим он не на
+   экране, и замер зазоров по невидимым узлам дал бы нули, то есть «прошёл» бы вхолостую. */
 {
   const { ctx, page, errors } = await context();
   await open(page, '?m=sd');
   const text = await page.evaluate(async () => {
     setToolsOpen(true);
+    setPtsMode(true);
     const mode = document.getElementById('ac-curve');
     if (mode) mode.click();
     await new Promise(r => setTimeout(r, 300));
@@ -185,6 +188,8 @@ const fromInUrl = (page) => page.evaluate(() => new URLSearchParams(location.sea
     return { openToVal: Math.round((ink(vals[0]).left - R(open).right) * 10) / 10,
              valToSemi: Math.round((R(semi).left - ink(vals[0]).right) * 10) / 10 };
   });
+  const shown = await page.evaluate(() => !!document.getElementById('ac-range').getClientRects().length);
+  ok(shown, 'подпись отрезка не на экране (панель режима не открыта)');
   ok(gaps && gaps.openToVal <= 1.5 && gaps.valToSemi <= 1.5, 'подпись отрезка, зазоры: ' + JSON.stringify(gaps));
   ok(text === 'на отрезке [0; 100]', 'подпись отрезка: ' + JSON.stringify(text));
   ok(!errors.length, 'подпись отрезка: ошибки страницы ' + errors.join(' | '));

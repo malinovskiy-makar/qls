@@ -327,6 +327,11 @@ if (want('В')) {
   }
   ok('кнопок столько же, сколько кривых, во всех моделях; на старте ни одна не выбрана', !miss.length, miss.slice(0, 5).join(' | '));
   await openKey(page, 'sd');
+  /* С 13.10 (ADR 0148) кнопки кривых живут в панели режима «Точки и площади» и видны,
+     когда открыто построение «+ Под кривой»: человек идёт туда тем же путём. */
+  await page.click('#tool-pts');
+  await page.click('#ac-curve');
+  await settle(page);
   const t0 = await page.evaluate(() => ({ text: __ar.t(document.getElementById('ac-calc')), dis: document.getElementById('ac-calc').disabled,
     group: document.getElementById('ac-pick-btns').getAttribute('role'), selHidden: document.getElementById('ac-pick').hidden,
     upgraded: !!document.querySelector('#ac-pane-curve .sel-btn') }));

@@ -257,8 +257,13 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
    «Параметры» и «Вмешательство государства», каждая только там, где ей есть
    что показать. Порядок по-прежнему один на все сцены; обязательные три
    карточки на месте в каждой сцене. */
-const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-show', 'sec-view', 'sec-areascalc'];
-const MUST_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО 13.10 (ADR 0148): «Точки» (#sec-view) и «Площади» (#sec-areascalc)
+   переехали из «Условия» в панель режима «Точки и площади» (#pts-panel). Правило
+   «одинаковая структура во всех сценах» осталось за обеими панелями: в «Условии»
+   прежний порядок без них, а в панели режима оба раздела стоят в каждой сцене. */
+const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-show'];
+const MUST_CARDS = ['sec-input'];
+const PTS_CARDS = ['sec-view', 'sec-areascalc'];
 const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const panelSweep = await page.evaluate(async (FORB) => {
@@ -290,7 +295,10 @@ const panelSweep = await page.evaluate(async (FORB) => {
       .map(e => [...e.childNodes].filter(n => n.nodeType === 3)
                                  .map(n => n.nodeValue).join('').trim())
       .filter(Boolean).join(' | ');
-    rows.push({ key: k, cards, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
+    // Панель режима: разделы на месте и не спрятаны сценой (сама панель видна только в режиме).
+    const pts = [...document.querySelectorAll('#pts-panel .section')]
+      .filter(s => s.style.display !== 'none').map(s => s.id);
+    rows.push({ key: k, cards, pts, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
   }
   return rows;
 }, FORBIDDEN_HEADS);
@@ -305,14 +313,15 @@ await t('(г) в каждой из 44 сцен карточки «Условия
       || MUST_CARDS.some(id => ids.indexOf(id) < 0)
       || r.cards.some(c => c.fold || c.open !== true)
       || r.cards[0].name !== 'Функции'
-      || r.cards[0].controls === 0;
+      || r.cards[0].controls === 0
+      || r.pts.join() !== PTS_CARDS.join();
   });
   // 44 маршрута: 41 прежняя сцена, ключ 'taxes' (объединённый сюжет налогов,
   // рядом с которым 'tax' и 'tax-adv' оставлены синонимами), 'quota' и
   // 'sdsum' — сложение спросов и предложений (ночная сессия 24.08).
   if (panelSweep.length !== 44) return `сцен ${panelSweep.length}, а не 44`;
   return bad.length === 0
-    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-') + (c.fold ? '(кнопка)' : '')).join(' ') + '] первая «' + (r.cards[0] || {}).name + '»').join('; ');
+    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-') + (c.fold ? '(кнопка)' : '')).join(' ') + '] первая «' + (r.cards[0] || {}).name + '», панель режима [' + r.pts.join(' ') + ']').join('; ');
 });
 
 // (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.

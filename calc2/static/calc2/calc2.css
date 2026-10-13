@@ -3639,7 +3639,8 @@ body.pts-on .cv-esc { display: inline; }
 #sec-areascalc:not(.ac-open) #ac-pane-curve,
 #sec-areascalc:not(.ac-open) #ac-pane-poly,
 #sec-areascalc:not(.ac-open) #ac-calc { display: none !important; }
-#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { background: transparent; box-shadow: none; color: var(--text); font-weight: 500; }
+#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { background: transparent; border-color: transparent; box-shadow: none; color: var(--text); font-weight: 500; }
+#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn:hover { background: var(--surface); color: var(--text); }
 /* Набор вершин заканчивают «Готово» в строке над холстом и щелчок по первой
    вершине: «Посчитать площадь» в панели на это время не нужна. */
 #sec-areascalc.ac-open:has(#ac-pane-poly:not([style*="none"])) #ac-calc { display: none; }

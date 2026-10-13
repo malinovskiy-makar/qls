@@ -1666,11 +1666,16 @@ const CASES = [
           var p = keyTargets().filter(function (t) { return /D и S/.test(t.name); })[0];
           pinKeyPoint(p);
           var m = STATE.marks[STATE.marks.length - 1];
-          var open = document.getElementById('sec-view').classList.contains('open-card') ? 1 : 0;
+          /* С 13.10 (ADR 0148) список точек живёт в панели режима «Точки и площади»;
+             закрепка режим не включает. Вынесенная точка обязана быть и в списке, и на
+             холсте (прежде здесь стояло «блок «Свои точки» раскрылся»). */
+          redrawAll();
+          var open = (document.querySelectorAll('#pts-panel #mark-list .mark-row:not(.mark-draft)').length === STATE.marks.length
+                      && document.querySelectorAll('#chart g.marks circle').length >= 1) ? 1 : 0;
           return { added: STATE.marks.length - before, x: m.x, y: m.y, open: open,
                    armed: STATE.armedCurve === curveShortName(d) ? 1 : 0 };`,
     checks: [['точка добавлена', 'added', 1, 0], ['координата Q', 'x', 50, 0.1],
-             ['координата P', 'y', 50, 0.1], ['блок раскрылся', 'open', 1, 0],
+             ['координата P', 'y', 50, 0.1], ['точка в списке и на холсте', 'open', 1, 0],
              ['вынос не гасит взведённую кривую', 'armed', 1, 0]],
   },
   {

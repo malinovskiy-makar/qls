@@ -12,8 +12,11 @@ const BEFORE = bArg > 0 ? JSON.parse(fs.readFileSync(process.argv[bArg + 1], 'ut
    карточки сверх трёх прежних — «Параметры» и «Вмешательство государства»
    (только там, где им есть что показать); карточки больше не сворачиваются,
    первая называется «Функции». Обязательные три — в каждой сцене. */
-const WANT = ['sec-input', 'sec-params', 'sec-tax', 'sec-show', 'sec-view', 'sec-areascalc'];
-const MUST = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО 13.10 (ADR 0148): «Точки» и «Площади» переехали из «Условия» в панель
+   режима «Точки и площади» (#pts-panel); их присутствие в каждой сцене стережёт
+   calc2_blocks.mjs, проверка (г), и redesign/modes_probe.mjs, раздел Б. */
+const WANT = ['sec-input', 'sec-params', 'sec-tax', 'sec-show'];
+const MUST = ['sec-input'];
 const FORBIDDEN = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const browser = await chromium.launch();
@@ -80,7 +83,7 @@ const empty    = data.filter(r => !r.cards[0] || r.cards[0].controls === 0);
 
 console.log('сцен проверено: ' + data.length);
 console.log('обязательные три на месте, чужих нет: ' + (data.length - badCount.length) + '/' + data.length);
-console.log('порядок input→params→tax→view→areas: ' + (data.length - badOrder.length) + '/' + data.length);
+console.log('порядок input→params→tax→show: ' + (data.length - badOrder.length) + '/' + data.length);
 console.log('все карточки раскрыты, кнопок сворачивания нет: ' + (data.length - badOpen.length) + '/' + data.length);
 console.log('первая карточка названа «Функции»: ' + (data.length - badName.length) + '/' + data.length);
 console.log('без запрещённых заголовков:    ' + (data.length - badForb.length) + '/' + data.length);

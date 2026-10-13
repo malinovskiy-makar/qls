@@ -5,7 +5,8 @@
    старого экрана (calc2/tests/redesign/baseline/<ключ>.json, раздел start):
      1. органы управления на месте: каждый орган старта старого экрана найден
         на новом — сам, по замене из закрытого списка (fates.mjs) или в
-        закрытом меню своей карточки; убранные по (л), (м) и заменённые видом
+        закрытом меню своей карточки, или в панели режима «Точки и площади»
+        (ADR 0148); убранные по (л), (м) и заменённые видом
         рабочего места (в, г, д, к) не ищутся — их судьба в PARITY.md;
      2. видимые числа старта равны базовым: каждая строка табло (блок,
         номер, значение) и итоговая функция.
@@ -96,9 +97,25 @@ for (const key of keys) {
       }
       // Орган в закрытом меню «…» своей карточки — достижим открытием меню.
       if (!el) { const any = window.__RD.findControlAny(k.mapped); if (any && any.closest('.fc-menu')) el = any; }
-      if (!el) out.push(k.orig);
+      if (!el) out.push(k);
     }
-    return out;
+    /* Режим «Точки и площади» (ADR 0148): точки и площади переехали в панель режима,
+       органы построения видны, когда оно открыто («+ Под кривой» / «+ Между точками»).
+       Режим открывается ОДИН раз на модель, а не на орган: иначе быстрый паритет
+       шёл 287 с вместо 16 (предел Django-теста — 120). */
+    let left = out;
+    if (left.length && typeof setPtsMode === 'function') {
+      const tick = () => new Promise(r => setTimeout(r, 40));
+      const sweep = () => { left = left.filter(k => !window.__RD.findControl(k.mapped)); };
+      setPtsMode(true); await tick(); sweep();
+      for (const id of ['ac-curve', 'ac-poly']) {
+        if (!left.length) break;
+        document.getElementById(id).click(); await tick(); sweep();
+      }
+      if (typeof closeAreaBuild === 'function') closeAreaBuild();
+      setPtsMode(false);
+    }
+    return left.map(k => k.orig);
   }, want.filter(k => {
     const f = fateOf(k);
     return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдк]$/.test(f.letter)));
