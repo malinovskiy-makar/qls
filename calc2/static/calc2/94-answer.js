@@ -297,19 +297,88 @@ function hideDrainedBlocks() {
     r.classList.toggle('ans-dup', !r.classList.contains('is-hero') && heroKeys.has(key(r)));
   });
   const ownText = (el) => [...el.childNodes].some(n => n.nodeType === 3 && /\S/.test(n.nodeValue));
+  /* «Блок пуст» решается по СОДЕРЖИМОМУ, а не по прямоугольникам (ADR 0150):
+     в спрятанной колонке прямоугольников нет ни у кого, и живые блоки гасли
+     (30 моделей из 42 открывались без строк). Узел виден человеку, если ни он,
+     ни его предки в блоке не спрятаны — атрибутом или стилем (getComputedStyle
+     считает и внутри спрятанной колонки). */
+  const shownIn = (el, blk) => {
+    for (let n = el; n && n !== blk; n = n.parentElement) {
+      if (n.hidden) return false;
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    }
+    return true;
+  };
   [...sb.children].forEach(blk => {
     if (!blk.id) return;
     blk.classList.remove('ans-drained');
     if (!blk.querySelector('.stat.is-hero, .stat[data-ans-head], .stat.ans-dup')) return;
     const left = [...blk.querySelectorAll('*')].some(el => !el.closest('.section-title, .katex-mathml')
-      && el.getClientRects().length && ownText(el));
+      && ownText(el) && shownIn(el, blk));
     if (!left) blk.classList.add('ans-drained');
   });
+}
+
+/* Строки табло, набранные ВСЛЕПУЮ (без прямоугольника: колонка «Ответ» спрятана
+   или ещё не разложена), при первом показе набираются заново по месту: замер
+   «помещается ли значение» (restatWide) вслепую пустой, и длинное значение
+   оставалось сырым текстом. Зовётся в начале каждой сборки «Ответа» и при показе
+   колонки (answerReflow); спрятанные строки (.is-hero и т. п.) не трогает.
+   Возвращает число перенабранных строк (ADR 0150). */
+function retypesetSeenRows() {
+  const sb = document.getElementById('sb-body');
+  if (!sb) return 0;
+  /* Раскладка ещё едет (переход сетки колонок; при «меньше движения» сайт даёт
+     всем свойствам переход 0,01 мс, и в кадр щелчка колонка ещё 44 px): мерить
+     рано, перенаберёт отложенный проход answerReflow. */
+  const app = document.querySelector('.app');
+  if (app && typeof app.getAnimations === 'function' && app.getAnimations().length) return 0;
+  const seen = [...sb.querySelectorAll('.stat')].filter(r => r._typesetBlind && typeof r._typesetSrc === 'string' && r.getClientRects().length);
+  seen.forEach(row => {
+    const val = row.querySelector(':scope > b');
+    if (val) { val.innerHTML = row._typesetSrc; val.classList.remove('stat-tex'); }
+    row.classList.remove('stat-eq', 'stat-own', 'stat-nosign', 'stat-stack', 'stat-phrase');
+    row.querySelectorAll(':scope > .stat-sign').forEach(x => x.remove());
+    row._typeset = false;
+    delete row._typesetBlind;
+  });
+  if (seen.length && typeof typesetStats === 'function') typesetStats(sb);
+  return seen.length;
+}
+
+/* Шрифт интерфейса догрузился: замер «помещается ли значение» шёл по запасному
+   шрифту (другая ширина чернил), и стопка зависела от того, кто успел первым.
+   Все набранные строки перемеряются один раз по настоящему шрифту. */
+function remeasureStatsAfterFonts() {
+  const sb = document.getElementById('sb-body');
+  if (!sb) return;
+  sb.querySelectorAll('.stat').forEach(r => { if (typeof r._typesetSrc === 'string') r._typesetBlind = true; });
+  _answerSig = '';
+  scheduleAnswer();
+}
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(remeasureStatsAfterFonts);
+  if (typeof document.fonts.addEventListener === 'function') document.fonts.addEventListener('loadingdone', remeasureStatsAfterFonts);
+}
+
+/* Колонку «Ответ» показали (стрелка, полоска, выезжающая панель, вкладка):
+   «Ответ» пересобирается — собранный закрытым открывается тем же, что открытый
+   с загрузки (ADR 0150). Пока колонка спрятана, это не зовётся. */
+function answerReflow() {
+  _answerSig = '';
+  buildAnswer();
+  // Ещё раз, когда раскладка устоялась (через два кадра; таймер — для фоновой вкладки).
+  let done = false;
+  const again = () => { if (done) return; done = true; _answerSig = ''; buildAnswer(); };
+  requestAnimationFrame(() => requestAnimationFrame(again));
+  setTimeout(again, 300);
 }
 
 function buildAnswer() {
   const host = document.getElementById('ans-hero');
   if (!host) return;
+  if (retypesetSeenRows()) _answerSig = '';
   const sig = answerSignature();
   /* Сцена может переписать табло тем же текстом (пометки is-hero при этом
      пропадают): тогда собираем заново, хотя подпись та же. */
@@ -545,9 +614,12 @@ function buildStatus() {
 
 /* «Разбор»: каждый абзац с жирным началом — вопрос-кнопка, остальное — ответ;
    абзац «Вывод:» / «Вывод.» — плашка вывода; абзац без жирного начала —
-   продолжение предыдущего ответа (COVERAGE О8). Первый вопрос открыт. */
+   продолжение предыдущего ответа (COVERAGE О8). По умолчанию ни один вопрос
+   не раскрыт (решение владельца 14.10, Notion …81de…, ADR 0150; до того был
+   раскрыт первый); раскрытые помнятся у модели (ANSWER_OPEN). */
 function buildExplainAccordion() {
   const ex = document.getElementById('ex-body');
+  syncExplainBar(ex);
   if (!ex || ex._accSig === ex.innerHTML.length + ':' + STATE.sceneKey) return;
   ex.querySelectorAll(':scope > .sb-note').forEach((note, ni) => {
     const ps = [...note.querySelectorAll(':scope > p')];
@@ -564,7 +636,7 @@ function buildExplainAccordion() {
       p.classList.add('ex-q');
       const mem = ANSWER_OPEN[STATE.sceneKey];
       const id = ni + ':' + i;
-      if (mem ? mem.has(id) : (ni === 0 && i === 0)) p.classList.add('ex-open');
+      if (mem && mem.has(id)) p.classList.add('ex-open');
       p.dataset.acc = id;
       // Ответ — всё после жирного вопроса: в свой узел, его и прячет аккордеон.
       if (!p.querySelector(':scope > .ex-a')) {
@@ -590,7 +662,52 @@ function buildExplainAccordion() {
       b.setAttribute('aria-expanded', p.classList.contains('ex-open') ? 'true' : 'false');
     });
   });
+  /* Жирное слово ВНУТРИ фразы (до него стоит текст) — строчное: правило
+     заголовка врезки (.sb-note b — блок 11 px) разрывало абзац «Налогов»
+     («сдвигается» отдельной строкой). Свой заголовок врезки — жирное в начале,
+     без текста перед ним — остаётся блоком. */
+  ex.querySelectorAll('.sb-note b').forEach(b => {
+    if (b.matches('p.ex-q > b')) return;
+    let before = '';
+    for (let n = b.previousSibling; n; n = n.previousSibling) before += n.textContent || '';
+    b.classList.toggle('ex-inline', !!before.trim());
+  });
   ex._accSig = ex.innerHTML.length + ':' + STATE.sceneKey;
+  syncExplainBar(ex);
+}
+
+/* Полоса «Разбор · N вопросов» — последняя строка «Ответа» (решение владельца
+   14.10, Notion …81de…, ADR 0150). «Разбор» свёрнут при загрузке и при каждом
+   входе в модель. Свёрнутость — ВИД, а не модель: класс body.ex-shown (у body
+   нет id, formNodes его не видит), кнопка #ex-bar — в FORM_SKIP_IDS. Ни шага
+   истории, ни ссылки. На телефоне полосы нет: вкладка «Разбор» показывает всё. */
+let _exBarScene = null;
+function questionsWord(n) {
+  const d = n % 10, h = n % 100;
+  if (d === 1 && h !== 11) return n + ' вопрос';
+  if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return n + ' вопроса';
+  return n + ' вопросов';
+}
+function syncExplainBar(ex) {
+  const bar = document.getElementById('ex-bar');
+  if (!bar) return;
+  if (!bar._wired) {
+    bar._wired = true;
+    bar.addEventListener('click', () => {
+      const on = !document.body.classList.contains('ex-shown');
+      document.body.classList.toggle('ex-shown', on);
+      bar.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+  }
+  if (_exBarScene !== STATE.sceneKey) {
+    _exBarScene = STATE.sceneKey;
+    document.body.classList.remove('ex-shown');
+  }
+  bar.setAttribute('aria-expanded', document.body.classList.contains('ex-shown') ? 'true' : 'false');
+  const n = ex ? ex.querySelectorAll('p.ex-q').length : 0;
+  const cnt = bar.querySelector('.ex-bar-count');
+  const t = n ? questionsWord(n) : '';
+  if (cnt && cnt.textContent !== t) cnt.textContent = t;
 }
 
 /* Табло пишут и вне перерисовки (отложенные расчёты сцен): «Ответ» следит

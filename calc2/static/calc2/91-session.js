@@ -48,7 +48,10 @@ function histOf(key) {
 
 /* Подпись состояния для сравнения: без окна и того, что считается от окна
    (масштаб и сдвиг в историю не входят). */
-const HIST_VIEW_KEYS = ['zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'crosses',
+/* legendSpot — место легенды, его выбирает раскладка (ширина холста): открыли
+   «Ответ» на 1280 — легенда пересела, и щелчок по стрелке давал шаг «Отменить»
+   (14.10, ADR 0150: «Ответ» теперь закрыт по умолчанию, и это бы видел каждый). */
+const HIST_VIEW_KEYS = ['zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'crosses', 'legendSpot',
   'mathXmin', 'mathXmax', 'mathYmin', 'mathYmax'];
 function histSig(s) {
   const st = Object.assign({}, s.state);

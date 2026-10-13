@@ -654,6 +654,11 @@ function typesetStats(root) {
     const val = row.querySelector(':scope > b');
     if (!lab || !val) return;
     row._typeset = true;
+    /* Строка без прямоугольника (колонка «Ответ» спрятана): замер ширины ниже
+       пустой. Запоминаем исходное значение — при показе колонки answerReflow
+       (94-answer.js) вернёт его и наберёт строку заново (ADR 0150). */
+    row._typesetSrc = val.innerHTML;
+    if (!row.getClientRects().length) row._typesetBlind = true;
     /* Значение уже набрано формулой самой сценой (renderMathIn прошёл раньше
        нас). Тогда трогать его нельзя: textContent у готового KaTeX это тройка
        «MathML + исходная запись + видимый текст», и мы напечатали бы её целиком.

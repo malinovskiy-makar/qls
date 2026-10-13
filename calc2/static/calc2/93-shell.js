@@ -55,6 +55,10 @@ function afterColumnShown() {
   ['flushMathfieldsSoon', 'refitFinalMathSoon', 'fitFormulaFieldsSoon'].forEach(fn => {
     if (typeof window[fn] === 'function') window[fn]();
   });
+  /* «Ответ», собранный в спрятанной колонке, при показе собирается заново
+     (ADR 0150): у спрятанных узлов нет прямоугольников, и замеры стопок
+     (restatWide) там пустые. */
+  if (typeof answerReflow === 'function') answerReflow();
 }
 
 /* Инструмент холста: «Курсор» | «Точки и площади» (решение владельца 13.10,
@@ -105,17 +109,25 @@ function setTool(which) {
 /* «Ответ» прячется в полоску (решение владельца 13.10, ADR 0148). Только от
    1240 px, где «Ответ» — колонка: класс body.ans-hidden действует лишь там
    (calc2.css), на 760–1239 «Ответ» выезжает по #btn-answer, на телефоне —
-   вкладка, и там ничего не меняется. По умолчанию открыт; выбор помнит браузер
-   (storeGet / storeSet, ключ calc2.v1.answerHidden). Это ВИД, а не модель: не
-   шаг истории, не автосохранение модели, не ссылка «Поделиться». Ширина холста
-   меняется — перерисовку делает ResizeObserver со своими предохранителями
-   (86-workspace.js); «Развернуть график» прячет обе колонки поверх этого. */
+   вкладка, и там ничего не меняется. По умолчанию ЗАКРЫТ (решение владельца
+   14.10, Notion …81de…, ADR 0150; до того — открыт): открыт, только если в
+   памяти '0'. Выбор помнит браузер (storeGet / storeSet, ключ
+   calc2.v1.answerHidden). Это ВИД, а не модель: не шаг истории, не
+   автосохранение модели, не ссылка «Поделиться». Ширина холста меняется —
+   перерисовку делает ResizeObserver со своими предохранителями
+   (86-workspace.js); «Развернуть график» прячет обе колонки поверх этого.
+   Стрелка #ans-hide одна на оба состояния: открыт «›» (спрятать), закрыт «‹». */
 const ANS_HIDDEN_KEY = 'answerHidden';
 const ANS_COLUMN_MQ = '(min-width: 1240px)';
 function answerHidden() { return document.body.classList.contains('ans-hidden'); }
 function setAnswerHidden(on, quiet) {
   on = !!on;
   document.body.classList.toggle('ans-hidden', on);
+  const hide = document.getElementById('ans-hide');
+  if (hide) {
+    hide.setAttribute('aria-expanded', on ? 'false' : 'true');
+    hide.setAttribute('aria-label', on ? 'Показать «Ответ»' : 'Спрятать «Ответ»');
+  }
   if (!quiet && typeof storeSet === 'function') storeSet(ANS_HIDDEN_KEY, on ? '1' : '0');
   if (!on) afterColumnShown();
 }
@@ -124,12 +136,10 @@ function showAnswerForSelf() {
   if (answerHidden() && window.matchMedia && window.matchMedia(ANS_COLUMN_MQ).matches) setAnswerHidden(false);
 }
 function wireAnswerHide() {
-  setAnswerHidden(typeof storeGet === 'function' && storeGet(ANS_HIDDEN_KEY) === '1', true);
+  setAnswerHidden(!(typeof storeGet === 'function' && storeGet(ANS_HIDDEN_KEY) === '0'), true);
   const hide = document.getElementById('ans-hide'), rail = document.getElementById('ans-rail');
-  if (hide) hide.addEventListener('click', () => {
-    setAnswerHidden(true);
-    if (rail && rail.offsetParent) rail.focus({ preventScroll: true });
-  });
+  // Стрелка остаётся на месте в обоих состояниях: фокус с неё не уходит.
+  if (hide) hide.addEventListener('click', () => setAnswerHidden(!answerHidden()));
   if (rail) rail.addEventListener('click', (e) => {
     setAnswerHidden(false);
     if (e.detail === 0 && hide && hide.offsetParent) hide.focus({ preventScroll: true });

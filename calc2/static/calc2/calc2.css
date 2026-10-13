@@ -3703,3 +3703,69 @@ body.pts-on .cv-esc { display: inline; }
   /* Колонка 317: «пересчитывается сразу» рядом с «Спрятать ›» не помещается. */
   #params-panel .col-head .col-note { visibility: hidden; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ТИХИЕ ПАНЕЛИ 14.10 (пакет claude/mockups/calc2_panels_20261014, README 3–5)
+   Этап А: «Ответ» и «Разбор» закрыты по умолчанию; стрелка на левом краю
+   колонки (решение владельца 14.10, Notion …81de…, ADR 0150).
+   ⚠️ Правила «спрятать» (.is-hero, .ans-dup, .ans-drained, .sb-note-src,
+   .scoped-off, [hidden]) стоят раньше: свой display здесь — с повтором их.
+   ═══════════════════════════════════════════════════════════════════ */
+/* Стрелка — ОДИН узел, прямой ребёнок #params-panel вне .side-inner: круг 40,
+   центр на границе с холстом, 12 px от верха колонки (README 4). Базовое
+   «.ans-hide { display: none }» стоит раньше — показ повторён ниже. */
+#params-panel > .ans-hide {
+  position: absolute; left: -20px; top: 12px; z-index: 3;
+  width: 40px; height: 40px; padding: 0; margin: 0; border-radius: 50%;
+  align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); cursor: pointer;
+}
+#params-panel > .ans-hide svg { width: 22px; height: 22px; }
+body.ans-hidden #params-panel > .ans-hide svg { transform: rotate(180deg); }
+#params-panel > .ans-hide:hover { background: var(--chip-bg); }
+#params-panel > .ans-hide:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Полоска закрытого «Ответа»: только вертикальное «Ответ» 13 / 600 сверху
+   (64 px), нажимается вся; своей «‹» нет — её заменяет стрелка. */
+.ans-rail { justify-content: flex-start; padding: 64px 0 16px; }
+.ans-rail-lab { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: .02em; }
+.ans-rail:hover .ans-rail-lab { color: var(--text); }
+@media (min-width: 1240px) {
+  #params-panel > .ans-hide { display: inline-flex; }
+  /* Место под стрелку в шапке колонки — только от 1240. */
+  #params-panel .col-head { padding-left: 34px; }
+  /* Стрелка заходит на холст на 20 px: панели холста справа запас 24 px, иначе
+     она ложится на «Развернуть график» (замер: правый край кнопки на 19 px
+     левее колонки). */
+  .cv-bar { padding-right: 32px; }
+}
+
+/* «Разбор» — последняя строка «Ответа»: полоса 56 px, черта сверху, «Разбор»
+   14 / 600, число вопросов 12 / 500, шеврон 20 справа (README 4). Свёрнут
+   классом body (вид, не модель); на телефоне полосы нет, содержимое раскрыто. */
+#params-panel #explain { margin-top: 0; border-top: 1px solid var(--border-soft); }
+#explain .col-sub.ex-head, #explain #ex-title { margin: 0; font-size: 14px; }
+.ex-bar {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; padding: 0;
+  border: 0; background: transparent; color: var(--text); cursor: pointer; font: inherit; text-align: left;
+}
+.ex-bar-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.ex-bar-count { font-size: 12px; font-weight: 500; color: var(--text3); }
+.ex-bar-count:empty { display: none; }
+.ex-bar-chev { width: 20px; height: 20px; margin-left: auto; color: var(--text2); transition: transform .18s var(--ease); }
+body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
+.ex-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .ex-bar-chev { transition: none; } }
+@media (min-width: 760px) {
+  body:not(.ex-shown) #ex-fold { display: none; }
+}
+@media (max-width: 759px) {
+  #ex-title { display: none; }
+  #params-panel #explain { border-top: 0; }
+}
+/* Жирное слово ВНУТРИ фразы «Разбора» — строчное: правило заголовка врезки
+   (.sb-note b — блок 11 px заглавными) разрывало абзац («S» и «сдвигается»
+   отдельными строками у taxes, mono, tradeprice, mono-kink). */
+#ex-body .sb-note p b, #ex-body .sb-note li b, #ex-body .sb-note b.ex-inline {
+  display: inline; margin: 0; font-size: inherit; text-transform: none; letter-spacing: 0;
+}
+#ex-body .sb-note p.ex-q > b { display: block; }

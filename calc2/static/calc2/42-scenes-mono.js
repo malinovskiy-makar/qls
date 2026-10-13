@@ -928,7 +928,13 @@ function updateMonoInterventionPanel() {
   {
     const _sec = document.getElementById(L_INTERV);
     const _box = document.getElementById('info-tax');
-    if (_sec && _box && _sec.classList.contains('scoped-off')) { _box.innerHTML = ''; return; }
+    /* И по маршруту модели (как «Разбор», 13.10): scoped-off ставится в конце
+       перерисовки, и первым кадром заметка «доступно в режиме «Обычная»» у
+       естественной монополии и дискриминации 1-й степени оставалась в табло до
+       следующей перерисовки (14.10: «Ответ», открытый с загрузки, её показывал). */
+    const _route = (typeof SCENE_ROUTE !== 'undefined') ? SCENE_ROUTE[STATE.sceneKey] : null;
+    const _locked = !!(_route && _route.lock && _route.lock.indexOf(L_INTERV) >= 0);
+    if (_box && (_locked || (_sec && _sec.classList.contains('scoped-off')))) { _box.innerHTML = ''; return; }
   }
   const box = document.getElementById('info-tax');
   if (!box) return;
