@@ -508,3 +508,21 @@ class SplitGluedTests(SimpleTestCase):
         risks = triage.task_risks(rows, set(), {'raw/pdf/t.pdf': 'pages/t'})
         self.assertEqual(list(risks), ['pages/t/p1'])
         self.assertIn('пропуск номеров до 9', risks['pages/t/p1'][0])
+
+    def test_22_no_split_when_number_exists_later_in_dict(self):
+        """ВП-финграм 2024/25, 11 кл.: задание 3 заведено из файла решений в конце
+        словаря; подпункт «3.» задания 2 — не склейка (пропуска номеров нет)."""
+        from collections import Counter, OrderedDict
+
+        from problems.olympiad_audit import assemble
+        two = assemble.Task('e', '2')
+        two.statement = ['Евгений поступил в университет.\n1. Посчитайте расходы.\n'
+                         '2. Посчитайте вычет.\n3. Сравните варианты.']
+        four, three = assemble.Task('e', '4'), assemble.Task('e', '3')
+        four.statement, three.statement = ['Четвёртое.'], ['Третье из решений.']
+        tasks = OrderedDict([(two.key, two), (four.key, four), (three.key, three)])
+        report = Counter()
+        assemble.split_glued(tasks, report)
+        self.assertEqual(report['склейка заданий разрезана по пропуску номеров'], 0)
+        self.assertIn('3. Сравните варианты.', tasks[('2', '')].statement[0])
+        self.assertEqual(tasks[('3', '')].statement, ['Третье из решений.'])

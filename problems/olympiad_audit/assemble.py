@@ -233,11 +233,20 @@ def split_glued(tasks, report):
     for i, task in enumerate(order):
         out[task.key] = task
         prefix, own = _tail(task.number)
-        nxt = next((t for t in order[i + 1:] if t.task_variant == task.task_variant
-                    and _tail(t.number)[0] == prefix), None)
-        if own is None or nxt is None or _tail(nxt.number)[1] - own < 2:
+        if own is None:
             continue
-        want = list(range(own + 1, _tail(nxt.number)[1]))
+        # Следующий номер — по ВСЕМ заданиям комплекта того же вида и варианта,
+        # а не по порядку создания: задание из файла решений заводится в конце
+        # (ВП-финграм 2024/25, 11 кл.: задание 3 — после 5), и «пропуск 2 → 4»
+        # отрезал бы у задания 2 его подпункт «3.».
+        later = [_tail(t.number)[1] for t in order
+                 if t.task_variant == task.task_variant and _tail(t.number)[0] == prefix
+                 and (_tail(t.number)[1] or 0) > own]
+        if not later or min(later) - own < 2:
+            continue
+        want = list(range(own + 1, min(later)))
+        if any((f'{prefix}{n}', task.task_variant) in tasks for n in want):
+            continue                      # такой номер уже есть — не резать поверх
         lines = join_pieces(task.statement).split('\n')
         # Сначала «2.», потом «2)»: у теста вопросы «2.», а варианты ответа «2)».
         for item in _ITEM_LINES:
