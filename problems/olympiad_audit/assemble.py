@@ -200,9 +200,12 @@ def compatible_number(task_number, number):
 def is_date_number(block):
     """Номер блока «ДД.ММ», а текст начинается с «ДД.ММ.ГГГГ» — это дата."""
     number = str(block.get('number') or '').strip()
+    text = block.get('text') or ''
+    if re.fullmatch(r'\d{1,2}\.\d{2}\.(?:19|20)\d\d', number):
+        return bool(re.match(r'^\W*' + re.escape(number), text))      # «20.11.2013»
     if not re.fullmatch(r'\d{1,2}\.\d{2}', number):
         return False
-    return bool(re.match(r'^\W*' + re.escape(number) + r'\.(?:19|20)\d\d', block.get('text') or ''))
+    return bool(re.match(r'^\W*' + re.escape(number) + r'\.(?:19|20)\d\d', text))
 
 
 def compatible_target(tasks, number, variant, last=None):
@@ -219,7 +222,7 @@ def compatible_target(tasks, number, variant, last=None):
     if last is not None and head is not None:
         prefix, tail = _tail(last.number)
         seq = [t for t in cands if prefix is not None and _tail(t.number)[0] == prefix
-               and tail == head - 1]
+               and _tail(t.number)[1] == head and tail == head - 1]
         if len(seq) == 1:
             return seq[0]               # продолжение последовательности: 4.5 → «6» = 4.6
     tests = [t for t in cands if t.number.startswith('тест-')]
@@ -776,6 +779,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     target = compatible_target(tasks, number, block.get('task_variant') or '',
                                                last)
                     if target is not None:
+                        follow = (target, number)
                         report['номер файла решений → совместимое задание'] += 1
                 if target is None:
                     target = task_for(number, block.get('task_variant') or '')

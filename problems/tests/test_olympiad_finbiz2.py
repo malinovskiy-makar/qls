@@ -556,6 +556,35 @@ class SplitGluedTests(SimpleTestCase):
         tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
         self.assertEqual([t.number for t in tasks], ['4'])
         self.assertIn('20.11.2013 Бизнес', '\n'.join(tasks[0].statement))
+        self.assertTrue(assemble.is_date_number({'number': '20.11.2013',
+                                                 'text': '**20.11.2013 Бизнес'}))
+        self.assertFalse(assemble.is_date_number({'number': '2.10', 'text': 'Подпункт 2.10'}))
+
+    def test_26_solution_right_after_compatible_question_goes_to_it(self):
+        """Файл ответов: вопрос «6» (подпункт кейса «4.6», своего «6» нет), за
+        ним решение «6» — к «4.6», а не к «тест-6»."""
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from problems.olympiad_audit import assemble, transcribe
+        root = Path(tempfile.mkdtemp(prefix='finbiz2_follow_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        transcribe.Transcriber._write(str(root / 'pages/t/p1.json'), {'status': 'ok', 'blocks': [
+            {'type': 'task', 'number': 'тест-6', 'text': 'Тестовый вопрос шесть.'},
+            {'type': 'task', 'number': '4.5', 'text': 'Кейс, вопрос пять.'},
+            {'type': 'task', 'number': '4.6', 'text': 'Кейс, вопрос шесть.'}]})
+        transcribe.Transcriber._write(str(root / 'pages/s/p1.json'), {'status': 'ok', 'blocks': [
+            {'type': 'criteria', 'number': '4.5', 'text': 'Критерии вопроса пять.'},
+            {'type': 'task', 'number': '6', 'text': 'Кейс, вопрос шесть.'},
+            {'type': 'solution', 'number': '6', 'text': 'Решение вопроса шесть.'}]})
+        event = {'event_id': 'mosh-entrepreneurship-2014-final-10-11-v1', 'grade': '10-11',
+                 'task_files': [{'file': 'raw/pdf/t.pdf', 'page_dir': 'pages/t', 'pages': 1}],
+                 'solution_files': [{'file': 'raw/pdf/s.pdf', 'page_dir': 'pages/s', 'pages': 1}]}
+        tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
+        by = {t.number: t for t in tasks}
+        self.assertEqual(by['4.6'].solution, ['Решение вопроса шесть.'])
+        self.assertEqual(by['тест-6'].solution, [])
 
 
 class OverlayTests(SimpleTestCase):
