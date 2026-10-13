@@ -324,7 +324,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 flag = crop_figure(os.path.join(root, page_dir, f'p{page}.png'), bbox, path) \
                     if crop else 'не вырезано'
                 files.append({'path': os.path.relpath(path, root).replace('\\', '/'),
-                              'caption': caption, 'flag': flag, 'page': page})
+                              'caption': caption, 'flag': flag, 'page': page,
+                              'page_dir': page_dir, 'bbox_model': bbox})
                 report[f'рисунок: {flag or "вырезан"}'] += 1
             setattr(task, out, files)
         # Рамка рисунка условия не удалась (пустая вырезка / нет рамки), а в
