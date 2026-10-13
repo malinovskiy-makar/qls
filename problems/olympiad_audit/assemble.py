@@ -109,9 +109,83 @@ def collect(root, files, role, overlay=None):
                 continue
             for block in record.get('blocks') or []:
                 out.append((entry, page, record, block))
-    return out
+    return _header_variants(out)
 
 
+def _variant_of_header(block):
+    match = re.search(r'\d+', str(block.get('variant') or ''))
+    return match.group() if match else ''
+
+
+def _header_variants(items):
+    """Файл из нескольких вариантов подряд (МОШ, финграмотность, отборочный
+    2017/18–2021/22: «вариант 1» на стр. 1–6, «вариант 2» на стр. 7–12, у
+    каждого нумерация с 1): вариант переносится на блоки без своего
+    `task_variant`, начало новой части помечается `_variant_switch` (сборка
+    сбрасывает счётчик «нумерация пошла заново»). Части узнаются так:
+      а) в шапках файла два и больше вариантов; шапка без номера и блоки до
+         первой шапки — вариант 1, если номер 1 не занят другой шапкой;
+      б) шапка с номером варианта одна, а нумерация заданий/ответов
+         сбрасывается к 1 после ≥ 8 пунктов — следующий вариант (ответы
+         «1 Вариант», затем снова 1, 2, … без шапки).
+    Файл без номеров вариантов в шапках не меняется."""
+    by_file = defaultdict(list)
+    for i, (entry, _page, _record, block) in enumerate(items):
+        if block is not None:
+            by_file[entry['file']].append(i)
+    items = list(items)
+    for _name, idxs in by_file.items():
+        headers = [(i, _variant_of_header(items[i][3])) for i in idxs
+                   if items[i][3].get('type') == 'header']
+        digits = []
+        for _i, v in headers:
+            if v and v not in digits:
+                digits.append(v)
+        if not digits:
+            continue
+        before_first = any(items[i][3].get('type') in ('task', 'solution', 'criteria')
+                           for i in idxs if i < headers[0][0])
+        multi = (len(digits) >= 2 or any(not v for _i, v in headers)
+                 or (digits[0] != '1' and before_first))
+        # Блоки до первой шапки — вариант 1, если номер 1 не занят шапкой.
+        current = '1' if multi and '1' not in digits else None
+        if not multi:
+            # б) одна шапка с номером: меняем файл, только если нумерация
+            # действительно сбрасывается к 1 (вторая часть без шапки).
+            last_int, seen, restarts = 0, 0, 0
+            for i in idxs:
+                block = items[i][3]
+                if block.get('type') in ('task', 'solution', 'criteria'):
+                    head = _leading_int(_block_number(block))
+                    if head == 1 and seen >= TEST_MIN_ITEMS and last_int > 1:
+                        restarts, seen = restarts + 1, 0
+                    if head is not None:
+                        last_int, seen = head, seen + 1
+            if not restarts:
+                continue
+        last_int, seen = 0, 0
+        for i in idxs:
+            entry, page, record, block = items[i]
+            kind = block.get('type')
+            if kind == 'header':
+                v = _variant_of_header(block) or ('1' if multi and '1' not in digits else '')
+                if v:
+                    block = dict(block, _variant_switch=current not in (None, v))
+                    current, last_int, seen = v, 0, 0
+            elif kind in ('task', 'task_continuation', 'solution', 'criteria', 'figure'):
+                head = _leading_int(_block_number(block)) if kind in ('task', 'solution',
+                                                                      'criteria') else None
+                if (not multi and head == 1 and seen >= TEST_MIN_ITEMS and last_int > 1
+                        and current and current.isdigit()):
+                    current = str(int(current) + 1)
+                    block = dict(block, _variant_switch=True)
+                    last_int, seen = 0, 0
+                if head is not None:
+                    last_int, seen = head, seen + 1
+                if current and not block.get('task_variant'):
+                    block = dict(block, task_variant=current)
+            items[i] = (entry, page, record, block)
+    return items
 def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
     """Комплект → (задания по порядку, отчёт комплекта)."""
     event_id = event['event_id']
@@ -138,6 +212,10 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
         if record is None:
             missing_pages.append(f'{entry["page_dir"]}/p{page}')
             continue
+        if block.get('_variant_switch'):
+            # Новый вариант в том же файле — новая нумерация, не «тест → задачи».
+            current, file_keys, last_int = None, [], 0
+            report['вариант из шапки файла'] += 1
         block = _test_number(block, entry['file'])
         kind = block['type']
         number = _block_number(block)

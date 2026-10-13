@@ -306,3 +306,44 @@ class AssembleNumberTests(SimpleTestCase):
         self.assertIn('Пункт 5 решения 2.', by['2'].solution)
         self.assertEqual(by['1'].criteria, ['Критерии 1.'])
         self.assertEqual(report['solution: не сопоставлено'], 0)
+
+    def test_12_two_variants_in_one_file_by_header(self):
+        """Файл «вариант 1» (1–9) + «вариант 2» (1–9) и ответы так же: задания
+        не становятся «тест-N», ответы ложатся на свой вариант; файл с одним
+        вариантом в шапке не меняется."""
+        from problems.olympiad_audit import assemble
+        root = Path(tempfile.mkdtemp(prefix='finbiz_var_'))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+
+        def page(page_dir, n, blocks):
+            transcribe.Transcriber._write(str(root / page_dir / f'p{n}.json'),
+                                          {'status': 'ok', 'blocks': blocks})
+        for v, n in (('1', 1), ('2', 2)):
+            page('pages/t', n, [{'type': 'header', 'variant': f'Вариант {v}'}] + [
+                {'type': 'task', 'number': str(k), 'text': f'Вопрос {k} варианта {v}'}
+                for k in range(1, 10)])
+            page('pages/a', n, [{'type': 'header', 'variant': v}] + [
+                {'type': 'solution', 'number': str(k), 'text': f'Ответ {k}.{v}'}
+                for k in range(1, 10)])
+        event = {'event_id': 'mosh-fingram-2019-qualifying-8-9-v1', 'grade': '8-9',
+                 'task_files': [{'file': 't.pdf', 'page_dir': 'pages/t', 'pages': 2}],
+                 'solution_files': [{'file': 'a.pdf', 'page_dir': 'pages/a', 'pages': 2}]}
+        tasks, report, _ = assemble.build_event(str(root), event, str(root / 'f'), crop=False)
+        keys = {(t.number, t.task_variant): t for t in tasks}
+        self.assertEqual(len(tasks), 18)
+        self.assertFalse(any(t.number.startswith('тест-') for t in tasks))
+        self.assertEqual(keys[('3', '2')].solution, ['Ответ 3.2'])
+        self.assertEqual(keys[('3', '1')].solution, ['Ответ 3.1'])
+        self.assertEqual(report['вариант из шапки файла'], 1)
+        # Один вариант в шапках — ключи без варианта, как раньше.
+        single = assemble._header_variants([
+            ({'file': 'x'}, 1, {}, {'type': 'header', 'variant': '1'}),
+            ({'file': 'x'}, 1, {}, {'type': 'task', 'number': '1'})])
+        self.assertNotIn('task_variant', single[1][3])
+        # «1 Вариант» в шапке один раз, затем нумерация снова с 1 — вариант 2.
+        items = [({'file': 'a'}, 1, {}, {'type': 'header', 'variant': '1 Вариант'})] + [
+            ({'file': 'a'}, 1, {}, {'type': 'solution', 'number': str(k % 9 + 1)})
+            for k in range(18)]
+        out = assemble._header_variants(items)
+        self.assertEqual([b[3]['task_variant'] for b in out[1:]], ['1'] * 9 + ['2'] * 9)
+        self.assertTrue(out[10][3]['_variant_switch'])
