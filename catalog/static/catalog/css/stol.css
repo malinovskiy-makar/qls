@@ -684,8 +684,15 @@ span.pp--src:active { transform: none; }
 .desk-side { position: sticky; top: var(--top); height: calc(100vh - var(--top)); height: calc(100dvh - var(--top)); min-width: 0; }
 .desk-side--rail { grid-column: 1; box-shadow: 1px 0 0 var(--border); background: var(--surface); z-index: 1; }
 .desk-side--help { grid-column: 3; box-shadow: -1px 0 0 var(--border); background: var(--surface); z-index: 1; }
-.desk-center { grid-column: 2; min-width: 0; padding: 18px 20px 80px; display: flex; justify-content: center; }
+.desk-center { grid-column: 2; min-width: 0; padding: 18px 20px var(--col-bottom-gap); display: flex; justify-content: center; }
 .desk-col { width: 680px; max-width: 100%; min-width: 0; }
+/* Нижнее поле колонки: обычно 24 px, чтобы страница не прокручивалась «на фон».
+   80 px – запас под кружок Telegram (низ 16 + высота 53 = 69 px), только там, где он
+   стоит над ссылкой «следующая →»: обе панели открыты, окно уже 1280, плашка
+   корзины репетитора. Телефон (≤ 759) задаёт своё поле ниже. */
+.desk { --col-bottom-gap: 24px; }
+.desk[data-rail="open"][data-help="open"], body.has-basket .desk { --col-bottom-gap: 80px; }
+@media (max-width: 1279px) { .desk { --col-bottom-gap: 80px; } }
 .desk[data-rail="open"] .stol-strip--rail, .desk[data-rail="closed"] .stol-rail,
 .desk[data-help="open"] .stol-strip--help, .desk[data-help="closed"] .help-panel { display: none; }
 
