@@ -112,10 +112,15 @@ class Reference:
         return rows[0].get('source_url', '') if rows else ''
 
     def event_for(self, year, grade):
-        """Официальный комплект по году и классу (`v1` раньше `reserve`)."""
-        found = [e for e in self.by_event
-                 if e.split('-')[1] == str(year)
-                 and '-'.join(e.split('-')[3:-1]) == str(grade)]
+        """Официальный комплект по году и классу (`v1` раньше `reserve`).
+        `event_id` разбирается через реестр: префикс бывает с дефисом
+        (`vp-fingram-…`, `mosh-entrepreneurship-…`)."""
+        from problems.olympiad_audit.registry import parse_event_id
+        found = []
+        for e in self.by_event:
+            parsed = parse_event_id(e)
+            if parsed and parsed[1] == str(year) and parsed[3] == str(grade):
+                found.append(e)
         found.sort(key=lambda e: (variant_of(e) != 'v1', e))
         return found[0] if found else None
 

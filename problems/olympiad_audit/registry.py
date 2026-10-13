@@ -166,6 +166,38 @@ REGISTRY = {
         journal_dir='journal',
         compare='markup_free',
     ),
+    #: Сессия 2 (13.10.2026): МОШ «по основам предпринимательства и финансовой
+    #: грамотности», 2009/10–2013/14 (на портале — раздел `entr`, «не проводится с
+    #: 2014-15»). Предшественник МОШ по финграмотности, но олимпиада другая
+    #: (другое название, классы с 3-го, тесты/кейсы/игра) — свой слаг.
+    'mosh-entrepreneurship': OlympiadAudit(
+        slug='mosh-entrepreneurship',
+        olympiad_name=('Московская олимпиада школьников по основам предпринимательства '
+                       'и финансовой грамотности'),
+        official_source_name=('Московская олимпиада школьников по основам '
+                              'предпринимательства и финансовой грамотности: '
+                              'официальный архив'),
+        official_source_defaults={
+            'author': 'Оргкомитет Московской олимпиады школьников',
+            'kind': 'олимпиада',
+            'note': ('Официальные задания и решения отборочного (дистанционного) и '
+                     'заключительного этапов Московской олимпиады школьников по основам '
+                     'предпринимательства и финансовой грамотности (2009/10–2013/14; '
+                     'не проводится с 2014/15, предшественник МОШ по финансовой '
+                     'грамотности): https://mos.olimpiada.ru/tasks/entr. У каждой '
+                     'задачи — ссылка на PDF в привязке к источнику.'),
+        },
+        official_site='https://mos.olimpiada.ru/tasks/entr',
+        official_hosts=('olimpiada.ru',),
+        stages=('qualifying', 'final'),
+        event_prefix='mosh-entrepreneurship-',
+        audit_dir=f'{_FINBIZ_DIR}/mosh_entrepreneurship',
+        family=('mosh-entrepreneurship',),
+        session='finbiz2',
+        reviewed_by='claude-code-20261013',
+        journal_dir='journal',
+        compare='markup_free',
+    ),
 }
 
 #: Слаги ВП — для мест, где порядок «семья ВП» нужен по старому имени.
@@ -179,6 +211,25 @@ def get(slug):
     except KeyError:
         raise KeyError(f'олимпиады {slug!r} нет в реестре аудита; есть: '
                        f'{", ".join(sorted(REGISTRY))}') from None
+
+
+def parse_event_id(event_id):
+    """`event_id` эталона → (слаг, год, этап, класс, вариант) или None.
+
+    Вид: `<префикс><год>-<этап>-<класс>-<вариант>`; класс бывает с дефисом
+    (`8-9`), вариант — последний кусок (`v1`, `reserve`, `day2`, `tour2`).
+    Префикс берётся САМЫЙ ДЛИННЫЙ из реестра: `vp-fingram-…` — не `vp-`
+    (раньше разбор шёл по первому дефису и ломался на `vp-fingram`)."""
+    text = str(event_id or '')
+    prefixes = sorted(((e.event_prefix, e.slug) for e in REGISTRY.values()
+                       if e.event_prefix), key=lambda p: -len(p[0]))
+    for prefix, slug in prefixes:
+        if not text.startswith(prefix):
+            continue
+        parts = text[len(prefix):].split('-')
+        if len(parts) >= 4 and parts[0].isdigit() and len(parts[0]) == 4:
+            return slug, parts[0], parts[1], '-'.join(parts[2:-1]), parts[-1]
+    return None
 
 
 def official_source_names():
