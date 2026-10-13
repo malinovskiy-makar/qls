@@ -450,9 +450,15 @@ class Command(BaseCommand):
                 done += 1
                 if error:
                     errors_in_row += 1
-                    record(rec, rel, None, cost, 'review', {'reason': 'ai_error'},
-                           {'error': error})
-                    rec.pop('_second', None)
+                    if rec.pop('_second', None) is not None:
+                        # Сбой ВТОРОГО чтения не стирает результат первого.
+                        kept = rows[rec['work_id']]
+                        kept.update({'runs': (kept.get('runs') or 0) + 1,
+                                     'cost': round((kept.get('cost') or 0) + cost, 6),
+                                     'read2_error': error})
+                    else:
+                        record(rec, rel, None, cost, 'review', {'reason': 'ai_error'},
+                               {'error': error})
                     if errors_in_row >= 10 and not stopped:
                         stopped = '10 сбоев модели подряд'
                 else:

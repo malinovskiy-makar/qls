@@ -892,6 +892,28 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         self.assertEqual(good['runs'], 2)
         self.assertEqual((bad['scores_status'], bad['reason']), ('review', 'double_read_disagree'))
 
+    @override_settings(MOSH_WORKS_PROVIDER='fake')
+    def test_failed_second_read_keeps_the_first_read(self):
+        """Сбой второго чтения не стирает баллы первого."""
+        rec = make_record('70001300', year=2024, total=85)
+        fetch.download_all([rec], self.dir, FakeClient(default=zip_with_title(red=True)),
+                           log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), [rec])
+        first = reply(['20', '20', '20', '20'], '')
+        real_run = __import__('problems.ai.core', fromlist=['run']).run
+        from problems.ai import core
+
+        def flaky(*args, **kwargs):
+            if scores.SECOND_HINT in args[1]:
+                raise core.AiUnavailable('таймаут', kind='other')
+            return real_run(*args, **kwargs)
+        with override_settings(AI_FAKE_REPLY=json.dumps(first)),                 mock.patch('problems.ai.core.run', side_effect=flaky):
+            rows = self.scores('--yes')
+        row = rows['70001300']
+        self.assertEqual([t['score'] for t in row['tasks']], [20, 20, 20, 20])
+        self.assertEqual((row['scores_status'], row['reason']), ('review', 'no_total_cell'))
+        self.assertIn('read2_error', row)
+
     def test_double_read_rejects_implausible_appeals_and_merged_form(self):
         first = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}], 'tasks_sum': 40}
         same = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}]}
