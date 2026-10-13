@@ -259,3 +259,38 @@ def verdict_rows(data, total_listed):
         delta = None if total_listed is None else _num(total_listed - details['tasks_sum'])
         return 'review', dict(details, reason='sum_mismatch', appeal_delta=delta)
     return 'ok', dict(details, reason='', verified_by='listed', appeal_delta=0)
+
+
+# ------------------------------------------------------------------ второе чтение
+
+#: Верхний предел разницы «таблица призёров − скан» (доля `total_listed`), при
+#: котором два совпавших чтения принимаются за ok (балл после апелляции).
+DOUBLE_READ_MAX_SHARE = 0.10
+
+
+def double_read(first, second, total_listed):
+    """Два независимых чтения выреза без клетки «Сумма» → (status, details).
+
+    `first` — details первого чтения (review/no_total_cell), `second` — details
+    чтения повёрнутого выреза. `ok` (verified_by=double_read) — только если ОБА
+    чтения дали одни и те же баллы по задачам И `appeal_delta` = total_listed −
+    сумма скана больше нуля и не больше 10 % `total_listed`; иначе review с
+    причиной. Совпавшие чтения сами по себе не доказательство — нужна ещё
+    правдоподобная апелляция.
+    """
+    s1 = [t['score'] for t in (first.get('tasks') or [])]
+    s2 = [t['score'] for t in (second.get('tasks') or [])]
+    details = dict(first, tasks_read2=s2)
+    if not s1 or len(s1) != len(s2) or any(a is None or b is None or abs(a - b) > 1e-9
+                                           for a, b in zip(s1, s2)):
+        return 'review', dict(details, reason='double_read_disagree')
+    tasks_sum = first.get('tasks_sum')
+    if total_listed is None or tasks_sum is None:
+        return 'review', dict(details, reason='double_read_no_listed')
+    delta = _num(total_listed - tasks_sum)
+    details['appeal_delta'] = delta
+    if delta <= 0:
+        return 'review', dict(details, reason='double_read_delta_not_positive')
+    if delta > DOUBLE_READ_MAX_SHARE * total_listed:
+        return 'review', dict(details, reason='double_read_delta_large')
+    return 'ok', dict(details, reason='', verified_by='double_read')

@@ -16,6 +16,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from django.core.management.base import BaseCommand, CommandError
+from PIL import Image
 
 from problems.mosh_works import fetch, listing, scans, scores
 from problems.vp_works import hse
@@ -79,7 +80,10 @@ class Command(BaseCommand):
                 p.add_argument('--years', default='',
                                help='только эти годы; по умолчанию все, кроме 2021 (пятна)')
                 p.add_argument('--preview', type=int, default=5,
-                               help='в плане: сколько случайных вырезов сохранить для осмотра')
+                               help='в плане: сколько случайных вырезов показать для осмотра')
+                p.add_argument('--release', default='',
+                               help='work_id (через запятую или @файл), чьи удержанные щитом '
+                                    'вырезы владелец посмотрел и разрешил')
 
     def say(self, message=''):
         self.stdout.write(message)
@@ -183,25 +187,48 @@ class Command(BaseCommand):
     def _save_scores(self, data_dir, rows):
         write_jsonl(os.path.join(data_dir, 'scores.jsonl'), [rows[k] for k in sorted(rows)])
 
-    def _make_crop(self, data_dir, rec, rotate=False):
-        """Вырез таблицы баллов → PNG в crops/ (ровно то, что уходит в модель)."""
-        rel = 'crops/%d/%s.png' % (rec['year'], rec['work_id'])
-        if rotate:
-            rel = rel[:-4] + '_rot180.png'
+    def _make_crop(self, data_dir, rec, rotate=False, release=()):
+        """Вырез таблицы баллов → (путь, причина_удержания).
+
+        Вырез проходит ЩИТ (`scans.table_shield`): рамка таблицы и её шапка. Не
+        прошёл — он кладётся в `held/` (для глаз), в `crops/` не попадает и в
+        модель не идёт. Щит для 2021 не применяется (отсев обложек и зона ФИО —
+        в `scans.analyze`, правила владельца 13.10); `release` — номера работ, чьи
+        held-вырезы владелец посмотрел и разрешил.
+        """
+        base = 'crops/%d/%s.png' % (rec['year'], rec['work_id'])
+        rel = base[:-4] + '_rot180.png' if rotate else base
         out = os.path.join(data_dir, rel)
-        if not os.path.exists(out):
-            os.makedirs(os.path.dirname(out), exist_ok=True)
+        if rotate:
+            if not os.path.exists(out):
+                with Image.open(os.path.join(data_dir, base)) as src:
+                    rotated = src.convert('RGB').rotate(180)
+                with open(out, 'wb') as fh:
+                    fh.write(scores.png_bytes(rotated))
+            return rel, None
+        if os.path.exists(out):
+            crop = Image.open(out).convert('RGB')
+        else:
             image = scans.first_page_image(
                 os.path.join(data_dir, fetch.scan_relpath(rec)), rec['first_page'], dpi=150,
                 page=rec.get('first_page_index') or 0, year=rec['year'])
             crop = scans.crop_band(image)
             if crop.width > 1600:
                 crop = crop.resize((1600, round(crop.height * 1600 / crop.width)))
-            if rotate:
-                crop = crop.rotate(180)
-            with open(out, 'wb') as fh:
-                fh.write(scores.png_bytes(crop))
-        return rel
+        if rec['year'] != 2021 and rec['work_id'] not in release:
+            ok, why, metrics = scans.table_shield(crop)
+            if not ok:
+                held = 'held/%d/%s.png' % (rec['year'], rec['work_id'])
+                os.makedirs(os.path.join(data_dir, os.path.dirname(held)), exist_ok=True)
+                with open(os.path.join(data_dir, held), 'wb') as fh:
+                    fh.write(scores.png_bytes(crop))
+                if os.path.exists(out):
+                    os.remove(out)
+                return held, 'shield_%s' % why
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out, 'wb') as fh:
+            fh.write(scores.png_bytes(crop))
+        return rel, None
 
     @staticmethod
     def _stratified(recs, limit):
@@ -228,6 +255,7 @@ class Command(BaseCommand):
         years = {int(y) for y in (opts.get('years') or '').split(',') if y.strip()} \
             or {y for y in listing.YEARS if y != 2021}
         wanted = only_ids(opts.get('only'))
+        release = only_ids(opts.get('release'))
         retry = bool(opts.get('retry_review'))
 
         eligible = [r for r in index if r.get('status') == 'ok' and r['year'] in years
@@ -239,7 +267,10 @@ class Command(BaseCommand):
                     and not rows[r['work_id']].get('retried')]
             hidden = []
         else:
-            todo = [r for r in eligible if r['work_id'] not in rows]
+            # Удержанные щитом возвращаются в очередь только с `--release`.
+            todo = [r for r in eligible if r['work_id'] not in rows
+                    or (rows[r['work_id']].get('scores_status') == 'held_shield'
+                        and r['work_id'] in release)]
             if opts.get('limit'):
                 # Проба стратифицирована: поровну на каждый год (скрытые тоже в счёте).
                 todo = self._stratified(todo, opts['limit'])
@@ -252,22 +283,54 @@ class Command(BaseCommand):
         if retry and opts.get('limit'):
             todo = self._stratified(todo, opts['limit'])
 
+        # Прежние review «клетка Сумма пуста» (проба 13.10): второе чтение без повторного первого.
+        second_only = []
+        if not retry:
+            for r in eligible:
+                row = rows.get(r['work_id'], {})
+                if r['year'] == 2021 or row.get('reason') != 'no_total_cell'                         or row.get('scores_status') != 'review' or 'tasks_read2' in row:
+                    continue
+                if row.get('merged_1_5'):
+                    row.update({'reason': 'merged_unverified'})
+                else:
+                    r['_second'] = {'tasks': row['tasks'], 'tasks_sum': row['tasks_sum'],
+                                    'merged_1_5': False}
+                    second_only.append(r)
+
+        # Щит и вырезы — ДО любых вызовов: удержанные не уходят в модель вообще.
+        held, passed = [], []
+        for n, rec in enumerate(todo, 1):
+            rel, why = self._make_crop(data_dir, rec, release=release)
+            (held if why else passed).append((rec, rel, why))
+            if n % 200 == 0:
+                self.say('  вырезов проверено щитом: %d из %d' % (n, len(todo)))
+        todo = [rec for rec, _rel, _why in passed]
+
         self.say('работ в index: %d; подходят (ok, годы %s): %d; закрашено маркером: %d; '
-                 'в модель: %d' % (len(index), sorted(years), len(eligible), len(hidden), len(todo)))
-        self.say('смета: ~$%.2f; уже потрачено прежними прогонами $%.4f; потолок на все '
-                 'прогоны $%.2f' % (scores.estimate_usd(len(todo)), spent_before, opts['max_usd']))
+                 'удержано щитом: %d; в модель: %d'
+                 % (len(index), sorted(years), len(eligible), len(hidden), len(held), len(todo)))
+        self.say('смета: ~$%.2f (+ вторые чтения); уже потрачено прежними прогонами $%.4f; '
+                 'потолок на все прогоны $%.2f'
+                 % (scores.estimate_usd(len(todo)), spent_before, opts['max_usd']))
         for rec in hidden:
             rows[rec['work_id']] = {
                 'work_id': rec['work_id'], 'year': rec['year'],
                 'scores_status': 'hidden_by_stickers', 'reason': 'stickers',
                 'band_stickers_pct': rec.get('band_stickers_pct'),
                 'total_listed': rec['total_listed'], 'source': None, 'runs': 0, 'cost': 0.0}
+        for rec, rel, why in held:
+            rows[rec['work_id']] = {
+                'work_id': rec['work_id'], 'year': rec['year'], 'scores_status': 'held_shield',
+                'reason': why, 'crop': rel, 'total_listed': rec['total_listed'],
+                'source': None, 'runs': 0, 'cost': 0.0}
 
         if not opts.get('yes'):
+            for rec, rel, why in held[:50]:
+                self.say('  удержан щитом (%s): %s' % (why, os.path.join(data_dir, rel)))
             sample = random.Random(7).sample(todo, min(opts.get('preview') or 0, len(todo)))
             for rec in sample:
                 self.say('  вырез для осмотра: %s'
-                         % os.path.join(data_dir, self._make_crop(data_dir, rec)))
+                         % os.path.join(data_dir, 'crops', str(rec['year']), rec['work_id'] + '.png'))
             self.say('ПЛАН. Без --yes модель не вызывается ни разу.')
             return None
 
@@ -282,11 +345,11 @@ class Command(BaseCommand):
             raise CommandError('Модель недоступна: %s' % provider.unavailable_reason())
 
         def call(rec):
-            rotate = bool(rec.get('_rot'))
-            rel = self._make_crop(data_dir, rec, rotate=rotate)
+            rotate = bool(rec.get('_rot')) or bool(rec.get('_second'))
+            rel, _ = self._make_crop(data_dir, rec, rotate=rotate, release=release)
             with open(os.path.join(data_dir, rel), 'rb') as fh:
                 png = fh.read()
-            hint = (' ' + scores.RETRY_HINT) if retry else ''
+            hint = (' ' + scores.RETRY_HINT) if (retry or rec.get('_second')) else ''
             user_text = 'Работа %s. Перепиши баллы из таблицы.%s%s' % (
                 rec['work_id'], hint, ' (вырез повёрнут на 180°)' if rotate else '')
             try:
@@ -328,7 +391,7 @@ class Command(BaseCommand):
 
         spent, done, errors_in_row, stopped = 0.0, 0, 0, ''
         workers = int(os.environ.get('MOSH_WORKS_WORKERS', '6'))
-        queue = list(todo)
+        queue = list(todo) + second_only
         total_calls = len(queue)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             running = set()
@@ -349,17 +412,35 @@ class Command(BaseCommand):
                     errors_in_row += 1
                     record(rec, rel, None, cost, 'review', {'reason': 'ai_error'},
                            {'error': error})
+                    rec.pop('_second', None)
                     if errors_in_row >= 10 and not stopped:
                         stopped = '10 сбоев модели подряд'
                 else:
                     errors_in_row = 0
                     judge = scores.verdict_rows if rec['year'] == 2021 else scores.verdict
                     status, details = judge(data, rec['total_listed'])
-                    if retry and status != 'ok' and not rec.get('_rot'):
+                    if rec.get('_second'):
+                        # Второе чтение (поворот 180°): сверяем с первым.
+                        first = rec.pop('_second')
+                        status, details = scores.double_read(first, details, rec['total_listed'])
+                        record(rec, rel, data, cost, status, details,
+                               {'tasks_read2': details.get('tasks_read2')})
+                    elif retry and status != 'ok' and not rec.get('_rot'):
                         # Тот же вырез не помог — один раз повёрнутый на 180°.
                         record(rec, rel, data, cost, 'review', details, {'retried': False})
                         rec['_rot'] = True
                         queue.append(rec)
+                    elif (not retry and rec['year'] != 2021 and status == 'review'
+                          and details.get('reason') == 'no_total_cell'):
+                        if details.get('merged_1_5'):
+                            # «1-5» одним числом: без совпадения с таблицей — всегда review.
+                            record(rec, rel, data, cost, 'review',
+                                   dict(details, reason='merged_unverified'))
+                        else:
+                            # Сверить не с чем: второе независимое чтение (поворот 180°).
+                            record(rec, rel, data, cost, 'review', details)
+                            rec['_second'] = details
+                            queue.append(rec)
                     else:
                         record(rec, rel, data, cost, status, details,
                                {'retried': True} if retry else None)
@@ -375,11 +456,17 @@ class Command(BaseCommand):
         self.say()
         if stopped:
             self.say('ОСТАНОВЛЕНО: %s' % stopped)
-        self.say('вызовов %d из %d плановых, потрачено $%.4f' % (done, total_calls, spent))
+        self.say('вызовов %d из %d плановых (+ вторые чтения), потрачено $%.4f'
+                 % (done, total_calls, spent))
         self.say('итого в scores.jsonl: %s' % dict(got))
-        batch_ids = {r['work_id'] for r in todo} | {r['work_id'] for r in hidden}
-        by_year = Counter((r['year'], r['scores_status']) for r in rows.values()
-                          if r['work_id'] in batch_ids)
+        batch_ids = {r['work_id'] for r in todo} | {r['work_id'] for r in hidden} \
+            | {rec['work_id'] for rec, _rel, _why in held}
+
+        def label(r):
+            if r['scores_status'] == 'ok' and r.get('verified_by') == 'double_read':
+                return 'ok(double_read)'
+            return r['scores_status']
+        by_year = Counter((r['year'], label(r)) for r in rows.values() if r['work_id'] in batch_ids)
         for year in sorted({y for y, _ in by_year}):
             n = sum(c for (y, _), c in by_year.items() if y == year)
             parts = ', '.join('%s %d (%.0f %%)' % (st, c, 100.0 * c / n)
@@ -400,7 +487,7 @@ class Command(BaseCommand):
             w.writerow(['work_id', 'year', 'reason', 'crop', 'read_tasks', 'tasks_sum',
                         'total_read', 'total_listed', 'appeal_delta'])
             for r in sorted(rows.values(), key=lambda x: x['work_id']):
-                if r.get('scores_status') == 'review':
+                if r.get('scores_status') in ('review', 'held_shield'):
                     w.writerow([r['work_id'], r['year'], r.get('reason'), r.get('crop', ''),
                                 json.dumps(r.get('tasks'), ensure_ascii=False),
                                 r.get('tasks_sum'), r.get('total_read'), r.get('total_listed'),

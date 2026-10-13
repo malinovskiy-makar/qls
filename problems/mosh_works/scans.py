@@ -310,3 +310,82 @@ def first_page_image(scan_dir, first_page, dpi=150, page=0, year=None):
         raise UnsafePage('страница похожа на обложку с личными данными')
     path = os.path.join(scan_dir, first_page)
     return pdf_page(path, page, dpi=dpi) if is_pdf else Image.open(path).convert('RGB')
+
+
+# ------------------------------------------------------------ щит выреза
+
+#: Щит (13.10.2026): в модель уходит только вырез, где видна рамка таблицы баллов
+#: и её шапка («Задача | 1 | 2 | 3 | 4 | Сумма»). Признаки — по линиям: после
+#: выравнивания наклона ищем вертикали (рамка и столбцы), по их высоте — таблицу,
+#: считаем горизонтали внутри и клетки шапки с чернилами. Обложка с ФИО, пустая
+#: страница и лист решения линий таблицы не дают; клетчатая бумага даёт их слишком
+#: много (больше SHIELD_MAX_LINES).
+SHIELD_WIDTH = 900
+SHIELD_LINE_CONTRAST = 14
+SHIELD_INK_CONTRAST = 12
+SHIELD_H_LINES = (3, 12)
+SHIELD_V_LINES = (6, 12)
+SHIELD_HEADER_CELLS = 3
+
+
+def _groups(indices, gap):
+    out = []
+    for i in indices:
+        if out and i - out[-1][1] <= gap:
+            out[-1][1] = i
+        else:
+            out.append([i, i])
+    return out
+
+
+def table_shield(crop):
+    """Вырез — таблица с рамкой и шапкой? → (ok, reason, metrics)."""
+    import numpy as np
+    from PIL import ImageFilter
+
+    g = crop.convert('L')
+    g = g.resize((SHIELD_WIDTH, max(1, round(g.height * SHIELD_WIDTH / g.width))))
+    arr = np.asarray(g, dtype=float)
+    contrast = np.asarray(g.filter(ImageFilter.GaussianBlur(10)), dtype=float) - arr
+    lines = Image.fromarray(((contrast > SHIELD_LINE_CONTRAST) * 255).astype('uint8'))
+    ink = Image.fromarray(((contrast > SHIELD_INK_CONTRAST) * 255).astype('uint8'))
+    best, best_score = 0.0, -1.0
+    for step in range(-8, 9):
+        angle = step * 0.5
+        rot = np.asarray(lines.rotate(angle, resample=Image.BILINEAR), dtype=float) / 255.0
+        score = float((rot.sum(axis=1) ** 2).sum())
+        if score > best_score:
+            best, best_score = angle, score
+    mask = np.asarray(lines.rotate(best, resample=Image.BILINEAR), dtype=float) > 127
+    inkm = np.asarray(ink.rotate(best, resample=Image.BILINEAR), dtype=float) > 127
+    h, w = mask.shape
+    metrics = {'angle': best, 'n_v': 0, 'n_h': 0, 'header_cells': 0}
+    vcols = _groups(np.where(mask.sum(axis=0) >= 0.25 * h)[0], 6)
+    metrics['n_v'] = len(vcols)
+    if len(vcols) < 2:
+        return False, 'no_frame', metrics
+    xs = [(a + b) // 2 for a, b in vcols]
+    support = mask[:, [max(x - 1, 0) for x in xs]].sum(axis=1) + mask[:, xs].sum(axis=1)
+    rows_ok = np.where(support >= 0.6 * len(xs))[0]
+    if not len(rows_ok):
+        return False, 'no_frame', metrics
+    spans = _groups(rows_ok, 8)
+    top, bot = max(spans, key=lambda s: s[1] - s[0])
+    x0, x1 = xs[0], xs[-1]
+    hl = _groups(np.where(mask[top:bot + 1, x0:x1 + 1].sum(axis=1) >= 0.35 * (x1 - x0))[0], 4)
+    metrics['n_h'] = len(hl)
+    if not (SHIELD_V_LINES[0] <= len(vcols) <= SHIELD_V_LINES[1]):
+        return False, 'no_frame', metrics
+    if not (SHIELD_H_LINES[0] <= len(hl) <= SHIELD_H_LINES[1]):
+        return False, 'no_frame', metrics
+    # Шапка — верхняя шестая часть таблицы (заголовок + пять строк).
+    y0, y1 = top + 4, top + max(12, int(0.16 * (bot - top)))
+    cells = 0
+    for a, b in zip(xs, xs[1:]):
+        cell = inkm[y0:y1, a + 4:b - 3]
+        if cell.size and cell.mean() > 0.01:
+            cells += 1
+    metrics['header_cells'] = cells
+    if cells < SHIELD_HEADER_CELLS:
+        return False, 'no_header', metrics
+    return True, '', metrics

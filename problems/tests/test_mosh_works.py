@@ -46,7 +46,8 @@ def table_html(year=2024, with_zip=True):
 
 # ------------------------------------------------------------ сканы и zip
 
-def page_image(red=False, yellow=False, work=False, cover=False, size=(600, 850)):
+def page_image(red=False, yellow=False, work=False, cover=False, notable=False, grid=False,
+               size=(600, 850)):
     """Выдуманная страница: «титул» с таблицей в полосе или лист с решением."""
     from PIL import Image, ImageDraw
 
@@ -70,7 +71,19 @@ def page_image(red=False, yellow=False, work=False, cover=False, size=(600, 850)
         return img
     d.rectangle((20, 60, 200, 140), fill='black')          # логотип
     d.rectangle((w - 160, 60, w - 40, 180), fill='black')   # QR
+    if notable:
+        return img
+    if grid:
+        # Клетчатая бумага: линий намного больше, чем у таблицы баллов.
+        for k in range(int(0.52 * h), int(0.92 * h), 11):
+            d.line((20, k, w - 20, k), fill=(120, 120, 120), width=1)
+        for k in range(20, w - 20, 11):
+            d.line((k, int(0.52 * h), k, int(0.92 * h)), fill=(120, 120, 120), width=1)
+        return img
     d.rectangle((60, 0.55 * h, w - 60, 0.85 * h), outline='black', width=3)
+    for i in range(6):   # заголовок «Задача | 1 | 2 | 3 | 4 | Сумма»: по значку в клетке
+        x = 60 + i * (w - 120) / 6 + 14
+        d.rectangle((x, 0.55 * h + 10, x + 18, 0.55 * h + 24), fill='black')
     for i in range(1, 6):
         d.line((60 + i * (w - 120) / 6, 0.55 * h, 60 + i * (w - 120) / 6, 0.85 * h),
                fill='black', width=2)
@@ -534,6 +547,14 @@ class ScansTests(TempDirMixin, SimpleTestCase):
         self.assertLess(scans.cover_ink_pct(page_image(red=True)), scans.COVER_INK_PCT)
         self.assertGreater(scans.cover_ink_pct(page_image(cover=True)), scans.COVER_INK_PCT)
 
+    def test_shield_passes_a_table_and_holds_everything_else(self):
+        """Щит: рамка и шапка таблицы — да; обложка, пустая страница, клетчатая бумага — нет."""
+        ok, why, m = scans.table_shield(scans.crop_band(page_image(red=True)))
+        self.assertEqual((ok, why), (True, ''), m)
+        for spec in ({'cover': True}, {'notable': True}, {'grid': True}, {'work': True}):
+            ok, why, m = scans.table_shield(scans.crop_band(page_image(**spec)))
+            self.assertFalse(ok, (spec, m))
+
     def test_band_cuts_off_header_with_participant_number(self):
         from PIL import Image
 
@@ -767,6 +788,108 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         fetch.download_all(recs, self.dir, client, log=no_log, sleep=lambda s: None)
         write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
         return recs
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
+    def test_crop_without_a_table_frame_is_held_and_never_sent(self):
+        """Дефект 11: вырез без рамки таблицы не уходит в модель (held_shield)."""
+        recs = [make_record('70000800', year=2023), make_record('70000801', year=2023)]
+        bodies = {recs[0]['zip_url']: zip_with_title(notable=True),
+                  recs[1]['zip_url']: zip_with_title(red=True)}
+        fetch.download_all(recs, self.dir, FakeClient(bodies=bodies), log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
+        sent = []
+        real_run = __import__('problems.ai.core', fromlist=['run']).run
+
+        def spy(*args, **kwargs):
+            sent.append(kwargs.get('images'))
+            return real_run(*args, **kwargs)
+        with mock.patch('problems.ai.core.run', side_effect=spy):
+            rows = self.scores('--yes')
+        self.assertEqual(rows['70000800']['scores_status'], 'held_shield')
+        self.assertEqual(rows['70000800']['reason'], 'shield_no_frame')
+        self.assertEqual(rows['70000801']['scores_status'], 'ok')
+        self.assertEqual(len(sent), 1)          # в модель ушёл один вырез, не два
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'held', '2023', '70000800.png')))
+        self.assertFalse(os.path.exists(os.path.join(self.dir, 'crops', '2023', '70000800.png')))
+        with open(os.path.join(self.dir, 'review.csv'), encoding='utf-8-sig') as fh:
+            self.assertIn('70000800', fh.read())
+        # Владелец посмотрел вырез и разрешил: с --release он идёт в модель.
+        rows = self.scores('--yes', '--release', '70000800')
+        self.assertEqual(rows['70000800']['scores_status'], 'ok')
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=json.dumps(
+        {'form': 'tasks4', 'rows': [{'label': 'Баллы', 'cells': ['40', '34']}],
+         'total': '', 'readable': True}))
+    def test_2021_cover_never_goes_to_the_model(self):
+        """Дефект 10: обложка 2021 с ФИО не идёт в модель — уходит вырез следующей страницы."""
+        from PIL import Image
+
+        rec = make_record('70000900', year=2021, total=74)
+        pdf = fake_pdf_bytes(specs=[{'cover': True}, {'red': True}, {'work': True}])
+        fetch.download_all([rec], self.dir, FakeClient(default=make_zip({'w.pdf': pdf})),
+                           log=no_log)
+        self.assertEqual(rec['first_page_index'], 1)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), [rec])
+        sent = []
+        real_run = __import__('problems.ai.core', fromlist=['run']).run
+
+        def spy(*args, **kwargs):
+            sent.append(kwargs['images'][0][1])
+            return real_run(*args, **kwargs)
+        with mock.patch('problems.ai.core.run', side_effect=spy):
+            rows = self.scores('--yes', '--years', '2021')
+        self.assertEqual(len(sent), 1)
+        picture = Image.open(io.BytesIO(sent[0])).convert('RGB')
+        self.assertGreater(scans.red_pct(picture), 0.05)       # красные цифры титула
+        self.assertLess(scans.cover_ink_pct(picture), 100)
+        self.assertEqual(rows['70000900']['scores_status'], 'ok')
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake')
+    def test_double_read_makes_ok_only_when_both_reads_agree_and_appeal_is_plausible(self):
+        """Дефект 12: double_read не ставит ok без совпадения чтений."""
+        recs = [make_record(str(70001000 + i), year=2024, total=85) for i in range(2)]
+        fetch.download_all(recs, self.dir, FakeClient(default=zip_with_title(red=True)),
+                           log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), recs)
+        first = reply(['20', '20', '20', '20'], '')       # сумма 80, «Сумма» пуста, в таблице 85
+
+        def answer(system, user_text):
+            if '(вырез повёрнут' not in user_text:
+                return first
+            # Второе чтение — у каждой работы свой ответ: у первой то же, у второй иное.
+            return first if '70001000' in user_text else reply(['20', '20', '20', '21'], '')
+        with override_settings(AI_FAKE_REPLY=answer):
+            rows = self.scores('--yes')
+        good, bad = rows['70001000'], rows['70001001']
+        self.assertEqual((good['scores_status'], good['verified_by'], good['appeal_delta']),
+                         ('ok', 'double_read', 5))
+        self.assertEqual(good['runs'], 2)
+        self.assertEqual((bad['scores_status'], bad['reason']), ('review', 'double_read_disagree'))
+
+    def test_double_read_rejects_implausible_appeals_and_merged_form(self):
+        first = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}], 'tasks_sum': 40}
+        same = {'tasks': [{'n': 1, 'score': 20}, {'n': 2, 'score': 20}]}
+        self.assertEqual(scores.double_read(first, same, 44)[0], 'ok')
+        for listed, reason in ((40, 'double_read_delta_not_positive'),
+                               (39, 'double_read_delta_not_positive'),
+                               (50, 'double_read_delta_large')):
+            status, d = scores.double_read(first, same, listed)
+            self.assertEqual((status, d['reason']), ('review', reason))
+
+    @override_settings(MOSH_WORKS_PROVIDER='fake')
+    def test_merged_1_5_without_a_match_is_review_without_second_read(self):
+        rec = make_record('70001100', year=2025, total=65)
+        fetch.download_all([rec], self.dir, FakeClient(default=zip_with_title(red=True)),
+                           log=no_log)
+        write_jsonl(os.path.join(self.dir, 'index.jsonl'), [rec])
+        merged = {'tasks': [{'n': 1, 'label': '1-5', 'score': '16'},
+                            {'n': 2, 'label': '6', 'score': '1'},
+                            {'n': 3, 'label': '7', 'score': '5'},
+                            {'n': 4, 'label': '8', 'score': '25'}], 'total': '', 'readable': True}
+        with override_settings(AI_FAKE_REPLY=json.dumps(merged)):
+            rows = self.scores('--yes')
+        self.assertEqual((rows['70001100']['scores_status'], rows['70001100']['reason'],
+                          rows['70001100']['runs']), ('review', 'merged_unverified', 1))
 
     @override_settings(MOSH_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD)
     def test_limit_is_stratified_by_year(self):
