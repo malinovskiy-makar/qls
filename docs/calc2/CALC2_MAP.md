@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-14. HEAD: `cb53f554`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-14. HEAD: `bd90b57c`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,41 +343,41 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2334 | 189.4 | шаблон |
-| `calc2/static/calc2/calc2.css` | 3937 | 291.0 | CSS |
+| `calc2/templates/calc2/calc2.html` | 2293 | 184.4 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4036 | 300.6 | CSS |
 | `calc2/static/calc2/previews.json` | 44 | 30.7 | json |
 | `calc2/static/calc2/00-config.js` | 576 | 49.8 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
 | `calc2/static/calc2/20-plane.js` | 993 | 67.4 | JS |
 | `calc2/static/calc2/30-curves.js` | 1452 | 105.7 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 3778 | 271.1 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 3778 | 271.0 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 1832 | 133.9 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1209 | 80.4 | JS |
-| `calc2/static/calc2/46-scenes-labor.js` | 756 | 54.8 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1204 | 79.8 | JS |
+| `calc2/static/calc2/46-scenes-labor.js` | 755 | 54.4 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 265 | 16.3 | JS |
-| `calc2/static/calc2/50-scenes-macro.js` | 435 | 30.2 | JS |
+| `calc2/static/calc2/50-scenes-macro.js` | 425 | 28.9 | JS |
 | `calc2/static/calc2/52-modes.js` | 956 | 65.5 | JS |
-| `calc2/static/calc2/54-scenes-ppf.js` | 3269 | 211.3 | JS |
-| `calc2/static/calc2/56-scenes-inequality.js` | 558 | 36.5 | JS |
+| `calc2/static/calc2/54-scenes-ppf.js` | 3275 | 211.8 | JS |
+| `calc2/static/calc2/56-scenes-inequality.js` | 555 | 36.3 | JS |
 | `calc2/static/calc2/60-overlays.js` | 4796 | 304.0 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2084 | 135.9 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1661 | 127.7 | JS |
 | `calc2/static/calc2/80-ui.js` | 696 | 43.1 | JS |
 | `calc2/static/calc2/82-input.js` | 2235 | 132.0 | JS |
 | `calc2/static/calc2/84-picker.js` | 580 | 43.9 | JS |
-| `calc2/static/calc2/86-workspace.js` | 2147 | 139.2 | JS |
-| `calc2/static/calc2/88-params.js` | 1960 | 132.9 | JS |
-| `calc2/static/calc2/89-model-state.js` | 349 | 22.1 | JS |
+| `calc2/static/calc2/86-workspace.js` | 2156 | 140.9 | JS |
+| `calc2/static/calc2/88-params.js` | 1962 | 133.2 | JS |
+| `calc2/static/calc2/89-model-state.js` | 357 | 23.0 | JS |
 | `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
-| `calc2/static/calc2/92-ui-kit.js` | 532 | 32.4 | JS |
+| `calc2/static/calc2/92-ui-kit.js` | 788 | 51.0 | JS |
 | `calc2/static/calc2/93-shell.js` | 282 | 17.0 | JS |
-| `calc2/static/calc2/94-answer.js` | 880 | 56.3 | JS |
+| `calc2/static/calc2/94-answer.js` | 910 | 58.2 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 470 | 26.7 | JS |
 | `calc2/static/calc2/96-self.js` | 322 | 21.4 | JS |
-| `calc2/static/calc2/99-boot.js` | 110 | 9.3 | JS |
+| `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 35 файлов, 43750 строк, 3055.1 КБ.**
+**Итого: 35 файлов, 44102 строк, 3081.2 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -640,45 +640,45 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 2780 — `applyPriceRegBounds`
 - строка 2789 — `applyTaxRateBounds`
 - строка 2824 — `syncQuotaHint`
-- строка 2841 — `syncPcHint`
-- строка 2849 — `markCurrentIntervHint`
-- строка 2858 — `intervHintKey`
-- строка 2868 — `intervHintHtml`
+- строка 2840 — `syncPcHint`
+- строка 2848 — `markCurrentIntervHint`
+- строка 2857 — `intervHintKey`
+- строка 2867 — `intervHintHtml`
 - строка 2889 — `syncTaxHint`
-- строка 2928 — `setTaxKind`
-- строка 2934 — `updateTaxPanel`
-- строка 3062 — `setTaxSide`
-- строка 3073 — `setTaxSideButtons`
-- строка 3086 — `drawElasticityZones`
-- строка 3104 — `drawElasticityPoint`
-- строка 3133 — `attachElastDrag`
-- строка 3141 — `drawElasticityPointS`
-- строка 3161 — `attachElastDragS`
-- строка 3169 — `updateElasticityPanel`
-- строка 3233 — `drawExtAreas`
-- строка 3247 — `drawExtCurves`
-- строка 3274 — `drawExtPoints`
-- строка 3308 — `drawExtScenario`
-- строка 3317 — `updateExtPanel`
-- строка 3359 — `setExtSign`
-- строка 3368 — `syncSocialFields`
-- строка 3396 — `syncExtHint`
-- строка 3408 — `socialDefaultExpr`
-- строка 3414 — `recompileSocial`
-- строка 3436 — `setPRegFields`
-- строка 3445 — `setPReg`
-- строка 3454 — `drawPcAreas`
-- строка 3481 — `drawPriceControl`
-- строка 3530 — `attachPcDrag`
-- строка 3539 — `updatePcPanel`
-- строка 3584 — `setQuotaFields`
-- строка 3596 — `setQuota`
-- строка 3603 — `setQuotaPos`
-- строка 3613 — `updateQuotaPriceLabel`
-- строка 3625 — `drawQuotaAreas`
-- строка 3652 — `drawQuotaLines`
-- строка 3697 — `attachQuotaDrag`
-- строка 3710 — `updateQuotaPanel`
+- строка 2927 — `setTaxKind`
+- строка 2933 — `updateTaxPanel`
+- строка 3066 — `setTaxSide`
+- строка 3077 — `setTaxSideButtons`
+- строка 3090 — `drawElasticityZones`
+- строка 3108 — `drawElasticityPoint`
+- строка 3137 — `attachElastDrag`
+- строка 3145 — `drawElasticityPointS`
+- строка 3165 — `attachElastDragS`
+- строка 3173 — `updateElasticityPanel`
+- строка 3237 — `drawExtAreas`
+- строка 3251 — `drawExtCurves`
+- строка 3278 — `drawExtPoints`
+- строка 3312 — `drawExtScenario`
+- строка 3321 — `updateExtPanel`
+- строка 3362 — `setExtSign`
+- строка 3371 — `syncSocialFields`
+- строка 3399 — `syncExtHint`
+- строка 3410 — `socialDefaultExpr`
+- строка 3416 — `recompileSocial`
+- строка 3438 — `setPRegFields`
+- строка 3447 — `setPReg`
+- строка 3456 — `drawPcAreas`
+- строка 3483 — `drawPriceControl`
+- строка 3532 — `attachPcDrag`
+- строка 3541 — `updatePcPanel`
+- строка 3586 — `setQuotaFields`
+- строка 3598 — `setQuota`
+- строка 3605 — `setQuotaPos`
+- строка 3615 — `updateQuotaPriceLabel`
+- строка 3627 — `drawQuotaAreas`
+- строка 3654 — `drawQuotaLines`
+- строка 3699 — `attachQuotaDrag`
+- строка 3712 — `updateQuotaPanel`
 - строка 3759 — `drawGhost`
 
 #### `calc2/static/calc2/42-scenes-mono.js`
@@ -725,18 +725,18 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 888 — `drawMonoFloorPoints`
 - строка 908 — `drawMonoFloorLine`
 - строка 923 — `updateMonoInterventionPanel`
-- строка 1055 — `makeCurve`
-- строка 1065 — `segExpr`
-- строка 1072 — `kinkedDemandExpr`
-- строка 1083 — `drawDiscr1`
-- строка 1114 — `updateDiscr1Panel`
-- строка 1139 — `allocateMR`
-- строка 1152 — `recomputeDiscr3`
-- строка 1192 — `drawMiniMarket`
-- строка 1299 — `redrawDiscr3`
-- строка 1342 — `drawMonoExport`
-- строка 1466 — `updateDiscr3Panel`
-- строка 1529 — `applyD3WorldLabels`
+- строка 1056 — `makeCurve`
+- строка 1066 — `segExpr`
+- строка 1073 — `kinkedDemandExpr`
+- строка 1084 — `drawDiscr1`
+- строка 1115 — `updateDiscr1Panel`
+- строка 1140 — `allocateMR`
+- строка 1153 — `recomputeDiscr3`
+- строка 1193 — `drawMiniMarket`
+- строка 1300 — `redrawDiscr3`
+- строка 1343 — `drawMonoExport`
+- строка 1467 — `updateDiscr3Panel`
+- строка 1530 — `applyD3WorldLabels`
 - строка 1552 — `buildKinkedDemand`
 - строка 1599 — `recomputeKinked`
 - строка 1639 — `drawKinkedFull`
@@ -777,43 +777,43 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 296 — `drawCostCurves`
 - строка 353 — `noMinNote`
 - строка 363 — `updateCostsPanel`
-- строка 405 — `redrawCosts`
-- строка 440 — `recomputeLongRun`
-- строка 509 — `drawLongRunArea`
-- строка 517 — `fillLongRunArea`
-- строка 541 — `drawLongRunMarks`
-- строка 546 — `fillLongRunMarks`
-- строка 578 — `drawLongRunHandle`
-- строка 589 — `setLrPrice`
-- строка 597 — `syncLrPriceFields`
-- строка 615 — `beginLrDrag`
-- строка 617 — `dragLrPrice`
-- строка 632 — `endLrDrag`
-- строка 639 — `updateLongRunPanel`
-- строка 682 — `prodEval`
-- строка 690 — `prodMP`
-- строка 695 — `prodAP`
-- строка 703 — `maxOf`
-- строка 723 — `realMax`
-- строка 725 — `recomputeProduction`
-- строка 744 — `redrawProduction`
-- строка 860 — `noMaxNote`
-- строка 869 — `updateProdPanel`
-- строка 893 — `recomputeIsoquant`
-- строка 904 — `redrawIsoquant`
-- строка 920 — `updateIsoPanel`
-- строка 958 — `plantMC`
-- строка 964 — `plantTC`
-- строка 970 — `plantQatMC`
-- строка 986 — `recomputePlants`
-- строка 1020 — `plantsAt`
-- строка 1037 — `redrawPlants`
-- строка 1118 — `updatePlantsPanel`
-- строка 1149 — `setPlantsView`
-- строка 1156 — `setPlantsQ`
-- строка 1167 — `setCostsInputMode`
-- строка 1175 — `syncCostsInputMode`
-- строка 1189 — `setCostsSub`
+- строка 402 — `redrawCosts`
+- строка 437 — `recomputeLongRun`
+- строка 506 — `drawLongRunArea`
+- строка 514 — `fillLongRunArea`
+- строка 538 — `drawLongRunMarks`
+- строка 543 — `fillLongRunMarks`
+- строка 575 — `drawLongRunHandle`
+- строка 586 — `setLrPrice`
+- строка 594 — `syncLrPriceFields`
+- строка 612 — `beginLrDrag`
+- строка 614 — `dragLrPrice`
+- строка 629 — `endLrDrag`
+- строка 636 — `updateLongRunPanel`
+- строка 679 — `prodEval`
+- строка 687 — `prodMP`
+- строка 692 — `prodAP`
+- строка 700 — `maxOf`
+- строка 720 — `realMax`
+- строка 722 — `recomputeProduction`
+- строка 741 — `redrawProduction`
+- строка 857 — `noMaxNote`
+- строка 866 — `updateProdPanel`
+- строка 890 — `recomputeIsoquant`
+- строка 901 — `redrawIsoquant`
+- строка 917 — `updateIsoPanel`
+- строка 954 — `plantMC`
+- строка 960 — `plantTC`
+- строка 966 — `plantQatMC`
+- строка 982 — `recomputePlants`
+- строка 1016 — `plantsAt`
+- строка 1033 — `redrawPlants`
+- строка 1114 — `updatePlantsPanel`
+- строка 1144 — `setPlantsView`
+- строка 1151 — `setPlantsQ`
+- строка 1162 — `setCostsInputMode`
+- строка 1170 — `syncCostsInputMode`
+- строка 1184 — `setCostsSub`
 
 #### `calc2/static/calc2/46-scenes-labor.js`
 
@@ -845,9 +845,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 541 — `setUnionModel`
 - строка 558 — `drawLaborBilateral`
 - строка 586 — `updateLaborBilateralPanel`
-- строка 604 — `setLaborStruct`
-- строка 627 — `updateLaborPanel`
-- строка 717 — `redrawLabor`
+- строка 602 — `setLaborStruct`
+- строка 625 — `updateLaborPanel`
+- строка 716 — `redrawLabor`
 
 #### `calc2/static/calc2/48-scenes-consumer.js`
 
@@ -877,7 +877,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 249 — `redrawMacro`
 - строка 328 — `drawEquilibriumAt`
 - строка 339 — `updateMacroPanel`
-- строка 423 — `setMacroModel`
+- строка 413 — `setMacroModel`
 
 #### `calc2/static/calc2/52-modes.js`
 
@@ -993,37 +993,37 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 2077 — `ensurePpfSum`
 - строка 2081 — `recomputePpfSumRaw`
 - строка 2192 — `renderPpfSumRows`
-- строка 2237 — `detectSumKinks`
-- строка 2255 — `drawPpfSumCurves`
-- строка 2287 — `drawPpfSumMarks`
-- строка 2313 — `updatePpfSumPanel`
-- строка 2429 — `fmtRu`
-- строка 2433 — `ppfSumSchemaData`
-- строка 2467 — `schemaNote`
-- строка 2474 — `drawPpfSumSchema`
-- строка 2526 — `redrawPpfSum`
-- строка 2539 — `setPpfSumView`
-- строка 2550 — `cornerByValue`
-- строка 2574 — `bestByValue`
-- строка 2597 — `ppfOcRange`
-- строка 2611 — `recomputePpfTrade`
-- строка 2676 — `drawPpfTrade`
-- строка 2704 — `drawPpfTradeMarks`
-- строка 2732 — `updatePpfTradePanel`
-- строка 2884 — `syncPpftPriceUI`
-- строка 2895 — `redrawPpfTrade`
-- строка 2916 — `recomputeTradeB`
-- строка 3005 — `tradeCpfPoints`
-- строка 3023 — `tradeCpfMark`
-- строка 3042 — `tradeBPanels`
-- строка 3063 — `drawTradeB`
-- строка 3136 — `drawTradeBMarks`
-- строка 3139 — `tbName`
-- строка 3145 — `updateTradeBPanel`
-- строка 3215 — `syncTbPriceUI`
-- строка 3228 — `redrawTradeB`
-- строка 3243 — `setTradeScenario`
-- строка 3255 — `setPpfSub`
+- строка 2243 — `detectSumKinks`
+- строка 2261 — `drawPpfSumCurves`
+- строка 2293 — `drawPpfSumMarks`
+- строка 2319 — `updatePpfSumPanel`
+- строка 2435 — `fmtRu`
+- строка 2439 — `ppfSumSchemaData`
+- строка 2473 — `schemaNote`
+- строка 2480 — `drawPpfSumSchema`
+- строка 2532 — `redrawPpfSum`
+- строка 2545 — `setPpfSumView`
+- строка 2556 — `cornerByValue`
+- строка 2580 — `bestByValue`
+- строка 2603 — `ppfOcRange`
+- строка 2617 — `recomputePpfTrade`
+- строка 2682 — `drawPpfTrade`
+- строка 2710 — `drawPpfTradeMarks`
+- строка 2738 — `updatePpfTradePanel`
+- строка 2890 — `syncPpftPriceUI`
+- строка 2901 — `redrawPpfTrade`
+- строка 2922 — `recomputeTradeB`
+- строка 3011 — `tradeCpfPoints`
+- строка 3029 — `tradeCpfMark`
+- строка 3048 — `tradeBPanels`
+- строка 3069 — `drawTradeB`
+- строка 3142 — `drawTradeBMarks`
+- строка 3145 — `tbName`
+- строка 3151 — `updateTradeBPanel`
+- строка 3221 — `syncTbPriceUI`
+- строка 3234 — `redrawTradeB`
+- строка 3249 — `setTradeScenario`
+- строка 3261 — `setPpfSub`
 
 #### `calc2/static/calc2/56-scenes-inequality.js`
 
@@ -1053,13 +1053,13 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 366 — `drawRedistArrow`
 - строка 381 — `updateIneqSortNote`
 - строка 389 — `updateInequalityPanel`
-- строка 429 — `redrawInequality`
-- строка 478 — `defaultGroupShares`
-- строка 485 — `setIneqInput`
-- строка 502 — `setIneqAlpha`
-- строка 518 — `setIneqGroupN`
-- строка 529 — `setIneqRedistTool`
-- строка 540 — `renderIneqGroupsTable`
+- строка 426 — `redrawInequality`
+- строка 475 — `defaultGroupShares`
+- строка 482 — `setIneqInput`
+- строка 499 — `setIneqAlpha`
+- строка 515 — `setIneqGroupN`
+- строка 526 — `setIneqRedistTool`
+- строка 537 — `renderIneqGroupsTable`
 
 #### `calc2/static/calc2/60-overlays.js`
 
@@ -1492,63 +1492,63 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 161 — `moveExplanations`
 - строка 259 — `conditionNotesSig`
 - строка 271 — `conditionNotesToExplain`
-- строка 317 — `answerNotesToExplain`
-- строка 360 — `syncAnalyticsPanel`
-- строка 444 — `sectionIcon`
-- строка 455 — `cardifySections`
-- строка 547 — `collapseCards`
-- строка 565 — `syncLabelSizeSeg`
-- строка 576 — `openSection`
-- строка 613 — `cardWithFormula`
-- строка 626 — `syncFirstCard`
-- строка 645 — `wireScene`
-- строка 814 — `resetCurrentScene`
-- строка 824 — `setWrenchOpen`
-- строка 834 — `applyViewBounds`
-- строка 861 — `quadWindow`
-- строка 866 — `quadSameWindow`
-- строка 885 — `offQuadShownPoints`
-- строка 915 — `fitWindowToOffQuad`
-- строка 937 — `setFirstQuad`
-- строка 987 — `setGridMode`
-- строка 1005 — `hintTip`
-- строка 1032 — `fitTipMath`
-- строка 1055 — `showHintTip`
-- строка 1113 — `hideHintTip`
-- строка 1138 — `tipText`
-- строка 1167 — `tipTex`
-- строка 1177 — `tipName`
-- строка 1194 — `tipExpr`
-- строка 1204 — `tipPlain`
-- строка 1233 — `ffEsc`
-- строка 1243 — `ffLatexOf`
-- строка 1265 — `finalFunctionHtml`
-- строка 1290 — `ffParseCases`
-- строка 1312 — `ffCondCompact`
-- строка 1336 — `ffMathHtml`
-- строка 1360 — `ffKatexW`
-- строка 1376 — `ffFitCases`
-- строка 1463 — `fitFinalMath`
-- строка 1492 — `ffCopyText`
-- строка 1500 — `ffCopyFallback`
-- строка 1512 — `wireFinalCopy`
-- строка 1545 — `ffOpenExpand`
-- строка 1566 — `ffCloseExpand`
-- строка 1578 — `setFinalFunctions`
-- строка 1596 — `refitFinalMathSoon`
-- строка 1624 — `markNotationsIn`
-- строка 1656 — `paintNotation`
-- строка 1666 — `showTipFor`
-- строка 1672 — `wireTips`
-- строка 1724 — `syncTipLabels`
-- строка 1737 — `hintAnchor`
-- строка 1818 — `fitPanelMath`
-- строка 1848 — `syncHintDots`
-- строка 1863 — `hintsToDots`
-- строка 1902 — `wireHintButtons`
-- строка 1944 — `wireWrench`
-- строка 2070 — `fillPrintBlocks`
-- строка 2100 — `setPrintViewBox`
+- строка 320 — `answerNotesToExplain`
+- строка 369 — `syncAnalyticsPanel`
+- строка 453 — `sectionIcon`
+- строка 464 — `cardifySections`
+- строка 556 — `collapseCards`
+- строка 574 — `syncLabelSizeSeg`
+- строка 585 — `openSection`
+- строка 622 — `cardWithFormula`
+- строка 635 — `syncFirstCard`
+- строка 654 — `wireScene`
+- строка 823 — `resetCurrentScene`
+- строка 833 — `setWrenchOpen`
+- строка 843 — `applyViewBounds`
+- строка 870 — `quadWindow`
+- строка 875 — `quadSameWindow`
+- строка 894 — `offQuadShownPoints`
+- строка 924 — `fitWindowToOffQuad`
+- строка 946 — `setFirstQuad`
+- строка 996 — `setGridMode`
+- строка 1014 — `hintTip`
+- строка 1041 — `fitTipMath`
+- строка 1064 — `showHintTip`
+- строка 1122 — `hideHintTip`
+- строка 1147 — `tipText`
+- строка 1176 — `tipTex`
+- строка 1186 — `tipName`
+- строка 1203 — `tipExpr`
+- строка 1213 — `tipPlain`
+- строка 1242 — `ffEsc`
+- строка 1252 — `ffLatexOf`
+- строка 1274 — `finalFunctionHtml`
+- строка 1299 — `ffParseCases`
+- строка 1321 — `ffCondCompact`
+- строка 1345 — `ffMathHtml`
+- строка 1369 — `ffKatexW`
+- строка 1385 — `ffFitCases`
+- строка 1472 — `fitFinalMath`
+- строка 1501 — `ffCopyText`
+- строка 1509 — `ffCopyFallback`
+- строка 1521 — `wireFinalCopy`
+- строка 1554 — `ffOpenExpand`
+- строка 1575 — `ffCloseExpand`
+- строка 1587 — `setFinalFunctions`
+- строка 1605 — `refitFinalMathSoon`
+- строка 1633 — `markNotationsIn`
+- строка 1665 — `paintNotation`
+- строка 1675 — `showTipFor`
+- строка 1681 — `wireTips`
+- строка 1733 — `syncTipLabels`
+- строка 1746 — `hintAnchor`
+- строка 1827 — `fitPanelMath`
+- строка 1857 — `syncHintDots`
+- строка 1872 — `hintsToDots`
+- строка 1911 — `wireHintButtons`
+- строка 1953 — `wireWrench`
+- строка 2079 — `fillPrintBlocks`
+- строка 2109 — `setPrintViewBox`
 
 #### `calc2/static/calc2/88-params.js`
 
@@ -1579,44 +1579,45 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 630 — `syncPultRegulators`
 - строка 659 — `upgradeRegulator`
 - строка 823 — `shortRegulatorName`
-- строка 847 — `ppfLinearFormula`
-- строка 853 — `ppfInterceptsOf`
-- строка 861 — `ppfSetSingle`
-- строка 869 — `ppfSetSum`
-- строка 889 — `addPultXChip`
-- строка 916 — `buildPultExtra`
-- строка 948 — `ineqParseIncomes`
-- строка 951 — `ineqMasterRebase`
-- строка 956 — `ineqMasterScale`
-- строка 974 — `ineqMasterApply`
-- строка 986 — `ineqMasterDetach`
-- строка 991 — `buildIneqMasterChip`
-- строка 1003 — `showPult`
-- строка 1030 — `updatePult`
-- строка 1062 — `liveFormula`
-- строка 1072 — `wireControls`
+- строка 849 — `ppfLinearFormula`
+- строка 855 — `ppfInterceptsOf`
+- строка 863 — `ppfSetSingle`
+- строка 871 — `ppfSetSum`
+- строка 891 — `addPultXChip`
+- строка 918 — `buildPultExtra`
+- строка 950 — `ineqParseIncomes`
+- строка 953 — `ineqMasterRebase`
+- строка 958 — `ineqMasterScale`
+- строка 976 — `ineqMasterApply`
+- строка 988 — `ineqMasterDetach`
+- строка 993 — `buildIneqMasterChip`
+- строка 1005 — `showPult`
+- строка 1032 — `updatePult`
+- строка 1064 — `liveFormula`
+- строка 1074 — `wireControls`
 
 #### `calc2/static/calc2/89-model-state.js`
 
 - строка 40 — `plainCopy`
 - строка 77 — `togglesInOrder`
-- строка 81 — `formNodes`
-- строка 86 — `captureForm`
-- строка 111 — `applyForm`
-- строка 160 — `captureStatePlain`
-- строка 169 — `applyStatePlain`
-- строка 176 — `rerenderModelLists`
-- строка 194 — `forceRebuildAfterApply`
-- строка 200 — `syncUiFromState`
-- строка 207 — `capturePristine`
-- строка 218 — `restorePristine`
-- строка 238 — `captureMemory`
-- строка 243 — `applyMemory`
-- строка 266 — `serializeCurves`
-- строка 279 — `rebuildCurves`
-- строка 299 — `modelKeyOf`
-- строка 304 — `collectModelState`
-- строка 324 — `applyModelState`
+- строка 86 — `isDisclosureBtn`
+- строка 89 — `formNodes`
+- строка 94 — `captureForm`
+- строка 119 — `applyForm`
+- строка 168 — `captureStatePlain`
+- строка 177 — `applyStatePlain`
+- строка 184 — `rerenderModelLists`
+- строка 202 — `forceRebuildAfterApply`
+- строка 208 — `syncUiFromState`
+- строка 215 — `capturePristine`
+- строка 226 — `restorePristine`
+- строка 246 — `captureMemory`
+- строка 251 — `applyMemory`
+- строка 274 — `serializeCurves`
+- строка 287 — `rebuildCurves`
+- строка 307 — `modelKeyOf`
+- строка 312 — `collectModelState`
+- строка 332 — `applyModelState`
 
 #### `calc2/static/calc2/90-explain.js`
 
@@ -1684,8 +1685,16 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 418 — `vgHomeShown`
 - строка 425 — `AREA_ID`
 - строка 426 — `syncOnChart`
-- строка 515 — `applyAreaHidden`
-- строка 529 — `vgFormIds`
+- строка 522 — `hideEmptyGroupTitles`
+- строка 550 — `wrapFieldInCard`
+- строка 617 — `paintCard`
+- строка 679 — `scOn`
+- строка 680 — `scProw`
+- строка 681 — `scParamAnchor`
+- строка 690 — `scSetup`
+- строка 762 — `scSync`
+- строка 771 — `applyAreaHidden`
+- строка 785 — `vgFormIds`
 
 #### `calc2/static/calc2/93-shell.js`
 
@@ -1725,17 +1734,18 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 371 — `remeasureStatsAfterFonts`
 - строка 386 — `answerReflow`
 - строка 396 — `buildAnswer`
-- строка 562 — `hideEchoes`
-- строка 596 — `markFirstSection`
-- строка 629 — `decorateTables`
-- строка 658 — `answerRow`
-- строка 704 — `burdenOn`
-- строка 710 — `burdenNoteText`
-- строка 716 — `buildBurden`
-- строка 749 — `buildStatus`
-- строка 776 — `buildExplainAccordion`
-- строка 841 — `questionsWord`
-- строка 847 — `syncExplainBar`
+- строка 563 — `hideEchoes`
+- строка 597 — `markFirstSection`
+- строка 630 — `decorateTables`
+- строка 659 — `liftTableHead`
+- строка 687 — `answerRow`
+- строка 733 — `burdenOn`
+- строка 739 — `burdenNoteText`
+- строка 746 — `buildBurden`
+- строка 779 — `buildStatus`
+- строка 806 — `buildExplainAccordion`
+- строка 871 — `questionsWord`
+- строка 877 — `syncExplainBar`
 
 #### `calc2/static/calc2/95-picker-screen.js`
 
@@ -1783,6 +1793,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1312.**
+**Итого функций в индексе: 1322.**
 
 <!-- AUTO:END -->
