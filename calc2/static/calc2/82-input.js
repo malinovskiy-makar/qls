@@ -1492,6 +1492,48 @@ function buildKeyboard(box, inp) {
   window.MathKbd.build(box, keyboardAdapter(inp, box));
 }
 
+/* «Как писать» — четвёртый раздел окна клавиатуры поля формулы (тихие панели 14.10:
+   кнопки «Как писать формулы» в шапке «Условия» больше нет, решение …81eb…, ADR 0151).
+   Таблица записи HOW_TO_ROWS (92-ui-kit.js) и примеры по роли поля (FORMULA_EXAMPLES).
+   Пример — строкой, как его набирают: это справка по записи, поэтому моноширинным
+   (единственное место панелей с моноширинным шрифтом — образец набора). Раздел
+   заводится здесь, а не в общем модуле static/mathkbd (им живут и домашки). */
+function addHowToTab(box, kind) {
+  const tabs = box.querySelector(':scope > .mkbd-tabs');
+  if (!tabs || box.querySelector(':scope > .mkbd-howto') || typeof HOW_TO_ROWS === 'undefined') return;
+  const tab = document.createElement('button');
+  tab.type = 'button'; tab.className = 'mkbd-tab'; tab.textContent = 'Как писать';
+  const pane = document.createElement('div');
+  pane.className = 'mkbd-pane mkbd-howto';
+  const rows = (list, typeset) => {
+    const t = document.createElement('div'); t.className = 'howto-rows';
+    list.forEach(([a, b]) => {
+      const r = document.createElement('div'); r.className = 'howto-row';
+      const m = document.createElement('span'); m.className = 'howto-ex';
+      if (typeset && typeof renderTex === 'function') renderTex(m, a); else m.textContent = a;
+      const n = document.createElement('span'); n.className = 'howto-note'; n.textContent = b;
+      r.append(m, n); t.appendChild(r);
+    });
+    return t;
+  };
+  pane.appendChild(rows(HOW_TO_ROWS, false));
+  const set = (typeof FORMULA_EXAMPLES !== 'undefined') ? FORMULA_EXAMPLES[kind] : null;
+  if (set && set.items && set.items.length) {
+    const sub = document.createElement('div'); sub.className = 'mkbd-lab'; sub.textContent = 'Примеры для этого поля';
+    pane.append(sub, rows(set.items, true));
+  }
+  const ps = box.querySelectorAll(':scope > .mkbd-pane'), last = ps[ps.length - 1];
+  if (last) last.after(pane); else box.appendChild(pane);
+  tab.addEventListener('click', () => {
+    tabs.querySelectorAll('.mkbd-tab').forEach(x => x.classList.remove('active'));
+    box.querySelectorAll(':scope > .mkbd-pane').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active'); pane.classList.add('active');
+  });
+  // Свои разделы модуля гасят только свои панели: «Как писать» гасим сами.
+  tabs.querySelectorAll('.mkbd-tab').forEach(x => x.addEventListener('click', () => { if (x !== tab) pane.classList.remove('active'); }));
+  tabs.appendChild(tab);
+}
+
 // Закрыть все открытые клавиатуры, кроме той, что в переданном слоте.
 function closeAllKeyboardsExcept(slot) {
   document.querySelectorAll('.mkbd.open').forEach(b => {
@@ -1838,7 +1880,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     closeAllKeyboardsExcept(null);
     if (open) {
       kbd._var = FORMULA_VAR[(typeof kind === 'function') ? kind() : kind] || 'x';
-      if (!kbd._built) { buildKeyboard(kbd, inp); kbd._built = true; }
+      if (!kbd._built) { buildKeyboard(kbd, inp); addHowToTab(kbd, (typeof kind === 'function') ? kind() : kind); kbd._built = true; }
       kbd.classList.add('open');
       if (inp && inp._mf) inp._mf.focusField(); else if (inp) inp.focus();
     }

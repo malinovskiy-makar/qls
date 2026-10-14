@@ -175,7 +175,7 @@
      Холст не тронут: он остаётся своим у калькулятора, под него
      откалиброваны цвета кривых. */
   --bg:          #1d1a16;
-  --input-bg:    #11151d;
+  --input-bg:    #232019;   /* = --surface-2 тёмной темы (тихие панели 14.10, README 3): прежний синий убран */
   --pick: rgba(var(--accent-rgb), .40);
   --shadow-float: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
   /* ⚠️ ЕДИНСТВЕННОЕ ОТЛИЧИЕ ОТ КАНОННОЙ ТЕНИ, И ОНО ИЗМЕРЕНО.
@@ -651,7 +651,7 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Пояснение «как это устроено» прячется под вопросик рядом с полем ввода:
    посреди панели такой абзац отвлекает, а нужен он один раз. */
-.hint-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }
+.hint-row, .lab-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }   /* .lab-row — подпись поля с бывшей «?» (окно «Скачать», 14.10) */
 .hint-btn {
   flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
   border: 1px solid var(--border); border-radius: var(--r-pill);
@@ -3077,7 +3077,9 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 /* Длинное слово названия («Дискриминация», «Производственная») переносится по слогам
    (lang="ru" у страницы), а не режется краем карточки (13.10, карточка Notion …81ec…):
    ряд недавних, «Продолжить», сетка блока, переключатель модели. */
-.pk-cname, .pk-screen .scard-name, .sw-row > span { -webkit-hyphens: auto; hyphens: auto; }
+/* overflow-wrap: break-word — рядом с переносом по слогам: без словаря переносов (язык без
+   него, браузер без словаря) длинное слово иначе резалось краем карточки (14.10, …81ec…). */
+.pk-cname, .pk-screen .scard-name, .sw-row > span { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
 .pk-recent { gap: 12px; padding: 10px; }
 /* Недавние в ряду 2 : 1 : 1 : 1 узкие: при 1280 миниатюра 120 px оставляла тексту 71 px.
    Миниатюра меньше, кегль 14 — как у недавних на узких экранах ниже. */
@@ -3467,8 +3469,8 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 /* «Вернуть по формуле» у отрезка ответа: текстовая ссылка (вид поправит сессия 3). */
 .ans-seg-auto { margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .ans-seg-auto[hidden] { display: none; }
-#ans-seg-row .hint-row { margin-top: 0; }
-#ans-seg-row .hint-row label { margin: 0; }
+#ans-seg-row .seg-lab-row { display: flex; align-items: center; gap: 7px; margin: 0 0 2px; }
+#ans-seg-row .seg-lab-row label { margin: 0; }
 .opt-range-row input { width: 0; flex: 1 1 0; height: 34px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums; }
 
 /* Телефон: имя модели не вылезает на кнопки шапки — многоточие; «Сначала сам»
@@ -3578,7 +3580,7 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
   padding: 10px 12px 12px; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--r-card);
 }
-#ans-seg-row .hint-row label { font-size: 13.5px; font-weight: 400; color: var(--text2); }
+#ans-seg-row .seg-lab-row label { font-size: 13.5px; font-weight: 400; color: var(--text2); }
 #ans-seg-row .opt-range-row { margin-top: 8px; gap: 8px; }
 #ans-seg-row .opt-range-row > span { flex: 0 0 auto; font-size: 14px; color: var(--text2); }
 #ans-seg-row .opt-range-row > .ans-seg-var { color: var(--text); }
@@ -3860,3 +3862,57 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 /* «Сначала сам» на подложке: строка уже на поля подложки (14 + 14), «Проверить» ужата
    по бокам, чтобы поле осталось не уже 60 % строки (self_probe). */
 #ans-hero .ans-rows .self-row .self-check { padding: 0 10px; }
+
+/* ── Этап В: тишина (решение «никаких подсказок», Notion …81eb…; README 6; ADR 0151) ──
+   Кнопок «?», их плашек, «Как писать формулы» в шапке и поясняющих строк «Условия»,
+   окон и панели точек на экране нет. Тексты: экономика — в «Разборе»
+   (conditionNotesToExplain), синтаксис — в окне клавиатуры поля («Как писать»),
+   инструкции интерфейса — убраны по закрытому списку (README 10). */
+.hint-btn, .hint-pop, .hint-pop.open, .help-dot, #btn-howto, .hint-row:has(> .hint-lead),
+#tools-panel .hint, #tools-panel .hint.hint-keep, .fc-menu-note, .crow-auto, .wrench-note, .pts-hint,
+.cv-esc, body.pts-on .cv-esc, .f-pal-lead, .howto-foot, .side-reset__why { display: none !important; }
+#hint-tip { display: none !important; }
+/* «Как писать» в окне клавиатуры: пример — моноширинным (образец набора), пояснение 12 / 500. */
+.mkbd-howto .howto-rows { display: flex; flex-direction: column; gap: 6px; }
+.mkbd-howto .howto-row { display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.mkbd-howto .howto-ex { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.mkbd-howto .howto-note { font-size: 12px; font-weight: 500; color: var(--text2); line-height: 1.45; }
+.mkbd-howto .mkbd-lab { margin-top: 12px; }
+
+/* ── Этап В: лесенка A слева и в окнах (решение «шрифт панелей — вариант A», Notion …81d6…;
+   README 3–4; ADR 0151). Montserrat, шесть ступеней: 18 / 600 заголовок колонки, 14 / 600
+   разделы, 14 / 500 подписи и имена, 14 / 400 абзацы, 13 / 600 кнопки и сегменты, 12 / 500
+   мелочь. ⚠️ Кегль и вес здесь с !important: в «Условии» за годы накопились правила
+   разной силы (сегменты .active, карточки, «Вид графика»), и иначе лесенку пришлось бы
+   перебивать по одному. KaTeX и MathLive не трогаем (у них em от своего кегля), окно
+   клавиатуры — образец набора, оно своё. Только вид: разметка «Условия» прежняя
+   (карточки — сессии 5–6). ── */
+#tools-panel, #pts-panel, #wrench-pop, .fc-menu { font-family: var(--font-ui); }
+#tools-panel .col-head h2, #pts-panel .pts-title, #wrench-pop .wrench-head {
+  font-size: 18px !important; font-weight: 600 !important; letter-spacing: -.01em;
+}
+#tools-panel .sec-head, #tools-panel .sec-head b, #tools-panel .sec-head span, #pts-panel .pts-sec-head,
+#wrench-pop .wrench-title, #tools-panel .curve-group-title, #tools-panel .vsub {
+  font-size: 14px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--text);
+}
+#tools-panel label, #tools-panel .field > label, #tools-panel label.chk, #tools-panel .fc-name, #tools-panel .curve-name,
+#tools-panel .show-name, #tools-panel .show-name .nowrap, #tools-panel .edval-text, #tools-panel .pchip-label,
+#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note),
+#wrench-pop label, #wrench-pop label.chk, #wrench-pop .wrench-field span, #pts-panel .area-row span, #pts-panel .area-name-fixed,
+#pts-panel .mark-on, .fc-menu .fc-mi {
+  font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
+}
+#tools-panel .fc-add { font-size: 14px !important; font-weight: 500 !important; color: var(--text2); }
+#tools-panel .seg-btn, #pts-panel .seg-btn, #wrench-pop .seg-btn, #tools-panel .tgl-lab,
+#tools-panel .btn, #tools-panel .btn-quiet, #pts-panel .btn, #pts-panel .btn-quiet, #pts-panel .pts-done,
+#wrench-pop .btn, #wrench-pop .btn-quiet, #tools-panel .sel-btn, #pts-panel .sel-btn, #pts-panel .ac-cbtn, #tools-panel .ac-cbtn {
+  font-size: 13px !important; font-weight: 600 !important;
+}
+#tools-panel .param-bound, #tools-panel .param-kill, #pts-panel .param-bound {
+  font-size: 12px !important; font-weight: 500 !important; color: var(--text3);
+}
+#tools-panel .pchip-val:not(:has(.katex)), #pts-panel .area-row b { font-size: 14px !important; font-weight: 600 !important; }
+/* Подпись → поле: зазор не меньше 6 px (скрины владельца «Суммарная кривая / Имя на графике», КПВ 1 / КПВ 2). */
+#tools-panel .field > label, #tools-panel .grow > label { display: block; margin-bottom: 6px; }
+/* «Группа N» в таблице долей неравенства (подпись задана стилем узла 12 px, 56-scenes-inequality.js). */
+#tools-panel #ineq-groups-table span { font-size: 14px !important; font-weight: 500 !important; }

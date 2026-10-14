@@ -240,6 +240,49 @@ function moveExplanations() {
     if (ih) to.insertAdjacentHTML('afterbegin', ih);
   }
   answerNotesToExplain(from, to);
+  conditionNotesToExplain(to);
+}
+
+/* Пояснения «Условия» — в «Разбор» (тихие панели 14.10, этап В; решение «никаких
+   подсказок, объяснения только в «Разборе»», Notion …81eb…; README пакета 6).
+   Экономика и математика модели: абзацы .hint «Условия» (прятались под «?»), пометка
+   «коридор от … до …» у квоты и абзацы плашек «?» с пометкой data-explain. Как
+   пользоваться интерфейсом — не копируется (синтаксис формул — в клавиатуре поля).
+   Видимость — сценой (hidden, display: none, scoped-off): чужие модели не попадают.
+   Абзацы встают после вступления, перед вопросами; уже стоящий текст второй раз не
+   кладётся. */
+function conditionNotesToExplain(to) {
+  const root = document.getElementById('tools-panel');
+  if (!root || !to) return;
+  const norm = (t) => String(t || '').replace(/[\s\u00a0\u202f\u2009\u200b]+/g, ' ').trim();
+  const key = (t) => norm(t).replace(/\s+/g, '').slice(0, 60);
+  const sceneHidden = (w) => {
+    for (let n = w; n && n !== root; n = n.parentElement) {
+      if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return true;
+    }
+    return false;
+  };
+  const items = [];
+  root.querySelectorAll('.hint, .hint-pop [data-explain]').forEach(n => {
+    if (n.closest('.sb-note-src') || n.classList.contains('sb-note-src') || sceneHidden(n)) return;
+    const c = n.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    if (!norm(c.textContent)) return;
+    items.push({ html: n.innerHTML, text: c.textContent });
+  });
+  if (!items.length) return;
+  const have = key(to.textContent);
+  const seen = new Set();
+  const ps = items.filter(it => {
+    const k = key(it.text);
+    if (!k || seen.has(k) || have.indexOf(k) >= 0) return false;
+    seen.add(k);
+    return true;
+  }).map(it => '<p>' + it.html + '</p>').join('');
+  if (!ps) return;
+  const html = '<div class="sb-note ex-from-cond">' + ps + '</div>';
+  const firstQ = [...to.children].find(n => n.querySelector && n.querySelector('p > b:first-child'));
+  if (firstQ) firstQ.insertAdjacentHTML('beforebegin', html); else to.insertAdjacentHTML('beforeend', html);
 }
 
 /* Пояснения «Ответа» — в «Разбор» (тихие панели 14.10, решение владельца
@@ -984,7 +1027,13 @@ function fitTipMath(t) {
   ffFitCases(host.querySelector('.ff-math'));
 }
 
+/* ⚠️ ТИХИЕ ПАНЕЛИ (решение владельца 14.10 «никаких подсказок», Notion …81eb…; ADR 0151):
+   плашка больше не показывается ни по наведению, ни по фокусу, ни по касанию.
+   Текст `data-tip` остаётся невидимой подписью `aria-label` (syncTipLabels) —
+   её читает экранный диктор. Пояснения живут только в «Разборе». */
+const HINT_TIP_OFF = true;
 function showHintTip(dot, html) {
+  if (HINT_TIP_OFF) { hideHintTip(); return; }
   const t = hintTip();
   t.innerHTML = html;
   t.classList.remove('tip-math');
@@ -1633,18 +1682,31 @@ function wireTips() {
   document.addEventListener('click', (e) => { if (near(e)) hideHintTip(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideHintTip(); });
   syncTipLabels();
+  /* Узлы с data-tip появляются и позже (строки кривых, окна, ползунки): подпись для
+     диктора раздаётся им на кадре после появления. Наблюдатель смотрит только
+     на data-tip и новые узлы; сам он пишет aria-label — на него не отвечает. */
+  if (typeof MutationObserver === 'function') {
+    let queued = false;
+    new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; syncTipLabels(); });
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-tip'] });
+  }
 }
 
 /* п. 81. Один текст на подпись и на чтеца. Своего `aria-label` у кнопки с
    подсказкой нет: он собирается из того же `data-tip`, и разойтись им негде.
    Зовётся и после смены подписи (стрелки панелей меняют её на «Открыть» и
    «Закрыть»). */
+/* С 14.10 (ADR 0151) плашки нет вовсе: подпись `aria-label` получает КАЖДЫЙ узел с
+   `data-tip`, не только кнопка-иконка, — иначе его пояснение пропало бы совсем. */
 function syncTipLabels() {
   document.querySelectorAll('[data-tip]').forEach(el => {
     const t = tipText(el);
     if (!t) return;
-    const own = (el.textContent || '').trim();
-    if (!own) el.setAttribute('aria-label', tipPlain(t));   // у кнопки-иконки своего текста нет
+    const a = tipPlain(t);
+    if (el.getAttribute('aria-label') !== a) el.setAttribute('aria-label', a);
   });
 }
 
@@ -1774,11 +1836,16 @@ function syncHintDots(root) {
   });
 }
 
+/* ⚠️ «?» У ЗАГОЛОВКОВ БОЛЬШЕ НЕТ (решение 14.10 «никаких подсказок», Notion …81eb…;
+   ADR 0151). Абзац-пояснение «Условия» прячется, как прятался, а его текст уходит в
+   «Разбор» (conditionNotesToExplain). Вопросик не заводится: HINT_DOTS_OFF. */
+const HINT_DOTS_OFF = true;
 function hintsToDots(root) {
   root = root || document.getElementById('tools-panel');
   if (!root) return;
   root.querySelectorAll('.hint').forEach(hint => {
     if (hint._dotted || hint.classList.contains('hint-keep')) return;
+    if (HINT_DOTS_OFF) { hint._dotted = true; hint.classList.add('hint-hidden'); return; }
     const anchor = hintAnchor(hint);
     if (!anchor) return;                 // некуда вешать — оставляем абзац как был
     hint._dotted = true;

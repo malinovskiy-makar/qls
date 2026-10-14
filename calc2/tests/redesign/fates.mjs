@@ -18,6 +18,8 @@ export const LETTERS = {
   // Сессия 3 (решение владельца 09.10, ADR 0144):
   'н': 'выбор кривой площади списком → кнопки кривых с цветной точкой',
   'о': 'тумблер «Под кривой | Между точками» → сегмент из двух половин',
+  // Тихие панели 14.10 (решение владельца «никаких подсказок», Notion …81eb…; ADR 0151):
+  'п': 'кнопки «?» и их плашки, «?» у заголовков, «Как писать формулы» в шапке «Условия» (без замены; экономика — в «Разборе», запись — в клавиатуре поля)',
 };
 
 export const CHECK = 'snapshot.mjs (layer new) + compare.mjs';
@@ -37,6 +39,7 @@ export const FATES = [
   [/^#seg-quota$/, 'убран', 'м', '', 'compare.mjs: в «Квотах» сегмента нет, квота задаётся ползунком'],
   [/^#ac-pane-curve>button\.sel-btn$/, 'заменён', 'н', 'кнопки кривых #ac-pick-btns (скрытый #ac-pick — источник правды)', 'redesign/answer_rows_probe.mjs + control_numbers.mjs (площади)'],
   [/^#areascalc-body>button\.tgl-sw$/, 'заменён', 'о', 'сегмент #ac-mode (#ac-curve, #ac-poly)', 'parity_quick.mjs: орган #ac-curve'],
+  [/hint-btn|help-dot|^#btn-howto$/, 'убран', 'п', '', 'redesign/quiet_probe.mjs: видимых .hint-btn, .help-dot, #btn-howto — 0'],
 ];
 export function fateOf(key) {
   const k = key.replace(/^mf:/, '');

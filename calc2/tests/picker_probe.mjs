@@ -328,19 +328,23 @@ await browser.close();
    карточки сетки каждого блока, все строки переключателя модели: у самого
    заголовка и у каждой его строки scrollWidth ≤ clientWidth + 1, заголовок не
    длиннее трёх строк, страница не едет вбок. Chromium и WebKit (Safari),
-   1000 / 1280 / 1440 / 390. ENGINES=chromium — без WebKit. */
+   1000 / 1280 / 1440 / 390. ENGINES=chromium — без WebKit.
+   С 14.10 (тихие панели, комментарий к карточке …81ec…) каждая ширина проверяется ДВАЖДЫ: со словарём
+   переносов и без него (временный lang="zxx" у страницы — языка без словаря): тогда длинное слово
+   держит overflow-wrap: break-word рядом с hyphens: auto. */
 const ENGINES = (process.env.ENGINES || 'chromium,webkit').split(',');
 for (const eng of ENGINES) {
   const pw = await import('playwright');
   let br;
   try { br = await pw[eng].launch(); } catch (e) { ok(eng + ': движок запускается', false, 'НЕ ПРОВЕРЕНО: ' + e.message.split('\n')[0]); continue; }
-  for (const [W, H] of [[1000, 800], [1280, 800], [1440, 900], [390, 844]]) {
+  for (const nodict of [false, true]) for (const [W, H] of [[1000, 800], [1280, 800], [1440, 900], [390, 844]]) {
     const ctx = await br.newContext({ viewport: { width: W, height: H }, reducedMotion: 'reduce', locale: 'ru-RU', isMobile: eng === 'chromium' && W < 760, hasTouch: W < 760 });
     await ctx.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('theme', 'dark'); } catch (e) {} });
     const page = await ctx.newPage();
     await page.goto(BASE + '/calc2/', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForFunction(() => typeof pickScene === 'function' && document.querySelector('#scene-picker .pk-pv'), null, { timeout: 25000 });
-    const tag = eng + ' ' + W;
+    if (nodict) await page.evaluate(() => { document.documentElement.lang = 'zxx'; });
+    const tag = eng + ' ' + W + (nodict ? ' без словаря' : '');
     const MEASURE = (sel) => {
       const vis = (el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
       const out = [];

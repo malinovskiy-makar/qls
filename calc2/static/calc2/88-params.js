@@ -265,6 +265,10 @@ function texifyName(name) {
      вместо индекса (замер 25.08). */
   const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
   if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
+  /* Экономическое сокращение из заглавных (MC, ATC, DWL, MSB…) — одно обозначение
+     прямым шрифтом, как в списке кривых и на холсте (notationTex, 94-answer.js), а
+     не буква с индексом: «Сдвиг MC» набирался «M с индексом C» (карточка …8169…). */
+  if (/^[A-Z]{2,4}$/.test(s)) return '\\mathrm{' + s + '}';
   const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
   if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
   return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';

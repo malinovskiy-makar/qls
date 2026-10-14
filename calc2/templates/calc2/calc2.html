@@ -975,9 +975,9 @@
         <button class="hint-btn" type="button" data-pop="hp-labor" aria-label="Как этим пользоваться">?</button>
       </div>
       <div class="hint-pop" id="hp-labor">
-        <p>Стороны здесь поменялись местами: труд покупают фирмы, продают работники.
+        <p data-explain="1">Стороны здесь поменялись местами: труд покупают фирмы, продают работники.
           По горизонтали идёт занятость, по вертикали ставка зарплаты.</p>
-        <p>Переключатель сверху задаёт устройство рынка: конкуренция, единственный наниматель,
+        <p data-explain="1">Переключатель сверху задаёт устройство рынка: конкуренция, единственный наниматель,
           профсоюз или двусторонняя монополия. От него зависит, какие кривые появятся на поле
           и по какому правилу считается занятость.</p>
       </div>
@@ -1446,12 +1446,16 @@
            переносит его под поля функций текущего сюжета, в том числе в
            «Построение графиков». У «С ограничением» строки нет. -->
       <div class="field opt-range" id="ans-seg-row">
-        <div class="hint-row">
+        <div class="seg-lab-row">
           <label for="ans-a">Ответ ищем на отрезке</label>
           <button class="hint-btn" type="button" data-pop="hp-ans-seg" aria-label="Что это за отрезок">?</button>
         </div>
+        <!-- Плашки «?» с 14.10 не показываются (ADR 0151): абзацы с data-explain (экономика
+             и математика модели) копирует в «Разбор» conditionNotesToExplain (86-workspace.js),
+             прочее — как пользоваться интерфейсом — уходит по закрытому списку README 10. -->
         <div class="hint-pop" id="hp-ans-seg">
-          <p>Корни, вершины и пересечения считаются на этом отрезке. Масштаб графика на ответ не влияет.</p>
+          <p data-explain="1">Корни, вершины и пересечения считаются на этом отрезке.</p>
+          <p>Масштаб графика на ответ не влияет.</p>
         </div>
         <div class="opt-range-row">
           <span class="ans-seg-var" aria-hidden="true">x</span><span>от</span><input type="text" inputmode="decimal" id="ans-a" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: от">
@@ -1518,7 +1522,7 @@
         <div class="hint-pop" id="hp-optimum">
           <p>Пишите функцию от x в поле выше: x^2, x^3 - 3*x, sqrt(x), 1/x.
             Отрезок задаётся строкой «Ответ ищем на отрезке» выше.</p>
-          <p>Подписи на графике читаются так: x* это точка на оси x, y* это
+          <p data-explain="1">Подписи на графике читаются так: x* это точка на оси x, y* это
             значение функции в ней.</p>
         </div>
       </div>
@@ -1577,7 +1581,7 @@
         <div class="hint-pop" id="hp-minmax">
           <p>Каждую функцию пишите от x: 4 - x, x^2, 2. Исходные кривые идут
             пунктиром и подписаны f₁, f₂, f₃, итог рисуется жирной линией.</p>
-          <p>Кружками отмечены точки, где кривые меняются местами: слева главной
+          <p data-explain="1">Кружками отмечены точки, где кривые меняются местами: слева главной
             была одна, справа другая.</p>
         </div>
       </div>
@@ -2135,7 +2139,7 @@
           {% elif not user.is_authenticated %}<div class="exp-fmt-off">Войдите, чтобы скачать PDF.</div>{% endif %}
         </div>
         <div class="field exp-label-field" id="exp-label-field" hidden>
-          <div class="hint-row">
+          <div class="lab-row">
             <span class="hint-lead">Метка для перекрёстной ссылки</span>
             <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
           </div>
