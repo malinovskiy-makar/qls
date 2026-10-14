@@ -576,6 +576,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
     event['preamble'] = []
     econ = profile == ECON
     leads_by_number = {}          # v5: номер задания → инструкции раздела
+    sol_leads = []                # v5: (номера, инструкция) из файлов ответов
+    sol_sections = []             # v5: разделы файлов ответов (дочитываются в конце)
     section = {'file': None, 'lead': '', 'left': None}   # v5: инструкция раздела без номеров
     open_lead = []                # v5: подводка «ответьте на вопросы (3)-(5)» + цитата
 
@@ -890,6 +892,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
         region_mode = (profile == ECON and len(headers) >= 2
                        and any(t.absorbed for t in tasks.values()))
         region = None
+        sol_section = {'lead': '', 'left': None, 'nums': []}   # v5: раздел в файле ответов
+        sol_sections.append(sol_section)
         for entry, page, record, block in stream:
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
@@ -963,6 +967,27 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     target.solution_figures.append(figure)
                 continue
             in_statement = kind == 'task'
+            if (profile == ECON and kind == 'task' and not _real_number(_block_number(block))
+                    and econ_rules.format_lines(block.get('text') or '', block.get('title') or '')
+                    and econ_rules.is_service_text(block.get('text') or '',
+                                                   block.get('title') or '')):
+                # v5: инструкция раздела только в файле ответов («Задания 6-8 – выберите
+                # все верные ответы», mosh-2022-qualifying-7): с номерами — этим
+                # заданиям, иначе — следующим вопросам раздела («(10 вопросов…)»).
+                text, title = block.get('text') or '', block.get('title') or ''
+                rest_lines = []
+                for line in econ_rules.format_lines(text, title):
+                    line_nums = econ_rules.targets(line)
+                    if line_nums:
+                        sol_leads.append((line_nums, line))
+                    else:
+                        rest_lines.append(line)
+                if sol_section['lead'] and sol_section['nums']:
+                    sol_leads.append((sol_section['nums'], sol_section['lead']))
+                sol_section.update(lead='\n\n'.join(rest_lines), nums=[],
+                                   left=econ_rules.section_count(f'{title}\n{text}'))
+                report['v5: инструкция раздела из файла ответов'] += 1
+                continue
             if region_mode and kind == 'task':
                 number = _block_number(block)
                 if (block.get('title') or '').strip() and number in headers:
@@ -1040,6 +1065,13 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     target.answer = (target.answer + '\n' + block['answer']).strip()
                     target.solution_pages.append((entry['file'], page))
                     report['ответ теста из файла ответов'] += 1
+                head = _leading_int(number)
+                if sol_section['lead'] and head is not None and head not in sol_section['nums']:
+                    sol_section['nums'].append(head)       # номер вопроса раздела
+                    if sol_section['left'] is not None and len(sol_section['nums']) >= \
+                            sol_section['left']:
+                        sol_leads.append((sol_section['nums'], sol_section['lead']))
+                        sol_section.update(lead='', nums=[])
                 last = target
                 continue
             if kind == 'task_continuation' and profile != ECON:
@@ -1074,6 +1106,19 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             last = _attach_answer(tasks, last, block, role if kind == 'task_continuation'
                                   else kind, entry, page, report, force=force,
                                   profile=profile) or last
+
+    # v5: инструкции из файла ответов — заданиям с этими номерами: вопросу теста
+    # «тест-N», если он есть (номера вопросов теста в файле ответов совпадают с
+    # номерами задач), иначе заданию N.
+    sol_leads.extend((sec['nums'], sec['lead']) for sec in sol_sections
+                     if sec['lead'] and sec['nums'])
+    for nums, text in sol_leads:
+        for n in nums:
+            found = [t for t in tasks.values() if t.number == f'тест-{n}'] or \
+                [t for t in tasks.values() if t.number == str(n)]
+            for task in found:
+                if not any(same_intro(text, seen) for seen in task.leads):
+                    task.leads.append(text)
 
     # Рисунки: вырезка.
     for task in tasks.values():
