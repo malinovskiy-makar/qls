@@ -21,6 +21,8 @@ export const LETTERS = {
   // Тихие панели 14.10 (решение владельца «никаких подсказок», Notion …81eb…; ADR 0151):
   'п': 'кнопки «?» и их плашки, «?» у заголовков, «Как писать формулы» в шапке «Условия» (без замены; экономика — в «Разборе», запись — в клавиатуре поля)',
   'р': 'строки закрасок модели в списке площадей панели точек → образец цвета строки «На графике» в «Виде графика» (ADR 0152; README 10.6)',
+  // Тихие панели, сессия 5 (решение «левая панель одна во всех моделях», Notion …8142…; ADR 0153):
+  'с': 'тумблер пары подписей («Задам TC | Задам кривые», «Инд. спросы | Кусочный», профсоюз) → сегмент: видна полоса кнопок с их id, тумблер спрятан',
 };
 
 export const CHECK = 'snapshot.mjs (layer new) + compare.mjs';
@@ -42,6 +44,7 @@ export const FATES = [
   [/^#areascalc-body>button\.tgl-sw$/, 'заменён', 'о', 'сегмент #ac-mode (#ac-curve, #ac-poly)', 'parity_quick.mjs: орган #ac-curve'],
   [/hint-btn|help-dot|^#btn-howto$/, 'убран', 'п', '', 'redesign/quiet_probe.mjs: видимых .hint-btn, .help-dot, #btn-howto — 0'],
   [/^#info-areacalc>button\.swatch/, 'заменён', 'р', 'кнопка цвета .vg-pick строки закраски в «Виде графика»', 'redesign/view_probe.mjs: строка у каждой закраски'],
+  [/^#(costs-pane-costs|mono-kink-pane|union-pane)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
 ];
 export function fateOf(key) {
   const k = key.replace(/^mf:/, '');

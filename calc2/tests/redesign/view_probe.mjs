@@ -298,8 +298,13 @@ async function rowsOf(page) {
     }).filter(Boolean);
   }, ROW_SEL);
 }
+/* Состояние — STATE модели (без ключей вида, как histSig) и органы самого «Вида»; скрытые поля чужих моделей
+   в форме не сравниваются (у m-optimum поле m-minmax после загрузки расходится с записью истории — старое, к
+   «Отменить» в «Виде» отношения не имеет). */
 const snapOf = (page) => page.evaluate(() => ({
-  sig: histSig(collectModelState()),
+  sig: (() => { const s = collectModelState(); const f = {}; const box = document.querySelector('#wrench-pop .vg-onchart');
+    Object.keys(s.form || {}).forEach(id => { const e = document.getElementById(id); if (e && box && box.contains(e)) f[id] = s.form[id]; });
+    return histSig({ state: s.state, form: f }); })(),
   /* Картинка — набор путей холста (закраска, заливка, линия, видимость), без длины записи d: окно после перерисовки
      то же, а числа в d округляются по-разному. */
   pic: [...document.querySelectorAll('#chart path')].filter(p => !p.closest('[data-service]')).map(p => (p.getAttribute('data-legend') || '') + '|' + (p.getAttribute('fill') || p.style.fill || '') + '|' + (p.getAttribute('stroke') || p.style.stroke || '') + '|' + getComputedStyle(p).display + getComputedStyle(p).opacity).sort().join(';'),
