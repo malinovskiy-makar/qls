@@ -15,7 +15,8 @@
 //   ЗАКРАСКИ — набор закрасок на холсте на старте тот же;
 //   ОШИБКИ  — новых ошибок страницы нет.
 // allow.json — закрытый список сознательно убранного: { "<модель>": { "numbers": ["-450"], "notes": ["…"],
-//   "rows": ["Налог t"], "ids": ["btn-howto"], "legend": [] }, "*": {…} } — «*» действует на все модели.
+//   "rows": ["Налог t"], "ids": ["btn-howto"], "legend": [], "questions": [{ "q": "…", "to": "…" | null, "why": "…" }] },
+//   "*": {…} } — «*» действует на все модели.
 //   Каждая запись — с причиной
 //   в журнале сессии. Код выхода 1, если осталось хоть одно расхождение вне списка.
 import fs from 'fs';
@@ -109,9 +110,16 @@ for (const k of Object.keys(B)) {
     if (allowR.includes(normText(r.lab))) return;
     miss.push('СТРОКА «' + r.lab + '» ' + r.b + ' → ' + r.a + ': нет ни строкой таблицы, ни главной ячейкой с «до»');
   });
-  // ВОПРОСЫ
+  // ВОПРОСЫ. allow «questions» (сессия 6): [{ "q": "старый вопрос", "to": "новый вопрос" | null, "why": "причина" }] —
+  // вопрос переименован (to — новый текст, он обязан быть после) или убран (to: null). Без причины запись не действует.
   const qa = new Set(a.explain.questions.map(normText));
-  b.explain.questions.forEach(q => { if (!qa.has(normText(q))) miss.push('ВОПРОС «' + q + '»'); });
+  const allowQ = [...((ALLOW['*'] || {}).questions || []), ...((ALLOW[k] || {}).questions || [])].filter(x => x && x.q && x.why);
+  b.explain.questions.forEach(q => {
+    if (qa.has(normText(q))) return;
+    const r = allowQ.find(x => normText(x.q) === normText(q));
+    if (!r) { miss.push('ВОПРОС «' + q + '»'); return; }
+    if (r.to && !qa.has(normText(r.to))) miss.push('ВОПРОС «' + q + '» переименован в «' + r.to + '», но нового нет');
+  });
   // ОРГАНЫ
   const allowI = allowOf(k, 'ids');
   const idsAfter = new Set([...a.left, ...a.view, ...(a.menus || [])].map(c => c.id).filter(Boolean));
