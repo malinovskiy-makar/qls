@@ -695,6 +695,9 @@ const SC_PROWS = {
   'tax-field': ['Ставка', 't', 'd3'],
   'pc-field': ['Цена', () => ((document.getElementById('pc-letter') || {}).textContent || 'P'), 'd3'],
   'quota-field': ['Объём квоты', 'Q_{\\text{к}}', 'd3'], 'quota-price-field': ['Цена внутри коридора', 'P_k', 'd3'],
+  // Д4: малая открытая экономика. Слова квоты — от направления торговли (openQuotaName: «Квота ввоза / вывоза»).
+  'open-tariff-field': ['Тариф', 't', 'd4'],
+  'open-quota-field': [() => (typeof openQuotaName === 'function' ? openQuotaName() : 'Квота'), 'Q_{\\text{к}}', 'd4'],
 };
 /* Буква, которая является переменной оси модели макро (r у «Заёмных средств», i, e, Y…), ползунка не получает
    (сессия 6, В5; Notion …8187…): замер claude/panels_s6/dead_r_loanable.json — сдвиг r не меняет ни «Ответ», ни один
@@ -740,7 +743,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3']);
+  'd1', 'd2', 'd3', 'd4']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -771,7 +774,8 @@ function scSetup() {
     f._scRow = true;
     f.classList.add('sc-prow');
     const nm = document.createElement('span');
-    nm.className = 'sc-pname'; scWords(nm, SC_PROWS[id][0]);
+    const w = SC_PROWS[id][0];
+    nm.className = 'sc-pname'; scWords(nm, typeof w === 'function' ? w() : w);
     f.insertBefore(nm, f.firstChild);
   });
   SC_NROWS.forEach(([id, m]) => {
@@ -851,6 +855,12 @@ function scSync() {
   scMmRows();
   scPchips();
   scIntervSync();
+  // Слова строки ползунка, которые зависят от состояния («Квота ввоза / вывоза»), — на каждой перерисовке.
+  Object.keys(SC_PROWS).forEach(id => {
+    const w = SC_PROWS[id][0]; if (typeof w !== 'function' || !scProw(id)) return;
+    const nm = document.querySelector('#' + id + ' > .sc-pname'); const t = w();
+    if (nm && nm.textContent !== t) scWords(nm, t);
+  });
   scParamsCont();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
