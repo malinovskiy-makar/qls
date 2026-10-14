@@ -58,6 +58,7 @@ const RENAME = {
      кнопок, тумблер спрятан; орган — её левая кнопка. Ключ дописывается вместе с моделью (SC_ON, 92-ui-kit.js). */
   '#costs-pane-costs>button.tgl-sw': '#cm-tc',
   '#mono-kink-pane>button.tgl-sw': '#ki-indiv',
+  '#union-pane>button.tgl-sw': '#un-monopoly',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];
