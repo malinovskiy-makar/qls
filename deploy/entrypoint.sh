@@ -93,10 +93,31 @@ echo "[entrypoint] gunicorn…"
 # умного поиска ДО первого запроса к воркеру (catalog/warmup.py). Без него
 # холодный воркер строил корпус прямо на запросе человека. Выключить прогрев —
 # SMART_SEARCH_WARMUP=0 в /srv/weconomics/.env.
+#
+# ⚠️ ПОТОКИ ВНУТРИ ВОРКЕРОВ (gthread), А НЕ БОЛЬШЕ ВОРКЕРОВ (ADR 0140).
+# Вопрос к ИИ держит место 5–25 с, ожидая поставщика, — это ожидание сети, а
+# не работа процессора. У синхронного воркера место одно: четыре вопроса к ИИ
+# разом — и любой посетитель ждёт (стенд: P95 лёгких страниц 39 с при восьми
+# вопросах). 4 воркера × 8 потоков = 32 места, память почти та же: потоки
+# делят процесс и корпус поиска. Каждый поток держит своё соединение с базой
+# (conn_max_age 600) — до 32 соединений у web.
+# Откат без пересборки: GUNICORN_WORKER_CLASS=sync в /srv/weconomics/.env,
+# затем `docker compose up -d web` и `docker compose restart nginx`.
+#
+# ⚠️ ПРИ sync ПОТОКОВ РОВНО ОДИН — ИНАЧЕ ОТКАТ НЕ ОТКАТЫВАЕТ. gunicorn сам
+# подменяет sync на gthread, если --threads больше 1 (поймано стендом
+# 08.10.2026: в окружении sync, в журнале «Using worker: gthread»).
+GUNICORN_WORKER_CLASS="${GUNICORN_WORKER_CLASS:-gthread}"
+GUNICORN_THREADS="${GUNICORN_THREADS:-8}"
+if [ "$GUNICORN_WORKER_CLASS" = "sync" ]; then
+    GUNICORN_THREADS=1
+fi
 exec gunicorn config.wsgi:application \
     -c /app/config/gunicorn_conf.py \
     --bind 0.0.0.0:8000 \
     --workers "${GUNICORN_WORKERS:-4}" \
+    --worker-class "$GUNICORN_WORKER_CLASS" \
+    --threads "$GUNICORN_THREADS" \
     --timeout 60 \
     --graceful-timeout 30 \
     --max-requests 1000 \

@@ -784,19 +784,25 @@ def smart_search(request):
 
 
 # ── Страница задачи ─────────────────────────────────────────────────────────
-_TAG_SECTIONS = {}
+_TAG_SECTIONS = None
 
 
 def _tag_section(tag_name, fallback):
     """Раздел карты для тега: по названию из `topic_map.json`, иначе — раздел
     первой темы задачи. Теги базы с темами не связаны, а карта знает, под
-    какой темой стоит тег таксономии; совпало по названию — красим им."""
-    if not _TAG_SECTIONS:
+    какой темой стоит тег таксономии; совпало по названию — красим им.
+
+    ⚠️ СЛОВАРЬ СОБИРАЕТСЯ ЦЕЛИКОМ И ПУБЛИКУЕТСЯ ОДНИМ ПРИСВАИВАНИЕМ (потоки
+    gunicorn, ADR 0140). Наполнение по ключу прямо в общем словаре показало бы
+    соседнему потоку недостроенный словарь, и тег покрасился бы запасным цветом."""
+    global _TAG_SECTIONS
+    sections = _TAG_SECTIONS
+    if sections is None:
         text, _etag = _topic_map_payload()
-        for node in json.loads(text).get('nodes', []):
-            if node.get('k') == 'tag':
-                _TAG_SECTIONS[normalize_topic(node.get('l', ''))] = node.get('g', 'other')
-    return _TAG_SECTIONS.get(normalize_topic(tag_name), fallback)
+        sections = {normalize_topic(node.get('l', '')): node.get('g', 'other')
+                    for node in json.loads(text).get('nodes', []) if node.get('k') == 'tag'}
+        _TAG_SECTIONS = sections
+    return sections.get(normalize_topic(tag_name), fallback)
 
 
 def _catalog_link(**changes):
@@ -2078,18 +2084,21 @@ def problem_figure_svg(request, pk):
 # Файл читается ОДИН РАЗ при первом запросе в модульную переменную —
 # 69 КБ JSON на каждый запрос это лишняя работа диска на ровном месте.
 
-_TOPIC_MAP_CACHE = {'text': None, 'etag': None}
+_TOPIC_MAP_CACHE = {'payload': None}
 
 
 def _topic_map_payload():
-    """Отдаёт (текст JSON, ETag), читая файл один раз на процесс."""
-    if _TOPIC_MAP_CACHE['text'] is None:
+    """Отдаёт (текст JSON, ETag), читая файл один раз на процесс.
+
+    ⚠️ ТЕКСТ И ETag ПУБЛИКУЮТСЯ ОДНОЙ ПАРОЙ (потоки gunicorn, ADR 0140): двумя
+    присваиваниями соседний поток мог получить текст при ETag = None."""
+    payload = _TOPIC_MAP_CACHE['payload']
+    if payload is None:
         from catalog.taxonomy_map import JSON_PATH
         text = JSON_PATH.read_text(encoding='utf-8')
-        _TOPIC_MAP_CACHE['text'] = text
-        _TOPIC_MAP_CACHE['etag'] = '"%s"' % hashlib.sha256(
-            text.encode('utf-8')).hexdigest()[:32]
-    return _TOPIC_MAP_CACHE['text'], _TOPIC_MAP_CACHE['etag']
+        payload = (text, '"%s"' % hashlib.sha256(text.encode('utf-8')).hexdigest()[:32])
+        _TOPIC_MAP_CACHE['payload'] = payload
+    return payload
 
 
 def _map_stats():

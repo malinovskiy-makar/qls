@@ -513,7 +513,9 @@ class LogoutTests(TestCase):
         html = self.client.get('/catalog/').content.decode('utf-8')
         self.assertIn('class="nav-login"', html)
         self.assertIn('Создать аккаунт', html)
-        self.assertNotIn('class="nav-user"', html)
+        # Начало атрибута без закрывающей кавычки: у плашки есть ещё класс
+        # `ym-hide-content` (Вебвизор не пишет имя вошедшего).
+        self.assertNotIn('class="nav-user', html)
 
     def test_header_form_is_post_with_csrf(self):
         self.client.force_login(self.user)
@@ -532,18 +534,18 @@ class ProfileChipTests(TestCase):
                                         last_name='Петров')
         self.client.force_login(user)
         html = self.client.get('/catalog/').content.decode('utf-8')
-        chip = html.split('<a class="nav-user"', 1)[1].split('</a>', 1)[0]
+        chip = html.split('<a class="nav-user', 1)[1].split('</a>', 1)[0]
         self.assertIn('ИП', chip)
         self.assertIn('Иван Петров', chip)
-        self.assertIn('href="/profile/"', html.split('<a class="nav-user"', 1)[0][-40:]
-                      + '<a class="nav-user"' + chip)
+        self.assertIn('href="/profile/"', html.split('<a class="nav-user', 1)[0][-40:]
+                      + '<a class="nav-user' + chip)
 
     def test_initials_fall_back_to_username(self):
         user = User.objects.create_user(username='zebra', password=PASSWORD,
                                         role='student')
         self.client.force_login(user)
         html = self.client.get('/catalog/').content.decode('utf-8')
-        chip = html.split('<a class="nav-user"', 1)[1].split('</a>', 1)[0]
+        chip = html.split('<a class="nav-user', 1)[1].split('</a>', 1)[0]
         self.assertIn('Z', chip)
 
 

@@ -1,6 +1,6 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-08 (сессия «Экзамен B»: ai_exam_build, ai_exam_run,
-> ai_exam_report; блок «Текущий фокус»)
+> **Обновлён:** 2026-10-09 (сессия «Сайт не встаёт»: gunicorn gthread, стенд
+> нагрузки, ai_load_probe; блок «Текущий фокус»)
 > **Статус:** актуален
 
 # CLAUDE.md — точка входа
@@ -243,6 +243,9 @@ ai_exam_report <прогон> [--vs <прежний>]   # REPORT.md и срав�
 ai_beta_report --out D [--since --until --team-file F]  # цифры беты ИИ-чата и поиска A–K, два среза; на копии боя, файлы ВНЕ репозитория (docs/AI_BETA.md)
 ai_beta_dialogs --out D [--since --until]   # разговоры беты: dialogs.jsonl + читалка reader.html с отметками ai_beta_marks/1
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
+ai_load_probe --ai K --problem ID [--ai-user U --baseline F.json]  # зонд «Сайт не встаёт»: K вопросов к ИИ разом,
+                                  # ждут ли лёгкие страницы; запускать ВНУТРИ контейнера web
+                                  # (стенд deploy/docker-compose.loadtest.yml или бой) — docs/SERVER.md «Воркеры и потоки»
 search_eval                       # измеритель поиска на эталонных наборах A/B/C (docs/EMBEDDINGS.md)
 human_review_mark [--apply/--revert]     # approved/defect по вердиктам ReviewVerdict
 pending_review_gate [--apply/--revert]   # скрыть непроверенное из каталога
@@ -284,7 +287,14 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 - Клон репозитория — `/srv/weconomics/app`, доступ к GitHub **отдельным
   deploy key только на чтение**. Все команды `docker compose` — из
   `/srv/weconomics/app/deploy`, и только оттуда.
-- Обновление: `git pull` → `docker compose build web` → `docker compose up -d web`.
+- Обновление: `git pull` → `docker compose build web` → `docker compose up -d web` →
+  **`docker compose restart nginx`** (nginx помнит старый адрес web — иначе 502).
+- **gunicorn — gthread, 4 воркера × 8 потоков** (ADR 0140): вопрос к ИИ не занимает
+  сайт. Откат — `GUNICORN_WORKER_CLASS=sync` в `/srv/weconomics/.env`; при sync
+  entrypoint ставит один поток (иначе gunicorn сам вернёт gthread).
+- ⚠️ **Команды Django на бою — ВНУТРИ контейнера** (`docker compose exec web python
+  manage.py …` из `/srv/weconomics/app/deploy`): на хосте нет ни окружения, ни
+  `/srv/weconomics/.env` в переменных, и команда ушла бы не в ту базу или упала.
 - **Откат к заглушке одной командой** — раздел «Откат» в `docs/SERVER.md`.
   Команда проверена дважды на живом сайте, а не написана по памяти.
 - Бэкапы: ежедневно 03:20 МСК, 30 копий, восстановление проверено.
@@ -441,14 +451,13 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 
 <!-- NOTION-SYNC:START — генерируется из Notion, руками не править -->
 
-**Обновлено: 2026-10-08 (сессия «Экзамен B»)** ·
+**Обновлено: 2026-10-09 (сессия «Сайт не встаёт»)** ·
 [Notion-штаб](https://app.notion.com/p/39ab11c92bc181f7bbe1efa8a89e38a9)
 
 **В работе (9):**
 - **ИИ, шаг 0: экзамен v0, данные беты, правки чата, выбор модели (8–28 октября)** –
-  Макар + Claude Code; «Экзамен A», «A2» (ветка `feat/ai-exam-v0`), «Данные беты 1»
-  (`feat/ai-beta-data`) и «Экзамен B» (`feat/ai-exam-b`: сборка и сейф, прогонщик,
-  отчёт «было → стало», проба трубы) сделаны, не запушены; ждём разметку людей
+  Макар + Claude Code; «Экзамен A/A2/B» и «Данные беты 1» — свои ветки, не запушены;
+  «Сайт не встаёт» (`fix/gunicorn-threads`: gthread 4 × 8, стенд, зонд) — ждёт вливания и выкатки
 - **Полный аудит олимпиад → полный исторический банк** – пилот ВП, сессия 1 выполнена
 - **Завести личные аккаунты на проде, затем закрыть общий вход makar** – Андрей (сервер) + Макар
 - Первая волна починки: Сборник АА (131 задача) – Анич
@@ -465,18 +474,18 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 - **Укрепление беты 24.09** (17 пунктов) – ветка `fix/beta-hardening-20260924`
 
 **Надо (свежие 7):**
+- **Площадка dev: холодная сборка корпуса доходит до ~800 МиБ** при пределе web-dev 900m – Claude Code
+- **Автовыкатка dev не перезапускает nginx** после пересоздания web-dev — возможен 502 – Claude Code
 - **Разметить глазами источники олимпиад, которых у нас нет** (EO, WEC, NEC, AP, Финатлон…)
 - **Выгрузить олимпиады по финансовой грамотности и основам бизнеса** (МОШ, ВП)
 - **Дотянуть защиту привязки олимпиад**: тест на шаг B, «пустой этап против заполненного»
 - **Разобрать очередь ручной проверки текстовых копий олимпиад**: 251 строка
 - **Чат: реплика со сбоем формата пишется в `ChatTurn` с ценой 0**, хотя вызов оплачен – Claude Code
-- **Сторож автозагрузки чужих хостов не влит в main и не видит Метрику** – Claude Code
-- **Аналитика беты пишет тексты ссылок, полные адреса и Referer** в `Event` – Claude Code
 
 **Последние решения (3):**
+- **Сайт не встаёт от вопросов к ИИ: потоки gunicorn (gthread)**, а не больше воркеров и не очередь; проверка — стендом в Docker
 - **Цель аудита олимпиад — полный исторический банк**: недостающее идёт в очередь импорта
 - **Почта для обращений по данным — отдельный ящик на Яндексе**; Google Форму из профиля убираем
-- **Аудит ВП: отборочный этап = qualifying**; эталон только по заключительному этапу
 
 <!-- NOTION-SYNC:END -->
 

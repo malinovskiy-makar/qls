@@ -519,3 +519,6 @@ reports/corpus_transfer_20260913/*
 !reports/corpus_transfer_20260913/excluded_bad_ids_v3.txt
 !reports/corpus_transfer_20260913/prod_mentions_figure_ids.txt
 !reports/corpus_transfer_20260913/plain_skipped_with_material.txt
+
+# Стенд нагрузки: настоящие значения окружения (образец — deploy/env.loadtest.example).
+deploy/env.loadtest

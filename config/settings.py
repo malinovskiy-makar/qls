@@ -367,6 +367,20 @@ AI_DAILY_COST_CAPS = {
 # reasoning=low добавляет к смете +$74.
 AI_REASONING_EFFORT = os.environ.get('AI_REASONING_EFFORT', 'none').strip()
 
+# Суточный лимит обращений к ИИ на пользователя (`core.daily_limit`). Из
+# окружения — ради стенда нагрузки (docs/SERVER.md, «Воркеры и потоки»): там
+# один служебный аккаунт шлёт десятки вопросов. На бою переменной нет — 30.
+AI_GENERATOR_DAILY_LIMIT = int(os.environ.get('AI_GENERATOR_DAILY_LIMIT', '30').strip() or 30)
+
+# ─── Подставной поставщик `fake` (стенд нагрузки и проверки) ─────────────
+#
+# Ответ — строкой из окружения, тем же именем и с тем же значением по
+# умолчанию, что в settings_check.py; у настоящих поставщиков не читается.
+# ⚠️ Задержка — ТОЛЬКО у `fake`: «медленный подставной ИИ» держит воркер,
+# как настоящий вызов 5–25 с, но бесплатно (стенд «Сайт не встаёт»).
+AI_FAKE_REPLY = os.environ.get('QLS_FAKE_REPLY', '{"rows": [], "note": ""}')
+AI_FAKE_DELAY_SECONDS = float(os.environ.get('AI_FAKE_DELAY_SECONDS', '0').strip() or 0)
+
 # ─── Чат на странице задачи (catalog/chat.py) ────────────────────────────
 #
 # Решение владельца 15.09.2026 (Notion «Решения»): чат ведёт GLM-5.3, а не

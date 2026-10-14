@@ -18,6 +18,9 @@
 корневой шаблон подключает обе половины; кабинеты не отдают Метрике
 заголовков (в них имена детей).
 
+**Вебвизор пишет только публичные страницы.** В кабинетах `webvisor: false`;
+на публичных страницах имя вошедшего в шапке стоит внутри `ym-hide-content`.
+
 Таблица «ресурс × роль × действие» (проверка границ доступа):
 
 | Ресурс | Аноним | Ученик / репетитор | Персонал |
@@ -30,6 +33,7 @@
 Каждая клетка закрыта тестом ниже.
 """
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 from urllib.parse import urlencode
@@ -74,6 +78,53 @@ def _request(cookie=None):
     if cookie is not None:
         request.COOKIES[COOKIE] = cookie
     return request
+
+
+class _RecordedText(HTMLParser):
+    """Текст страницы, который Вебвизор ЗАПИШЕТ: всё вне `ym-hide-content`.
+
+    Класс справки Метрики скрывает элемент вместе с потомками, поэтому считаем
+    глубину вложенности в скрытые элементы. Скрипты и стили — не текст экрана.
+    """
+
+    VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+            'meta', 'param', 'source', 'track', 'wbr'}
+
+    def __init__(self):
+        super().__init__()
+        self.stack = []        # (тег, скрыт ли этот элемент)
+        self.hidden = 0
+        self.skip = 0
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.VOID:
+            return
+        hides = 'ym-hide-content' in (dict(attrs).get('class') or '').split()
+        self.stack.append((tag, hides))
+        self.hidden += hides
+        self.skip += tag in ('script', 'style')
+
+    def handle_endtag(self, tag):
+        # Незакрытые теги (`<p>` без `</p>`) снимаем до ближайшего своего.
+        if not any(t == tag for t, _ in self.stack):
+            return
+        while self.stack:
+            t, hides = self.stack.pop()
+            self.hidden -= hides
+            self.skip -= t in ('script', 'style')
+            if t == tag:
+                break
+
+    def handle_data(self, data):
+        if not self.hidden and not self.skip:
+            self.parts.append(data)
+
+
+def recorded_text(html):
+    parser = _RecordedText()
+    parser.feed(html)
+    return ' '.join(parser.parts)
 
 
 def _touch_of(client):
@@ -293,6 +344,136 @@ class CounterOnPagesTests(TestCase):
         self.client.force_login(user)
         html = self.client.get('/profile/').content.decode()
         self.assertIn('sendTitle: false', html)
+
+
+@override_settings(YANDEX_METRIKA_ID=METRIKA_ID)
+class WebvisorTests(TestCase):
+    """Вебвизор пишет только публичные страницы (решение владельца 08.10.2026).
+
+    В кабинетах на экране имена и оценки школьников, а запись Вебвизора — копия
+    экрана целиком. На публичных страницах из личного остаётся только имя
+    вошедшего в шапке, и его Вебвизор не записывает (`ym-hide-content`).
+    """
+
+    NAME = 'Иван Петров'
+
+    def _init_line(self, html):
+        line = re.search(r'ym\(%s, "init", \{[^}]*\}\);' % METRIKA_ID, html)
+        self.assertIsNotNone(line, 'нет вызова init')
+        return line.group(0)
+
+    def _login(self, username, role):
+        user = User.objects.create_user(username, password=PASSWORD, role=role,
+                                        first_name='Иван', last_name='Петров')
+        self.client.force_login(user)
+        return user
+
+    def test_cabinets_have_no_webvisor(self):
+        """Все четыре корня кабинетов: репетитор, ученик, профиль, календарь."""
+        self._login('prepod_vv', 'teacher')
+        for url in (reverse('teacher:groups'), '/profile/', '/calendar/'):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                init = self._init_line(response.content.decode())
+                self.assertIn('webvisor: false', init)
+                self.assertNotIn('webvisor: true', init)
+                self.assertIn('sendTitle: false', init)
+        self._login('uchenik_vv', 'student')
+        response = self.client.get('/student/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('webvisor: false', self._init_line(response.content.decode()))
+
+    def test_public_page_keeps_webvisor_for_logged_in(self):
+        self._login('uchenik_pub', 'student')
+        init = self._init_line(self.client.get('/catalog/').content.decode())
+        self.assertIn('webvisor: true', init)
+        self.assertNotIn('webvisor: false', init)
+        self.assertNotIn('sendTitle', init)
+        # Остальные параметры решение не трогало.
+        self.assertIn('clickmap: true, trackLinks: true, accurateTrackBounce: true', init)
+
+    def test_header_name_is_hidden_from_webvisor_on_public_pages(self):
+        """Каталог («Стол»), Rush, ВП, калькулятор: шапка одна — `_nav.html`."""
+        self._login('uchenik_hide', 'student')
+        for url in ('/catalog/', '/game/', '/vp/', '/calc2/'):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                html = response.content.decode()
+                self.assertIn('webvisor: true', self._init_line(html))
+                chip = re.search(r'<a class="([^"]*)" href="/profile/">(.*?)</a>', html, re.S)
+                self.assertIsNotNone(chip, 'нет плашки профиля в шапке')
+                classes = chip.group(1).split()
+                self.assertIn('nav-user', classes)
+                self.assertIn('ym-hide-content', classes)
+                self.assertIn(self.NAME, chip.group(2))
+                self.assertIn('ИП', chip.group(2))
+                # Имя в шапке — единственное место на странице, где оно видно.
+                self.assertEqual(html.count(self.NAME), 1)
+                self.assertNotIn(self.NAME, recorded_text(html))
+
+    # Чужие логины в запись не попадают: доски Rush (набор и день — одна общая
+    # таблица `game/_board_table.html`) и таблица лучших попыток ВП.
+
+    def _assert_logins_hidden(self, html, logins):
+        recorded = recorded_text(html)
+        for login in logins:
+            self.assertIn(login, html, 'логина нет на странице — проверять нечего')
+            self.assertNotIn(login, recorded)
+
+    def test_rush_set_board_is_hidden(self):
+        from game.tests.test_daily import played
+        from game.tests.test_sets import make_q, make_set
+        gset = make_set(make_q(3))
+        for login, score in (('igrok_odin', 300), ('igrok_dva', 200)):
+            played(User.objects.create_user(login, password=PASSWORD), gset, score)
+        html = self.client.get(reverse('game:set_page', args=[gset.code])).content.decode()
+        self.assertIn('webvisor: true', self._init_line(html))
+        self.assertIn('<table class="gb-table ym-hide-content">', html)
+        self.assertIn('Кто прошёл', recorded_text(html))   # заголовок доски остаётся
+        self._assert_logins_hidden(html, ['igrok_odin', 'igrok_dva'])
+
+    def test_rush_daily_board_is_hidden(self):
+        from game import daily as daily_mod
+        from game.tests.test_daily import make_q, played
+        make_q(30)
+        gset = daily_mod.get_daily_set('blitz')
+        played(User.objects.create_user('igrok_dnya', password=PASSWORD), gset, 150)
+        html = self.client.get(reverse('game:daily_board', args=['blitz'])).content.decode()
+        self.assertIn('<table class="gb-table ym-hide-content">', html)
+        self._assert_logins_hidden(html, ['igrok_dnya'])
+
+    def test_vp_landing_board_is_hidden(self):
+        from vp.tests.helpers import make_published
+        from vp.tests.test_board import _attempt
+        variant = make_published('wv-board')
+        _attempt(variant, User.objects.create_user('vp_igrok', password=PASSWORD),
+                 score=80, seconds=1200)
+        me = self._login('vp_ya', 'student')
+        _attempt(variant, me, score=60, seconds=1500)
+        html = self.client.get(reverse('vp:index')).content.decode()
+        self.assertIn('class="vp-land-rows ym-hide-content"', html)
+        self.assertIn('Лучшие попытки', recorded_text(html))
+        self._assert_logins_hidden(html, ['vp_igrok', 'vp_ya'])
+
+    def test_vp_my_attempts_list_is_hidden_header_and_tabs_stay(self):
+        from vp.tests.helpers import make_published
+        from vp.tests.test_board import _attempt
+        variant = make_published('wv-my')
+        me = self._login('vp_moi', 'student')
+        _attempt(variant, me, score=70, seconds=1300)
+        html = self.client.get(reverse('vp:my')).content.decode()
+        recorded = recorded_text(html)
+        # Список с баллами и местами скрыт…
+        self.assertIn('в таблице · 1-е', html)
+        self.assertNotIn('в таблице', recorded)
+        self.assertIn(variant.title, html)
+        self.assertNotIn(variant.title, recorded)
+        # …а шапка страницы и фильтры остаются в записи.
+        self.assertIn('Мои попытки', recorded)
+        self.assertIn('Все · 1', html)
+        self.assertIn('Все · 1', recorded)
 
 
 class EveryRootTemplateTests(SimpleTestCase):

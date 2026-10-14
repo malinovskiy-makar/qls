@@ -352,7 +352,13 @@ nav.site-nav {
     </button>
     {% include '_theme_toggle.html' %}
     {% if user.is_authenticated %}
-      <a class="nav-user" href="/profile/">
+      {% comment %}
+      `ym-hide-content` — класс справки Метрики: Вебвизор не записывает
+      содержимое элемента и его потомков (имя, инициалы, фото). Кабинеты
+      Вебвизор не пишут вовсе, а на публичных страницах эта шапка — то
+      единственное место, где видно, кто вошёл (см. `_metrika.html`).
+      {% endcomment %}
+      <a class="nav-user ym-hide-content" href="/profile/">
         <span class="nav-ava">
           {% if nav_avatar_url %}<img src="{{ nav_avatar_url }}" alt="">{% else %}{{ nav_user_initials }}{% endif %}
         </span>

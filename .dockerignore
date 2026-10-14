@@ -47,3 +47,6 @@ deploy/certbot/
 .pytest_cache/
 .ruff_cache/
 htmlcov/
+
+# Окружение локального стенда нагрузки — в образ не нужно.
+deploy/env.loadtest
