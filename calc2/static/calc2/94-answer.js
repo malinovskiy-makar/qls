@@ -547,6 +547,7 @@ function buildAnswer() {
   decorateTables();
   hideEchoes();
   hideDrainedBlocks();
+  liftTableHead();
   if (typeof applySelf === 'function') applySelf();
   markFirstSection();
 }
@@ -650,6 +651,34 @@ function decorateTables() {
   }
 }
 
+/* Подписи столбцов «до», «после» стоят на строке заголовка раздела «До и после …», только если таблица идёт
+   СРАЗУ за заголовком (правка А2 по приёмке 14.10, сессия 5). У квоты между заголовком и таблицей стоят «Коридор
+   цен» и «Выбранная цена», и поднятые подписи ложились поверх второй строки — там подписи своей строкой над
+   таблицей. «Видно» решается по вычисленному стилю узлов внутри блока (колонка может быть закрыта, и
+   прямоугольников нет ни у кого); класс ставится на блок — атрибут, наблюдатель табло его пропускает. */
+function liftTableHead() {
+  const tx = document.getElementById('info-tax');
+  if (!tx) return;
+  const tbl = tx.querySelector('table.tx-table');
+  let lift = !!(tbl && tx.hasAttribute('data-head'));
+  if (lift) {
+    const shown = (el) => {
+      for (let n = el; n && n !== tx; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      }
+      return true;
+    };
+    const w = document.createTreeWalker(tx, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (tbl.contains(t)) break;
+      if (!(tbl.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_PRECEDING)) break;
+      if (t.nodeValue.trim() && shown(t.parentElement)) { lift = false; break; }
+    }
+  }
+  if (tx.classList.contains('tx-lift') !== lift) tx.classList.toggle('tx-lift', lift);
+}
+
 /* Строка «Ответа»: подпись слева, значение справа, изменение «50 − 10» под значением.
    Классы .ans-cell / .ans-lab / .ans-not / .ans-val / .ans-was и data-src —
    прежние (меняется вид, а не смысл): по ним работают паритет и «Сначала сам».
@@ -710,8 +739,9 @@ function burdenOn() {
 function burdenNoteText() {
   if (!burdenOn()) return '';
   const form = (typeof taxFormKey === 'function') ? taxFormKey() : 'unit';
-  return (form && form !== 'unit') ? 'При налоге долей от цены клин растёт вместе с ценой.'
-    : 'Не зависит от того, кто платит по закону: переключите сторону, и числа не изменятся.';
+  /* У потоварного налога строки нет (сессия 5, А4): «переключите сторону, и числа не изменятся» — интерфейс и та же
+     мысль, что вопрос «Разбора» «Кто на самом деле платит налог?». */
+  return (form && form !== 'unit') ? 'При налоге долей от цены клин растёт вместе с ценой.' : '';
 }
 function buildBurden() {
   const box = document.getElementById('ans-burden');

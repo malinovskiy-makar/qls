@@ -508,6 +508,34 @@ function syncOnChart() {
   const c = vis('curves'), a = vis('areas'), m = vis('more');
   box.querySelectorAll('.vg-sub').forEach(h => { h.hidden = !(h.dataset.vg === 'curves' ? c && (a || m) : a && (c || m)); });
   box.hidden = !(c || a || m);
+  hideEmptyGroupTitles();
+}
+/* Заголовок группы «Условия», под которым не осталось ни одного видимого органа, не показывается (правка А3 по
+   приёмке 14.10, сессия 5): галочки картинки уехали в «Вид» (ADR 0152), а «Средние и предельные затраты», «Полные
+   затраты» в «Издержках фирмы» и «Области» в КПВ остались висеть пустыми. Решение по содержимому, для всех
+   моделей: группа заголовка — соседи до следующего такого же заголовка (у h3.sec-head — его раздел); «видно» —
+   по вычисленному стилю до «Условия» (колонка бывает спрятана классом, прямоугольников тогда нет). Класс на узле
+   без id: вид, не модель. */
+const GROUP_TITLE_SEL = '.curve-group-title, .vsub, .section-title';
+const ORGAN_SEL = 'input:not([type=hidden]), button, select, textarea, math-field, .edval, .tgl-sw, [role=switch]';
+function hideEmptyGroupTitles() {
+  const tp = document.getElementById('tools-panel');
+  if (!tp) return;
+  const shown = (el) => {
+    for (let n = el; n && n !== tp; n = n.parentElement) {
+      if (n.hidden) return false;
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    }
+    return true;
+  };
+  const hasOrgan = (nodes) => nodes.some(n => n.nodeType === 1 && ((n.matches(ORGAN_SEL) && shown(n)) || [...n.querySelectorAll(ORGAN_SEL)].some(shown)));
+  tp.querySelectorAll(GROUP_TITLE_SEL).forEach(t => {
+    if (t.closest('.vg-onchart')) return;
+    const group = [];
+    for (let n = t.nextElementSibling; n && !n.matches(GROUP_TITLE_SEL); n = n.nextElementSibling) group.push(n);
+    t.classList.toggle('grp-empty', !hasOrgan(group));
+  });
 }
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из
    холста до легенды, PNG и .tex (они собирают то, что нарисовано). Протяжки (клин налога) —

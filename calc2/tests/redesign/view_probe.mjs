@@ -10,9 +10,16 @@
         .tex (buildTex) нет; вернул → как было; в labor снятая «Излишек фирм» прячет закраску;
      В  ссылка «Поделиться» туда и обратно для каждой переехавшей галочки и для areaHidden; старая ссылка с
         showCS: false (снята на коммите до этапа Г, claude/panels_night/old_link_taxes_showCS_false.txt) прячет
-        CS; каждый щелчок — шаг истории; «Вид по умолчанию» — старт модели.
+        CS; каждый щелчок — шаг истории; «Вид по умолчанию» — старт модели; (сессия 5, А3) у каждой строки «На
+        графике» во всех моделях имя словами стоит левее обозначения, имя не начинается с запятой, строка не
+        начинается обозначением («MC , предельные…», «TP (общий продукт)»);
+     Г  (сессия 5, правка А1 по приёмке 14.10) «Отменить» с одного нажатия: в каждой модели щелчок человека по каждой
+        строке «На графике» (галочка, строка закраски, тумблер заводов, глаз рыночных D и S, цвет f′, имя суммарной
+        КПВ и Z) — ровно один новый шаг истории; одно «Отменить» (кнопка в шапке) возвращает состояние модели
+        (histSig), картинку (пути холста) и сам орган; «Повторить» — обратно; на свежей модели после «Отменить»
+        снова undo: false. Плюс сценарий владельца на свежей загрузке taxes: CS и DWL.
 
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/view_probe.mjs [--only А] [--before путь]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/view_probe.mjs [--only А,Г] [--before путь]
    ENGINES=chromium,webkit (по умолчанию оба). Код 0 — всё сошлось.          */
 import * as pw from 'playwright';
 import fs from 'fs';
@@ -242,8 +249,148 @@ async function sectionV() {
     await P3.ctx.close();
     ok('старая ссылка с showCS: false — CS спрятан, галочка снята', o.show === false && o.chk === false && o.paths === 0, JSON.stringify(o));
   } else ok('старая ссылка с showCS: false есть', false, 'нет файла ' + OLD_LINK);
+  // А3 (сессия 5): строки «На графике» — имя слева, обозначение справа (как в taxes и на макете 08_view_costs).
+  const order = [];
+  let nNamed = 0;
+  for (const key of KEYS) {
+    await pick(page, key);
+    await openView(page);
+    await page.waitForTimeout(150);
+    const r = await page.evaluate(() => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const txt = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation, .crow-auto, .crow-more, .fc-menu, .crow-sliders').forEach(x => x.remove()); c.querySelectorAll('.katex').forEach(x => x.replaceWith('[' + x.textContent + ']')); return c.textContent.replace(/\s+/g, ' ').trim(); };
+      const out = []; let n = 0;
+      [...document.querySelectorAll('#wrench-pop .vg-onchart .vg-row')].filter(vis).forEach(row => {
+        const t = txt(row);
+        if (/^\[?[A-Za-zА-Я′ʹ'()₀-₉]{1,6}\]?\s*[,(]/.test(t)) out.push('строка начинается обозначением «' + t.slice(0, 30) + '»');
+        const nm = [...row.querySelectorAll('.show-name, .fc-name')].find(vis);
+        const nt = [...row.querySelectorAll('.show-not, .fc-notation')].find(e => vis(e) && e.textContent.trim());
+        if (!nm) return;
+        n++;
+        const nmt = txt(nm);
+        if (/^\s*,/.test(nmt)) out.push('имя с запятой «' + nmt.slice(0, 30) + '»');
+        if (nt && nm.getBoundingClientRect().left >= nt.getBoundingClientRect().left) out.push('обозначение левее имени «' + t.slice(0, 30) + '»');
+        if (nt && (nm.compareDocumentPosition(nt) & Node.DOCUMENT_POSITION_PRECEDING) && getComputedStyle(nt).order <= getComputedStyle(nm).order) out.push('узел обозначения раньше имени «' + t.slice(0, 30) + '»');
+      });
+      return { out, n };
+    });
+    nNamed += r.n;
+    r.out.forEach(x => order.push(key + ': ' + x));
+    await closeView(page);
+  }
+  ok('строк «На графике» с именем ' + nNamed + ': имя словами левее обозначения, без запятой впереди', nNamed > 0 && !order.length, order.slice(0, 8).join(' | '));
   ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
+}
+
+/* Г. «Отменить» с одного нажатия (сессия 5, А1). Щелчки — настоящие (page.click / mouse): только они ставят метку
+   «действие человека», и только так видно, что щелчок по «Отменить» закрывает «Вид графика». */
+const ROW_SEL = '#wrench-pop .vg-onchart .vg-row';
+async function rowsOf(page) {
+  return page.evaluate((sel) => {
+    const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+    return [...document.querySelectorAll(sel)].map((r, i) => {
+      if (!vis(r)) return null;
+      const has = (q) => [...r.querySelectorAll(q)].some(vis);
+      const kind = r.querySelector('input[type=checkbox]') && vis(r.querySelector('input[type=checkbox]').closest('label') || r) ? 'chk'
+        : has('.tgl-sw') ? 'tgl' : has('.fc-eye') ? 'eye' : has('.cpick-btn') ? 'color' : has('.edval-text') ? 'name' : null;
+      return kind ? { i, kind, name: r.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) } : null;
+    }).filter(Boolean);
+  }, ROW_SEL);
+}
+const snapOf = (page) => page.evaluate(() => ({
+  sig: histSig(collectModelState()),
+  /* Картинка — набор путей холста (закраска, заливка, линия, видимость), без длины записи d: окно после перерисовки
+     то же, а числа в d округляются по-разному. */
+  pic: [...document.querySelectorAll('#chart path')].filter(p => !p.closest('[data-service]')).map(p => (p.getAttribute('data-legend') || '') + '|' + (p.getAttribute('fill') || p.style.fill || '') + '|' + (p.getAttribute('stroke') || p.style.stroke || '') + '|' + getComputedStyle(p).display + getComputedStyle(p).opacity).sort().join(';'),
+  can: historyCan(), undo: histOf().undo.length,
+}));
+function sigDiff(a, b) {
+  const x = JSON.parse(a), y = JSON.parse(b), out = [];
+  [0, 1].forEach(i => new Set([...Object.keys(x[i]), ...Object.keys(y[i])]).forEach(k => {
+    if (JSON.stringify(x[i][k]) !== JSON.stringify(y[i][k])) out.push(k + ' ' + String(JSON.stringify(x[i][k])).slice(0, 60) + ' → ' + String(JSON.stringify(y[i][k])).slice(0, 60));
+  }));
+  return ' (' + out.slice(0, 3).join('; ') + ')';
+}
+async function actOnRow(page, row) {
+  const base = ROW_SEL + ':nth-child(' + 0 + ')';
+  const h = await page.evaluateHandle(([sel, i]) => document.querySelectorAll(sel)[i], [ROW_SEL, row.i]);
+  const el = h.asElement();
+  if (row.kind === 'chk') { const inp = await el.$('input[type=checkbox]'); await inp.click({ force: true }); }
+  else if (row.kind === 'tgl') { const t = await el.$('.tgl-sw'); await t.click(); }
+  else if (row.kind === 'eye') { const t = await el.$('.fc-eye'); await t.click(); }
+  else if (row.kind === 'color') {
+    const t = await el.$('.cpick-btn'); await t.click();
+    await page.waitForTimeout(150);
+    const sw = await page.$('.cpick-menu .cpick-sw[aria-checked="false"]');
+    if (sw) await sw.click();
+  } else if (row.kind === 'name') {
+    const t = await el.$('.edval-text'); await t.click();
+    await page.waitForTimeout(150);
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+    await page.keyboard.type('Имя проверки');
+    await page.keyboard.press('Enter');
+  }
+  void base;
+}
+async function sectionG() {
+  head('Г. «Отменить» с одного нажатия: каждая строка «На графике»');
+  const { ctx, page, errors } = await openPage();
+  const bads = [];
+  let nRows = 0;
+  const kinds = {};
+  for (const key of KEYS) {
+    await pick(page, key);
+    await page.click('#btn-view'); await page.waitForTimeout(200);
+    const rows = await rowsOf(page);
+    await page.click('#btn-view'); await page.waitForTimeout(150);
+    for (const row of rows) {
+      /* Каждая строка — на свежей загрузке модели по адресу (как у человека): после pickScene из другой модели в
+         форме остаются узлы её списка кривых, и сравнение состояний «до» и «после «Отменить» шумело бы. */
+      await page.evaluate(() => resetSceneMemory());
+      await page.goto(BASE + '/calc2/?m=' + key, { waitUntil: 'load', timeout: 40000 });
+      await page.waitForFunction((k) => typeof pickScene === 'function' && typeof modelKeyOf === 'function' && modelKeyOf() === k, key, { timeout: 40000 });
+      await page.waitForTimeout(700);
+      await page.click('#btn-view'); await page.waitForTimeout(250);
+      const s0 = await snapOf(page);
+      const tag = key + ' «' + row.name + '» (' + row.kind + ')';
+      if (s0.can.undo) { bads.push(tag + ': на свежей модели undo: true'); continue; }
+      await actOnRow(page, row);
+      await page.waitForTimeout(800);
+      const s1 = await snapOf(page);
+      nRows++; kinds[row.kind] = (kinds[row.kind] || 0) + 1;
+      if (s1.undo !== s0.undo + 1) { bads.push(tag + ': шагов истории ' + (s1.undo - s0.undo)); continue; }
+      if (s1.sig === s0.sig) { bads.push(tag + ': щелчок не изменил состояние'); continue; }
+      await page.click('#btn-undo'); await page.waitForTimeout(800);
+      const s2 = await snapOf(page);
+      if (s2.sig !== s0.sig) bads.push(tag + ': одно «Отменить» не вернуло состояние' + sigDiff(s0.sig, s2.sig));
+      if (s2.pic !== s0.pic) bads.push(tag + ': одно «Отменить» не вернуло картинку');
+      if (s2.can.undo) bads.push(tag + ': после «Отменить» на свежей модели undo: true');
+      if (!s2.can.redo) { bads.push(tag + ': «Повторить» выключена'); continue; }
+      await page.click('#btn-redo'); await page.waitForTimeout(800);
+      const s3 = await snapOf(page);
+      if (s3.sig !== s1.sig) bads.push(tag + ': «Повторить» не вернула правку');
+      if (s3.pic !== s1.pic) bads.push(tag + ': «Повторить» не вернула картинку');
+    }
+  }
+  ok('строк «На графике» проверено ' + nRows + ' ' + JSON.stringify(kinds) + ': один щелчок — один шаг; одно «Отменить» возвращает состояние, картинку и орган; «Повторить» — обратно', nRows > 0 && !bads.length, bads.length + ': ' + bads.slice(0, 8).join(' | '));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+  // Сценарий владельца на свежей загрузке: taxes, «Излишек потребителя» и «Потери общества».
+  for (const [label, sel, probe] of [['«Излишек потребителя» (chk-cs)', '#chk-cs', 'STATE.showCS'],
+    ['«Потери общества» (areaHidden)', '#wrench-pop .vg-gen[data-key="Потери общества (DWL)"] input', "!STATE.areaHidden.includes('Потери общества (DWL)')"]]) {
+    const P = await openPage(BASE + '/calc2/?m=taxes');
+    await P.page.waitForTimeout(800);
+    const c0 = await P.page.evaluate(() => historyCan());
+    await P.page.click('#btn-view'); await P.page.waitForTimeout(300);
+    await P.page.click(sel, { force: true }); await P.page.waitForTimeout(800);
+    const c1 = await P.page.evaluate((x) => ({ can: historyCan(), on: eval(x), dwl: document.querySelectorAll('#chart [data-legend="Потери общества (DWL)"]').length }), probe);
+    await P.page.click('#btn-undo'); await P.page.waitForTimeout(800);
+    const c2 = await P.page.evaluate((x) => ({ can: historyCan(), on: eval(x), dwl: document.querySelectorAll('#chart [data-legend="Потери общества (DWL)"]').length }), probe);
+    ok('свежая загрузка taxes, ' + label + ': до щелчка undo:false, после — undo:true, одно «Отменить» вернуло признак, undo:false',
+      !c0.undo && c1.can.undo && !c1.on && c2.on && !c2.can.undo && c2.can.redo && c2.dwl > 0, JSON.stringify({ c0, c1, c2 }));
+    await P.ctx.close();
+  }
 }
 
 for (const name of ENGINES) {
@@ -255,6 +402,7 @@ for (const name of ENGINES) {
   if (want('А')) await sectionA();
   if (want('Б')) await sectionB();
   if (want('В')) await sectionV();
+  if (want('Г')) await sectionG();
   await browser.close();
 }
 console.log('\nИТОГ view_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));

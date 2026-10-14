@@ -78,10 +78,18 @@ function togglesInOrder() {
   const all = [...document.querySelectorAll('.app .tgl-sw')];
   return all.map((el, i) => [el._tgIdx != null ? el._tgIdx : 1e6 + i, el]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
+/* Кнопка, которая раскрывает окно, меню или раздел (aria-expanded, aria-haspopup: «Вид графика», «Поделиться»,
+   клавиатура поля, «⋯» карточки), — вид, а не модель (тихие панели, сессия 5, правка А1). Её «открыто» в форме
+   давало лишний шаг: щелчок по «Отменить» закрывает «Вид графика», кнопка теряет «нажата», и история сначала
+   записывала это закрытие шагом, а потом его же и отменяла — галочку «На графике» возвращало только второе
+   нажатие. */
+function isDisclosureBtn(el) {
+  return el.tagName === 'BUTTON' && (el.hasAttribute('aria-expanded') || el.hasAttribute('aria-haspopup'));
+}
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];
-  return [...app.querySelectorAll('[id]')].filter(el => !FORM_SKIP_IDS.has(el.id) && !el.closest('#chart, #graph-wrap svg, .modal, .pop'));
+  return [...app.querySelectorAll('[id]')].filter(el => !FORM_SKIP_IDS.has(el.id) && !isDisclosureBtn(el) && !el.closest('#chart, #graph-wrap svg, .modal, .pop'));
 }
 function captureForm() {
   const out = {};

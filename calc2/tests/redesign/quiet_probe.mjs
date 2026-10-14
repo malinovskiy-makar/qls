@@ -11,10 +11,12 @@
         одна из ступеней 18/600, 14/600, 14/500, 14/400, 13/600, 12/500, шрифт Montserrat (KaTeX и MathLive не
         считаются); узлов с моноширинным шрифтом вне окна клавиатуры — 0; зазор подпись → поле ≥ 6 px;
      К  тёмная тема: фон полей и списков «Условия» #232019; «Сдвиг MC» в mono, mono-nat, mono-d1 без индекса
-        (нет .msupsub), у smallopen «Pw» с индексом; в calc2.css нет #11151d.
+        (нет .msupsub), у smallopen «Pw» с индексом; в calc2.css нет #11151d;
+     З  (сессия 5, правка А3 по приёмке 14.10) 42 модели и costs «Задам кривые»: в «Условии» нет видимого заголовка
+        группы или раздела (h3.sec-head, .curve-group-title, .vsub, .section-title) без видимого органа под ним.
 
    ENGINES=chromium,webkit (по умолчанию оба). KEYS="sd taxes" — выборка моделей.
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/quiet_probe.mjs [--only А]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/quiet_probe.mjs [--only А,З]
    Код 0 — всё сошлось.                                                     */
 import * as pw from 'playwright';
 import fs from 'fs';
@@ -233,6 +235,48 @@ async function sectionK() {
   await ctx.close();
 }
 
+async function sectionZ() {
+  head('З. Нет пустых заголовков в «Условии»');
+  const { ctx, page, errors } = await openPage(1440, 'light');
+  const bads = [];
+  let n = 0;
+  const check = async (label) => {
+    const r = await page.evaluate(() => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const ORG = 'input:not([type=hidden]), button, select, textarea, math-field, .edval, .tgl-sw, [role=switch]';
+      const hasOrg = (nodes) => nodes.some(x => (x.matches(ORG) && vis(x)) || [...x.querySelectorAll(ORG)].some(vis));
+      const TIT = '.curve-group-title, .vsub, .section-title';
+      const tp = document.getElementById('tools-panel');
+      const out = [];
+      let cnt = 0;
+      tp.querySelectorAll('h3.sec-head').forEach(h => {
+        if (!vis(h)) return; cnt++;
+        const sec = h.closest('.section') || h.parentElement;
+        if (!hasOrg([...sec.children].filter(x => x !== h && !x.contains(h)))) out.push('«' + h.textContent.trim().slice(0, 40) + '»');
+      });
+      tp.querySelectorAll(TIT).forEach(t => {
+        if (!vis(t)) return; cnt++;
+        const g = [];
+        for (let x = t.nextElementSibling; x && !x.matches(TIT); x = x.nextElementSibling) g.push(x);
+        if (!hasOrg(g)) out.push('«' + t.textContent.trim().slice(0, 40) + '»');
+      });
+      return { out, cnt };
+    });
+    n += r.cnt;
+    r.out.forEach(x => bads.push(label + ': ' + x));
+  };
+  for (const key of KEYS) { await pick(page, key); await check(key); }
+  if (KEYS.includes('costs')) {
+    await pick(page, 'costs');
+    await page.evaluate(() => document.getElementById('cm-curves').click());
+    await page.waitForTimeout(400);
+    await check('costs «Задам кривые»');
+  }
+  ok('заголовков проверено ' + n + ': у каждого видимого есть видимый орган под ним', n > 0 && !bads.length, bads.slice(0, 8).join(' | '));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 for (const name of ENGINES) {
   eng = name;
   try { browser = await pw[name].launch(); } catch (e) {
@@ -242,6 +286,7 @@ for (const name of ENGINES) {
   if (want('А')) await sectionA();
   if (want('Ш')) await sectionSh();
   if (want('К')) await sectionK();
+  if (want('З')) await sectionZ();
   await browser.close();
 }
 console.log('\nИТОГ quiet_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));

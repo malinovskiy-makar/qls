@@ -592,11 +592,9 @@ function updateLaborBilateralPanel() {
   html += `<div class="stat"><span>Диапазон зарплаты</span><b>${fmt(b.Wlo)} … ${fmt(b.Whi)}</b></div>`;
   if (b.Wk != null) html += `<div class="stat"><span>Конкурентный ориентир Wk</span><b>${fmt(b.Wk)}</b></div>`;
   html += `<div class="stat"><span>Занятость на границах</span><b>${fmt(b.Lm)} и ${fmt(b.Lu)}</b></div>`;
-  html += '<div class="hint" style="margin-top:6px;">Один наниматель против одного профсоюза. У этой модели ' +
-    '<b>нет единственного равновесия</b>: если бы монопсонист диктовал условия один, зарплата упала бы до Wм; ' +
-    'если бы диктовал профсоюз, поднялась бы до Wп. Реальный исход лежит между и зависит от переговорной силы ' +
-    'сторон, которую модель не описывает. Показывать здесь одно «точное» число было бы ложной точностью, ' +
-    'поэтому показан диапазон.</div>';
+  /* «Один наниматель против одного профсоюза… нет единственного равновесия…» убрано (сессия 5, А4): та же мысль —
+     вопросы «Разбора» «Что такое двусторонняя монополия?», «Почему модель не даёт одного числа?», «От чего зависит
+     итог внутри диапазона?». */
   return html;
 }
 
@@ -646,7 +644,8 @@ function updateLaborPanel() {
       if (u.Lk != null) html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
       if (u.Wk != null) html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
       if (u.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
-      html += '<div class="hint">Профсоюз-монополист продаёт труд там, где MRL&nbsp;=&nbsp;S, и берёт зарплату Wп с кривой спроса, ВЫШЕ конкурентной, но занятость НИЖЕ. Зеркало монопсонии. Серым закрашены потери общества.</div>';
+      // Как профсоюз выбирает Lп и Wп — абзац «Условия» в «Разборе»; здесь только чтение картинки (сессия 5, А4).
+      html += '<div class="hint">Серым закрашены потери общества.</div>';
     } else {
       html += `<div class="stat"><span>Зарплата профсоюза Wп</span><b>${fmt(u.W)}</b></div>`;
       if (u.binding) {
@@ -670,7 +669,7 @@ function updateLaborPanel() {
     if (m.Lk != null) html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(m.Lk)}</b></div>`;
     if (m.Wk != null) html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(m.Wk)}</b></div>`;
     if (m.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
-    html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм&nbsp;=&nbsp;W_s(Lм), ниже их предельного продукта. Серым закрашены потери общества.</div>`;
+    html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм по кривой предложения при занятости Lм, ниже их предельного продукта. Серым закрашены потери общества.</div>`;
     if (bind) {
       html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
       html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
@@ -705,7 +704,7 @@ function updateLaborPanel() {
         html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(w.firmCS)}</b></div>`;
         html += `<div class="stat"><span>$DWL$ (потери)</span><b>${fmt(w.dwl)}</b></div>`;
       }
-      html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при W_min, возникает безработица (избыток предложения труда).</div>`;
+      html += `<div class="hint">МРОТ выше равновесия: занятость падает до спроса при $W_{\\min}$, возникает безработица (избыток предложения труда).</div>`;
     } else if (STATE.laborMinOn && STATE.laborMinW > 0) {
       html += '<div class="hint" style="margin-top:6px;">МРОТ ниже равновесия, поэтому не связывает. Рынок в равновесии.</div>';
     }

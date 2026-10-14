@@ -20,9 +20,18 @@
          блочных потомков, кроме внутренностей .katex, p.ex-q > b, .ex-a, .tbl;
          щелчки по полосе и вопросам — не шаг истории, ссылка та же; 1000 —
          полоса есть и свёрнута; 390 — вкладка «Разбор» раскрыта, полосы нет.
+     Д   (сессия 5, правка А2 по приёмке 14.10) подписи столбцов «до / после»: 42 модели на старте и состояния
+         вмешательств (taxes налог, субсидия, НДС, акциз; ceil потолок и пол; quota; mono налог 20, субсидия,
+         потолок; smallopen тариф и квота; labor с МРОТ), 1440 и 1280: прямоугольник подписей не пересекается ни с
+         одной другой видимой строкой колонки; в taxes подписи на строке заголовка «До и после налога», в quota —
+         своей строкой под «Выбранной ценой»;
+     Е   (сессия 5, правка А5; решение владельца 14.10, Notion …81c3…) субсидия: «Расходы бюджета» — положительное
+         число без знака: taxes субсидия 20 — «Излишек потребителя» 1 250 → 1 800, «Излишек производителя»
+         1 250 → 1 800, «Расходы бюджета» 0 → 1 200, «Общественное благосостояние» 2 500 → 2 400; тождество
+         «SW после = до − DWL» и «SW после = CS + PS − расходы» при субсидии 10, 20, 35; mono субсидия 10 — 0 → 450.
 
    ENGINES=chromium,webkit (по умолчанию оба). Нет движка — громкий пропуск.
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А,Д,Е]
    Код 0 — всё сошлось.                                                     */
 import * as pw from 'playwright';
 
@@ -567,9 +576,13 @@ async function sectionV3() {
     const ps = [...c.querySelectorAll('.sb-note')].flatMap(nt => nt.querySelector('p') ? [...nt.querySelectorAll(':scope > p')] : [nt]).map(p => p.textContent.replace(/\s+/g, ' ').trim());
     return { ps, q: document.querySelectorAll('#ex-body p.ex-q').length };
   });
-  const start = ['Цена покупателя и цена продавца разошлись', 'Не зависит от того, кто платит по закону', 'Результат не зависит от того'];
-  ok('taxes: «Разбор» начинается ушедшими заметками, по одной', start.every((t, i) => ex.ps[i] && ex.ps[i].startsWith(t)) && start.every(t => ex.ps.filter(p => p.startsWith(t)).length === 1), ex.ps.slice(0, 4).map(p => p.slice(0, 40)).join(' | '));
-  ok('taxes: дальше прежнее вступление и 4 вопроса', /^Потоварный налог/.test(ex.ps[3] || '') && ex.q === 4, (ex.ps[3] || '').slice(0, 40) + ' / ' + ex.q);
+  /* Сессия 5, правка А4 (README 6, 10): «Не зависит от того, кто платит по закону: переключите сторону…» (интерфейс) и
+     «Результат не зависит от того, кто формально платит налог…» (та же мысль, что вопрос «Кто на самом деле платит
+     налог?») из «Разбора» убраны; осталась одна ушедшая заметка. */
+  const start = ['Цена покупателя и цена продавца разошлись'];
+  ok('taxes: «Разбор» начинается ушедшей заметкой, одной', start.every((t, i) => ex.ps[i] && ex.ps[i].startsWith(t)) && start.every(t => ex.ps.filter(p => p.startsWith(t)).length === 1)
+    && !ex.ps.some(p => /^(Не зависит от того, кто платит|Результат не зависит от того)/.test(p)), ex.ps.slice(0, 4).map(p => p.slice(0, 40)).join(' | '));
+  ok('taxes: дальше прежнее вступление и 4 вопроса', /^Потоварный налог/.test(ex.ps[start.length] || '') && ex.q === 4, (ex.ps[start.length] || '').slice(0, 40) + ' / ' + ex.q);
   const quiet = [];
   for (const key of KEYS) {
     await pick(page, key);
@@ -596,6 +609,110 @@ async function sectionV3() {
   await ctx.close();
 }
 
+/* ── Д (сессия 5, А2): подписи «до / после» не ложатся на чужие строки ─────────── */
+const headOverlaps = (page) => page.evaluate(() => {
+  const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+  const col = document.querySelector('#params-panel > .side-inner');
+  const out = [];
+  const info = [];
+  [...col.querySelectorAll('table.tx-table')].filter(vis).forEach(t => {
+    const ths = [...t.querySelectorAll('tr:first-child th')].filter(th => vis(th) && th.textContent.trim());
+    if (!ths.length) return;
+    const rs = ths.map(th => { const r = document.createRange(); r.selectNodeContents(th); return r.getBoundingClientRect(); }).filter(r => r.width > 0);
+    if (!rs.length) return;
+    const R = { l: Math.min(...rs.map(r => r.left)), r: Math.max(...rs.map(r => r.right)), t: Math.min(...rs.map(r => r.top)), b: Math.max(...rs.map(r => r.bottom)) };
+    const hr = t.querySelector('tr');
+    const tx = t.closest('#info-tax');
+    // top — от строки заголовка раздела (верх блока плюс его отступ сверху).
+    info.push({ lift: !!(tx && tx.classList.contains('tx-lift')), top: tx ? Math.round(R.t - tx.getBoundingClientRect().top - parseFloat(getComputedStyle(tx).paddingTop)) : null });
+    // Строки колонки: строки табло и «Ответа», строки таблицы, заголовки, абзацы.
+    [...col.querySelectorAll('.stat, .ans-cell, tr, .section-title, .ans-ghead, h3, p, .warn, .ff, .burden-cols')].filter(e => vis(e) && e !== hr && !e.contains(t) && !hr.contains(e) && !t.contains(e) || (t.contains(e) && e.tagName === 'TR' && e !== hr && vis(e))).forEach(e => {
+      // Прямоугольник ТЕКСТА строки (не коробки целиком): пустые поля строки не мешают.
+      const rg = document.createRange(); rg.selectNodeContents(e);
+      [...rg.getClientRects()].forEach(q => {
+        if (q.width < 1 || q.height < 1) return;
+        const ix = Math.min(R.r, q.right) - Math.max(R.l, q.left), iy = Math.min(R.b, q.bottom) - Math.max(R.t, q.top);
+        if (ix > 1 && iy > 1) out.push((e.className || e.tagName) + ' «' + e.textContent.replace(/\s+/g, ' ').trim().slice(0, 30) + '»');
+      });
+    });
+  });
+  return { out: [...new Set(out)], info };
+});
+async function sectionD() {
+  head('Д. «до / после» не наезжают на строки колонки');
+  const states = [['taxes налог 20', 'taxes', "setType('tax'); setTaxForm('unit'); setTax(20);"],
+    ['taxes субсидия 20', 'taxes', "setType('subsidy'); setTaxForm('unit'); setTax(20);"],
+    ['taxes НДС 20 %', 'taxes', "setType('tax'); setTaxForm('vat'); setTax(20);"],
+    ['taxes акциз 20 %', 'taxes', "setType('tax'); setTaxForm('excise'); setTax(20);"],
+    ['ceil потолок', 'ceil', ''], ['ceil пол 70', 'ceil', "setType('floor'); setPReg(70);"],
+    ['quota', 'quota', ''],
+    ['mono налог 20', 'mono', "setType('tax'); setTax(20);"], ['mono субсидия 10', 'mono', "setType('subsidy'); setTax(10);"],
+    ['mono потолок 50', 'mono', "setType('ceil'); setPReg(50);"],
+    ['smallopen тариф', 'smallopen', "setOpenPw(30); setOpenTool('tariff'); STATE.openTariff = 5;"],
+    ['smallopen квота', 'smallopen', "setOpenPw(30); setOpenTool('quota'); STATE.openQuota = 20;"],
+    ['labor МРОТ', 'labor', "const c = document.getElementById('chk-labmin'); if (!c.checked) c.click();"]];
+  for (const W of [1440, 1280]) {
+    const { ctx, page, errors } = await openThemed(W, 'light');
+    const bads = [];
+    let nTables = 0;
+    const run = async (label, key, x) => {
+      await pick(page, key, x);
+      const r = await headOverlaps(page);
+      nTables += r.info.length;
+      if (r.out.length) bads.push(label + ': ' + r.out.join(', '));
+      return r;
+    };
+    for (const key of KEYS) await run(key, key, '');
+    const got = {};
+    for (const [label, key, x] of states) got[label] = await run(label, key, x);
+    ok(W + ': ' + (KEYS.length + states.length) + ' состояний, таблиц с «до / после» ' + nTables + ': подписи не пересекаются со строками колонки', !bads.length && nTables > 0, bads.slice(0, 6).join(' | '));
+    const tx = got['taxes налог 20'].info[0] || {};
+    ok(W + ': taxes — «до / после» на строке заголовка «До и после налога» (tx-lift, сверху блока ≤ 4 px)', tx.lift === true && tx.top != null && tx.top <= 4, JSON.stringify(tx));
+    const q = got['quota'].info[0] || {};
+    ok(W + ': quota — «до / после» своей строкой (не подняты к заголовку)', q.lift === false && q.top > 30, JSON.stringify(q));
+    ok(W + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
+/* ── Е (сессия 5, А5): «Расходы бюджета» положительным ───────────────────────── */
+async function sectionE() {
+  head('Е. Субсидия: «Расходы бюджета» положительным числом');
+  const { ctx, page, errors } = await openThemed(1440, 'light');
+  await pick(page, 'taxes', "setType('subsidy'); setTaxForm('unit'); setTax(20);");
+  const rows = await tableRows(page);
+  const got = rows.map(r => r.word + ' ' + r.before + ' → ' + r.after).join(' | ');
+  ok('taxes субсидия 20: «Излишек потребителя» 1 250 → 1 800, «Излишек производителя» 1 250 → 1 800, «Расходы бюджета» 0 → 1 200, «Общественное благосостояние» 2 500 → 2 400',
+    rows.map(r => r.word + ' ' + n(r.before) + '→' + n(r.after)).join('|') === 'Излишек потребителя 1250→1800|Излишек производителя 1250→1800|Расходы бюджета 0→1200|Общественное благосостояние 2500→2400', got);
+  const bud = rows.find(r => r.word === 'Расходы бюджета');
+  ok('taxes субсидия 20: в строке «Расходы бюджета» нет знака минус (ни «-», ни «−»)', !!bud && !/[-−]/.test(bud.before + bud.after), JSON.stringify(bud));
+  for (const sv of [10, 20, 35]) {
+    await pick(page, 'taxes', "setType('subsidy'); setTaxForm('unit'); setTax(" + sv + ');');
+    const r = await page.evaluate(() => {
+      const t = document.querySelector('#info-tax .tx-table');
+      const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+      const get = (lab) => { const tr = [...t.querySelectorAll('tr')].find(x => x.children[0] && tx(x.children[0]) === lab); return tr ? [tx(tr.children[1]), tx(tr.children[2])] : null; };
+      return { sw: get('SW'), dwl: get('DWL'), bud: get('Бюджет (расход)'), st: { cs0: STATE.cs, ps0: STATE.ps, cs: STATE.csTax, ps: STATE.psTax, b: STATE.budget, dwl: STATE.dwl } };
+    });
+    const s0 = r.st.cs0 + r.st.ps0, s1 = r.st.cs + r.st.ps + r.st.b;
+    const okId = r.sw && r.bud && Math.abs(s1 - (s0 - r.st.dwl)) < 1e-6 && r.st.b < 0
+      && Math.abs(n(r.bud[1]) - Math.abs(r.st.b)) < 0.01 && Math.abs(n(r.sw[1]) - (r.st.cs + r.st.ps - n(r.bud[1]))) < 0.02 && !/[-−]/.test(r.bud[1]);
+    ok('субсидия ' + sv + ': SW после = до − DWL и = CS + PS − расходы; расходы ' + (r.bud && r.bud[1]) + ' без знака (STATE.budget ' + Math.round(r.st.b * 100) / 100 + ')', !!okId, JSON.stringify(r));
+  }
+  await pick(page, 'mono', "setType('subsidy'); setTax(10);");
+  const m = await page.evaluate(() => {
+    const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+    const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+    const td = [...document.querySelectorAll('#params-panel .tx-table td[data-word="Расходы бюджета"]')].find(vis);
+    if (!td) return null;
+    const tr = td.parentElement;
+    return { before: tx(tr.children[1]), after: tx(tr.children[2]), budget: STATE.monoTax && STATE.monoTax.budget };
+  });
+  ok('mono субсидия 10: «Расходы бюджета» 0 → 450, без знака (monoTax.budget прежний, −450)', !!m && n(m.before) === 0 && n(m.after) === 450 && !/[-−]/.test(m.after) && Math.abs(m.budget + 450) < 1, JSON.stringify(m));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 for (const name of ENGINES) {
   eng = name;
   engName = name; ctxCount = 0;
@@ -609,6 +726,8 @@ for (const name of ENGINES) {
   if (want('В')) await sectionV();
   if (want('В2')) await sectionV2();
   if (want('В3')) await sectionV3();
+  if (want('Д')) await sectionD();
+  if (want('Е')) await sectionE();
   await browser.close();
 }
 console.log('\nИТОГ answer_panel_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));

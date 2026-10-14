@@ -283,6 +283,13 @@ const noteOnce = (x) => { if (!NOTED.has(x)) { NOTED.add(x); RESET_NOTES.push('(
    Значение органа сверяется строго; заменяется только этот текст. */
 const fixedProps = (p) => (p && Array.isArray(p.options))
   ? Object.assign({}, p, { options: p.options.map(o => String(o).replace(/UUU/g, 'U').replace(/DDD/g, 'D')) }) : p;
+/* Строка «Бюджет (расход)» пишет величину без знака (решение владельца 14.10, Notion …81c3…; тихие панели,
+   сессия 5, А5): в базовом снимке «-1 200», на экране «1 200». STATE.budget прежний — меняется только запись. */
+const budgetAbs = (r) => (String(r[0]).trim() !== 'Бюджет (расход)' ? r : r.map((x, i) => {
+  if (!i) return x;
+  const v = String(x).replace(/^[-−+]\s*/, '');
+  return i === 3 && v !== '0' ? '+' + v : v;   // столбец «Δ»: расход растёт от нуля
+}));
 function answerMatch(a0, a1, issues, where) {
   let n = 0;
   const b1 = new Map((a1.blocks || []).map(b => [b.id, b]));
@@ -296,7 +303,7 @@ function answerMatch(a0, a1, issues, where) {
       if (normNum(q.value) !== normNum(r.value) && !(q.raw != null && normNum(q.raw) === normNum(r.value))) issues.push(where + ': ' + b.id + ' «' + r.label + '» ' + r.value + ' → ' + q.value);
       if (LABELS && normText(q.label) !== normText(r.label)) issues.push(where + ': ' + b.id + ' подпись «' + r.label + '» → «' + q.label + '»');
     });
-    n++; if (JSON.stringify(b.tables.map(t => t.map(r => r.map(normText)))) !== JSON.stringify((c.tables || []).map(t => t.map(r => r.map(normText))))) issues.push(where + ': ' + b.id + ' таблица разошлась');
+    n++; if (JSON.stringify(b.tables.map(t => t.map(r => budgetAbs(r).map(normText)))) !== JSON.stringify((c.tables || []).map(t => t.map(r => r.map(normText))))) issues.push(where + ': ' + b.id + ' таблица разошлась');
     ['notes', 'warns'].forEach(k => {
       n++;
       const x0 = (b[k] || []).map(normText), x1 = (c[k] || []).map(normText);

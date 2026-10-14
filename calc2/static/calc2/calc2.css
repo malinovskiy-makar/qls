@@ -3857,8 +3857,10 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
    отрезке…», вердикты «Сначала сам», #self-gate. */
 #params-panel #sb-body .hint, #params-panel #sb-body .muted, #params-panel #sb-body .scope-note { display: none !important; }
 /* «до», «после» — в строке заголовка раздела «До и после …» (макет 09): строка
-   заголовков таблицы поднята на высоту заголовка, её левая ячейка пустая. */
-#params-panel #info-tax[data-head] .tx-table { margin-top: -30px; }
+   заголовков таблицы поднята на высоту заголовка, её левая ячейка пустая. Только если
+   таблица идёт сразу за заголовком (класс tx-lift, liftTableHead; правка А2 сессии 5),
+   иначе подписи — своей строкой прямо над таблицей. */
+#params-panel #info-tax[data-head].tx-lift .tx-table { margin-top: -30px; }
 /* «Сначала сам» на подложке: строка уже на поля подложки (14 + 14), «Проверить» ужата
    по бокам, чтобы поле осталось не уже 60 % строки (self_probe). */
 #ans-hero .ans-rows .self-row .self-check { padding: 0 10px; }
@@ -3943,3 +3945,21 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
   font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
 }
 #wrench-pop .vg-row .tgl-lab { font-size: 13px !important; font-weight: 600 !important; }
+
+/* ── Тихие панели, сессия 5 (14.10.2026; README пакета 4, 8, 12) ───────────────────
+   А3: заголовок группы «Условия» без видимых органов под ним не показывается
+   (hideEmptyGroupTitles, 92-ui-kit.js). */
+#tools-panel .grp-empty { display: none; }
+/* А3: строки «На графике» — имя словами слева, обозначение справа KaTeX 16 px (как в «Налогах», макет
+   08_view_costs). Карточки рыночных D и S «Сложения спросов» в «Виде» — тоже строкой, без рамки и обрезки
+   имени; порядок — раскладкой (узлы карточки собирает renderCurveList, их не переписываем). */
+#wrench-pop .vg-deriv .fc-card { padding: 0; border: 0; background: transparent; gap: 0; }
+#wrench-pop .vg-deriv .fc-card > .crow-top { gap: 10px; }
+#wrench-pop .vg-deriv .fc-name { order: 1; white-space: normal; overflow: visible; text-overflow: clip; color: var(--text); }
+#wrench-pop .vg-deriv .fc-name::first-letter { text-transform: uppercase; }
+#wrench-pop .vg-deriv .fc-notation { order: 2; margin-left: auto; font-size: 16px; color: var(--text2); }
+#wrench-pop .vg-deriv .fc-ico { order: 3; }
+/* А4: перенесённые в «Разбор» абзацы «Условия», «Ответа» и вмешательства — каждый отдельным абзацем с отступом
+   (были сплошной стеной строк). */
+#ex-body .ex-from-cond > p, #ex-body .ex-from-answer > p { margin: 0 0 10px; }
+#ex-body .ex-from-cond > p:last-child, #ex-body .ex-from-answer > p:last-child { margin-bottom: 0; }

@@ -291,7 +291,10 @@ function conditionNotesToExplain(to) {
     items.push({ html: n.innerHTML, text: c.textContent });
   });
   if (!items.length) return;
-  const have = key(to.textContent);
+  /* Весь текст «Разбора» (ключ абзаца — его первые 60 знаков, а «Разбор» целиком не обрезается) и без невидимой
+     копии формул KaTeX (.katex-mathml): прежнее key(to.textContent) брало только первые 60 знаков «Разбора», и тот
+     же абзац клался второй раз (m-transform, tradeprice; сессия 5, А4). */
+  const have = norm((() => { const c = to.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent; })()).replace(/\s+/g, '');
   const seen = new Set();
   const ps = items.filter(it => {
     const k = key(it.text);
@@ -339,12 +342,18 @@ function answerNotesToExplain(from, to) {
     (blk && heroBlocks.has(blk.id) ? first : rest).push({ html: n.innerHTML, text: c.textContent });
   });
   const items = [];
-  if (typeof segNoteOn === 'function' && segNoteOn()) items.push({ html: SEG_NOTE_SCALE, text: SEG_NOTE_SCALE });
+  /* «Масштаб графика на ответ не влияет» — только если «Разбор» сам ещё не говорит о масштабе (в «Касательной» это уже
+     ответ на вопрос о шаге производной; сессия 5, А4: без повторов). */
+  const toLower = (to.textContent || '').toLowerCase();
+  if (typeof segNoteOn === 'function' && segNoteOn() && toLower.indexOf('масштаб') < 0) items.push({ html: SEG_NOTE_SCALE, text: SEG_NOTE_SCALE });
   items.push(...first);
   if (typeof burdenNoteText === 'function') { const b = burdenNoteText(); if (b) items.push({ html: b, text: b }); }
   items.push(...rest);
   if (!items.length) return;
-  const have = key(to.textContent);
+  /* Весь текст «Разбора» (ключ абзаца — его первые 60 знаков, а «Разбор» целиком не обрезается) и без невидимой
+     копии формул KaTeX (.katex-mathml): прежнее key(to.textContent) брало только первые 60 знаков «Разбора», и тот
+     же абзац клался второй раз (m-transform, tradeprice; сессия 5, А4). */
+  const have = norm((() => { const c = to.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent; })()).replace(/\s+/g, '');
   const seen = new Set();
   const ps = items.filter(it => {
     const k = key(it.text);
