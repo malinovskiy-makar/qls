@@ -1,8 +1,8 @@
 /* КАРТОЧКИ ФУНКЦИЙ ЛЕВОЙ ПАНЕЛИ (тихие панели, сессия 5, 14.10.2026; решение владельца «левая панель одна во
    всех моделях и только про условие», Notion …8142…; ADR 0153; README пакета 4, 8).
 
-   Разделы (--only Б,В,Г) — модели этапов сессии 5:
-     Б  ppf, ppfsum, trade, tradeprice;   В  prod, costs (и «Задаю кривые»), plants, isoquant;
+   Разделы (--only К,М,Б,В,Г) — К и М сессии 6 и модели этапов сессии 5:
+     Б  ppf, ppfsum, trade, tradeprice (у второй КПВ — поле MathLive и клавиатура, сессия 6, А6);   В  prod, costs (и «Задаю кривые»), plants, isoquant;
      Г  mono-d3, mono-kink (и «Кусочный»), monoexport, mono-nat, mono, mono-d1, labor, labor-mono, labor-union,
         labor-bilat, smallopen.
    В каждой модели (и состоянии):
@@ -18,6 +18,17 @@
      · ввод формулы в карточке (одна контрольная запись на модель, потом вернуть) меняет «Ответ» так же, как на
        коде до обёртки (сервер BEFORE, по умолчанию 8098 — копия кода до карточек; нет сервера — громкий пропуск);
      · ничего не вылезает: у карточек и их потомков scrollWidth ≤ clientWidth + 1, у «Условия» нет прокрутки вбок.
+
+   К  (сессия 6, А1–А2; ADR 0154) — один вид карточки и числа плашкой, на старте 42 моделей и в состояниях CASES,
+      ширина 1 440 и 1 280 (на 1 240–1 399 колонка 305 px): у каждого видимого НЕкусочного поля карточки кегль 18 px
+      или, если запись при 18 шире поля, от 16 до 18; ни одна такая запись не обрезана (.ML__content: scrollWidth ≤
+      clientWidth + 1); кусочная запись (\begin{cases}) — тот же кегль и тот же вид, что на коде BEFORE; видимый
+      круг точки цвета 16 ± 1 px с кольцом у всех карточек, у кнопки цвета размер нажатия ≥ 26 px; у каждого
+      видимого числа строки параметров вид плашки (фон --surface-2, рамка 1 px --border, радиус 6, цифры справа,
+      76 ± 1 × 36 ± 1, без пунктира) — в светлой и тёмной теме.
+
+   М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
+      Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
    CALC2_BASE_URL=http://127.0.0.1:8099 BEFORE=http://127.0.0.1:8098 node calc2/tests/redesign/cards_probe.mjs
    ENGINES=chromium,webkit (по умолчанию оба), KEYS="ppf costs" — выборка. Код 0 — всё сошлось.            */
@@ -63,6 +74,10 @@ const CASES = [
   ['Г', 'labor-bilat', '', '', ['curve-expr-1', '90 - L']],
   ['Г', 'smallopen', '', '', ['curve-expr-1', '90 - Q']],
 ];
+
+const ALL42 = 'm-graph m-transform m-optimum m-tangent m-minmax m-constraint ppf ppfsum trade tradeprice sd sdsum taxes ceil quota elast ext prod costs plants isoquant mono mono-nat mono-d1 mono-d3 mono-kink labor labor-mono labor-union labor-bilat smallopen monoexport consumer cons-slutsky adas islm phillips money loanable fx ineq laffer'.split(' ');
+// К: кусочная запись — та же на коде BEFORE (кегль, высокая строка) — [модель, поле, запись].
+const K_CASES_REC = ['sd', 'curve-expr-1', 'Q < 40 ? 100 - Q : 140 - 2*Q'];
 
 let bad = 0, total = 0, eng = '';
 function ok(label, cond, detail) {
@@ -208,8 +223,20 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
     ok(tag + ': id органов описи на месте (' + ids.length + ')', !miss.length, miss.join(', '));
   }
   if (beforeAns && beforeAns.ids != null) {
+    // Поля, ставшие полями формул по решению (А6 сессии 6: «КПВ 2» было простым текстовым полем), — не подмена.
+    const NEW_FORMULA = new Set(['inp-ppf2b']);
+    const strip = (x) => x.split(',').filter(i => i && !NEW_FORMULA.has(i)).join(',');
     const ids = await formulaIds(page);
-    ok(tag + ': ОРГАН — id полей формул те же, что до обёртки (' + beforeAns.ids + ')', ids === beforeAns.ids, 'сейчас ' + ids);
+    ok(tag + ': ОРГАН — id полей формул те же, что до обёртки (' + beforeAns.ids + ')', strip(ids) === strip(beforeAns.ids), 'сейчас ' + ids);
+  }
+  // Сессия 6, А6 (Notion …8138…): у второй КПВ поле MathLive и кнопка клавиатуры, как у первой.
+  if (key === 'ppf' && label) {
+    const k2 = await page.evaluate(() => {
+      const i = document.getElementById('inp-ppf2b'); const row = i && i.closest('.f-row');
+      const kb = row && row.querySelector('.f-kbd, .f-help');
+      return { mf: !!(i && i._mf && i._mf.getClientRects().length), kbd: !!(kb && kb.getClientRects().length && getComputedStyle(kb).visibility !== 'hidden') };
+    });
+    ok(tag + ': у второй КПВ поле MathLive и кнопка клавиатуры (' + JSON.stringify(k2) + ')', k2.mf && k2.kbd, JSON.stringify(k2));
   }
   // Контрольная запись: на свежей модели (без следов щелчков выше).
   await pick(page, key, extra);
@@ -221,6 +248,151 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
       t.after !== t.before && t.back === t.before && same !== false, JSON.stringify({ now: t.after.slice(0, 120), was: beforeAns && beforeAns.after.slice(0, 120) }));
   }
   ok(tag + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+
+/* ── К: один вид карточки и числа плашкой (сессия 6, А1–А2) ── */
+const kLook = (page) => page.evaluate(() => {
+  const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+  const tp = document.getElementById('tools-panel');
+  const out = { fields: [], dots: [], nums: [] };
+  [...tp.querySelectorAll('.fc-card math-field')].filter(vis).forEach(mf => {
+    const id = ((mf.parentElement && mf.parentElement.querySelector('input[id]')) || {}).id || '?';
+    const box = mf.shadowRoot && mf.shadowRoot.querySelector('.ML__content');
+    if (!box) return;
+    const tall = /\\begin\{cases\}/.test(String(mf.value || ''));
+    const fs = parseFloat(getComputedStyle(mf).fontSize);
+    const cut = box.scrollWidth > box.clientWidth + 1 ? box.scrollWidth + '>' + box.clientWidth : '';
+    // Шире ли запись при 18 px (иначе ужатие не оправдано): мерим и возвращаем как было.
+    let wide18 = null;
+    if (!tall && Math.abs(fs - 18) > 0.1) {
+      const was = mf.style.fontSize; mf.style.fontSize = '18px';
+      const pre = mf.closest('.crow-formula'); const off = pre && pre.classList.contains('fc-pre-off');
+      wide18 = box.scrollWidth > box.clientWidth + 1;
+      if (off) { pre.classList.remove('fc-pre-off'); wide18 = true; pre.classList.add('fc-pre-off'); }
+      mf.style.fontSize = was;
+    }
+    out.fields.push({ id, tall, fs, cut, wide18, value: String(mf.value || '').slice(0, 60) });
+  });
+  [...tp.querySelectorAll('.fc-card > .crow-top')].filter(vis).forEach(top => {
+    const card = top.parentElement;
+    const tag = ((card.querySelector('input[id]') || {}).id) || 'карточка';
+    const d = [...top.querySelectorAll('.fc-dot, .cpick-btn')].find(vis);
+    if (!d) return;
+    const cs = getComputedStyle(d);
+    const r = d.getBoundingClientRect();
+    // видимый круг: у кнопки — внутренность рамки (на телефоне рамка прозрачная), у значка — сам узел
+    const w = d.clientWidth, h = d.clientHeight;
+    const ring = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 1;
+    let hit = null;
+    if (d.classList.contains('cpick-btn')) {
+      d.scrollIntoView({ block: 'center' });
+      const rr = d.getBoundingClientRect(), cx = rr.left + rr.width / 2, cy = rr.top + rr.height / 2;
+      const at = (x, y) => { const e = document.elementFromPoint(x, y); return !!(e && (e === d || d.contains(e))); };
+      hit = at(cx - 12.5, cy) && at(cx + 12.5, cy) && at(cx, cy - 12.5) && at(cx, cy + 12.5);
+    }
+    out.dots.push({ tag, kind: d.classList.contains('cpick-btn') ? 'кнопка' : 'значок', w, h, ring, hit, rw: Math.round(r.width) });
+  });
+  const tok = (v, prop) => { const p = document.createElement('div'); p.style.setProperty(prop, 'var(' + v + ')'); if (prop.startsWith('border')) p.style.borderStyle = 'solid'; tp.appendChild(p); const c = getComputedStyle(p)[prop === 'background-color' ? 'backgroundColor' : 'borderTopColor']; p.remove(); return c; };
+  const bg = tok('--surface-2', 'background-color'), bc = tok('--border', 'border-top-color');
+  [...tp.querySelectorAll('.sc-nrow > input, input.sc-num')].filter(vis).forEach(i => {
+    const cs = getComputedStyle(i);
+    const bad = [];
+    if (cs.backgroundColor !== bg) bad.push('фон ' + cs.backgroundColor + ' ≠ ' + bg);
+    ['Top', 'Right', 'Bottom', 'Left'].forEach(sd => {
+      if (cs['border' + sd + 'Style'] !== 'solid' || Math.abs(parseFloat(cs['border' + sd + 'Width']) - 1) > 0.1 || cs['border' + sd + 'Color'] !== bc) bad.push('рамка ' + sd + ' ' + cs['border' + sd + 'Style'] + ' ' + cs['border' + sd + 'Width'] + ' ' + cs['border' + sd + 'Color']);
+    });
+    if (Math.abs(parseFloat(cs.borderTopLeftRadius) - 6) > 0.1) bad.push('радиус ' + cs.borderTopLeftRadius);
+    if (cs.textAlign !== 'right') bad.push('цифры ' + cs.textAlign);
+    const r = i.getBoundingClientRect();
+    if (Math.abs(r.width - 76) > 1 || Math.abs(r.height - 36) > 1) bad.push('размер ' + Math.round(r.width) + '×' + Math.round(r.height));
+    out.nums.push({ id: i.id, bad });
+  });
+  return out;
+});
+async function kRun(theme) {
+  const tag0 = '[' + theme + '] ';
+  for (const W of [1440, 1280]) {
+    const ctx = await newCtx({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+    await ctx.addInitScript((t) => { try { localStorage.clear(); localStorage.setItem('theme', t); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} }, theme);
+    const page = await ctx.newPage();
+    const errors = []; page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+    await page.goto(BASE + '/calc2/', { waitUntil: 'load', timeout: 40000 });
+    await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 40000 });
+    await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
+    const states = ALL42.map(k => [k, '', '']).concat(CASES.filter(c => c[2]).map(c => [c[1], c[2], c[3]]));
+    const f = { size: [], cut: [], dot: [], hit: [], num: [] };
+    let nF = 0, nD = 0, nN = 0;
+    for (const [key, label, extra] of states) {
+      if (KEYS && !KEYS.includes(key)) continue;
+      await pick(page, key, extra);
+      const r = await kLook(page);
+      const where = key + (label ? ' «' + label + '»' : '');
+      r.fields.filter(x => !x.tall).forEach(x => {
+        nF++;
+        const okSize = Math.abs(x.fs - 18) <= 0.1 || (x.wide18 && x.fs >= 15.9 && x.fs <= 18.1);
+        if (!okSize) f.size.push(where + ' ' + x.id + ' ' + x.fs + ' px' + (x.wide18 === false ? ' (при 18 помещается)' : ''));
+        if (x.cut) f.cut.push(where + ' ' + x.id + ' ' + x.cut + ' «' + x.value + '»');
+      });
+      r.dots.forEach(d => {
+        nD++;
+        if (Math.abs(d.w - 16) > 1 || Math.abs(d.h - 16) > 1 || !d.ring) f.dot.push(where + ' ' + d.tag + ' ' + d.kind + ' ' + d.w + '×' + d.h + (d.ring ? '' : ' без кольца'));
+        if (d.hit === false) f.hit.push(where + ' ' + d.tag);
+      });
+      r.nums.forEach(n => { nN++; if (n.bad.length) f.num.push(where + ' ' + n.id + ': ' + n.bad.join(', ')); });
+    }
+    const w = tag0 + W + ': ';
+    ok(w + 'запись карточек 18 px, ужата до 16–18 только если при 18 шире поля (' + nF + ' полей)', !f.size.length, f.size.slice(0, 6).join(' | '));
+    ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', nF > 0 && !f.cut.length, f.cut.slice(0, 6).join(' | '));
+    ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', nD > 0 && !f.dot.length, f.dot.slice(0, 6).join(' | '));
+    ok(w + 'у кнопки цвета размер нажатия ≥ 26 px', !f.hit.length, f.hit.slice(0, 6).join(' | '));
+    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
+    ok(w + 'ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+// Кусочная запись — как на коде BEFORE (кегль, высокая строка, обрезка).
+async function kCases(base) {
+  const { ctx, page } = await openAt(base);
+  await pick(page, K_CASES_REC[0]);
+  await page.evaluate(([id, v]) => setFieldValue(document.getElementById(id), v), [K_CASES_REC[1], K_CASES_REC[2]]);
+  await page.waitForTimeout(900);
+  await page.evaluate(() => { redrawAll(); });
+  await page.waitForTimeout(700);
+  const r = await page.evaluate((id) => {
+    const i = document.getElementById(id); const mf = i && i._mf; if (!mf) return null;
+    const box = mf.shadowRoot.querySelector('.ML__content');
+    return { tall: /\\begin\{cases\}/.test(mf.value), fs: getComputedStyle(mf).fontSize, rowTall: !!(i.closest('.f-row') || {}).classList?.contains('f-tall'), fits: box.scrollWidth <= box.clientWidth + 1 };
+  }, K_CASES_REC[1]);
+  await ctx.close();
+  return r;
+}
+
+/* ── М: мировая цена «КТВ. Две страны-партнёра» — строка и «Ответ» одним числом (сессия 6, А3) ── */
+const twoPw = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ''); };
+  const num = (t) => { const m = String(t).replace(/−/g, '-').match(/-?\d+(?:[.,]\d+)?/g); return m ? m[m.length - 1].replace(',', '.') : null; };
+  const row = document.querySelector('#tb-price-field .reg-eq');
+  const st = [...document.querySelectorAll('#info-tb .stat')].find(e => /Мироваяцена/.test(tx(e.querySelector('span'))));
+  const hero = [...document.querySelectorAll('#ans-hero .ans-cell')].find(e => /Мироваяцена/.test(tx(e)));
+  return { row: num(tx(row)), table: st ? num(tx(st.querySelector('b'))) : null, hero: hero ? num(tx(hero.querySelector('.ans-val'))) : null, rowText: tx(row) };
+});
+async function mRun() {
+  const { ctx, page, errors } = await openAt(BASE);
+  await pick(page, 'tradeprice');
+  const same = (r) => r.row != null && r.row === r.table && (r.hero == null || r.hero === r.row);
+  const a = await twoPw(page);
+  ok('М: на старте строка «Мировая цена» и «Ответ» — одно число (' + JSON.stringify(a) + ')', same(a) && a.row === '1.41', JSON.stringify(a));
+  await page.evaluate(() => { const s = document.getElementById('tb-price-slider'); s.value = String(+s.min + (+s.max - +s.min) * 0.7); s.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(700);
+  const b = await twoPw(page);
+  ok('М: после сдвига дорожки — одно число (' + JSON.stringify(b) + ')', same(b) && b.row !== a.row, JSON.stringify(b));
+  await page.evaluate(() => document.getElementById('btn-tb-reset').click());
+  await page.waitForTimeout(700);
+  const c = await twoPw(page);
+  ok('М: после «Сбросить к равновесной» — одно число, 1,41 (' + JSON.stringify(c) + ')', same(c) && c.row === '1.41', JSON.stringify(c));
+  ok('М: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -241,6 +413,7 @@ try {
       if (!t.missing) beforeMap[key + '|' + label] = Object.assign(t, { ids });
       await ctx.close();
     }
+    if (want('К')) beforeMap.kCases = await kCases(BEFORE);
   } else console.log('\n!!! сервер BEFORE (' + BEFORE + ') недоступен — сравнение ввода с кодом до обёртки НЕ ПРОВЕРЕНО');
   await b0.close();
 } catch (e) { console.log('!!! замер «до» не удался: ' + String(e).slice(0, 160)); }
@@ -251,6 +424,16 @@ for (const name of ENGINES) {
     console.log('\n!!! ' + name + ': движок не запустился — НЕ ПРОВЕРЕНО (' + String(e).slice(0, 120) + ')');
     continue;
   }
+  if (want('К')) {
+    head('К. Один вид карточки, числа плашкой (сессия 6)');
+    await kRun('light');
+    await kRun('dark');
+    if (!KEYS || KEYS.includes(K_CASES_REC[0])) {
+      const now = await kCases(BASE), was = beforeMap.kCases;
+      ok('К: кусочная запись карточки — как на коде до сессии (' + JSON.stringify(now) + ')', !!now && now.tall && (!was || JSON.stringify(now) === JSON.stringify(was)), 'было ' + JSON.stringify(was || 'BEFORE недоступен'));
+    }
+  }
+  if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;

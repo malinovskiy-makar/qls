@@ -1062,6 +1062,7 @@ function upgradeFormulaField(inp) {
    чужой библиотеки — вещь непрочная: не нашли узел, значит просто не
    подбираем кегль, а ширину строке всё равно отдаём. */
 const FIELD_MIN_PX = 11;
+const CARD_MIN_PX = 16;   // запись карточки функции не мельче 16 px (сессия 6, А1)
 
 function fitFormulaField(inp) {
   const mf = inp && inp._mf;
@@ -1105,6 +1106,29 @@ function fitFormulaField(inp) {
       mf.style.fontSize = '';
       shrink();
     }
+  } else if (inp.closest('.fc-card')) {
+    /* Карточка функции (тихие панели, сессия 6, А1; ADR 0154): база записи 18 px у всех карточек; запись, которая
+       не помещается, ужимается до CARD_MIN_PX, не меньше. Только НЕкусочные записи и только поля в карточке:
+       кусочные идут веткой выше побайтно как было, прочие поля FORMULA_FIELDS не задеты. */
+    const line = inp.closest('.crow-formula');
+    const shrink = () => {
+      let size = parseFloat(getComputedStyle(mf).fontSize) || 18;
+      for (let step = 0; step < 4; step++) {
+        const need = box.scrollWidth, have = box.clientWidth;
+        if (!need || !have || need <= have + 1 || size <= CARD_MIN_PX) break;
+        size = Math.max(CARD_MIN_PX, size * have / need - 0.2);
+        mf.style.fontSize = size + 'px';
+      }
+    };
+    if (line) line.classList.remove('fc-pre-off');
+    shrink();
+    /* Не влезла и в 16 px (TC «Издержек» в колонке 305 px при 1 240–1 399) — приставка «TC =» уходит (обозначение
+       карточки стоит в верхнем ряду), кегль подбирается заново. Класс на строке без id: вид, не модель. */
+    if (line && box.scrollWidth > box.clientWidth + 1 && line.querySelector(':scope > .fc-prefix')) {
+      line.classList.add('fc-pre-off');
+      mf.style.fontSize = '';
+      shrink();
+    }
   }
   inp._fitSaw = box.scrollWidth;
 }
@@ -1120,10 +1144,15 @@ function fitFormulaFields() {
 function fitFormulaFieldsSoon() {
   fitFormulaFields();
   requestAnimationFrame(fitFormulaFields);
-  if (_fitSoonT == null) {
-    _fitSoonT = setTimeout(() => { _fitSoonT = null; fitFormulaFields(); }, 200);
-  }
+  /* Отложенный проход — через 200 мс после ПОСЛЕДНЕГО вызова (сессия 6, А1): таймер от первого вызова срабатывал
+     раньше, чем MathLive дорисовывает только что показанное поле, и запись MC, ATC «Задаю кривые» в WebKit
+     оставалась 18 px и резалась. */
+  if (_fitSoonT != null) clearTimeout(_fitSoonT);
+  _fitSoonT = setTimeout(() => { _fitSoonT = null; fitFormulaFields(); }, 200);
 }
+/* Шрифты формул догружаются позже первой подгонки: запись, которая помещалась запасным шрифтом, после загрузки
+   шире — подгоняем заново (сессия 6, А1: без этого TC «Издержек» оставалась 18 px и резалась). */
+if (document.fonts && typeof document.fonts.addEventListener === 'function') document.fonts.addEventListener('loadingdone', () => fitFormulaFieldsSoon());
 
 /* Собираем только те поля, которые ПРЯМО СЕЙЧАС на экране (А56).
 
