@@ -761,7 +761,15 @@ function upgradeRegulator(field) {
     if (num) num.classList.add('reg-num-hidden');
   }
 
-  const paint = () => paintEqLabel(eq, nameOf(), +sl.value, unitOf());
+  /* Значение строки — значение МОДЕЛИ, если сцена его сообщила (sl._modelValue) и дорожка стоит на нём с
+     точностью до шага: дорожка с шагом 0,005 встаёт на 1,415, а модель держит 1,41421 («КТВ. Две
+     страны-партнёра»: строка 1,42 при «Ответе» 1,41, сессия 6, А3). Сдвинули дорожку — строка пишет её число,
+     пока сцена не пересчитала модель. */
+  const valueOf = () => {
+    const m = sl._modelValue, v = +sl.value;
+    return (typeof m === 'number' && isFinite(m) && Math.abs(m - v) <= (+sl.step || 0) / 2 + 1e-9) ? m : v;
+  };
+  const paint = () => paintEqLabel(eq, nameOf(), valueOf(), unitOf());
   const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
   sync();
   /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
@@ -782,7 +790,7 @@ function upgradeRegulator(field) {
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
-    editEqValue(eq, nameOf(), +sl.value, (v) => {
+    editEqValue(eq, nameOf(), valueOf(), (v) => {
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
