@@ -4105,3 +4105,19 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-prow > .sc-pval .katex { font-size: 1em; }
 #tools-panel .sc-prow-own > input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; }
 
+/* ── Г2: «Построение графиков» (scGraphRows, 92-ui-kit.js). Строка .grow сама — карточка; пустая — пунктиром
+   («Новая функция»), точка — простой значок, «⋯» нет. Приставка «y =» — только у записи без «=». ── */
+#tools-panel .sc-gcard { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 8px 10px 12px; border-radius: 10px; }
+#tools-panel .sc-gcard > .crow-top { justify-content: flex-start; }
+/* «Ответ ищем на отрезке» — строкой раздела «Параметры» (README 8), без рамки-коробки: подпись, «x от … до …» (поля
+   как есть), тихая «Вернуть по формуле». Узел один, его переносит syncAnsSegUI — заголовок раздела рисуется самой
+   строкой (::before), отдельного узла нет. */
+#tools-panel #ans-seg-row { padding: 18px 0 0; margin: 18px 0 8px; background: transparent; border: 0; border-top: 1px solid var(--border-soft); border-radius: 0; }
+#tools-panel #ans-seg-row::before { content: 'Параметры'; display: block; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+#tools-panel #ans-seg-row .ans-seg-auto { margin-top: 8px; padding: 0; border: 0; background: transparent; font-size: 13px; font-weight: 600; color: var(--text2); }
+#tools-panel #ans-seg-row .ans-seg-auto:hover { color: var(--text); text-decoration: none; }
+#tools-panel .sc-gcard.sc-gnew { border-style: dashed; border-color: var(--border-strong); background: transparent; }
+#tools-panel .sc-gcard .sc-gone { display: none; }
+#tools-panel .sc-gcard > .crow-formula > .f-slot { display: contents; }
+#tools-panel .sc-gcard .fc-menu > .grow-name { width: 100%; }
+

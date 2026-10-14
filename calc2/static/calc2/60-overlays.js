@@ -296,6 +296,7 @@ function renderGraphRows() {
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
   equipGraphRows(box);
+  if (typeof scGraphRows === 'function') scGraphRows(box);   // строка — карточка (тихие панели, сессия 6, Г2)
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы
      вставили в разметку только что: разбираем очередь здесь, иначе поле
      остаётся обычным текстовым окошком до следующей перерисовки. */
@@ -418,7 +419,7 @@ function graphRowInput(row, inp, del, name) {
     row.dataset.cid = c.id;
     del.style.visibility = '';
     const box = graphRowsBox();
-    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); }
+    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); if (typeof scGraphRows === 'function') scGraphRows(box); }
     redrawAll();
     return;
   }

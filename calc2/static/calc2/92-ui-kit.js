@@ -727,7 +727,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -826,6 +826,7 @@ function scSync() {
   }
   scConsumerSync();
   scIneqSync();
+  scGraphRows();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
 }
@@ -966,6 +967,76 @@ function scIneqSync() {
     const sl = document.getElementById(sid); const f = sl && sl.closest('.sc-prow-own'); if (!f) return;
     const v = f.querySelector('.sc-pval'); const tex = sym + ' = ' + fmt(+sl.value) + unit;
     if (v && v._tex !== tex) { v._tex = tex; katexInto(v, tex); }
+  });
+}
+
+/* ═══ «Построение графиков»: каждая функция — карточка (сессия 6, Г2; README 8) ═══
+   Строку (.grow) собирает сцена двумя путями: полная пересборка (renderGraphRows) и «рождение» следующей пустой
+   строки после первого ввода (graphRowInput, 60-overlays.js) — оборачиваем в обоих (и на каждой перерисовке, на
+   случай третьего). Строка САМА становится карточкой: тот же узел, поле и его id (graph-f-N), обработчики; узлы
+   переезжают: выбор цвета — точкой-кнопкой в верхний ряд, «Имя на графике» и крестик «Убрать функцию» — в «⋯».
+   Последняя пустая строка — пунктирная карточка «Новая функция»: точка — простой значок (до первой записи цвет и
+   имя там ничего не делают: if (!row._curve) return), «⋯» нет; после первой записи — обычная карточка. */
+function scGraphRows(box) {
+  box = box || document.getElementById('graph-rows');
+  if (!box || !scOn('m-graph')) return;
+  box.querySelectorAll(':scope > .grow').forEach(row => {
+    if (row._scG) return;
+    const pick = row.querySelector(':scope > .cpick');
+    const fwrap = row.querySelector(':scope > .f-slot');
+    const del = row.querySelector(':scope > .btn-icon');
+    const name = row.querySelector(':scope > .grow-name');
+    if (!fwrap) return;
+    row._scG = true;
+    row.classList.add('fc-card', 'sc-card', 'sc-gcard');
+    const top = document.createElement('div'); top.className = 'crow-top';
+    const dot = document.createElement('span'); dot.className = 'fc-dot'; dot.setAttribute('aria-hidden', 'true');
+    const sym = document.createElement('span'); sym.className = 'fc-notation sc-sym';
+    const nm = document.createElement('span'); nm.className = 'fc-name sc-name';
+    if (pick) { pick.classList.add('sc-dot-slot'); top.appendChild(pick); }
+    top.append(dot, sym, nm);
+    const more = document.createElement('div');
+    more.className = 'crow-more fc-menu'; more.setAttribute('role', 'dialog'); more.setAttribute('aria-label', 'Настройки функции');
+    if (name) { const l = document.createElement('div'); l.className = 'fc-menu-lab'; l.textContent = 'Имя на графике'; more.append(l, name); }
+    if (del) { del.classList.add('fc-mi'); del.textContent = 'Убрать функцию'; more.appendChild(del); }
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.className = 'btn-icon crow-gear fc-ico';
+    gear.setAttribute('aria-label', 'Настройки функции'); gear.setAttribute('aria-haspopup', 'dialog'); gear.setAttribute('aria-expanded', 'false');
+    gear.innerHTML = ICON_DOTS;
+    gear.addEventListener('click', (e) => { e.stopPropagation(); if (more.classList.contains('open')) { closeFcMenu(); return; } openFcMenu(gear, more); });
+    top.appendChild(gear);
+    const line = document.createElement('div'); line.className = 'crow-formula';
+    const pre = document.createElement('span'); pre.className = 'fc-prefix'; pre.setAttribute('aria-hidden', 'true');
+    katexInto(pre, 'y\\,=');
+    row.insertBefore(top, row.firstChild);
+    top.after(line);
+    line.append(pre, fwrap);
+    line.after(more);
+    row._scParts = { pick, dot, sym, nm, gear, pre, del };
+  });
+  scGraphSync(box);
+}
+function scGraphSync(box) {
+  box = box || document.getElementById('graph-rows');
+  if (!box) return;
+  const taken = new Set((STATE.curves || []).filter(c => !c.role).map(c => c._auto).filter(Boolean));
+  const nextLetter = (typeof AUTO_CURVE_LETTERS !== 'undefined' ? AUTO_CURVE_LETTERS : ['f']).find(l => !taken.has(l)) || 'f';
+  box.querySelectorAll(':scope > .grow.sc-gcard').forEach(row => {
+    const p = row._scParts; if (!p) return;
+    const c = row._curve, isNew = !c;
+    row.classList.toggle('sc-gnew', isNew);
+    if (p.pick) p.pick.classList.toggle('sc-gone', isNew);
+    p.dot.classList.toggle('sc-gone', !isNew);
+    p.gear.classList.toggle('sc-gone', isNew);
+    if (isNew) { const b = p.pick && p.pick.querySelector('.cpick-btn'); const col = (b && b.style.background) || ''; if (p.dot._col !== col) { p.dot._col = col; p.dot.style.background = col; } }
+    const short = isNew ? nextLetter : curveShortName(c);
+    const tex = /^[A-Za-z]$/.test(short) ? short : (typeof texifyName === 'function' ? texifyName(short) : '\\text{' + short + '}');
+    if (p.sym._tex !== tex) { p.sym._tex = tex; katexInto(p.sym, tex); }
+    const want = isNew ? 'Новая функция' : 'Функция';
+    if (p.nm.textContent !== want) p.nm.textContent = want;
+    const inp = row.querySelector('.f-slot input[id]');
+    const eq = !!(inp && /=/.test(String(inp.value || '')));
+    p.pre.classList.toggle('sc-gone', eq);   // уравнение — без приставки
   });
 }
 

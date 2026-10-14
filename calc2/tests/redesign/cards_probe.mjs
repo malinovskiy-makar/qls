@@ -92,6 +92,7 @@ const CASES = [
   ['Е', 'fx', '', '', ['ma-fxd', '110 - 2*e']],
   ['Е', 'laffer', '', '', ['ma-lafd', '90 - Q']],
   ['Ж', 'ineq', 'Формула', "setIneqInput('formula');", ['ineq-formula', 'p^3']],
+  ['Ж', 'm-graph', '', '', ['@graph', 'x^2 - 9']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
@@ -141,6 +142,8 @@ const formulaIds = (page) => page.evaluate(() => [...document.querySelectorAll('
   .filter(e => e.getClientRects().length).map(e => { const i = e.tagName === 'MATH-FIELD' ? e.parentElement.querySelector('input[id]') : e; return i ? i.id : '?'; })
   .filter((x, i, a) => a.indexOf(x) === i).sort().join(','));
 async function typeAndRead(page, id, expr) {
+  // «@graph» — поле первой строки «Построения графиков» (id строк graph-f-N растут при каждой пересборке).
+  if (id === '@graph') id = await page.evaluate(() => { const i = document.querySelector('#graph-rows .f-slot input[id]'); return i ? i.id : '@graph'; });
   const was = await page.evaluate((id) => { const i = document.getElementById(id); return i ? i.value : null; }, id);
   if (was == null) return { missing: true };
   const before = await answerNums(page);
@@ -570,6 +573,48 @@ async function zhIneq(before) {
   await ctx.close();
 }
 
+async function zhGraph() {
+  if (KEYS && !KEYS.includes('m-graph')) return;
+  const { ctx, page, errors } = await openAt(BASE);
+  await pick(page, 'm-graph');
+  const st = () => page.evaluate(() => {
+    const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ''); };
+    const cards = [...document.querySelectorAll('#graph-rows > .grow')].filter(r => r.getClientRects().length);
+    return { curves: STATE.curves.length, cards: cards.map(r => ({ card: r.classList.contains('fc-card'), isNew: r.classList.contains('sc-gnew'), sym: tx(r.querySelector('.crow-top .fc-notation')), name: tx(r.querySelector('.crow-top .fc-name')),
+      gear: !!(r.querySelector('.crow-top .crow-gear') && r.querySelector('.crow-top .crow-gear').getClientRects().length), pickBtn: !!(r.querySelector('.crow-top .cpick-btn') && r.querySelector('.crow-top .cpick-btn').getClientRects().length) })),
+      undo: histOf().undo.length };
+  });
+  const s0 = await st();
+  ok('m-graph: каждая функция — карточка с точкой-кнопкой цвета, обозначением, именем «Функция» и «⋯»; последняя — пунктирная «Новая функция» без кнопки цвета и «⋯» (' + JSON.stringify(s0.cards) + ')',
+    s0.cards.length === 2 && s0.cards.every(c => c.card) && s0.cards[0].name === 'Функция' && s0.cards[0].sym === 'f' && s0.cards[0].gear && s0.cards[0].pickBtn && s0.cards[1].isNew && s0.cards[1].name === 'Новаяфункция' && !s0.cards[1].gear && !s0.cards[1].pickBtn, JSON.stringify(s0));
+  // Ввод в пустую карточку — настоящий набор.
+  const mf = await page.$('#graph-rows > .grow.sc-gnew math-field');
+  if (mf) { await mf.click(); await page.keyboard.type('2*x+1'); await page.waitForTimeout(900); }
+  const s1 = await st();
+  ok('m-graph: ввод в пустую карточку заводит функцию и новую пустую (' + JSON.stringify(s1.cards.map(c => c.sym + (c.isNew ? '*' : ''))) + ')', !!mf && s1.curves === 2 && s1.cards.length === 3 && !s1.cards[1].isNew && s1.cards[2].isNew && s1.cards[1].name === 'Функция' && s1.cards[1].gear, JSON.stringify(s1));
+  await page.mouse.click(5, 5); await page.waitForTimeout(500);
+  // «⋯» — вид, не модель: открыть и закрыть — не шаг истории.
+  const u0 = (await st()).undo;
+  const gear = await page.$('#graph-rows > .grow:nth-child(2) .crow-gear');
+  if (gear) { await gear.click(); await page.waitForTimeout(250); await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
+  const u1 = (await st()).undo;
+  ok('m-graph: «⋯» открыть и закрыть — не шаг истории (' + u0 + ' → ' + u1 + ')', !!gear && u1 === u0, '');
+  // «⋯» → «Имя на графике» в меню, «Убрать функцию» убирает.
+  if (gear) await gear.click();
+  await page.waitForTimeout(250);
+  const menu = await page.evaluate(() => { const m = document.querySelector('.fc-menu.open'); const tx = (e) => e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; return m ? { lab: tx(m.querySelector('.fc-menu-lab')), name: !!m.querySelector('.grow-name'), del: tx(m.querySelector('.fc-mi')) } : null; });
+  ok('m-graph: в «⋯» «Имя на графике» и «Убрать функцию» (' + JSON.stringify(menu) + ')', !!menu && menu.lab === 'Имя на графике' && menu.name && menu.del === 'Убрать функцию', JSON.stringify(menu));
+  const delBtn = await page.$('.fc-menu.open .fc-mi');
+  if (delBtn) { await delBtn.click(); await page.waitForTimeout(900); }
+  const s2 = await st();
+  ok('m-graph: «Убрать функцию» убирает (функций ' + s1.curves + ' → ' + s2.curves + ', карточек ' + s2.cards.length + ')', s2.curves === 1 && s2.cards.length === 2, JSON.stringify(s2));
+  await page.click('#btn-undo'); await page.waitForTimeout(900);
+  const s3 = await st();
+  ok('m-graph: одно «Отменить» возвращает функцию и карточку (функций ' + s3.curves + ', карточек ' + s3.cards.length + ')', s3.curves === 2 && s3.cards.length === 3 && s3.cards[1].card, JSON.stringify(s3));
+  ok('m-graph: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -625,7 +670,7 @@ for (const name of ENGINES) {
   }
   if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
   if (want('Е')) { head('Е. Макро: карточки, строки, нет ползунка переменной оси'); await eRun(); }
-  if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); }
+  if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
