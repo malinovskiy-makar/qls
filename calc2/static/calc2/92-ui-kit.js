@@ -673,6 +673,9 @@ const SC_CARDS = [
   // Математика (сессия 6, Г3): «Деформации», «Оптимум», «Касательная» — общее поле f (подпись math-f-label пишет
   // сюжет — остаётся спрятанной). Точка — цвет кривой f; у «Касательной» — кнопка цвета tanF (scMathSync).
   { m: 'm-math', input: 'inp-mathf', sym: 'f', name: 'Функция', prefix: 'y =', col: () => (STATE.mathSub === 'tangent' ? COL.tanF : COL.D), keepLabel: true },
+  // «Оптимум при ограничении» (сессия 6, Г5): цель — линии уровня (COL.D), ограничение — уравнение (COL.S, без приставки).
+  { m: 'm-constraint', input: 'inp-mathfc', sym: 'f', name: 'Целевая функция', prefix: 'f(x,\\,y) =', col: 'D' },
+  { m: 'm-constraint', input: 'inp-mathgc', sym: 'g', name: 'Ограничение', col: 'S' },
   // Неравенство (сессия 6, Г1): способ «Формула» — карточка L.
   { m: 'ineq', input: 'ineq-formula', sym: 'L', name: 'Функция Лоренца', prefix: 'L(p) =', col: 'S' },
 ];
@@ -726,11 +729,11 @@ const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['pp
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
   ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
-const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax']];
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {

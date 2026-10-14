@@ -97,6 +97,7 @@ const CASES = [
   ['Ж', 'm-optimum', '', '', ['inp-mathf', 'x^2 - 2*x']],
   ['Ж', 'm-tangent', '', '', ['inp-mathf', 'x^3']],
   ['Ж', 'm-minmax', '', '', ['mm-f1', '2*x']],
+  ['Ж', 'm-constraint', '', '', ['inp-mathfc', 'x*y']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
