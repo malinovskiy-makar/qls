@@ -38,10 +38,14 @@ const fails = [];
 const ok = (cond, msg) => { if (!cond) fails.push(msg); return cond; };
 
 const SKIP = /^#(scene-back|dock-export|tools-toggle|params-toggle|btn-scene-reset|btn-zoom(in|out)|btn-wrench|ac-clear)$|hint-btn|swatch|fold-btn|crow-gear|btn-icon/;
+/* Тумблер пары подписей заменён сегментом (тихие панели, сессия 5; ADR 0153; буква «с» в fates.mjs): щелчок по
+   тумблеру базового снимка = щелчок по второй половине полосы (тумблер спрятан, прибор иначе терял правку). */
+const TGL_TO_SEG = { '#costs-pane-costs>button.tgl-sw': '#cm-curves', '#mono-kink-pane>button.tgl-sw': '#ki-piece', '#union-pane>button.tgl-sw': '#un-wagefloor' };
 function edits(rec) {
   return (rec.steps || []).filter(s => s.path.length === 1 && s.effect === 'model' && !SKIP.test(s.path[0])
     && /^(input:(range|number|checkbox)|math-field|select|exact|switch)$/.test(s.kind))
-    .map(s => (rec.controls || []).find(c => c.key === s.path[0])).filter(Boolean).slice(0, 3);
+    .map(s => (rec.controls || []).find(c => c.key === s.path[0])).filter(Boolean)
+    .map(c => (TGL_TO_SEG[c.key] ? Object.assign({}, c, { key: TGL_TO_SEG[c.key] }) : c)).slice(0, 3);
 }
 /* Сравнимое состояние: STATE без окна, следов и кэшей; значения органов. */
 async function sig(page) {

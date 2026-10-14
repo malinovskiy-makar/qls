@@ -245,7 +245,7 @@ async function sectionZ() {
       const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
       const ORG = 'input:not([type=hidden]), button, select, textarea, math-field, .edval, .tgl-sw, [role=switch]';
       const hasOrg = (nodes) => nodes.some(x => (x.matches(ORG) && vis(x)) || [...x.querySelectorAll(ORG)].some(vis));
-      const TIT = '.curve-group-title, .vsub, .section-title';
+      const TIT = '.curve-group-title, .vsub, .section-title, .sc-sec';
       const tp = document.getElementById('tools-panel');
       const out = [];
       let cnt = 0;

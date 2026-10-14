@@ -3978,7 +3978,8 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .fc-card .fc-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 #tools-panel .fc-card .fc-dot {
   flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; margin: 0 2px 0 4px;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong);
+  /* Кольцо — обводкой, как у кнопки цвета карточки (.fc-card .cpick-btn): тень канон разрешает только окнам. */
+  outline: 1px solid var(--border-strong); outline-offset: 2px;
 }
 #tools-panel .fc-card .sc-dot-slot { display: inline-flex; flex: 0 0 auto; }
 #tools-panel .fc-card .sc-dot-slot:empty { display: none; }

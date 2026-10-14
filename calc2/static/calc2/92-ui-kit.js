@@ -517,7 +517,7 @@ function syncOnChart() {
    моделей: группа заголовка — соседи до следующего такого же заголовка (у h3.sec-head — его раздел); «видно» —
    по вычисленному стилю до «Условия» (колонка бывает спрятана классом, прямоугольников тогда нет). Класс на узле
    без id: вид, не модель. */
-const GROUP_TITLE_SEL = '.curve-group-title, .vsub, .section-title';
+const GROUP_TITLE_SEL = '.curve-group-title, .vsub, .section-title, .sc-sec';
 const ORGAN_SEL = 'input:not([type=hidden]), button, select, textarea, math-field, .edval, .tgl-sw, [role=switch]';
 function hideEmptyGroupTitles() {
   const tp = document.getElementById('tools-panel');
@@ -719,7 +719,7 @@ function scSetup() {
     const a = scParamAnchor(document.getElementById(id));
     if (!a || (a.previousElementSibling && a.previousElementSibling.classList.contains('sc-sec'))) return;
     const h = document.createElement('div');
-    h.className = 'section-title sc-sec'; h.textContent = 'Параметры';
+    h.className = 'sc-sec'; h.textContent = 'Параметры';   // не .section-title: внутри «Функций» заголовков верхнего уровня нет (calc2_ui)
     a.before(h);
   });
   SC_SEGS.forEach(([id, m]) => {
