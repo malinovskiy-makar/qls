@@ -733,7 +733,9 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
+  // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
+  'd1']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -842,6 +844,7 @@ function scSync() {
   scGraphRows();
   scMathSync();
   scMmRows();
+  scPchips();
   scParamsCont();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
@@ -1156,6 +1159,42 @@ function scMmRows() {
     row.insertBefore(top, row.firstChild);
     top.after(line);
     grow.classList.add('sc-gone');
+  });
+}
+
+/* ═══ Строки параметров для ползунков пульта (сессия 6, этап Д; README 4; макеты 05_left_Mono, 06_left_taxes) ═══
+   Д1 — сдвиг под карточкой (.pchip из #params-curves): слева «Сдвиг», справа число (KaTeX 17 px; рисует
+   upgradeRegulator через scValueOnly), ниже дорожка, под ней пределы «−50 … 50» (12 / 500, настоящий минус —
+   boundText, 88-params.js); меню границ по щелчку — как было. Цвет дорожки — общий --accent (не цвет кривой).
+   Ползунки без меню границ (τ, T, Δx, «Сила неравенства») получают только подписи пределов простым текстом
+   (.sc-bounds) — меню границ и правку щелчком им не добавляем: это новая функция и новое состояние (ADR 0153). */
+function scValueOnly(field) {
+  return scOn('d1') && !!field && field.classList.contains('pchip') && field.dataset.pultBox === 'params-curves';
+}
+function scPchips() {
+  const tp = document.getElementById('tools-panel');
+  if (!tp) return;
+  if (scOn('d1')) tp.querySelectorAll('.pchip[data-pult-box="params-curves"]').forEach(ch => {
+    if (!ch.classList.contains('sc-pchip')) ch.classList.add('sc-pchip');
+    const top = ch.querySelector(':scope > .pchip-top');
+    if (top && !top.querySelector('.sc-pname')) {
+      const nm = document.createElement('span'); nm.className = 'sc-pname'; nm.textContent = 'Сдвиг';
+      top.insertBefore(nm, top.querySelector('.reg-eq') || top.firstChild);
+      if (ch._regSync) ch._regSync();
+    }
+  });
+  if (scOn('d1')) ['ineq-tau', 'ineq-transfer', 'mathdx-slider', 'ineq-master-slider'].forEach(id => {
+    const sl = document.getElementById(id);
+    if (!sl) return;
+    let b = sl.nextElementSibling;
+    if (!b || !b.classList.contains('sc-bounds')) {
+      b = document.createElement('div'); b.className = 'sc-bounds'; b.setAttribute('aria-hidden', 'true');
+      b.append(document.createElement('span'), document.createElement('span'));
+      sl.after(b);
+    }
+    const t0 = boundText(+sl.min), t1 = boundText(+sl.max);
+    if (b.children[0].textContent !== t0) b.children[0].textContent = t0;
+    if (b.children[1].textContent !== t1) b.children[1].textContent = t1;
   });
 }
 

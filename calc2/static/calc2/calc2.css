@@ -4133,3 +4133,25 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-mmcard > .crow-formula > .f-slot { display: contents; }
 #wrench-pop .vg-row > .sc-zpick { flex: 0 0 auto; margin-right: 8px; }
 
+/* ── Д1: ползунки сдвига под карточками (scPchips, 92-ui-kit.js; макет 05_left_Mono). Строка: «Сдвиг» слева
+   14 / 500 --text2, число справа KaTeX 17 px, ниже дорожка во всю ширину, под ней пределы 12 / 500 --text3 (без
+   пунктира; щелчок — меню границ, как было). Дорожка — системная с accent-color --accent, как строки параметров
+   сессии 5. Ползункам без меню границ — подписи пределов простым текстом (.sc-bounds). ── */
+#tools-panel .pchip.sc-pchip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 10px; row-gap: 6px; }
+#tools-panel .pchip.sc-pchip > .pchip-top { display: contents; }
+#tools-panel .pchip.sc-pchip .pchip-dot { display: none; }
+#tools-panel .pchip.sc-pchip .sc-pname { grid-column: 1; font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel .pchip.sc-pchip .reg-eq { grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .pchip.sc-pchip .reg-eq .katex { font-size: 1em; }
+#tools-panel .pchip.sc-pchip > .param-track, #tools-panel .pchip.sc-pchip > .param-editor { grid-column: 1 / -1; }
+#tools-panel .sc-pchip .param-track, #tools-panel .sc-prow .param-track { display: grid; grid-template-columns: 1fr 1fr; row-gap: 4px; }
+#tools-panel .sc-pchip .param-track > input[type=range] { grid-column: 1 / -1; grid-row: 1; width: 100%; margin: 0; }
+#tools-panel .sc-pchip .param-track > .param-bound { grid-row: 2; }
+#tools-panel .sc-pchip .param-track > .param-bound:first-child { justify-self: start; }
+#tools-panel .sc-pchip .param-track > .param-bound:last-child { justify-self: end; }
+#tools-panel .sc-pchip .param-bound, #tools-panel .sc-prow .param-bound { border-bottom-color: transparent; }
+#tools-panel .sc-pchip .param-bound:hover, #tools-panel .sc-prow .param-bound:hover { color: var(--text); }
+#tools-panel .sc-pchip input[type=range], #tools-panel .sc-prow input[type=range], #tools-panel #ineq-master-slider { accent-color: var(--accent); }
+#tools-panel .sc-bounds { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--text3); }
+#tools-panel .sc-prow-own > .sc-bounds { grid-column: 1 / -1; }
+

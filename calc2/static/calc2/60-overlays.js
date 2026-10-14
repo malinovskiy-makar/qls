@@ -3339,8 +3339,8 @@ function buildParamChip(box, name) {
   const syncSlider = () => {
     sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step);
     sl.value = p.value;
-    loLab.textContent = fmt(p.min);
-    hiLab.textContent = fmt(p.max);
+    loLab.textContent = boundText(p.min);   // настоящий минус в подписи предела (сессия 6, Д1)
+    hiLab.textContent = boundText(p.max);
     val.textContent = fmt(p.value);
     paintEq();
   };

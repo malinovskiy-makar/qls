@@ -555,7 +555,8 @@ function buildPultCurveChips(list) {
     // середина дорожки, а у сдвинутой — её настоящее положение. Жёсткий ноль
     // здесь врал бы после пересборки панели.
     sl.value = c.linear.b - base;
-    sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
+    /* Цвет дорожки — общий --accent (тихие панели, сессия 6, Д1; README 4): прежний «акцент в цвет кривой» давал
+       на одном экране дорожки пяти цветов. Кривую называет карточка, под которой ползунок стоит. */
     // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
     // тот не появляется ни с клавиатуры, ни на сенсорном экране.
     sl.setAttribute('data-tip', 'Параллельный сдвиг кривой по вертикали');
@@ -771,8 +772,14 @@ function upgradeRegulator(field) {
     const m = sl._modelValue, v = +sl.value;
     return (typeof m === 'number' && isFinite(m) && Math.abs(m - v) <= (+sl.step || 0) / 2 + 1e-9) ? m : v;
   };
-  const paint = () => paintEqLabel(eq, nameOf(), valueOf(), unitOf());
-  const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
+  /* Сдвиг под карточкой (сессия 6, Д1): слова «Сдвиг» слева пишет строка параметра, справа — только число. */
+  const valueOnly = () => typeof scValueOnly === 'function' && scValueOnly(field);
+  const paint = () => {
+    if (!valueOnly()) { paintEqLabel(eq, nameOf(), valueOf(), unitOf()); return; }
+    eq.classList.add('param-eq'); eq.dataset.eqName = nameOf();
+    if (!katexInto(eq, fmt(valueOf()))) eq.textContent = fmt(valueOf());
+  };
+  const sync = () => { lo.textContent = boundText(+sl.min); hi.textContent = boundText(+sl.max); paint(); };
   sync();
   /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
      значение сцена присваивает свойством (`sl.value = …` в setTax, в сбросе
@@ -792,7 +799,7 @@ function upgradeRegulator(field) {
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
-    editEqValue(eq, nameOf(), valueOf(), (v) => {
+    editEqValue(eq, valueOnly() ? '' : nameOf(), valueOf(), (v) => {
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
@@ -830,6 +837,9 @@ const REGULATOR_SHORT = {
      подпись по длине и даёт «Цена внутри…» — многоточие вместо смысла. */
   'quota-price-field': 'Pk',
 };
+/* Подпись предела дорожки: число fmt с настоящим минусом U+2212 (сессия 6, Д1; README 3). Только в подписи
+   предела — fmt (табло, паритет, .tex) не трогаем. */
+function boundText(v) { return String(fmt(v)).replace(/-/g, '−'); }
 function shortRegulatorName(id, raw) {
   /* ⚠️ У СТАВКИ ОБОЗНАЧЕНИЕ ЗАВИСИТ ОТ ФОРМЫ, поэтому в готовом списке его
      нет. У процентных форм это «τ, %», у потоварных — t или s. Стояло здесь
