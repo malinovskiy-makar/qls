@@ -19,6 +19,11 @@ v4 (инвариант сессии v5, 14.10.2026).
   `rep` в поле, где стоит маркер `find`, а текста сноски нет;
 * `min` — сколько замен ожидается не меньше.
 
+Операции v5 (14.10.2026; v4-правки ими не пользуются): `prepend` / `append` —
+вставить `rep` абзацем в начало / конец поля `field` (по умолчанию
+`statement_md`) заданий кандидатов, чей номер совпадает с выражением `find`
+(«^[678]$»); уже стоит — `already_fixed`.
+
 Статусы журнала: `applied` (замен ≥ min), `partial` (меньше), `already_fixed`
 (замены нет, а заменяющий текст уже стоит), `absent_in_<vA>` (искомого нет
 нигде в эталоне), `not_found`, `ambiguous(N tasks)` (сноска подходит к
@@ -103,7 +108,8 @@ def field_name(path):
 
 
 def load_fixes(path):
-    """`fixes_vN.json` → список кортежей (set, page, op, find, rep, min, note)."""
+    """`fixes_vN.json` → список кортежей (set, page, op, find, rep, min, note).
+    Для `prepend`/`append` поле правки — в `rep` как (поле, текст)."""
     with open(path, encoding='utf-8') as handle:
         data = json.load(handle)
     items = data['fixes'] if isinstance(data, dict) else data
@@ -113,6 +119,8 @@ def load_fixes(path):
         if item['op'] == 'fn':
             table = str.maketrans(rep['translate'])
             rep = (lambda table: lambda m: m.group(0).translate(table))(table)
+        elif item['op'] in ('prepend', 'append'):
+            rep = (item.get('field') or 'statement_md', rep)
         out.append((item['set'], item['page'], item['op'], item['find'], rep,
                     int(item.get('min', 1)), item.get('note', '')))
     return out
@@ -189,6 +197,27 @@ def run(fixes, datasets):
         else:
             cand = [k for k, p in enumerate(tp) if page in p]
             scope = 'page'
+        if op in ('prepend', 'append'):
+            field, text = rep
+            nrep, touched, present = 0, [], 0
+            for k in cand:
+                r = rows[k]
+                if not re.search(find, str(r.get('number') or '')):
+                    continue
+                current = r.get(field) or ''
+                if text.strip()[:60] in current:
+                    present += 1
+                    continue
+                r[field] = (text + '\n\n' + current if op == 'prepend'
+                            else current.rstrip() + '\n\n' + text).strip()
+                nrep += 1
+                touched.append((k, field))
+            status = ('applied' if nrep >= mn and nrep else 'already_fixed' if present
+                      else 'partial' if nrep else 'not_found')
+            log.append(dict(i=i, set=s, page=page, op=op, find=find[:50], status=status, n=nrep,
+                            mn=mn, scope=scope, tasks=sorted(set(k for k, _ in touched)),
+                            note=note))
+            continue
         if op == 'foot':
             nrep, touched, pr = _try_apply(rows, cand, op, find, rep)
             if pr:

@@ -129,6 +129,8 @@ class PageOverlay:
     * `human` — остаток: если перечитывание дало меньше замечаний, берётся
       оно (в заплатке есть `blocks`), страница остаётся «на глаза»;
     * `needs_fix`, `judge_error` — запись v2 как была;
+    * `numbers_loss_ok` в заплатке (v5) — человек проверил по картинке, что
+      пропавший номер был выдуман моделью: защита номеров не мешает заплатке;
     * страница из `norm` (ярусы B/C вне выборки контроля) — норма.
     """
 
@@ -169,7 +171,7 @@ class PageOverlay:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status in PATCH_OK:
             if (self.check_numbers and (status == 'fixed' or 'blocks' in patch)
-                    and 'blocks' in patch
+                    and 'blocks' in patch and not patch.get('numbers_loss_ok')
                     and not numbers_kept(base.get('blocks'), patch['blocks'])):
                 # Перечитывание поправило текст, но потеряло номера блоков
                 # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
@@ -184,7 +186,8 @@ class PageOverlay:
             # Расшифровка human-страницы судьёй не подтверждена: берём её, только
             # если «скелет» (тип+номер блоков заданий/решений/критериев) тот же —
             # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
-            if 'blocks' in patch and skeleton(patch['blocks']) == skeleton(base.get('blocks')):
+            if 'blocks' in patch and (patch.get('numbers_loss_ok')
+                                      or skeleton(patch['blocks']) == skeleton(base.get('blocks'))):
                 self._take(out, patch, base)
             out.update(needs_eyes=True, status='human')
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
