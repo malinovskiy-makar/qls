@@ -469,6 +469,71 @@ class QueueRereadRunner(QueueMixin, JudgeBase):
         return result['status']
 
 
+class QueueSecondRunner(QueueMixin, JudgeBase):
+    """Второй заход для `human` после перечитывания: ещё одно перечитывание с
+    замечаниями ОБОИХ судей (до и после первого захода), повторный судья;
+    берётся версия с наименьшим числом замечаний из трёх (текущая, первый и
+    второй заход; при равенстве — более ранняя). Пилот v5: первый заход часто
+    чинит замечание, но вносит новую опечатку («игрекка», «транссраничного»)."""
+
+    def transcribe_page(self, job):
+        old = self.current(job)
+        patch = triage.read_json(self.v3(job))
+        before, after1 = patch.get('judge_before') or {}, patch.get('judge') or {}
+        hints = patch.get('hints') or self.hints_for(job)
+        issues, seen = [], set()
+        for item in (before.get('issues') or []) + (after1.get('issues') or []):
+            if item['detail'] not in seen:
+                seen.add(item['detail'])
+                issues.append(item)
+        missing_layer = list(old.get('numbers_missing') or []) if job.has_layer else []
+        data, usage = self._call(
+            job, SYSTEM_PROMPT,
+            reread_user_text(job, issues, missing_layer) + hint_text(hints) + REREAD_RULES,
+            SCHEMA, 'reread2_v5', PROFILE)
+        cost = float((usage or {}).get('cost_usd') or 0)
+        attempt = self._attempt(job, data, usage, retry=True)
+        new = {'blocks': attempt['blocks'], 'flags': attempt['flags'],
+               'layer_ratio': attempt['metrics'][0], 'numbers_ok': attempt['metrics'][1],
+               'numbers_missing': attempt['metrics'][2][:50],
+               'numbers_extra': attempt['metrics'][3][:50], 'layer_fuzz': attempt['metrics'][4],
+               'parse_error': attempt.get('parse_error', '')}
+        after2, error = None, ''
+        if new['parse_error'] and not new['blocks']:
+            error = 'сбой формата второго захода'
+        else:
+            expected = list(new['numbers_missing']) if job.has_layer else []
+            after2, error, judge_cost = self.judge_blocks(job, new['blocks'], expected,
+                                                          'rejudge2_v5', extra=hint_text(hints))
+            cost += judge_cost
+        result = dict(patch)
+        result.update({'reread2': new, 'judge2': after2, 'error2': error, 'at2': _now(),
+                       'cost_usd': round(float(patch.get('cost_usd') or 0) + cost, 6)})
+        options = [('v2', before, None)]
+        if patch.get('judge') is not None and patch.get('reread'):
+            options.append(('v3', after1, patch['reread']))
+        if after2 is not None:
+            options.append(('v3b', after2, new))
+        best = min(options, key=lambda o: defect_count(o[1]))
+        for key in triage.PATCH_FIELDS:
+            result.pop(key, None)
+        result['chosen'] = best[0]
+        if best[2] is not None:
+            for key in triage.PATCH_FIELDS:
+                result[key] = best[2][key]
+        result['status'] = ('fixed' if best[2] is not None and decide_status(best[1]) == 'ok_judge'
+                            else 'human')
+        triage.write_json_atomic(self.v3(job), result)
+        return result['status']
+
+
+def select_for_second(keys, digitized, patches):
+    """Второй заход: `human` после перечитывания, второго захода ещё не было."""
+    return [key for key in keys
+            if (lambda p: p.get('phase') == 'reread' and p.get('status') == 'human'
+                and 'reread2' not in p)(triage.read_json(_patch_path(digitized, key, patches)) or {})]
+
+
 def queue_keys(queue_rows, set_name, priorities):
     """Страницы очереди своей олимпиады с нужными приоритетами →
     [«pages/<sha16>/pN»] по порядку очереди и {ключ: приоритет}."""

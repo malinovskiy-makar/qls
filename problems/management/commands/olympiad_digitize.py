@@ -200,6 +200,9 @@ class Command(BaseCommand):
                                 help='С --queue: fixes_vN.json — правки страницы в подсказку '
                                      '(«на картинке «…», а не «…»).')
             if name == 'reread':
+                runner.add_argument('--second', action='store_true',
+                                    help='С --queue: второй заход для human (замечания обоих '
+                                         'судей, лучшая из трёх версий).')
                 runner.add_argument('--force-eyes', action='store_true',
                                     help='С --queue: перечитать и ok_judge-страницы с находкой '
                                          'сверки глазами.')
@@ -720,6 +723,11 @@ class Command(BaseCommand):
 
     def _reread_queue_pages(self, options):
         setup = self._queue_setup(options)
+        if options.get('second'):
+            keys = judge.select_for_second(setup[0], str(self.digitized), self.patches)
+            self._queue_phase(options, judge.QueueSecondRunner, keys, setup, estimate=0.006,
+                              per_page=0.0035, label='reread --second')
+            return
         force = set()
         if options.get('force_eyes'):
             force = {k for k in setup[0] if any(h.startswith(('сверка глазами', 'сомнение'))
