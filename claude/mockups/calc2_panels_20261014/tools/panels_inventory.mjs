@@ -105,6 +105,10 @@ function pageInventory() {
   document.querySelectorAll('#chart [data-legend]').forEach(e => { legend[e.getAttribute('data-legend')] = 1; });
   return {
     left: controls(L, 'L'), view: controls(V, 'V'),
+    /* Органы в закрытом «⋯» видимых карточек «Условия» (сессия 5: подпись на графике, «Стандартные издержки»
+       переезжают в меню карточки — README 1, судьба «переехал в «⋯»»). Меню закрыто, поэтому в left их нет. */
+    menus: L ? [...L.querySelectorAll('.fc-card')].filter(vis).flatMap(card => [...card.querySelectorAll('.fc-menu input, .fc-menu button, .fc-menu select, .fc-menu textarea')]
+      .map(el => ({ side: 'M', tag: el.tagName.toLowerCase(), id: el.id || '', label: (clean(el) || el.getAttribute('aria-label') || '').slice(0, 60) }))) : [],
     hints, tips, titles,
     answer: {
       open: !!(R && vis(R.querySelector('.side-inner'))),
