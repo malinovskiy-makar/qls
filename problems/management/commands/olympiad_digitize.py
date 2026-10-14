@@ -41,6 +41,20 @@
         30 случайных страниц яруса A со статусом ok_judge (обе олимпиады, seed
         зафиксирован) → human_review_control\\ без пометок судьи.
 
+    apply-fixes --olympiad X --from vA|--in F --to vB|--out F --fixes F [F …] [--no-autofix] [--replace]
+        точечные правки сверки глазами (problems/olympiad_audit/fixes.py): эталон
+        vA + правки по порядку + автоисправления (U+00AD, точный повтор «Ответ:»)
+        → digitized\\vB\\reference_problems_vB.jsonl; журналы fixes_log.csv,
+        fixes_unapplied.csv, autofix_log.csv, vB_changes.md рядом с выходом.
+        Существующий выход без --replace не перезаписывается;
+    sweeps --olympiad X --version vN [--layers pages_vK,…] [--rows F]
+        9 классов автопроверок (problems/olympiad_audit/sweeps.py) по
+        digitized\\vN\\reference_problems_vN.jsonl → vN\\sweeps_vN.json + сводка;
+        заплатки страниц — pages_vK с K ≤ N, старшая первой (без модели);
+    reread-queue --olympiad X --version vN --eye F [--also SLUG …] [--out F]
+        очередь перечитывания по находкам sweeps и сверки глазами
+        (problems/olympiad_audit/reread_queue.py) → vN\\reread_queue_vN.csv.
+
     --base vN (triage, judge, reread, report, review-pack): эталон, чью очередь
         разбираем, — reference_problems_vN.jsonl; заплатки — pages_v<N+1>\\
         (по умолчанию v2 → pages_v3; финграмотность и бизнес: --base v1 →
@@ -70,8 +84,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from problems.olympiad_audit import (assemble, digitize, judge, registry, review_pack,
-                                     transcribe, triage)
+from problems.olympiad_audit import (assemble, digitize, fixes, judge, registry,
+                                     reread_queue, review_pack, sweeps, transcribe, triage)
 
 #: Подкоманда → метод. `transcribe` и `assemble` допишутся сюда же.
 _SUBCOMMANDS = {
@@ -86,6 +100,9 @@ _SUBCOMMANDS = {
     'reread': '_reread',
     'review-pack': '_review_pack',
     'control-pack': '_control_pack',
+    'apply-fixes': '_apply_fixes',
+    'sweeps': '_sweeps',
+    'reread-queue': '_reread_queue',
 }
 
 PROGRESS_EVERY_PAGES = 100
@@ -180,6 +197,37 @@ class Command(BaseCommand):
         common(sub.add_parser('review-pack', help='Остаток → пакет для просмотра глазами.'))
         common(sub.add_parser('control-pack', help='30 страниц яруса A, пропущенных судьёй '
                                                    '(обе олимпиады) → пакет контроля.'))
+        fx = common(sub.add_parser('apply-fixes', help='Эталон vA + точечные правки → vB.'))
+        fx.add_argument('--from', dest='from_version', metavar='vA',
+                        help='Вход: reference_problems_vA.jsonl (digitized\\vA\\ или digitized\\).')
+        fx.add_argument('--in', dest='in_file', metavar='F', help='Вход — этот файл.')
+        fx.add_argument('--to', dest='to_version', metavar='vB',
+                        help='Выход: digitized\\vB\\reference_problems_vB.jsonl.')
+        fx.add_argument('--out', dest='out_file', metavar='F', help='Выход — этот файл.')
+        fx.add_argument('--fixes', nargs='+', required=True, metavar='F',
+                        help='Файлы правок fixes_vN.json (применяются по порядку).')
+        fx.add_argument('--no-autofix', action='store_true',
+                        help='Без автоисправлений U+00AD и повторов «Ответ:».')
+        fx.add_argument('--replace', action='store_true',
+                        help='Перезаписать существующий выход (без флага — отказ).')
+        sw = common(sub.add_parser('sweeps', help='9 классов автопроверок эталона vN.'))
+        sw.add_argument('--version', required=True, metavar='vN')
+        sw.add_argument('--layers', default=None, metavar='pages_vK,…',
+                        help='Папки заплаток страниц по старшинству (по умолчанию '
+                             'pages_vK с K ≤ N, старшая первой).')
+        sw.add_argument('--rows', default=None, metavar='F',
+                        help='Задания из этого файла (по умолчанию vN\\reference_problems_vN.jsonl).')
+        sw.add_argument('--out', dest='out_file', metavar='F',
+                        help='Куда писать находки (по умолчанию vN\\sweeps_vN.json).')
+        rq = common(sub.add_parser('reread-queue', help='Очередь перечитывания по sweeps и глазам.'))
+        rq.add_argument('--version', required=True, metavar='vN')
+        rq.add_argument('--eye', required=True, metavar='F',
+                        help='Находки сверки глазами (eye_queue_vN.json).')
+        rq.add_argument('--also', nargs='*', default=[], metavar='SLUG',
+                        help='Добавить в ту же очередь эти олимпиады (общий бюджет).')
+        rq.add_argument('--cap-usd', type=float, default=5.0,
+                        help='Бюджет приоритетов 1+2 по $0,006 за страницу.')
+        rq.add_argument('--out', dest='out_file', metavar='F')
 
     # ── Вход ────────────────────────────────────────────────────────────
 
@@ -625,3 +673,114 @@ class Command(BaseCommand):
         result = review_pack.build_control_pack(entries, str(self.root / 'human_review_control'))
         self._say(f'Контроль судьи: кандидатов {len(candidates)}, выбрано {result["pages"]} '
                   f'(seed {review_pack.CONTROL_PACK_SEED}); {result["index"]}')
+
+    # ── apply-fixes / sweeps / reread-queue (инструменты v4 в репозитории) ──
+
+    def _version_rows_path(self, version):
+        """reference_problems_vN.jsonl: digitized\\vN\\ (v3, v4…) или digitized\\ (v1, v2)."""
+        for path in (self.digitized / version / f'reference_problems_{version}.jsonl',
+                     self.digitized / f'reference_problems_{version}.jsonl'):
+            if path.is_file():
+                return path
+        return self.digitized / version / f'reference_problems_{version}.jsonl'
+
+    def _apply_fixes(self, options):
+        if bool(options.get('from_version')) == bool(options.get('in_file')):
+            raise CommandError('Нужен ровно один вход: --from vA или --in F. Ничего не сделано.')
+        if bool(options.get('to_version')) == bool(options.get('out_file')):
+            raise CommandError('Нужен ровно один выход: --to vB или --out F. Ничего не сделано.')
+        src = (Path(options['in_file']) if options.get('in_file')
+               else self._version_rows_path(options['from_version']))
+        if not src.is_file():
+            raise CommandError(f'Нет входа: {src}')
+        label = options.get('to_version') or Path(options['out_file']).stem.replace(
+            'reference_problems_', '')
+        out = (Path(options['out_file']) if options.get('out_file')
+               else self.digitized / label / f'reference_problems_{label}.jsonl')
+        if out.resolve() == src.resolve():
+            raise CommandError('Вход и выход — один файл: правки на месте запрещены.')
+        if out.exists() and not options.get('replace'):
+            raise CommandError(f'Выход уже есть: {out}. Без --replace не перезаписываю.')
+        base_label = options.get('from_version') or src.stem.replace('reference_problems_', '')
+        rows = fixes.read_rows(src)
+        all_fixes = []
+        for path in options['fixes']:
+            all_fixes.extend(fixes.load_fixes(path))
+        new, log, auto, orig = fixes.apply_version(
+            str(self.digitized), rows, all_fixes, self.olympiad.slug, base_label,
+            with_autofix=not options.get('no_autofix'))
+        fixes.write_rows(str(out), new)
+        fixes.write_logs(str(out.parent), log, auto)
+        text, changed = fixes.changes_md(
+            orig, new, f'{label}: что изменилось относительно {base_label} ({self.olympiad.slug})')
+        (out.parent / f'{label}_changes.md').write_text(text, encoding='utf-8')
+        self._say(f'Правки {self.olympiad.slug}: {src} → {out}')
+        self._say(f'  правок {len(log)}: {fixes.counts(log)}; автоисправлений {len(auto)}; '
+                  f'изменено заданий {changed}')
+
+        def empty(rs):
+            return sum(1 for r in rs if not (r.get('statement_md') or '').strip())
+        self._say(f'  заданий {len(rows)} → {len(new)}; пустых условий {empty(rows)} → '
+                  f'{empty(new)}; комплектов {len({r["event_id"] for r in new})}')
+        for x in log:
+            if not fixes.status_ok(x['status']):
+                self._say(f'  НЕ ПРИМЕНЕНО: {x["status"]} {x["page"]} {x["op"]} «{x["find"]}»')
+
+    def _sweep_layers(self, version, given=None):
+        """Заплатки страниц для vN: pages_vK с 2 < K ≤ N, старшая первой."""
+        if given:
+            return tuple(x.strip() for x in given.split(',') if x.strip())
+        top = int(str(version).lstrip('v'))
+        return tuple(f'pages_v{k}' for k in range(top, 2, -1)
+                     if (self.digitized / f'pages_v{k}').is_dir())
+
+    def _run_sweeps(self, version, layers=None, rows_file=None):
+        path = Path(rows_file) if rows_file else self._version_rows_path(version)
+        layers = self._sweep_layers(version, layers)
+        ctx = sweeps.Ctx(self.olympiad.slug, fixes.read_rows(path), str(self.digitized), layers)
+        res = []
+        for _n, func in sweeps.ALL:
+            res += func(ctx)
+        return ctx, res, layers
+
+    def _sweeps(self, options):
+        version = options['version']
+        _ctx, res, layers = self._run_sweeps(version, options.get('layers'), options.get('rows'))
+        out = (Path(options['out_file']) if options.get('out_file')
+               else self.digitized / version / f'sweeps_{version}.json')
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(res, ensure_ascii=False), encoding='utf-8')
+        by = Counter(x['cls'][0] for x in res)
+        self._say(f'Автопроверки {self.olympiad.slug} {version} (заплатки: '
+                  f'{", ".join(layers) or "нет"}) → {out}')
+        self._say('  по классам 1–9: ' + ' / '.join(str(by[k]) for k in '123456789')
+                  + f'; всего {len(res)}')
+
+    def _reread_queue(self, options):
+        version = options['version']
+        findings = {}
+        for slug in [self.olympiad.slug] + list(options.get('also') or []):
+            digitized = self.root / registry.get(slug).audit_dir / 'digitized'
+            saved = self.digitized, self.olympiad
+            self.digitized, self.olympiad = digitized, registry.get(slug)
+            try:
+                saved_json = digitized / version / f'sweeps_{version}.json'
+                rows = fixes.read_rows(self._version_rows_path(version))
+                ctx = sweeps.Ctx(slug, rows, str(digitized), self._sweep_layers(version))
+                if saved_json.is_file():
+                    res = json.loads(saved_json.read_text(encoding='utf-8'))
+                else:
+                    res = []
+                    for _n, func in sweeps.ALL:
+                        res += func(ctx)
+                findings[slug] = (ctx, res)
+            finally:
+                self.digitized, self.olympiad = saved
+        rows = reread_queue.build(reread_queue.read_eye(options['eye']), findings,
+                                  cap_usd=options['cap_usd'])
+        out = (Path(options['out_file']) if options.get('out_file')
+               else self.digitized / version / f'reread_queue_{version}.csv')
+        reread_queue.write(str(out), rows)
+        by = Counter((r['set'], r['priority']) for r in rows)
+        self._say(f'Очередь перечитывания {version} → {out}: строк {len(rows)}; '
+                  + '; '.join(f'{s} p{p}: {n}' for (s, p), n in sorted(by.items())))
