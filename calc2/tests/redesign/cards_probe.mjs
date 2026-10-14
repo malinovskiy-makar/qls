@@ -1,7 +1,7 @@
 /* КАРТОЧКИ ФУНКЦИЙ ЛЕВОЙ ПАНЕЛИ (тихие панели, сессия 5, 14.10.2026; решение владельца «левая панель одна во
    всех моделях и только про условие», Notion …8142…; ADR 0153; README пакета 4, 8).
 
-   Разделы (--only К,М,Б,В,Г,Д,Е) — К, М, Д, Е сессии 6 и модели этапов сессии 5:
+   Разделы (--only К,М,Б,В,Г,Д,Е,Ж) — К, М, Д, Е, Ж сессии 6 и модели этапов сессии 5:
      Б  ppf, ppfsum, trade, tradeprice (у второй КПВ — поле MathLive и клавиатура, сессия 6, А6);   В  prod, costs (и «Задаю кривые»), plants, isoquant;
      Г  mono-d3, mono-kink (и «Кусочный»), monoexport, mono-nat, mono, mono-d1, labor, labor-mono, labor-union,
         labor-bilat, smallopen.
@@ -35,6 +35,9 @@
       в карточке, обозначение и имя, id те же, контрольная запись меняет «Ответ» так же, как на коде BEFORE; у phillips
       карточек нет); плюс: LRAS — поле ЧИСЛА в карточке без кнопки клавиатуры; ни у одной модели макро нет ползунка
       своей переменной оси (у loanable — буквы r); строки чисел и ползунков — словами слева.
+   Ж  (сессия 6, этап Г) неравенство и математика: ineq — «5 групп | 10 групп» сегментом (щелчок даёт тот же «Ответ»,
+      что выбор в прежнем списке на коде BEFORE), группы числами, «Сила неравенства» — дорожка цвета --accent,
+      строки τ и T словами и значением; карточка L в «Формуле» (общие проверки); математика — см. ниже по моделям.
    М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
       Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
@@ -88,6 +91,7 @@ const CASES = [
   ['Е', 'loanable', '', '', ['ma-ls', '40 + 2*r']],
   ['Е', 'fx', '', '', ['ma-fxd', '110 - 2*e']],
   ['Е', 'laffer', '', '', ['ma-lafd', '90 - Q']],
+  ['Ж', 'ineq', 'Формула', "setIneqInput('formula');", ['ineq-formula', 'p^3']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
@@ -370,7 +374,7 @@ async function kRun(theme) {
     ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', (nF > 0 || onlyNoCards) && !f.cut.length, f.cut.slice(0, 6).join(' | '));
     ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', (nD > 0 || onlyNoCards) && !f.dot.length, f.dot.slice(0, 6).join(' | '));
     ok(w + 'у кнопки цвета размер нажатия ≥ 26 px', !f.hit.length, f.hit.slice(0, 6).join(' | '));
-    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
+    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer', 'ineq'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
     ok(w + 'ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
@@ -520,6 +524,52 @@ async function eRun() {
   await ctx.close();
 }
 
+/* ── Ж: неравенство и математика (сессия 6, этап Г) ── */
+async function ineqSeries(page, viaSeg) {
+  const out = {};
+  for (const n of ['10', '5']) {
+    if (viaSeg) {
+      const ok1 = await page.evaluate((n) => { const b = [...document.querySelectorAll('#tools-panel .sc-nseg .seg-btn')].find(x => x.dataset.v === n); if (b) { b.click(); return true; } return false; }, n);
+      if (!ok1) { out[n] = 'нет кнопки ' + n; continue; }
+    } else await page.evaluate((n) => { const s = document.getElementById('ineq-ngroups'); s.value = n; s.dispatchEvent(new Event('change', { bubbles: true })); }, n);
+    await page.waitForTimeout(600);
+    out[n] = (await answerNums(page)) + '#rows=' + (await page.evaluate(() => document.querySelectorAll('#ineq-groups-table input').length));
+  }
+  await page.evaluate(() => { const s = document.getElementById('tau-dummy'); void s; document.getElementById('ineq-redist').click(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const t = document.getElementById('ineq-tau'); t.value = '0.4'; t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.waitForTimeout(500);
+  out.tau = await answerNums(page);
+  return out;
+}
+async function zhIneq(before) {
+  if (KEYS && !KEYS.includes('ineq')) return;
+  const { ctx, page, errors } = await openAt(BASE);
+  await pick(page, 'ineq');
+  const look = await page.evaluate(() => {
+    const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+    const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+    const seg = [...document.querySelectorAll('#tools-panel .sc-nseg .seg-btn')].filter(vis).map(tx);
+    const listShown = [...document.querySelectorAll('#ineq-pane-groups .sel-btn, #ineq-ngroups')].some(vis);
+    const ms = document.getElementById('ineq-master-slider');
+    const acc = (() => { const d = document.createElement('div'); d.style.color = 'var(--accent)'; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; })();
+    return { seg, listShown, accent: ms ? getComputedStyle(ms).accentColor : null, acc, masterLab: ms ? tx(ms.closest('.pchip').querySelector('.pchip-label')) : '' };
+  });
+  ok('ineq: «Число групп» — сегмент «5 групп | 10 групп», прежнего списка не видно', look.seg.join('|') === '5 групп|10 групп' && !look.listShown, JSON.stringify(look));
+  ok('ineq: «Сила неравенства» — дорожка цвета --accent (' + look.accent + ')', look.masterLab === 'Сила неравенства' && look.accent === look.acc, JSON.stringify(look));
+  await page.evaluate(() => document.getElementById('ineq-redist').click()); await page.waitForTimeout(400);
+  const tau = await page.evaluate(() => { const f = document.getElementById('ineq-tau-field'); const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ''); }; return { name: tx(f.querySelector('.sc-pname')), val: tx(f.querySelector('.sc-pval')), katex: !!f.querySelector('.sc-pval .katex') }; });
+  ok('ineq: строка «Прогрессивность τ = 0» — слова слева, значение KaTeX справа (' + JSON.stringify(tau) + ')', tau.name === 'Прогрессивность' && tau.val === 'τ=0' && tau.katex, JSON.stringify(tau));
+  await pick(page, 'ineq');
+  const now = await ineqSeries(page, true);
+  if (before) {
+    const diff = Object.keys(before).filter(k => before[k] !== now[k]);
+    ok('ineq: «5 | 10 групп» сегментом, перераспределение τ = 0,4 — «Ответ» тот же, что на коде до сессии (' + JSON.stringify(Object.keys(now).map(k => k + ':' + String(now[k]).split('#rows=')[1])) + ')', !diff.length && /rows=10/.test(now['10']) && /rows=5/.test(now['5']), diff.map(k => k + ': было ' + String(before[k]).slice(0, 80) + ' / стало ' + String(now[k]).slice(0, 80)).join(' | '));
+  } else ok('ineq: сравнение с кодом до сессии НЕ ПРОВЕРЕНО (нет BEFORE)', false, '');
+  ok('ineq: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -538,6 +588,12 @@ try {
       await ctx.close();
     }
     if (want('К')) beforeMap.kCases = await kCases(BEFORE);
+    if (want('Ж') && (!KEYS || KEYS.includes('ineq'))) {
+      const { ctx, page } = await openAt(BEFORE);
+      await pick(page, 'ineq');
+      beforeMap.ineq = await ineqSeries(page, false);
+      await ctx.close();
+    }
     if (want('Д')) {
       beforeMap.cons = {};
       for (const key of ['consumer', 'cons-slutsky']) {
@@ -569,11 +625,12 @@ for (const name of ENGINES) {
   }
   if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
   if (want('Е')) { head('Е. Макро: карточки, строки, нет ползунка переменной оси'); await eRun(); }
+  if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;
-    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая', 'Д': 'Потребитель (общие проверки карточек)', 'Е': 'Макро (общие проверки карточек)' }[sec]); last = sec; }
+    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая', 'Д': 'Потребитель (общие проверки карточек)', 'Е': 'Макро (общие проверки карточек)', 'Ж': 'Неравенство и математика (общие проверки карточек)' }[sec]); last = sec; }
     await runCase(sec, key, label, extra, ctl, inv, beforeMap[key + '|' + label]);
   }
   await browser.close();

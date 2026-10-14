@@ -59,6 +59,9 @@ const RENAME = {
   '#costs-pane-costs>button.tgl-sw': '#cm-tc',
   '#mono-kink-pane>button.tgl-sw': '#ki-indiv',
   '#union-pane>button.tgl-sw': '#un-monopoly',
+  '#ineq-redist-pane>button.tgl-sw': '#ineq-rd-tax',
+  /* (у) список «Число групп» → сегмент «5 групп | 10 групп» (сессия 6, Г1): кнопки без id пишут в прежний список. */
+  '#ineq-pane-groups>button.sel-btn': '#ineq-pane-groups>button.seg-btn',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];

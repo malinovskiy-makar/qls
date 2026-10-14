@@ -1004,7 +1004,8 @@ function ineqMasterDetach() {         // ручная правка профил�
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
-  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v),
+  // Цвет дорожки — общий --accent (сессия 6, Г1: «Сила неравенства» — строка ползунка обычного вида, была синяя).
+  addPultXChip(box, 'Сила неравенства', pct, null, 0, 200, 1, v => ineqMasterApply(v),
                'ineq-master-slider', v => fmt(v) + '%');
   const val = document.getElementById('ineq-master-slider-val');
   // Отвязанный мастер процентов не показывает: профиль правили руками, и доля

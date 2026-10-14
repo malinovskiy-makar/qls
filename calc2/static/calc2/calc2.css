@@ -4092,3 +4092,16 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 }
 #tools-panel .fc-card > .crow-formula > input.sc-numfield:hover { color: var(--text); }
 
+/* ── Г1: неравенство (scIneqSetup, 92-ui-kit.js). «Число групп» — подпись слева, сегмент справа; кнопка-список
+   прежнего списка спрятана классом (источник правды — сам select). Группы — подпись слева, число плашкой справа.
+   Ползунки τ и T — строка параметра (слова слева, значение KaTeX справа). ── */
+#tools-panel .sc-segrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+#tools-panel .sc-segrow > label { margin: 0; }
+#tools-panel .sc-segrow > .sel-btn.sc-gone { display: none; }
+#tools-panel .sc-nseg { display: inline-flex; margin: 0; }
+#tools-panel #ineq-groups-table > .sc-grow { justify-content: space-between; margin-bottom: 8px !important; }
+#tools-panel .sc-prow > label.sc-old-label { display: none; }
+#tools-panel .sc-prow > .sc-pval { grid-row: 1; grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .sc-prow > .sc-pval .katex { font-size: 1em; }
+#tools-panel .sc-prow-own > input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; }
+

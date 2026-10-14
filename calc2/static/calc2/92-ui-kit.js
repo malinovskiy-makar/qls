@@ -670,6 +670,8 @@ const SC_CARDS = [
   { m: 'fx', input: 'ma-fxs', sym: 'S', name: 'Предложение валюты', prefix: 'Q =', col: 'S' },
   { m: 'laffer', input: 'ma-lafd', sym: 'D', name: 'Спрос', prefix: 'P =', col: 'D' },
   { m: 'laffer', input: 'ma-lafs', sym: 'S', name: 'Предложение', prefix: 'P =', col: 'S' },
+  // Неравенство (сессия 6, Г1): способ «Формула» — карточка L.
+  { m: 'ineq', input: 'ineq-formula', sym: 'L', name: 'Функция Лоренца', prefix: 'L(p) =', col: 'S' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -681,6 +683,7 @@ const SC_PROWS = {
   // Сессия 6, Б2: «Новая цена товара x» и P_{x₁} (shortRegulatorName резал «Px₁» до «…», Notion …81b4…).
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
   'ma-dg-field': ['Дефицит бюджета', '\\Delta G', 'loanable'], 'ma-fx-fixed-field': ['Курс', 'e', 'fx'],
+  'ineq-alpha-field': ['Параметр', '\\alpha', 'ineq'],
 };
 /* Буква, которая является переменной оси модели макро (r у «Заёмных средств», i, e, Y…), ползунка не получает
    (сессия 6, В5; Notion …8187…): замер claude/panels_s6/dead_r_loanable.json — сдвиг r не меняет ни «Ответ», ни один
@@ -720,11 +723,11 @@ const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['pp
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
   ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
-const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -746,6 +749,7 @@ function scSetup() {
     wrapFieldInCard(field, Object.assign({}, o, { menu }));
   });
   if (scOn('consumer')) scConsumerCard();
+  if (scOn('ineq')) scIneqSetup();
   Object.keys(SC_PROWS).forEach(id => {
     const f = document.getElementById(id);
     if (!f || f._scRow || !scProw(id)) return;
@@ -821,6 +825,7 @@ function scSync() {
     if (hb.textContent !== want) hb.textContent = want;
   }
   scConsumerSync();
+  scIneqSync();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
 }
@@ -900,6 +905,68 @@ function scConsumerSync() {
   const dot = card.querySelector('.fc-dot');
   const col = COL.indiff || '';
   if (dot && dot._col !== col) { dot._col = col; dot.style.background = col; }
+}
+
+/* ═══ Неравенство доходов (сессия 6, Г1; README 4, 8) ═══
+   «Число групп» — сегмент «5 групп | 10 групп»: источник правды — прежний список ineq-ngroups (под upgradeSelect),
+   кнопки сегмента без id пишут в него и шлют change (как кнопки кривых площади пишут в ac-pick). Группы — строки
+   чисел плашкой (строки пересобирает сцена, renderIneqGroupsTable: вид ставится на каждой перерисовке). Ползунки τ и
+   T — строки параметра: слова слева, «τ = 0» справа (их значение пишет и сцена в ineq-tau-val, здесь — вид). */
+function scIneqSetup() {
+  const sel = document.getElementById('ineq-ngroups');
+  const f = sel && sel.closest('.field');
+  if (f && !f._scIneq) {
+    f._scIneq = true;
+    f.classList.add('sc-segrow');
+    const seg = document.createElement('div');
+    seg.className = 'seg sc-nseg'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', 'Число групп');
+    [['5', '5 групп'], ['10', '10 групп']].forEach(([v, t]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'seg-btn'; b.textContent = t; b.dataset.v = v;
+      b.setAttribute('role', 'radio');
+      b.addEventListener('click', () => {
+        if (sel.value === v) return;
+        sel.value = v; if (sel._paint) sel._paint();
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      seg.appendChild(b);
+    });
+    sel.before(seg);
+    const sb = sel.previousElementSibling && sel.previousElementSibling.previousElementSibling;   // кнопка-список upgradeSelect
+    f.querySelectorAll(':scope > .sel-btn').forEach(x => x.classList.add('sc-gone'));
+    void sb;
+  }
+  [['ineq-tau-field', 'ineq-tau', 'Прогрессивность'], ['ineq-transfer-field', 'ineq-transfer', 'Трансферт, % дохода']].forEach(([fid, sid, words]) => {
+    const fld = document.getElementById(fid), sl = document.getElementById(sid);
+    if (!fld || !sl || fld._scRow) return;
+    fld._scRow = true;
+    fld.classList.add('sc-prow', 'sc-prow-own');
+    const lab = fld.querySelector(':scope > label'); if (lab) lab.classList.add('sc-old-label');
+    const nm = document.createElement('span'); nm.className = 'sc-pname'; nm.textContent = words;
+    const val = document.createElement('span'); val.className = 'sc-pval'; val.setAttribute('aria-hidden', 'true');
+    fld.insertBefore(val, fld.firstChild); fld.insertBefore(nm, val);
+    sl.addEventListener('input', scIneqSync);
+  });
+  scIneqSync();
+}
+function scIneqSync() {
+  const sel = document.getElementById('ineq-ngroups');
+  const seg = document.querySelector('#tools-panel .sc-nseg');
+  if (sel && seg) seg.querySelectorAll('.seg-btn').forEach(b => {
+    const on = b.dataset.v === sel.value;
+    b.classList.toggle('active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#ineq-groups-table > div').forEach(r => {
+    if (r._scRow) return;
+    r._scRow = true;
+    r.classList.add('sc-grow');
+    const i = r.querySelector('input'); if (i) { i.classList.add('sc-num'); i.style.flex = ''; }
+  });
+  [['ineq-tau', '\\tau', ''], ['ineq-transfer', 'T', '\\,\\%']].forEach(([sid, sym, unit]) => {
+    const sl = document.getElementById(sid); const f = sl && sl.closest('.sc-prow-own'); if (!f) return;
+    const v = f.querySelector('.sc-pval'); const tex = sym + ' = ' + fmt(+sl.value) + unit;
+    if (v && v._tex !== tex) { v._tex = tex; katexInto(v, tex); }
+  });
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из

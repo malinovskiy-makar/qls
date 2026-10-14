@@ -24,6 +24,7 @@ export const LETTERS = {
   // Тихие панели, сессия 5 (решение «левая панель одна во всех моделях», Notion …8142…; ADR 0153):
   'с': 'тумблер пары подписей («Задам TC | Задам кривые», «Инд. спросы | Кусочный», профсоюз) → сегмент: видна полоса кнопок с их id, тумблер спрятан',
   // Тихие панели, сессия 6 (ADR 0154; README пакета 10, 13):
+  'у': 'список «Число групп» (неравенство) → сегмент «5 групп | 10 групп»: кнопки без id пишут в прежний список ineq-ngroups и шлют change',
   'т': 'мёртвый ползунок буквы, которая является переменной оси модели макро (r в «Заёмных средствах»: сдвиг не меняет ни «Ответ», ни узел холста, ни .tex — claude/panels_s6/dead_r_loanable.json) — без замены; STATE.params прежний',
 };
 
@@ -46,7 +47,8 @@ export const FATES = [
   [/^#areascalc-body>button\.tgl-sw$/, 'заменён', 'о', 'сегмент #ac-mode (#ac-curve, #ac-poly)', 'parity_quick.mjs: орган #ac-curve'],
   [/hint-btn|help-dot|^#btn-howto$/, 'убран', 'п', '', 'redesign/quiet_probe.mjs: видимых .hint-btn, .help-dot, #btn-howto — 0'],
   [/^#info-areacalc>button\.swatch/, 'заменён', 'р', 'кнопка цвета .vg-pick строки закраски в «Виде графика»', 'redesign/view_probe.mjs: строка у каждой закраски'],
-  [/^#(costs-pane-costs|mono-kink-pane|union-pane)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
+  [/^#ineq-pane-groups>button\.sel-btn$/, 'заменён', 'у', 'сегмент «5 групп | 10 групп» (#ineq-pane-groups>button.seg-btn)', 'redesign/cards_probe.mjs Ж: щелчок по сегменту даёт тот же «Ответ», что выбор в списке на коде до сессии'],
+  [/^#(costs-pane-costs|mono-kink-pane|union-pane|ineq-redist-pane)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
 ];
 /* Судьбы, которые зависят от МОДЕЛИ (ключ органа общий для всех моделей): [модель, выражение, судьба, буква, чем
    заменён, чем проверено]. Без модели (parity.mjs, compare.mjs) не действуют. */

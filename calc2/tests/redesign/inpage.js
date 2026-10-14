@@ -324,6 +324,7 @@
     if (el.getAttribute('role') === 'switch') return 'switch';
     return t;
   }
+  /* Классы вида тихих панелей «sc-…» (сессии 5–6: число плашкой sc-num и т. п.) — вид, не орган: в ключ не идут. */
   function ctrlKey(el) {
     if (el.id) return '#' + el.id;
     // Поле MathLive: ключ по его скрытому input (у него id есть).
@@ -332,14 +333,14 @@
       if (inp && inp.id) return 'mf:#' + inp.id;
     }
     const anc = el.parentElement ? el.parentElement.closest('[id]') : null;
-    const cls = (el.className && typeof el.className === 'string') ? el.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-)/.test(c))[0] || '' : '';
+    const cls = (el.className && typeof el.className === 'string') ? el.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-|sc-)/.test(c))[0] || '' : '';
     const role = [el.tagName.toLowerCase(), cls, el.dataset.col || el.dataset.cid || el.dataset.scene || el.dataset.mode || ''].filter(Boolean).join('.');
     let idx = 0;
     if (anc) {
       const same = [...anc.querySelectorAll(CTRL_SEL)].filter(x => {
         const a2 = x.parentElement ? x.parentElement.closest('[id]') : null;
         if (a2 !== anc) return false;
-        const c2 = (x.className && typeof x.className === 'string') ? x.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-)/.test(c))[0] || '' : '';
+        const c2 = (x.className && typeof x.className === 'string') ? x.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-|sc-)/.test(c))[0] || '' : '';
         return [x.tagName.toLowerCase(), c2, x.dataset.col || x.dataset.cid || x.dataset.scene || x.dataset.mode || ''].filter(Boolean).join('.') === role;
       });
       idx = same.indexOf(el);
@@ -432,7 +433,7 @@
      «#params-curves>роль[i]» ищется по чипам этой коробки в их прежнем
      порядке — где бы они сейчас ни стояли. */
   function roleOf(x) {
-    const c2 = (x.className && typeof x.className === 'string') ? x.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-)/.test(c))[0] || '' : '';
+    const c2 = (x.className && typeof x.className === 'string') ? x.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-|sc-)/.test(c))[0] || '' : '';
     return [x.tagName.toLowerCase(), c2, x.dataset.col || x.dataset.cid || x.dataset.scene || x.dataset.mode || ''].filter(Boolean).join('.');
   }
   function findPultVirtual(key) {
