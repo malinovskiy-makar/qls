@@ -92,6 +92,8 @@ const CASES = [
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
 
+// Модели без карточек функций (README 8): «Кривая Филлипса» — только «Параметры».
+const NO_CARDS_MODELS = new Set(['phillips']);
 const ALL42 = 'm-graph m-transform m-optimum m-tangent m-minmax m-constraint ppf ppfsum trade tradeprice sd sdsum taxes ceil quota elast ext prod costs plants isoquant mono mono-nat mono-d1 mono-d3 mono-kink labor labor-mono labor-union labor-bilat smallopen monoexport consumer cons-slutsky adas islm phillips money loanable fx ineq laffer'.split(' ');
 // К: кусочная запись — та же на коде BEFORE (кегль, высокая строка) — [модель, поле, запись].
 const K_CASES_REC = ['sd', 'curve-expr-1', 'Q < 40 ? 100 - Q : 140 - 2*Q'];
@@ -231,8 +233,7 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
   await pick(page, key, extra);
   const r = await cardsCheck(page);
   // У «Кривой Филлипса» карточек нет (README 8: только «Параметры»).
-  const NO_CARDS = new Set(['phillips']);
-  ok(tag + ': каждое поле формулы в карточке (' + r.cards + ' карточек)', (NO_CARDS.has(key) ? r.cards === 0 : r.cards > 0) && !r.bare.length, 'голые: ' + r.bare.join(', '));
+  ok(tag + ': каждое поле формулы в карточке (' + r.cards + ' карточек)', (NO_CARDS_MODELS.has(key) ? r.cards === 0 : r.cards > 0) && !r.bare.length, 'голые: ' + r.bare.join(', '));
   ok(tag + ': у карточек обозначение KaTeX и имя, имя не обрезается', !r.noSym.length && !r.noName.length && !r.cut.length, JSON.stringify({ noSym: r.noSym, noName: r.noName, cut: r.cut }));
   ok(tag + ': в верхнем ряду карточек только глаз, «⋯», кнопка цвета; значок цвета не нажимается; старой подписи не видно', !r.other.length, r.other.join(' | '));
   const f = await functional(page, r);
@@ -365,8 +366,9 @@ async function kRun(theme) {
     }
     const w = tag0 + W + ': ';
     ok(w + 'запись карточек 18 px, ужата до 16–18 только если при 18 шире поля (' + nF + ' полей)', !f.size.length, f.size.slice(0, 6).join(' | '));
-    ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', nF > 0 && !f.cut.length, f.cut.slice(0, 6).join(' | '));
-    ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', nD > 0 && !f.dot.length, f.dot.slice(0, 6).join(' | '));
+    const onlyNoCards = !!KEYS && KEYS.every(k => NO_CARDS_MODELS.has(k));
+    ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', (nF > 0 || onlyNoCards) && !f.cut.length, f.cut.slice(0, 6).join(' | '));
+    ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', (nD > 0 || onlyNoCards) && !f.dot.length, f.dot.slice(0, 6).join(' | '));
     ok(w + 'у кнопки цвета размер нажатия ≥ 26 px', !f.hit.length, f.hit.slice(0, 6).join(' | '));
     if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
     ok(w + 'ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));

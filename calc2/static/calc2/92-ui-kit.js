@@ -675,7 +675,15 @@ const SC_PROWS = {
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
 };
 /* Подписи строк чисел словами (сессия 6): [id поля] → подпись; $…$ — набор KaTeX. */
-const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход' };
+const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход',
+  'ma-pe': 'Ожидаемая инфляция $\\pi^{e}$', 'ma-ustar': 'Естественная безработица $u^{*}$', 'ma-beta': 'Наклон $\\beta$' };
+/* Модели без карточек функций (сессия 6, В3: «Кривая Филлипса»): заголовок карточки ввода — «Параметры», а не
+   «Функции» (scSync), второго заголовка нет. */
+const SC_NO_FUNCS = (m) => scOn(m) && m === 'phillips';
+function scFirstCardName() {
+  const k = STATE.mode === 'macro' ? STATE.macroModel : null;
+  return k && SC_NO_FUNCS(k) ? 'Параметры' : null;
+}
 /* Слова с формулами: «Цена товара $x$» — текст и KaTeX кусками (подпись строки, имя ползунка). */
 function scWords(el, text) {
   el.textContent = '';
@@ -688,7 +696,8 @@ function scWords(el, text) {
 // Строки чисел (подпись слева, поле 76 × 36 справа): [id поля, модель].
 const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle-x2', 'ppfsum'], ['inp-bundle-y2', 'ppfsum'],
   ['inp-bundle-xt', 'trade'], ['inp-bundle-yt', 'trade'], ['iso-w', 'isoquant'], ['iso-r', 'isoquant'], ['iso-c', 'isoquant'],
-  ['inp-nat-fc', 'mono-nat'], ['cons-px', 'consumer'], ['cons-py', 'consumer'], ['cons-i', 'consumer']];
+  ['inp-nat-fc', 'mono-nat'], ['cons-px', 'consumer'], ['cons-py', 'consumer'], ['cons-i', 'consumer'],
+  ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips']];
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
@@ -698,7 +707,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -787,6 +796,13 @@ function scSetup() {
 // По состоянию на каждой перерисовке: смысл карточек «Дискриминации» / «Внешнего рынка», цвета значков.
 function scSync() {
   document.querySelectorAll('#tools-panel .sc-card').forEach(paintCard);
+  // Заголовок карточки ввода («Функции»; у модели без функций — «Параметры»). Узел без id: вид, не модель.
+  const hb = document.querySelector('#sec-input > h3.sec-head span > b');
+  if (hb) {
+    if (hb._scOwn == null) hb._scOwn = hb.textContent;
+    const want = scFirstCardName() || hb._scOwn;
+    if (hb.textContent !== want) hb.textContent = want;
+  }
   scConsumerSync();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
