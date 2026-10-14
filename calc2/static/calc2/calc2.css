@@ -4046,3 +4046,14 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 }
 /* Запись не помещается и в 16 px — приставка уходит (fitFormulaField, класс fc-pre-off на строке поля). */
 #tools-panel .fc-card > .crow-formula.fc-pre-off > .fc-prefix { display: none; }
+/* А2: числа — плашкой (макет 05_left_Consumer): поле 76 × 36, фон --surface-2 (обе темы), рамка 1 px --border,
+   радиус 6, цифры по правому краю шрифтом формул; кольцо фокуса как у полей; пунктирной черты нет. id, значения и
+   обработчики прежние — меняется только вид. .sc-num — числа сессии 6 вне строки .sc-nrow (a и b в карточке U). */
+#tools-panel .sc-nrow > input, #tools-panel input.sc-num {
+  box-sizing: border-box; flex: 0 0 76px; width: 76px; height: 36px; padding: 0 10px; margin: 0;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  text-align: right; color: var(--text); font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 16px;
+}
+#tools-panel .sc-nrow > input:hover, #tools-panel input.sc-num:hover { color: var(--text); border-color: var(--border-strong); }
+#tools-panel .sc-nrow > input:focus, #tools-panel input.sc-num:focus { border-color: var(--accent); }
+#tools-panel .sc-nrow > input:focus-visible, #tools-panel input.sc-num:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
