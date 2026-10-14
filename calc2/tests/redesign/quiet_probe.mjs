@@ -11,7 +11,7 @@
         одна из ступеней 18/600, 14/600, 14/500, 14/400, 13/600, 12/500, шрифт Montserrat (KaTeX и MathLive не
         считаются); узлов с моноширинным шрифтом вне окна клавиатуры — 0; зазор подпись → поле ≥ 6 px;
      К  тёмная тема: фон полей и списков «Условия» #232019; «Сдвиг MC» в mono, mono-nat, mono-d1 без индекса
-        (нет .msupsub), у smallopen «Pw» с индексом; в calc2.css нет #11151d;
+        (texifyName имени регулятора — \mathrm{MC}; строка с сессии 6 — «Сдвиг» словами и число, README 4), у smallopen «Pw» с индексом; в calc2.css нет #11151d;
      З  (сессия 5, правка А3 по приёмке 14.10) 42 модели и costs «Задам кривые»: в «Условии» нет видимого заголовка
         группы или раздела (h3.sec-head, .curve-group-title, .vsub, .section-title) без видимого органа под ним.
 
@@ -225,9 +225,16 @@ async function sectionK() {
       .map(e => ({ tex: ((e.querySelector('annotation') || {}).textContent || '').trim(), sub: !!e.querySelector('.msupsub') }))
       .filter(x => re.test(x.tex));
   }, re); };
+  /* Сессия 6, Д1 (README 4, макет 05_left_Mono): строка сдвига под карточкой — «Сдвиг» словами слева и число справа,
+     кривую называет карточка (MC). Обозначение «Сдвиг MC» живёт в имени регулятора (data-eq-name) и в его наборе
+     texifyName — проверяем, что MC там одним обозначением (\mathrm{MC}, без индекса), а строка — «Сдвиг» и число. */
   for (const key of ['mono', 'mono-nat', 'mono-d1']) {
-    const r = await label(key, 'Сдвиг.*M');
-    ok(key + ': «Сдвиг MC» одним обозначением (без индекса)', r.length > 0 && r.every(x => !x.sub), JSON.stringify(r));
+    await pick(page, key);
+    const r = await page.evaluate(() => [...document.querySelectorAll('#tools-panel .pchip.sc-pchip')].filter(e => e.getClientRects().length)
+      .map(ch => { const eq = ch.querySelector('.reg-eq'); const nm = eq && eq.dataset.eqName; const tex = nm ? texifyName(nm) : '';
+        return { name: nm, mathrm: /\\mathrm\{MC\}/.test(tex), sub: /M_\{/.test(tex), words: (ch.querySelector('.sc-pname') || {}).textContent, num: !!(eq && eq.querySelector('.katex')) && !/M/.test((eq.querySelector('annotation') || {}).textContent || '') }; })
+      .filter(x => /MC/.test(x.name || '')));
+    ok(key + ': «Сдвиг MC» одним обозначением (без индекса); строка — «Сдвиг» и число', r.length > 0 && r.every(x => x.mathrm && !x.sub && x.words === 'Сдвиг' && x.num), JSON.stringify(r));
   }
   const pwR = await label('smallopen', '^P_');
   ok('smallopen: «Pw» с индексом', pwR.length > 0 && pwR.some(x => x.sub), JSON.stringify(pwR));
