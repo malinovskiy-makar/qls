@@ -153,8 +153,8 @@ class PageOverlay:
         if self.keep_points and 'blocks' in patch:
             # Слой v5: баллы — из прежней расшифровки; блоки помечаются `_v5`
             # (сборка не даёт перечитыванию заводить новые задания из файла ответов).
-            out['blocks'] = [dict(b, _v5=True)
-                             for b in keep_points(base.get('blocks') or [], out['blocks'])]
+            out['blocks'] = [dict(b, _v5=True) for b in title_stems(
+                keep_points(base.get('blocks') or [], out['blocks']))]
 
     def apply(self, page_dir, page, base):
         if base is None:
@@ -223,6 +223,24 @@ def keep_points(base_blocks, new_blocks):
         key = (b.get('type'), str(b.get('number') or ''), str(b.get('task_variant') or ''))
         if key[1] and b.get('points') in (None, '') and key in points:
             b = dict(b, points=points[key])
+        out.append(b)
+    return out
+
+
+_OPTION_LINE = re.compile(r'^\s*(?:[-*]\s+|\(?[1-9а-еa-eА-ЕA-E][).]\s*)')
+
+
+def title_stems(blocks):
+    """Слой v5: формулировка вопроса, которую перечитывание положило в поле
+    названия («Главная проблема экономики состоит в том, что:»), а текст блока
+    начинается со списка вариантов, — возвращается в начало текста (МОШ 2012/13,
+    7–8 кл., тест: 7 вопросов без формулировки)."""
+    out = []
+    for b in blocks or []:
+        title, text = (b.get('title') or '').strip(), (b.get('text') or '').strip()
+        if (b.get('type') == 'task' and title and _OPTION_LINE.match(text)
+                and (title.endswith((':', '?', '…')) or len(title) >= 60)):
+            b = dict(b, title='', text=f'{title}\n\n{text}')
         out.append(b)
     return out
 
