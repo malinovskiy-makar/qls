@@ -43,9 +43,18 @@ function ok(label, cond, detail) {
 const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 60 - s.length)));
 
 let browser = null;
+/* ⚠️ WebKit в Playwright отказывает после 63 контекстов на один запущенный браузер: 64-я загрузка висит до
+   таймаута (замер 14.10: ровно 63 и на коде 9b2c3e54, и на текущем — свойство движка, не calc2). Прибор
+   открывает их больше сотни, поэтому браузер перезапускается, когда открыто 50 и сейчас ни одного не держим. */
+let ctxCount = 0, engName = '';
+async function newCtx(opts) {
+  if (ctxCount >= 50 && !browser.contexts().length) { await browser.close(); browser = await pw[engName].launch(); ctxCount = 0; }
+  ctxCount++;
+  return browser.newContext(opts);
+}
 /* mem: значение calc2.v1.answerHidden до загрузки (null — пустая память). */
 async function openPage(w, h, key, mem) {
-  const ctx = await browser.newContext({ viewport: { width: w, height: h }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  const ctx = await newCtx({ viewport: { width: w, height: h }, reducedMotion: 'reduce', locale: 'ru-RU' });
   await ctx.addInitScript((m) => {
     try {
       if (sessionStorage.getItem('__probeInit')) return;   // перезагрузка — память не трогаем
@@ -274,8 +283,11 @@ async function sectionB() {
      его первого прямоугольника = верх последнего прямоугольника предыдущего
      текста (± 4 px). Блоком оно начинало бы новую строку. */
   const sameLine = await page.evaluate(() => {
-    const p = document.querySelector('#ex-body > .sb-note');
-    const b = p && [...p.querySelectorAll(':scope > b')].find(x => { let t = ''; for (let n = x.previousSibling; n; n = n.previousSibling) t += n.textContent || ''; return !!t.trim(); });
+    /* С этапа Б первыми идут пояснения, перенесённые из «Ответа» и «Условия» (.ex-from-answer,
+       .ex-from-cond, ADR 0150–0151): вступление модели — первая собственная врезка с таким жирным. */
+    const midBold = (p) => [...p.querySelectorAll(':scope > b')].find(x => { let t = ''; for (let n = x.previousSibling; n; n = n.previousSibling) t += n.textContent || ''; return !!t.trim(); });
+    const p = [...document.querySelectorAll('#ex-body > .sb-note:not(.ex-from-answer):not(.ex-from-cond)')].find(midBold);
+    const b = p && midBold(p);
     if (!b) return null;
     let prev = b.previousSibling;
     while (prev && !(prev.textContent || '').trim()) prev = prev.previousSibling;
@@ -335,7 +347,7 @@ async function sectionB() {
 /* ── Этап Б (14.10, README 3–5): вид, повторы, пояснения ───────────────────────── */
 /* Открытая страница одной темы и ширины; модели меняются pickScene без перезагрузки. */
 async function openThemed(W, theme) {
-  const ctx = await browser.newContext({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  const ctx = await newCtx({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
   await ctx.addInitScript((t) => { try { localStorage.clear(); localStorage.setItem('theme', t); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} }, theme);
   const page = await ctx.newPage();
   const errors = [];
@@ -482,7 +494,7 @@ async function sectionV() {
 }
 const BASE_SWAP = { v: '' };
 async function openThemedAt(base, W, theme) {
-  const ctx = await browser.newContext({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  const ctx = await newCtx({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
   await ctx.addInitScript((t) => { try { localStorage.clear(); localStorage.setItem('theme', t); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} }, theme);
   const page = await ctx.newPage();
   await page.goto(base + '/calc2/', { waitUntil: 'load', timeout: 40000 });
@@ -586,6 +598,7 @@ async function sectionV3() {
 
 for (const name of ENGINES) {
   eng = name;
+  engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {
     console.log('\n!!! ' + name + ': движок не запустился — НЕ ПРОВЕРЕНО (' + String(e).slice(0, 120) + ')');
     continue;

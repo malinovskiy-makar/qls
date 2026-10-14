@@ -404,7 +404,7 @@ function vgSetup() {
     // Образец закраски — кнопка цвета (STATE.areaColor): цвета закрасок уходят сюда из панели точек.
     if (kind === 'areas' && covers && covers.length && typeof makeColorPicker === 'function') {
       const chk = document.getElementById(id);
-      const pick = makeColorPicker('#888888', (hex) => { covers.forEach(k => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; }); redrawAll(); },
+      const pick = makeColorPicker(COL.ink, (hex) => { covers.forEach(k => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; }); redrawAll(); },
         tipName('Цвет: ' + covers[0]));
       pick.classList.add('vg-pick');
       if (chk) chk.after(pick);
@@ -486,7 +486,7 @@ function syncOnChart() {
         STATE.areaHidden = [...set];
         redrawAll();
       });
-      const pick = makeColorPicker('#888888', (hex) => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; redrawAll(); }, tipName('Цвет: ' + k));
+      const pick = makeColorPicker(COL.ink, (hex) => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; redrawAll(); }, tipName('Цвет: ' + k));
       pick.classList.add('vg-pick');
       const nm = document.createElement('span'); nm.className = 'show-name'; nm.textContent = String(k).replace(/\s*\([^)]{1,12}\)\s*$/, '');
       const nt = document.createElement('span'); nt.className = 'show-not';

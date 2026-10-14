@@ -252,7 +252,8 @@ await page.waitForTimeout(400);
    TC и FC (Б21) — в списке был один VC без своей пары. Ожидание изменено
    вместе с продуктом, а не подогнано: проверяем, что пикер есть у каждой. */
 await t('у семи кривых издержек есть пикеры', async () => {
-  const n = await page.locator('#sec-costs .cpick[data-col^="cost"]').count();
+  /* С 14.10 (ADR 0152) галочки кривых издержек с их пикерами переехали узлами в «Вид графика». */
+  const n = await page.locator('#sec-costs .cpick[data-col^="cost"], #wrench-pop .vg-onchart .cpick[data-col^="cost"]').count();
   return n === 7 || `пикеров ${n}`;
 });
 

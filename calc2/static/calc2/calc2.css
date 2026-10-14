@@ -3935,3 +3935,11 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #wrench-pop .vg-row .field { margin: 6px 0 0; }
 #wrench-pop .vg-row .fc-card { margin: 4px 0; }
 #wrench-pop .vg-row .tgl { margin: 4px 0; }
+/* Лесенка A и для строк, переехавших в «Вид» (правила этапа В писались для #tools-panel): имена карточек
+   рыночных D и S — не моноширинным, тумблер заводов — как кнопки, обозначение без KaTeX («Tx», «Коридор»)
+   — подписью. */
+#wrench-pop .vg-row .curve-name, #wrench-pop .vg-row .fc-name, #wrench-pop .vg-row .show-name,
+#wrench-pop .vg-row .show-not:not(:has(.katex)) {
+  font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
+}
+#wrench-pop .vg-row .tgl-lab { font-size: 13px !important; font-weight: 600 !important; }

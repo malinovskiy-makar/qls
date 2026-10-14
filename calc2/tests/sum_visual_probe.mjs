@@ -185,9 +185,9 @@ function svCurves() {
     var segs = svPathsOf(c.id).map(function (p) { return svSegInfo(p, bg); });
     // Образец цвета в строке левой панели.
     var swatch = null;
-    var rows = [].slice.call(document.querySelectorAll('#curve-list .curve-row'));
-    var idx = STATE.curves.filter(function (x) { return true; }).indexOf(c);
-    var row = rows[idx];
+    /* Строка — по data-cid: с 14.10 (ADR 0152) строки суммарных кривых живут в «Виде графика»,
+       и номер строки в #curve-list больше не номер кривой. */
+    var row = document.querySelector('#curve-list .curve-row[data-cid="' + c.id + '"], #wrench-pop .vg-onchart .curve-row[data-cid="' + c.id + '"]');
     if (row) {
       var sw = row.querySelector('.swatch');
       if (sw) swatch = svHex(svRGB(getComputedStyle(sw).backgroundColor));

@@ -414,6 +414,8 @@ if (need('Д2')) {
      Берём длинные коэффициенты и смотрим, что плашка расширилась либо запись
      пересобрана второй формой — и в обоих случаях осталась внутри плашки. */
   head('Д2 (третий край) · заведомо широкая запись');
+  /* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, ADR 0151): showHintTip больше не показывает плашку ни для какой записи,
+     даже заведомо широкой, — узла #hint-tip нет или он спрятан. Правило ширины плашки вместе с ней ушло. */
   const w3 = await page.evaluate(() => {
     const LONG = '(Q >= 0 and Q < 40) ? 123.456789 - 0.987654*Q : '
                + '((Q >= 40 and Q < 80) ? 987.654321 - 0.123456*Q : '
@@ -421,26 +423,9 @@ if (need('Д2')) {
     const dot = document.querySelector('.crow-auto') || document.body;
     showHintTip(dot, 'Сейчас это ' + tipExpr(LONG));
     const el = document.getElementById('hint-tip');
-    const r = el.getBoundingClientRect();
-    const k = el.querySelector('.katex');
-    const kr = k ? k.getBoundingClientRect() : null;
-    const ann = k ? k.querySelector('annotation[encoding="application/x-tex"]') : null;
-    return {
-      text: ffText(el), wide: el.classList.contains('tip-math'),
-      stacked: /gathered/.test(ann ? ann.textContent : ''),
-      w: Math.round(r.width), over: kr ? Math.round(kr.right - r.right) : null,
-      inWindow: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
-    };
+    return { shown: !!el && el.style.display !== 'none' && !!el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' };
   });
-  note('плашка ' + w3.w + ' px, расширена: ' + w3.wide + ', вторая форма: ' + w3.stacked);
-  note('текст: ' + w3.text.slice(0, 200));
-  flag('широкая запись включила правило ширины', w3.wide || w3.stacked,
-       'расширение ' + w3.wide + ', вторая форма ' + w3.stacked);
-  show('запись выходит за правый край плашки, px', w3.over, null);
-  flag('широкая запись НЕ выходит за правый край плашки', w3.over != null && w3.over <= 1,
-       w3.over + ' px');
-  flag('плашка целиком в окне браузера', w3.inWindow);
-  await shot('d2-tip-wide');
+  flag('широкая запись: плашки подсказки нет (решение 14.10)', !w3.shown, JSON.stringify(w3));
 }
 
 /* ═══════════ Д3. Субсидия покупателю ═══════════════════════════════ */
