@@ -47,12 +47,12 @@ _SERVICE = re.compile(
     r'внимание!|правила проведения|уважаемый участник)|ответ на вопрос данного типа|'
     r'решите задачи, приведите только ответ|посмотрите внимательно на данные|'
     r'в задании \d+ (от|со)несите|выберите несколько правильных ответов|'
-    r'из нескольких вариантов нужно выбрать', re.IGNORECASE)
+    r'из нескольких вариантов нужно выбрать|внимание!|(необходимо|нужно)\s+выбрать', re.IGNORECASE)
 _OPTION = re.compile(r'^\s*(?:[-*•○☐☑]\s+|\(?[1-9а-еa-eА-ЕA-E]\)\s+|[1-9]\.\s+\S)', re.MULTILINE)
 _QUESTION = re.compile(r'\?|найдите|определите|рассчитайте|вычислите|сколько|чему равн|'
                        r'какой|какая|какие|каков|во сколько', re.IGNORECASE)
-_RANGE = re.compile(r'(?:задани\w*|задач\w*|вопрос\w*)\s*№?\s*\(?(\d{1,2})\)?\s*(?:[-–—]|до)\s*'
-                    r'\(?(\d{1,2})\)?', re.IGNORECASE)
+_RANGE = re.compile(r'(?:задани\w*|задач\w*|вопрос\w*)\s*(?:№|с)?\s*(?:[A-ZА-Я]\s*)?\(?(\d{1,2})\)?'
+                    r'\s*(?:[-–—]|до|по)\s*(?:[A-ZА-Я]\s*)?\(?(\d{1,2})\)?', re.IGNORECASE)
 _SINGLE = re.compile(r'\bв\s+задани[ие]\s+(\d{1,2})\b', re.IGNORECASE)
 SERVICE_MAX = 1500
 
@@ -99,6 +99,15 @@ def format_lines(text, title=''):
         if clean and _FORMAT_LINE.search(clean):
             out.append(para if not _MARKER.match(para.strip('*# ')) else clean)
     return out
+
+
+_COUNT = re.compile(r'(\d{1,2})\s+вопрос', re.IGNORECASE)
+
+
+def section_count(text):
+    """«Тест II (10 вопросов, 20 баллов)», «раздел состоит из 10 вопросов» → 10."""
+    m = _COUNT.search(text or '')
+    return int(m.group(1)) if m else None
 
 
 def targets(text):
@@ -182,7 +191,8 @@ def qualifying_blocks(items, report=None):
             if is_rules_text(text, title) or (not str(block.get('task_variant') or '').strip()
                                               and is_service_text(text, title)):
                 items[i] = (entry, page, record, dict(block, number='', _service=True))
-                leads.append((i, marker_of(block), '\n\n'.join(format_lines(text, title))))
+                if not is_rules_text(text, title):      # правила — только во вступление
+                    leads.append((i, marker_of(block), '\n\n'.join(format_lines(text, title))))
                 if report is not None:
                     report['v5: служебный блок — не задание'] += 1
                 continue

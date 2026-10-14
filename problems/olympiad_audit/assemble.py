@@ -576,7 +576,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
     event['preamble'] = []
     econ = profile == ECON
     leads_by_number = {}          # v5: номер задания → инструкции раздела
-    section = {'file': None, 'lead': ''}   # v5: инструкция раздела без номеров
+    section = {'file': None, 'lead': '', 'left': None}   # v5: инструкция раздела без номеров
     open_lead = []                # v5: подводка «ответьте на вопросы (3)-(5)» + цитата
 
     def task_for(number, variant='', create=True):
@@ -585,13 +585,19 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             tasks[key] = Task(event_id, number, variant)
             if econ and section['lead'] and section['file'] == current_file:
                 tasks[key].leads.append(section['lead'])
+                if section['left'] is not None:      # «(10 вопросов)» — ровно столько заданий
+                    section['left'] -= 1
+                    if section['left'] <= 0:
+                        section['lead'] = ''
         return tasks.get(key)
 
-    def add_lead(numbers, text):
+    def add_lead(numbers, text, file=None):
+        # file — инструкция действует только на задания своего файла (тест и
+        # задачи у МОШ — разные файлы с номерами 1…N у обоих).
         for n in numbers:
             got = leads_by_number.setdefault(n, [])
-            if text and not any(same_intro(text, seen) for seen in got):
-                got.append(text)
+            if text and not any(same_intro(text, seen) for seen, _f in got):
+                got.append((text, file))
 
     def declared_count():
         for text in event['preamble']:
@@ -668,7 +674,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             event['preamble'].append(block['_rules_head'])     # v5: правила этапа
         if econ and block.get('_lead'):
             # v5: инструкция блока отборочного МОШ (служебный блок или начало вопроса).
-            add_lead(block.get('_lead_numbers') or [], block['_lead'])
+            add_lead(block.get('_lead_numbers') or [], block['_lead'], entry['file'])
         if econ and block.get('_service'):
             text = block.get('text') or ''
             if econ_rules.is_rules_text(text, block.get('title') or '') and not any(
@@ -695,11 +701,18 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             lines = econ_rules.format_lines(text, title)
             nums = econ_rules.targets(f'{title}\n{text}')
             if lines and econ_rules.is_service_text(text, title):
-                lead = '\n\n'.join(lines)
-                if nums:
-                    add_lead(nums, lead)
-                else:
-                    section.update(file=entry['file'], lead=lead)
+                # Построчно: строка с номерами («Задачи 1—5 требуют записи
+                # решения») — этим заданиям, остальные — раздел дальше по файлу.
+                rest_lines = []
+                for line in lines:
+                    line_nums = econ_rules.targets(line)
+                    if line_nums:
+                        add_lead(line_nums, line, entry['file'])
+                    else:
+                        rest_lines.append(line)
+                if rest_lines:
+                    section.update(file=entry['file'], lead='\n\n'.join(rest_lines),
+                                   left=econ_rules.section_count(f'{title}\n{text}'))
                 rest = [para for para in re.split(r'\n\s*\n', f'{title}\n\n{text}')
                         if para.strip() and para.strip() not in lines
                         and not econ_rules.marker_of({'title': para.strip()})]
@@ -710,14 +723,14 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             if nums and re.search(r'ответьте на вопрос|к заданиям|к вопросам', text, re.I):
                 # Подводка к нескольким вопросам («Прочитайте текст ниже и ответьте на
                 # вопросы (3) - (5)», vp-2026-final-10) — к ним, не к предыдущему.
-                open_lead[:] = [nums, [text]]
+                open_lead[:] = [nums, [text], entry['file']]
                 report['v5: подводка к вопросам'] += 1
                 continue
             if open_lead:
                 open_lead[1].append(text)
                 continue
         if econ and open_lead and kind == 'task' and _real_number(number):
-            add_lead(open_lead[0], '\n\n'.join(open_lead[1]))
+            add_lead(open_lead[0], '\n\n'.join(open_lead[1]), open_lead[2])
             open_lead.clear()
         if kind == 'task' and not _real_number(number):
             # Блок «задание» без номера (или «0», «intro», буква подпункта):
@@ -762,6 +775,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 # собранная часть файла — тест, номера «тест-N» (как в v1);
                 # иначе вопрос 10 и задача 10 слились бы в одно задание.
                 restarted = True
+                section['lead'] = ''      # v5: инструкция теста не переходит на задачи
                 for key in file_keys:
                     task = tasks.pop(key)
                     task.number = f'тест-{task.number}'
@@ -831,8 +845,10 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
         split_glued(tasks, report)
     for task in tasks.values():
         head = _leading_int(task.number.replace('тест-', ''))
-        for text in leads_by_number.get(head, []):
-            if not any(same_intro(text, seen) for seen in task.leads):
+        files = {f for f, _p in task.pages}
+        for text, file in leads_by_number.get(head, []):
+            if (file is None or file in files) and not any(
+                    same_intro(text, seen) for seen in task.leads):
                 task.leads.append(text)
 
     # 2. Решения и 3. критерии из своих файлов.
@@ -1356,8 +1372,11 @@ def count_tables(markdown):
 
 def task_record(task, event, model):
     statement = join_pieces(task.statement)
-    if task.leads:
-        statement = '\n\n'.join(task.leads + ([statement] if statement else []))
+    # v5: инструкция раздела — в начало условия, если её там ещё нет (у ВП 2007
+    # каждый вопрос уже начинается с «Выберите среди предложенных ответов…»).
+    missing = [lead for lead in task.leads if not is_statement_echo(lead, statement)]
+    if missing:
+        statement = '\n\n'.join(missing + ([statement] if statement else []))
     solution = '\n\n'.join(t.strip() for t in task.solution if t.strip())
     criteria = '\n\n'.join(t.strip() for t in task.criteria if t.strip())
     pages = task.quality
