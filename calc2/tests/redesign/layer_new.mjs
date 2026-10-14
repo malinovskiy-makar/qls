@@ -56,6 +56,7 @@ const RENAME = {
   '#areascalc-body>button.tgl-sw': '#ac-curve',
   /* (с) тумблер пары подписей → сегмент (тихие панели, сессия 5; README пакета 4; ADR 0153): видна сама полоса
      кнопок, тумблер спрятан; орган — её левая кнопка. Ключ дописывается вместе с моделью (SC_ON, 92-ui-kit.js). */
+  '#costs-pane-costs>button.tgl-sw': '#cm-tc',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];
