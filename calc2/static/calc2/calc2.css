@@ -4057,3 +4057,5 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-nrow > input:hover, #tools-panel input.sc-num:hover { color: var(--text); border-color: var(--border-strong); }
 #tools-panel .sc-nrow > input:focus, #tools-panel input.sc-num:focus { border-color: var(--accent); }
 #tools-panel .sc-nrow > input:focus-visible, #tools-panel input.sc-num:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* А5: раздел внутри блока табло («С МРОТ» на рынке труда) — заголовок раздела «Ответа» 14 / 600 с чертой сверху. */
+#params-panel #sb-body .sb-subsec { margin: 18px 0 10px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); }

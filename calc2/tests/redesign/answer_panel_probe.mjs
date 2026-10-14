@@ -29,9 +29,12 @@
          число без знака: taxes субсидия 20 — «Излишек потребителя» 1 250 → 1 800, «Излишек производителя»
          1 250 → 1 800, «Расходы бюджета» 0 → 1 200, «Общественное благосостояние» 2 500 → 2 400; тождество
          «SW после = до − DWL» и «SW после = CS + PS − расходы» при субсидии 10, 20, 35; mono субсидия 10 — 0 → 450.
+     Ж   (сессия 6, правка А5; Notion …8149…) «Ответ» при МРОТ: labor и labor-mono со включённым МРОТ, 1440 и 1280 —
+         в видимом тексте колонки нет «_»; есть раздел «С МРОТ»; строки с одной подписью стоят только в разных
+         разделах (раздел — группа главных чисел, блок табло, подраздел .sb-subsec).
 
    ENGINES=chromium,webkit (по умолчанию оба). Нет движка — громкий пропуск.
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А,Д,Е]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А,Д,Е,Ж]
    Код 0 — всё сошлось.                                                     */
 import * as pw from 'playwright';
 
@@ -713,6 +716,49 @@ async function sectionE() {
   await ctx.close();
 }
 
+async function sectionZh() {
+  head('Ж. «Ответ» при МРОТ: W_min индексом, раздел «С МРОТ»');
+  for (const W of [1440, 1280]) {
+    const { ctx, page, errors } = await openThemed(W, 'light');
+    for (const key of ['labor', 'labor-mono']) {
+      await pick(page, key, "const c = document.getElementById('chk-labmin'); if (c && !c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }");
+      const r = await page.evaluate(() => {
+        const col = document.querySelector('#params-panel .side-inner');
+        const shown = (e) => { for (let n = e; n && n !== col; n = n.parentElement) { const cs = getComputedStyle(n); if (n.hidden || cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
+        const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+        const under = [];
+        const w = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+        for (let t = w.nextNode(); t; t = w.nextNode()) {
+          const e = t.parentElement;
+          if (!e || e.closest('.katex-mathml, annotation, script, style, #ex-body')) continue;
+          if (t.nodeValue.includes('_') && shown(e)) under.push(tx(e).slice(0, 50));
+        }
+        // Разделы и подписи строк в порядке колонки.
+        const BOUND = '#ans-hero > .ans-group, #ans-burden, #sb-body > [id], #sb-body .sb-subsec';
+        let sec = 0; const seen = {}; const dup = []; let hasSub = false;
+        const ew = document.createTreeWalker(col, NodeFilter.SHOW_ELEMENT);
+        for (let e = ew.nextNode(); e; e = ew.nextNode()) {
+          if (e.closest('#ex-body')) continue;
+          if (e.matches(BOUND)) { sec++; if (e.matches('.sb-subsec') && shown(e) && /С МРОТ/.test(e.textContent)) hasSub = true; continue; }
+          let lab = null;
+          if (e.matches('#ans-hero .ans-cell')) lab = e.querySelector('.ans-lab');
+          else if (e.matches('#sb-body .stat')) lab = e.querySelector(':scope > span');
+          if (!lab || !shown(e)) continue;
+          const L = tx(lab).replace(/\s*\(.*\)$/, '').trim();
+          const k = L.toLowerCase();
+          if (seen[k] != null && seen[k] === sec) dup.push(L);
+          seen[k] = sec;
+        }
+        return { on: STATE.laborMinOn, under, dup, hasSub };
+      });
+      ok(W + ' ' + key + ': МРОТ включён, в «Ответе» нет видимого «_»', r.on && !r.under.length, JSON.stringify(r.under.slice(0, 4)));
+      ok(W + ' ' + key + ': раздел «С МРОТ» есть, строки с одной подписью — только в разных разделах', r.hasSub && !r.dup.length, JSON.stringify(r));
+    }
+    ok(W + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
 for (const name of ENGINES) {
   eng = name;
   engName = name; ctxCount = 0;
@@ -728,6 +774,7 @@ for (const name of ENGINES) {
   if (want('В3')) await sectionV3();
   if (want('Д')) await sectionD();
   if (want('Е')) await sectionE();
+  if (want('Ж')) await sectionZh();
   await browser.close();
 }
 console.log('\nИТОГ answer_panel_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));

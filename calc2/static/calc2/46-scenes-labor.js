@@ -671,8 +671,10 @@ function updateLaborPanel() {
     if (m.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(m.dwl)}</b></div>`;
     html += `<div class="hint">Монопсония занижает и занятость, и зарплату против конкуренции: рабочим платят Wм по кривой предложения при занятости Lм, ниже их предельного продукта. Серым закрашены потери общества.</div>`;
     if (bind) {
-      html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-      html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
+      /* Блок МРОТ — своим разделом «Ответа» (сессия 6, А5; Notion …8149…): подзаголовок «С МРОТ» вместо черты, иначе
+         вторая пара «Излишек рабочих / фирм» читалась без пометки, что это при МРОТ. Обозначение — индексом. */
+      html += '<div class="sb-subsec">С МРОТ</div>';
+      html += `<div class="stat"><span>МРОТ $W_{\\min}$</span><b>${fmt(min.Wmin)}</b></div>`;
       html += `<div class="stat"><span>Занятость с МРОТ</span><b>${fmt(min.Lstar)} (было ${fmt(m.Lm)})</b></div>`;
       html += `<div class="stat"><span>Зарплата</span><b>${fmt(min.wage)}</b></div>`;
       if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
@@ -694,8 +696,10 @@ function updateLaborPanel() {
     if (STATE.laborWorkerCS != null) html += `<div class="stat"><span>Излишек рабочих</span><b>${fmt(STATE.laborWorkerCS)}</b></div>`;
     if (STATE.laborFirmCS != null) html += `<div class="stat"><span>Излишек фирм</span><b>${fmt(STATE.laborFirmCS)}</b></div>`;
     if (bind) {
-      html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-      html += `<div class="stat"><span>МРОТ W_min</span><b>${fmt(min.Wmin)}</b></div>`;
+      /* Блок МРОТ — своим разделом «Ответа» (сессия 6, А5; Notion …8149…): подзаголовок «С МРОТ» вместо черты, иначе
+         вторая пара «Излишек рабочих / фирм» читалась без пометки, что это при МРОТ. Обозначение — индексом. */
+      html += '<div class="sb-subsec">С МРОТ</div>';
+      html += `<div class="stat"><span>МРОТ $W_{\\min}$</span><b>${fmt(min.Wmin)}</b></div>`;
       html += `<div class="stat"><span>Занятость</span><b>${fmt(min.employment)} (было ${fmt(eq.Q)})</b></div>`;
       if (min.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(min.unemployment)}</b></div>`;
       const w = STATE.laborMinWelfare;
