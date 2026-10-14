@@ -4180,3 +4180,8 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel #taxside-row > .sc-sidelab { font-size: 14px; font-weight: 500; color: var(--text2); }
 #tools-panel #taxside-row > .seg.sc-seg { margin: 0; }
 
+/* ── Д5: «Сложение» — степперы групп (scStepper); имя карточки группы («спрос первой группы») с заглавной ТОЛЬКО
+   видом: строка имени лежит в STATE (c.label = sumGroupName), печатается в «Ответе» и по ней sumShortTag отличает
+   своё имя человека — менять её нельзя. ── */
+#tools-panel #curve-list .fc-card .fc-name::first-letter { text-transform: uppercase; }
+

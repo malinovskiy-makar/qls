@@ -733,6 +733,18 @@ async function zRun() {
   ok('З: нет видимого тумблера (в «Условии» и в «Виде»)', !f.tog.length, f.tog.slice(0, 6).join(' | '));
   ok('З: нет полосы сегментов из одной кнопки', !f.one.length, f.one.slice(0, 6).join(' | '));
   if (!KEYS || KEYS.includes('mono')) ok('З: полоса из пяти — в две строки 3 + 2 (' + nFive + ')', nFive > 0 && !f.five.length, f.five.join(' | '));
+  // Д5: степпер групп «Сложения»: «+» добавляет группу спроса, имя группы в STATE прежнее (строчное), видом — с заглавной.
+  if (!KEYS || KEYS.includes('sdsum')) {
+    await pick(page, 'sdsum');
+    const plus = await page.$('#sum-counts .sc-stepper .sc-step:last-child');
+    if (plus) { await plus.click(); await page.waitForTimeout(800); }
+    const r = await page.evaluate(() => {
+      const nm = [...document.querySelectorAll('#curve-list .fc-card .fc-name')].find(e => e.getClientRects().length);
+      return { n: STATE.sumN.D, cards: [...document.querySelectorAll('#curve-list .fc-card')].filter(e => e.getClientRects().length).length,
+        label: (STATE.curves.find(c => c.sumGroup === 'D' && c.kind !== 'sum') || {}).label, first: nm ? getComputedStyle(nm, '::first-letter').textTransform : '' };
+    });
+    ok('З: «Сложение» — степпер «+» добавляет группу спроса (' + JSON.stringify(r) + '), имя в STATE строчное, видом с заглавной', !!plus && r.n === 3 && r.label === 'спрос первой группы' && r.first === 'uppercase', JSON.stringify(r));
+  }
   ok('З: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
   await ctx.close();
 }

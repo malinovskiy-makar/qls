@@ -743,7 +743,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3', 'd4']);
+  'd1', 'd2', 'd3', 'd4', 'd5']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -812,6 +812,8 @@ function scSetup() {
   if (scOn('ppfsum')) scStepper('inp-ppfsum-n', 2, 5, 'Меньше КПВ', 'Больше КПВ');
   // «Сколько функций» (сессия 6, Г4) — тот же степпер.
   if (scOn('m-minmax')) scStepper('mm-count', 2, 8, 'Меньше функций', 'Больше функций');
+  // Д5: «Сложение спросов и предложений» — «Сколько групп спроса / предложения» степперами 1–8.
+  if (scOn('d5')) { scStepper('sum-nd', 1, 8, 'Меньше групп спроса', 'Больше групп спроса'); scStepper('sum-ns', 1, 8, 'Меньше групп предложения', 'Больше групп предложения'); }
   scSync();
 }
 /* Степпер «−, число, +» вокруг прежнего поля числа: поле — хранитель значения и слушает ввод (событие input). */
