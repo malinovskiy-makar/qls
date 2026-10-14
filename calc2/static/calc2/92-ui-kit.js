@@ -661,6 +661,8 @@ const SC_PROWS = {
   'lr-price-field': ['Цена', 'P', 'costs'], 'pl-q-field': ['Совокупный выпуск', 'Q', 'plants'],
   'union-wage-field': ['Зарплата профсоюза', 'W', 'labor'], 'labmin-field': ['Минимальная зарплата', 'W_min', 'labor'],
   'open-pw-field': ['Мировая цена', 'Pw', 'smallopen'],
+  // Сессия 6, Б2: «Новая цена товара x» и P_{x₁} (shortRegulatorName резал «Px₁» до «…», Notion …81b4…).
+  'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
 };
 /* Подписи строк чисел словами (сессия 6): [id поля] → подпись; $…$ — набор KaTeX. */
 const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход' };
