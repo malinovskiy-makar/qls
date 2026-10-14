@@ -23,6 +23,8 @@ export const LETTERS = {
   'р': 'строки закрасок модели в списке площадей панели точек → образец цвета строки «На графике» в «Виде графика» (ADR 0152; README 10.6)',
   // Тихие панели, сессия 5 (решение «левая панель одна во всех моделях», Notion …8142…; ADR 0153):
   'с': 'тумблер пары подписей («Задам TC | Задам кривые», «Инд. спросы | Кусочный», профсоюз) → сегмент: видна полоса кнопок с их id, тумблер спрятан',
+  // Тихие панели, сессия 6 (ADR 0154; README пакета 10, 13):
+  'т': 'мёртвый ползунок буквы, которая является переменной оси модели макро (r в «Заёмных средствах»: сдвиг не меняет ни «Ответ», ни узел холста, ни .tex — claude/panels_s6/dead_r_loanable.json) — без замены; STATE.params прежний',
 };
 
 export const CHECK = 'snapshot.mjs (layer new) + compare.mjs';
@@ -46,8 +48,14 @@ export const FATES = [
   [/^#info-areacalc>button\.swatch/, 'заменён', 'р', 'кнопка цвета .vg-pick строки закраски в «Виде графика»', 'redesign/view_probe.mjs: строка у каждой закраски'],
   [/^#(costs-pane-costs|mono-kink-pane|union-pane)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
 ];
-export function fateOf(key) {
+/* Судьбы, которые зависят от МОДЕЛИ (ключ органа общий для всех моделей): [модель, выражение, судьба, буква, чем
+   заменён, чем проверено]. Без модели (parity.mjs, compare.mjs) не действуют. */
+export const FATES_MODEL = [
+  ['loanable', /^#params-extra>(span\.pchip-label|button\.param-kill|button\.param-bound(\[1\])?|input)$/, 'убран', 'т', '', 'cards_probe.mjs Е: у loanable нет ползунка r; claude/panels_s6/dead_axis_probe.mjs'],
+];
+export function fateOf(key, model) {
   const k = key.replace(/^mf:/, '');
+  if (model) for (const [m, re, fate, letter, by, check] of FATES_MODEL) if (m === model && re.test(k)) return { fate, letter, by, check };
   for (const [re, fate, letter, by, check] of FATES) if (re.test(k)) return { fate, letter, by, check };
   return { fate: 'на месте', letter: '', by: '', check: CHECK };
 }

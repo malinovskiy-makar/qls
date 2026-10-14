@@ -135,7 +135,7 @@ for (const key of keys) {
     }
     return left.map(k => k.orig);
   }, want.filter(k => {
-    const f = fateOf(k);
+    const f = fateOf(k, key);   // судьбы по модели (сессия 6: мёртвый ползунок r у loanable — «т»)
     // «р» (ADR 0152): образец цвета закраски переехал строкой «На графике» — его стережёт view_probe.
     return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдкр]$/.test(f.letter)));
   }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })));

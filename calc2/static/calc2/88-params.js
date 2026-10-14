@@ -263,8 +263,8 @@ function texifyName(name) {
      подписаны кривые в сцене сложения, и без этой ветки строка уходила бы в
      \\text{} целиком — на экране стояло бы «D_1» с настоящим подчёркиванием
      вместо индекса (замер 25.08). */
-  // Готовая запись TeX с индексом в фигурных скобках («P_{x_1}», строки параметров сессии 6) — как есть.
-  if (/^[A-Za-z]_\{[A-Za-z0-9_{}\\]+\}$/.test(s)) return s;
+  // Готовая запись TeX («P_{x_1}», «\Delta G» — строки параметров сессии 6) — как есть.
+  if (/^[A-Za-z]_\{[A-Za-z0-9_{}\\]+\}$/.test(s) || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s)) return s;
   const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
   if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
   /* Экономическое сокращение из заглавных (MC, ATC, DWL, MSB…) — одно обозначение
@@ -931,7 +931,8 @@ function buildPultExtra(sig) {
   /* Две разные вещи, поэтому и две группы: сверху регуляторы самой модели
      (ставка, мировая цена, границы КПВ), ниже буквы, которые пользователь
      завёл своей формулой. В общий список их мешать нельзя. */
-  const names = Object.keys(STATE.params || {}).sort();
+  // Буква — переменная оси модели макро — ползунка не получает (сессия 6, В5; scAxisLetter, 92-ui-kit.js).
+  const names = Object.keys(STATE.params || {}).sort().filter(n => !(typeof scAxisLetter === 'function' && scAxisLetter(n)));
   const addTitle = (text) => {
     const t = document.createElement('div');
     t.className = 'params-group-title'; t.textContent = text;
