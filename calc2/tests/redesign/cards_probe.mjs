@@ -135,6 +135,9 @@ const cardsCheck = (page) => page.evaluate(() => {
       if (!vis(e) || e.closest('.fc-menu, .f-pop, .mkbd, math-field, .katex')) return;
       if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible' && e.clientWidth > 0) out.over.push(tag + ' ' + e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0] + ' ' + e.scrollWidth + '>' + e.clientWidth);
     });
+    // Старая подпись над полем (её текст пишет сцена — узел остаётся) не видна.
+    const oldLab = c.querySelector(':scope > label');
+    if (oldLab && vis(oldLab)) out.other.push(tag + ' видна старая подпись «' + oldLab.textContent.trim().slice(0, 30) + '»');
     const top = c.querySelector(':scope > .crow-top');
     [...top.querySelectorAll('button, [tabindex]')].filter(vis).forEach(b => {
       if (b.classList.contains('fc-eye')) out.eyes.push(i);
@@ -195,7 +198,7 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
   const r = await cardsCheck(page);
   ok(tag + ': каждое поле формулы в карточке (' + r.cards + ' карточек)', r.cards > 0 && !r.bare.length, 'голые: ' + r.bare.join(', '));
   ok(tag + ': у карточек обозначение KaTeX и имя, имя не обрезается', !r.noSym.length && !r.noName.length && !r.cut.length, JSON.stringify({ noSym: r.noSym, noName: r.noName, cut: r.cut }));
-  ok(tag + ': в верхнем ряду карточек только глаз, «⋯», кнопка цвета; значок цвета не нажимается', !r.other.length, r.other.join(' | '));
+  ok(tag + ': в верхнем ряду карточек только глаз, «⋯», кнопка цвета; значок цвета не нажимается; старой подписи не видно', !r.other.length, r.other.join(' | '));
   const f = await functional(page, r);
   ok(tag + ': глаз, «⋯», кнопка цвета что-то делают (глаз ' + r.eyes.length + ', «⋯» ' + r.gears.length + ', цвет ' + r.dots.length + ')', !f.length, f.join(' | '));
   ok(tag + ': ничего не вылезает (карточки, «Условие» вбок)', !r.over.length && !r.hscroll, r.over.slice(0, 4).join(' | ') + ' ' + r.hscroll);

@@ -3987,7 +3987,7 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-card > .crow-formula { min-height: 42px; }
 #tools-panel .sc-card > .crow-formula { flex-wrap: nowrap; }
 #tools-panel .sc-card > .crow-formula > .f-row { flex: 1 1 0; min-width: 0; width: auto; }
-#tools-panel .sc-old-label { display: none; }
+#tools-panel .sc-card > label.sc-old-label { display: none; }
 
 /* Строка параметра (README 4): подпись слева 14 / 500 --text2, «имя = значение» справа KaTeX 17 px, ниже
    дорожка во всю ширину, под ней пределы 12 / 500 --text3 (меню границ по щелчку — как было). */
