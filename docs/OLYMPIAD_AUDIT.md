@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-15 (эталон ВП + МОШ v5: слои заплаток pages_v3 + pages_v5, профиль сборки ECON, apply-fixes / sweeps / reread-queue / max-score)
+> **Обновлён:** 2026-10-14 (эталон ВП + МОШ v5: слои заплаток pages_v3 + pages_v5, профиль сборки ECON, apply-fixes / sweeps / reread-queue / max-score)
 > **Статус:** актуален
 
 # Аудит олимпиад по официальному эталону
