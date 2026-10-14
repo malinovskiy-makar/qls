@@ -497,14 +497,11 @@ class Command(BaseCommand):
             for name in names:
                 if not (self.digitized / name).is_dir():
                     self._say(f'  ⚠ слоя {name} нет на диске — пустой слой')
-            layers = [triage.PageOverlay(str(self.digitized), norm=norm if name == 'pages_v3' else (),
-                                         patches=name, keep_points=name != 'pages_v3',
-                                         check_numbers=name != 'pages_v3')
-                      for name in names]
             if options.get('keep_keys'):
                 extra['keep_keys'] = {(r['event_id'], r['number'], r.get('task_variant') or '')
                                       for r in digitize.read_jsonl(Path(options['keep_keys']))}
-            extra = {**extra, 'overlay': triage.LayeredOverlay(layers), 'suffix': options['suffix'],
+            extra = {**extra, 'overlay': triage.layer_stack(str(self.digitized), names, norm),
+                     'suffix': options['suffix'],
                      'out_dir': options.get('out_dir') or str(self.digitized / options['suffix'])}
         summary = assemble.assemble(
             str(self.digitized), reference_events, v1_rows, model=transcribe.MODEL,

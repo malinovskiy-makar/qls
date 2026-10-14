@@ -135,7 +135,7 @@ class PageOverlay:
     """
 
     def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES, keep_points=False,
-                 check_numbers=True):
+                 check_numbers=True, check_kinds=False):
         self.digitized, self.norm, self.patches = digitized, set(norm), patches
         #: Защита «перечитывание потеряло номера» (13.10). Слой pages_v3 в сборке
         #: v5 — без неё: так собран v3 (09.10), и сборка v5 с пустым pages_v5
@@ -145,6 +145,12 @@ class PageOverlay:
         #: прежней расшифровки (МОШ 2011, 10 кл., «Тест II»: перечитывание
         #: вернуло шапку теста, но потеряло «2 балла» у вопросов 16–21).
         self.keep_points = keep_points
+        #: v5: защита вида блоков (`kinds_kept`) — только у слоя v5 экономики;
+        #: заплатки финграм/бизнеса (pages_v2) собираются как раньше.
+        self.check_kinds = check_kinds
+
+    def _kinds_ok(self, base_blocks, new_blocks):
+        return not self.check_kinds or kinds_kept(base_blocks, new_blocks)
 
     def _take(self, out, patch, base):
         for key in PATCH_FIELDS:
@@ -173,7 +179,7 @@ class PageOverlay:
             if (self.check_numbers and (status == 'fixed' or 'blocks' in patch)
                     and 'blocks' in patch and not patch.get('numbers_loss_ok')
                     and (not numbers_kept(base.get('blocks'), patch['blocks'])
-                         or not kinds_kept(base.get('blocks'), patch['blocks']))):
+                         or not self._kinds_ok(base.get('blocks'), patch['blocks']))):
                 # Перечитывание поправило текст, но потеряло номера блоков
                 # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
                 # номера): старая разметка, страница — человеку.
@@ -189,7 +195,7 @@ class PageOverlay:
             # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
             if 'blocks' in patch and (patch.get('numbers_loss_ok')
                                       or skeleton(patch['blocks']) == skeleton(base.get('blocks'))) \
-                    and kinds_kept(base.get('blocks'), patch['blocks']):
+                    and self._kinds_ok(base.get('blocks'), patch['blocks']):
                 self._take(out, patch, base)
             out.update(needs_eyes=True, status='human')
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
@@ -210,6 +216,17 @@ class LayeredOverlay:
         for layer in self.layers:
             base = layer.apply(page_dir, page, base)
         return base
+
+
+def layer_stack(digitized, names, norm=()):
+    """Слои заплаток сборки v5 по порядку `names` («pages_v3,pages_v5»): pages_v3 —
+    как сборка v3 («норма» ярусов B/C, без защиты номеров), остальные — с
+    защитами номеров и вида блоков и с баллами прежней расшифровки."""
+    return LayeredOverlay([
+        PageOverlay(digitized, norm=norm if name == 'pages_v3' else (), patches=name,
+                    keep_points=name != 'pages_v3', check_numbers=name != 'pages_v3',
+                    check_kinds=name != 'pages_v3')
+        for name in names])
 
 
 def keep_points(base_blocks, new_blocks):

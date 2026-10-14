@@ -17,7 +17,10 @@ v4 (инвариант сессии v5, 14.10.2026).
   совпадение переводится по таблице `rep.translate` (кириллица → латиница);
   `del_line` — удалить строки, совпавшие целиком; `foot` — дописать сноску
   `rep` в поле, где стоит маркер `find`, а текста сноски нет;
-* `min` — сколько замен ожидается не меньше.
+* `min` — сколько замен ожидается не меньше;
+* `max` (v5, необязательно) — сколько замен допустимо не больше: найдено
+  больше — правка не применяется (статус `too_many(N)`), задания остаются
+  как были. Без `max` — поведение v4.
 
 Операции v5 (14.10.2026; v4-правки ими не пользуются): `prepend` / `append` —
 вставить `rep` абзацем в начало / конец поля `field` (по умолчанию
@@ -108,8 +111,9 @@ def field_name(path):
 
 
 def load_fixes(path):
-    """`fixes_vN.json` → список кортежей (set, page, op, find, rep, min, note).
-    Для `prepend`/`append` поле правки — в `rep` как (поле, текст)."""
+    """`fixes_vN.json` → список кортежей (set, page, op, find, rep, min, note, max).
+    Для `prepend`/`append` поле правки — в `rep` как (поле, текст); `max` — None,
+    если не задан."""
     with open(path, encoding='utf-8') as handle:
         data = json.load(handle)
     items = data['fixes'] if isinstance(data, dict) else data
@@ -122,7 +126,8 @@ def load_fixes(path):
         elif item['op'] in ('prepend', 'append'):
             rep = (item.get('field') or 'statement_md', rep)
         out.append((item['set'], item['page'], item['op'], item['find'], rep,
-                    int(item.get('min', 1)), item.get('note', '')))
+                    int(item.get('min', 1)), item.get('note', ''),
+                    int(item['max']) if item.get('max') is not None else None))
     return out
 
 
@@ -186,11 +191,14 @@ def run(fixes, datasets):
     меняются на месте. Возвращает (исходные строки {set: [...]}, журнал)."""
     orig = {s: copy.deepcopy(d.rows) for s, d in datasets.items()}
     log = []
-    for i, (s, page, op, find, rep, mn, note) in enumerate(fixes):
+    for i, fix in enumerate(fixes):
+        s, page, op, find, rep, mn, note = fix[:7]
+        mx = fix[7] if len(fix) > 7 else None
         if s not in datasets:
             continue
         data = datasets[s]
         rows, tp, h2f = data.rows, data.tp, data.h2f
+        before = copy.deepcopy(rows) if mx is not None else None
         if page.startswith('ev:'):
             cand = [k for k, r in enumerate(rows) if r['event_id'] == page[3:]]
             scope = 'event'
@@ -255,7 +263,10 @@ def run(fixes, datasets):
             if f and cand2:
                 nrep, touched, pr = _try_apply(rows, cand2, op, find, rep)
                 scope = 'file'
-        if nrep >= mn:
+        if mx is not None and nrep > mx:
+            rows[:] = before              # найдено больше ожидаемого — не трогать
+            status = 'too_many(%d)' % nrep
+        elif nrep >= mn:
             status = 'applied'
         elif nrep > 0:
             status = 'partial'
