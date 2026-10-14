@@ -1,7 +1,7 @@
 /* КАРТОЧКИ ФУНКЦИЙ ЛЕВОЙ ПАНЕЛИ (тихие панели, сессия 5, 14.10.2026; решение владельца «левая панель одна во
    всех моделях и только про условие», Notion …8142…; ADR 0153; README пакета 4, 8).
 
-   Разделы (--only К,М,Б,В,Г,Д,Е,Ж) — К, М, Д, Е, Ж сессии 6 и модели этапов сессии 5:
+   Разделы (--only К,М,Б,В,Г,Д,Е,Ж,З) — К, М, Д, Е, Ж, З сессии 6 и модели этапов сессии 5:
      Б  ppf, ppfsum, trade, tradeprice (у второй КПВ — поле MathLive и клавиатура, сессия 6, А6);   В  prod, costs (и «Задаю кривые»), plants, isoquant;
      Г  mono-d3, mono-kink (и «Кусочный»), monoexport, mono-nat, mono, mono-d1, labor, labor-mono, labor-union,
         labor-bilat, smallopen.
@@ -38,6 +38,12 @@
    Ж  (сессия 6, этап Г) неравенство и математика: ineq — «5 групп | 10 групп» сегментом (щелчок даёт тот же «Ответ»,
       что выбор в прежнем списке на коде BEFORE), группы числами, «Сила неравенства» — дорожка цвета --accent,
       строки τ и T словами и значением; карточка L в «Формуле» (общие проверки); математика — см. ниже по моделям.
+   З  (сессия 6, этап Д) строки параметров и сегменты во всех 42 моделях и состояниях вмешательств (taxes налог,
+      субсидия, НДС; ceil потолок и пол; quota; mono налог, субсидия, потолок; smallopen тариф и квота): у каждого
+      видимого ползунка «Условия» слова слева, значение справа, пределы 12 / 500 (у отрицательного — минус U+2212);
+      цвет дорожки — --accent, инлайнового цвета кривой нет; нет видимого тумблера (и в «Виде»); нет полосы сегментов
+      из одной кнопки; полоса из пяти — в две строки 3 + 2; у ext глаз MSB меняет картинку и «Ответ» так же, как
+      галочка на коде BEFORE.
    М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
       Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
@@ -655,6 +661,94 @@ async function zhMinmax() {
   await ctx.close();
 }
 
+/* ── З: строки параметров и сегменты (сессия 6, этап Д) ── */
+const Z_STATES = [['taxes', 'субсидия', "setType('subsidy'); setTaxForm('unit'); setTax(20);"], ['taxes', 'НДС', "setType('tax'); setTaxForm('vat'); setTax(20);"],
+  ['ceil', 'пол', "setType('floor'); setPReg(70);"], ['mono', 'налог', "setType('tax'); setTax(20);"], ['mono', 'субсидия', "setType('subsidy'); setTax(10);"],
+  ['mono', 'потолок', "setType('ceil'); setPReg(50);"], ['smallopen', 'тариф', "setOpenPw(30); setOpenTool('tariff'); STATE.openTariff = 5;"],
+  ['smallopen', 'квота', "setOpenPw(30); setOpenTool('quota'); STATE.openQuota = 20;"], ['ineq', 'перераспределение', "document.getElementById('ineq-redist').click();"],
+  ['m-tangent', 'секущая', "document.getElementById('chk-secant').click();"], ['labor', 'МРОТ', ''], ['fx', 'фиксированный курс', "document.getElementById('ma-fx-fixed').click();"]];
+const zLook = (page) => page.evaluate(() => {
+  const tp = document.getElementById('tools-panel');
+  const shown = (e) => { if (!e || !e.getClientRects().length) return false; for (let n = e; n && n !== document.body; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const acc = (() => { const d = document.createElement('input'); d.type = 'range'; d.style.accentColor = 'var(--accent)'; tp.appendChild(d); const c = getComputedStyle(d).accentColor; d.remove(); return c; })();
+  const out = { sliders: [], bad: [], toggles: [], oneSeg: [], five: [] };
+  [...tp.querySelectorAll('input[type=range]')].filter(shown).forEach(sl => {
+    const row = sl.closest('.pchip, .sc-prow, .sc-prow-own') || sl.closest('.field');
+    const tag = (row && (row.id || (row.querySelector('[id]') || {}).id)) || sl.id || '?';
+    const words = row && (row.querySelector('.sc-pname') || row.querySelector(':scope > .pchip-top > .pchip-label:not(.param-eq)'));
+    const val = row && (row.querySelector('.reg-eq, .param-eq, .sc-pval') || row.querySelector(':scope > .pchip-top > .pchip-val'));
+    const b = [...(row ? row.querySelectorAll('.param-bound, .sc-bounds > span') : [])].filter(shown);
+    const issues = [];
+    if (!words || !shown(words) || !tx(words)) issues.push('нет слов слева');
+    if (!val || !shown(val) || !tx(val)) issues.push('нет значения справа');
+    if (words && val && shown(words) && shown(val) && !(words.getBoundingClientRect().right <= val.getBoundingClientRect().left + 1)) issues.push('значение не правее слов');
+    if (b.length !== 2) issues.push('пределов ' + b.length);
+    b.forEach(x => { const cs = getComputedStyle(x); if (Math.abs(parseFloat(cs.fontSize) - 12) > 0.2 || cs.fontWeight !== '500') issues.push('предел ' + cs.fontSize + '/' + cs.fontWeight); if (/-/.test(x.textContent)) issues.push('дефис в пределе «' + x.textContent + '»'); });
+    if (+sl.min < 0 && b[0] && !/−/.test(b[0].textContent)) issues.push('нет минуса в пределе «' + (b[0] && b[0].textContent) + '»');
+    if (getComputedStyle(sl).accentColor !== acc) issues.push('цвет дорожки ' + getComputedStyle(sl).accentColor);
+    if (sl.style.accentColor && sl.style.accentColor !== 'var(--accent)') { const d = document.createElement('div'); d.style.color = sl.style.accentColor; tp.appendChild(d); const c = getComputedStyle(d).color; d.remove(); const a2 = (() => { const e = document.createElement('div'); e.style.color = 'var(--accent)'; tp.appendChild(e); const c2 = getComputedStyle(e).color; e.remove(); return c2; })(); if (c !== a2) issues.push('инлайновый цвет дорожки ' + sl.style.accentColor); }
+    out.sliders.push(tag);
+    if (issues.length) out.bad.push(tag + ': ' + issues.join(', ') + ' [' + tx(words) + ' | ' + tx(val) + ']');
+  });
+  out.toggles = [...document.querySelectorAll('#tools-panel .tgl-sw, #wrench-pop .tgl-sw')].filter(shown).map(t => tx(t.closest('.tgl') || t).slice(0, 40));
+  [...tp.querySelectorAll('.seg')].filter(shown).forEach(sg => {
+    const btns = [...sg.querySelectorAll(':scope > .seg-btn')].filter(shown);
+    if (btns.length === 1) out.oneSeg.push(tx(btns[0]));
+    if (btns.length === 5) {
+      const tops = [...new Set(btns.map(b => Math.round(b.getBoundingClientRect().top)))].sort((a, c) => a - c);
+      const rows = tops.map(t => btns.filter(b => Math.round(b.getBoundingClientRect().top) === t).length);
+      out.five.push(rows.join('+'));
+    }
+  });
+  return out;
+});
+async function zRun() {
+  const { ctx, page, errors } = await openAt(BASE);
+  const states = ALL42.map(k => [k, '', '']).concat(Z_STATES);
+  const f = { bad: [], tog: [], one: [], five: [] };
+  let nS = 0, nFive = 0;
+  for (const [key, label, extra] of states) {
+    if (KEYS && !KEYS.includes(key)) continue;
+    await pick(page, key, extra);
+    const r = await zLook(page);
+    const where = key + (label ? ' «' + label + '»' : '');
+    nS += r.sliders.length;
+    r.bad.forEach(x => f.bad.push(where + ' ' + x));
+    if (r.toggles.length) f.tog.push(where + ': ' + r.toggles.join(', '));
+    if (r.oneSeg.length) f.one.push(where + ': ' + r.oneSeg.join(', '));
+    r.five.forEach(x => { nFive++; if (x !== '3+2') f.five.push(where + ': ' + x); });
+  }
+  // Тумблеры «Вида» (полоса заводов живёт в «Виде»).
+  if (!KEYS || KEYS.includes('plants')) {
+    await pick(page, 'plants');
+    await page.evaluate(() => document.getElementById('btn-view').click()); await page.waitForTimeout(300);
+    const r = await zLook(page);
+    if (r.toggles.length) f.tog.push('plants «Вид»: ' + r.toggles.join(', '));
+    const seg = await page.evaluate(() => { const b = document.getElementById('plv-tc'); return !!(b && b.getClientRects().length); });
+    if (!seg) f.tog.push('plants «Вид»: нет сегмента «Суммарные TC | Предельные MC»');
+    await page.evaluate(() => document.getElementById('btn-view').click());
+  }
+  ok('З: у каждого ползунка «Условия» слова слева, значение справа, пределы 12 / 500 с минусом U+2212, дорожка --accent (' + nS + ' ползунков)', nS > 0 && !f.bad.length, f.bad.slice(0, 6).join(' | '));
+  ok('З: нет видимого тумблера (в «Условии» и в «Виде»)', !f.tog.length, f.tog.slice(0, 6).join(' | '));
+  ok('З: нет полосы сегментов из одной кнопки', !f.one.length, f.one.slice(0, 6).join(' | '));
+  if (!KEYS || KEYS.includes('mono')) ok('З: полоса из пяти — в две строки 3 + 2 (' + nFive + ')', nFive > 0 && !f.five.length, f.five.join(' | '));
+  ok('З: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+// ext: глаз MSB меняет картинку и «Ответ» так же, как галочка на коде до правки.
+async function zExt(viaEye, base) {
+  const { ctx, page } = await openAt(base);
+  await pick(page, 'ext');
+  const p0 = await pic(page), a0 = await answerNums(page);
+  if (viaEye) await page.evaluate(() => { const b = [...document.querySelectorAll('#tools-panel .sc-extcard .fc-eye')][0]; if (b) b.click(); });
+  else await page.evaluate(() => document.getElementById('chk-msb').click());
+  await page.waitForTimeout(800);
+  const p1 = await pic(page), a1 = await answerNums(page);
+  await ctx.close();
+  return { picChanged: p0 !== p1, ans: a1, ansChanged: a0 !== a1, p1 };
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -679,6 +773,7 @@ try {
       beforeMap.ineq = await ineqSeries(page, false);
       await ctx.close();
     }
+    if (want('З') && (!KEYS || KEYS.includes('ext'))) beforeMap.ext = await zExt(false, BEFORE);
     if (want('Д')) {
       beforeMap.cons = {};
       for (const key of ['consumer', 'cons-slutsky']) {
@@ -710,6 +805,14 @@ for (const name of ENGINES) {
   }
   if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
   if (want('Е')) { head('Е. Макро: карточки, строки, нет ползунка переменной оси'); await eRun(); }
+  if (want('З')) {
+    head('З. Строки параметров и сегменты во всех моделях');
+    await zRun();
+    if (!KEYS || KEYS.includes('ext')) {
+      const now = await zExt(true, BASE), was = beforeMap.ext;
+      ok('З: ext — глаз MSB меняет картинку и «Ответ» так же, как галочка до правки', now.picChanged && (!was || (was.picChanged && now.ans === was.ans && now.p1 === was.p1)), JSON.stringify({ now: { pic: now.picChanged, ans: now.ans.slice(0, 80) }, was: was && { pic: was.picChanged, ans: was.ans.slice(0, 80) } }));
+    }
+  }
   if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); await zhMinmax(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
