@@ -13,6 +13,8 @@
        «⋯» — в меню есть орган; кнопка цвета — выбор другого цвета перекрашивает линию холста; простой значок
        цвета — не кнопка и не в табуляции;
      · id органов модели из описи (по умолчанию claude/panels_s5/S5_A.json, --before) на месте в документе;
+       ОРГАН: id видимых полей формул «Условия» те же, что на коде до обёртки (сервер BEFORE) — опись пишет поле
+       MathLive без id (id у скрытого input), поэтому panels_compare подмену поля копией с новым id не видит;
      · ввод формулы в карточке (одна контрольная запись на модель, потом вернуть) меняет «Ответ» так же, как на
        коде до обёртки (сервер BEFORE, по умолчанию 8098 — копия кода до карточек; нет сервера — громкий пропуск);
      · ничего не вылезает: у карточек и их потомков scrollWidth ≤ clientWidth + 1, у «Условия» нет прокрутки вбок.
@@ -97,6 +99,9 @@ const answerNums = (page) => page.evaluate(() => {
   const sb = [...document.querySelectorAll('#sb-body .stat > b')].map(tx).join('|');
   return (hero + '#' + sb).replace(/[\s   ​]+/g, '');
 });
+const formulaIds = (page) => page.evaluate(() => [...document.querySelectorAll('#tools-panel math-field, #tools-panel .f-slot > input[type=text]')]
+  .filter(e => e.getClientRects().length).map(e => { const i = e.tagName === 'MATH-FIELD' ? e.parentElement.querySelector('input[id]') : e; return i ? i.id : '?'; })
+  .filter((x, i, a) => a.indexOf(x) === i).sort().join(','));
 async function typeAndRead(page, id, expr) {
   const was = await page.evaluate((id) => { const i = document.getElementById(id); return i ? i.value : null; }, id);
   if (was == null) return { missing: true };
@@ -199,6 +204,10 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
     const miss = await page.evaluate((ids) => ids.filter(id => !document.getElementById(id)), ids);
     ok(tag + ': id органов описи на месте (' + ids.length + ')', !miss.length, miss.join(', '));
   }
+  if (beforeAns && beforeAns.ids != null) {
+    const ids = await formulaIds(page);
+    ok(tag + ': ОРГАН — id полей формул те же, что до обёртки (' + beforeAns.ids + ')', ids === beforeAns.ids, 'сейчас ' + ids);
+  }
   // Контрольная запись: на свежей модели (без следов щелчков выше).
   await pick(page, key, extra);
   const t = await typeAndRead(page, ctl[0], ctl[1]);
@@ -224,8 +233,9 @@ try {
       if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;
       const { ctx, page } = await openAt(BEFORE);
       await pick(page, key, extra);
+      const ids = await formulaIds(page);
       const t = await typeAndRead(page, ctl[0], ctl[1]);
-      if (!t.missing) beforeMap[key + '|' + label] = t;
+      if (!t.missing) beforeMap[key + '|' + label] = Object.assign(t, { ids });
       await ctx.close();
     }
   } else console.log('\n!!! сервер BEFORE (' + BEFORE + ') недоступен — сравнение ввода с кодом до обёртки НЕ ПРОВЕРЕНО');
