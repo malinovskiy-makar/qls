@@ -35,6 +35,10 @@ BANK_TEXT = ('Вкладчик кладёт 120 000 рублей на депоз
 DOUBT_TEXT = ('Семья тратит 45 000 рублей в месяц на продукты, 12 000 на транспорт и '
               '18 500 на коммунальные услуги; доход семьи 96 000 рублей. Составьте бюджет '
               'на квартал и найдите, сколько можно отложить, если цены вырастут на 4 %.')
+DOUBT_BANK_TEXT = ('Семья расходует 45 000 рублей в месяц на продукты питания, 12 000 на поездки '
+                   'и 18 500 на коммунальные платежи; доход семьи 96 000 рублей. Составьте план '
+                   'бюджета семьи на квартал и найдите, сколько получится сберечь, если цены '
+                   'вырастут на 4 %.')
 
 
 def _row(number, statement, **extra):
@@ -70,10 +74,10 @@ class ImportReferenceCommandTests(TestCase):
         self.bank = Problem.objects.create(
             statement=BANK_TEXT, answer='старый ответ', solution='',
             status='published', content_format='markdown')
+        # Сходство 0,84 при тех же числах: держит ПОРОГ 0,80–0,90, а не
+        # числовой фильтр (с другими числами тест зеленел бы и без порога).
         self.doubt = Problem.objects.create(
-            statement=DOUBT_TEXT.replace('45 000', '41 000').replace('квартал', 'полгода')
-            .replace('отложить', 'сберечь, откладывая каждый месяц понемногу,'),
-            status='published', content_format='markdown')
+            statement=DOUBT_BANK_TEXT, status='published', content_format='markdown')
         rows = [
             _row(1, BANK_TEXT, answer='новый ответ', solution_md='Официальное решение.',
                  criteria_md='*Критерии оценивания:*\n1. Верно — 10 баллов'),
@@ -154,6 +158,17 @@ class ImportReferenceCommandTests(TestCase):
         after = (Problem.objects.count(), OlympiadRef.objects.count(),
                  SourceReference.objects.count(), ProblemFigure.objects.count())
         self.assertEqual(before, after)
+        # Защит две, и каждая обязана держать сама: созданное узнаётся по
+        # SourceReference, привязанное — по паре (задача, event_id).
+        import csv
+        with open(os.path.join(self.out, 'plan.csv'), encoding='utf-8-sig') as h:
+            reasons = {r['key']: r['причина'] for r in csv.DictReader(h)}
+        self.assertEqual(reasons['vp-fingram-2019-final-11-v1:3'], 'уже импортировано (SourceReference)')
+        # Ранняя защита — по всем строкам OlympiadRef этого задания (она же
+        # видит номера комплекта kit_numbers); поздняя в _plan_link пишет
+        # «…, ref N» и ловит только лучшего кандидата.
+        self.assertEqual(reasons['vp-fingram-2019-final-11-v1:1'],
+                         f'пара уже есть (задача #{self.bank.id})')
 
     def test_5_rollback_removes_everything_and_empties_filled(self):
         counts = (Problem.objects.count(), ProblemPart.objects.count(),
