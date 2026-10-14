@@ -172,7 +172,8 @@ class PageOverlay:
         elif status in PATCH_OK:
             if (self.check_numbers and (status == 'fixed' or 'blocks' in patch)
                     and 'blocks' in patch and not patch.get('numbers_loss_ok')
-                    and not numbers_kept(base.get('blocks'), patch['blocks'])):
+                    and (not numbers_kept(base.get('blocks'), patch['blocks'])
+                         or not kinds_kept(base.get('blocks'), patch['blocks']))):
                 # Перечитывание поправило текст, но потеряло номера блоков
                 # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
                 # номера): старая разметка, страница — человеку.
@@ -187,7 +188,8 @@ class PageOverlay:
             # если «скелет» (тип+номер блоков заданий/решений/критериев) тот же —
             # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
             if 'blocks' in patch and (patch.get('numbers_loss_ok')
-                                      or skeleton(patch['blocks']) == skeleton(base.get('blocks'))):
+                                      or skeleton(patch['blocks']) == skeleton(base.get('blocks'))) \
+                    and kinds_kept(base.get('blocks'), patch['blocks']):
                 self._take(out, patch, base)
             out.update(needs_eyes=True, status='human')
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
@@ -256,6 +258,32 @@ def numbers_kept(base_blocks, new_blocks):
         return {str(b.get('number') or '').strip() for b in blocks or []
                 if b.get('type') in STRUCTURE_TYPES and str(b.get('number') or '').strip()}
     return numbers(base_blocks) <= numbers(new_blocks)
+
+
+def kinds_kept(base_blocks, new_blocks):
+    """Перечитывание не превратило решение/критерии с номером N в условие N
+    (vp-2017-final-11, файл решений: блоки «решение 1, 2» стали «задание 1, 2» —
+    повтор условия в файле решений сборка не хранит, и решение пропадало)."""
+    def kinds(blocks):
+        out = {}
+        for b in blocks or []:
+            number = str(b.get('number') or '').strip()
+            if number and b.get('type') in STRUCTURE_TYPES:
+                out.setdefault(number, set()).add(b.get('type'))
+        return out
+    old, new = kinds(base_blocks), kinds(new_blocks)
+    for number, was in old.items():
+        lost = was & {'solution', 'criteria'} - new.get(number, set())
+        if lost and 'task' in new.get(number, set()) and 'task' not in was:
+            return False
+
+    def solution_text(blocks):
+        return sum(len(b.get('text') or '') for b in blocks or []
+                   if b.get('type') in ('solution', 'criteria'))
+    # Безномерные «Типичные ошибки…» критериев стали другим видом блока
+    # (vp-2020-final-9, № 3): решений и критериев на странице не меньше 80 %.
+    was = solution_text(base_blocks)
+    return was < 200 or solution_text(new_blocks) >= 0.8 * was
 
 
 def skeleton(blocks):

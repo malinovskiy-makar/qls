@@ -541,6 +541,19 @@ def _header_variants(items):
                     block = dict(block, task_variant=current)
             items[i] = (entry, page, record, block)
     return items
+_NOT_HEADER = re.compile(r'^\W*(пункт|критери|решени|ответ|примечани)', re.IGNORECASE)
+
+
+def _is_task_header(block, tasks):
+    """v5: повтор задачи в файле решений — блок «задание» с номером задачи и
+    названием («Задание 2. «Комплементарные факторы»»); «Пункт №4», «Критерии…»
+    — не повтор задачи."""
+    title = (block.get('title') or '').strip() if block is not None else ''
+    return bool(block is not None and block.get('type') == 'task' and title
+                and not _NOT_HEADER.match(title) and _real_number(_block_number(block))
+                and _find_task(tasks, _block_number(block), '', block.get('task_variant') or ''))
+
+
 def _item_count(task):
     return max(econ_rules.items_in(join_pieces(task.statement)), task.subitems)
 
@@ -883,10 +896,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
         # v5: файл решений «задача (повтор с названием) → её решение и критерии»:
         # под повтором задачи T блоки без названия с другим номером — пункты T
         # («Пункт №3 (7 баллов)», vp-2026-final-11), а не решения задачи № 3.
-        headers = {_block_number(b) for _e, _p, _r, b in stream
-                   if b is not None and b.get('type') == 'task' and (b.get('title') or '').strip()
-                   and _real_number(_block_number(b))
-                   and _find_task(tasks, _block_number(b), '', b.get('task_variant') or '')}
+        headers = {_block_number(b) for _e, _p, _r, b in stream if _is_task_header(b, tasks)}
         # Только у комплекта, где в файле условий нашлись пункты, размеченные
         # заданиями (_is_subitem), — иначе правило задело бы десятки комплектов.
         region_mode = (profile == ECON and len(headers) >= 2
@@ -990,10 +1000,9 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 continue
             if region_mode and kind == 'task':
                 number = _block_number(block)
-                if (block.get('title') or '').strip() and number in headers:
+                if _is_task_header(block, tasks) and number in headers:
                     region = _find_task(tasks, number, '', block.get('task_variant') or '')
-                elif (region is not None and _real_number(number) and number != region.number
-                      and not (block.get('title') or '').strip()):
+                elif region is not None:
                     last = region                 # повтор пункта задачи — мимо
                     report['v5: пункт задачи в файле решений'] += 1
                     continue
@@ -1098,10 +1107,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 force = last
             else:
                 follow = None
-            if (force is None and region is not None and not (block.get('title') or '').strip()
-                    and _real_number(_block_number(block))
-                    and _block_number(block) != region.number):
-                force = region
+            if force is None and region is not None:
+                force = region            # всё до следующего повтора задачи — её
                 report['v5: пункт задачи в файле решений'] += 1
             last = _attach_answer(tasks, last, block, role if kind == 'task_continuation'
                                   else kind, entry, page, report, force=force,
