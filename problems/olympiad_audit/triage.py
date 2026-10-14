@@ -149,7 +149,10 @@ class PageOverlay:
             if key in patch:
                 out[key] = patch[key]
         if self.keep_points and 'blocks' in patch:
-            out['blocks'] = keep_points(base.get('blocks') or [], out['blocks'])
+            # Слой v5: баллы — из прежней расшифровки; блоки помечаются `_v5`
+            # (сборка не даёт перечитыванию заводить новые задания из файла ответов).
+            out['blocks'] = [dict(b, _v5=True)
+                             for b in keep_points(base.get('blocks') or [], out['blocks'])]
 
     def apply(self, page_dir, page, base):
         if base is None:

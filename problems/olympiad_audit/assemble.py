@@ -27,6 +27,7 @@ from datetime import date
 
 from rapidfuzz import fuzz
 
+from problems.olympiad_audit import econ_rules
 from problems.olympiad_grades import parse_grades
 
 TITLE_MATCH = 0.85
@@ -85,6 +86,8 @@ class Task:
         self.criteria_points = None
         self.quality = []           # записи страниц, давших текст
         self.from_solution_only = False
+        self.leads = []             # v5: инструкции раздела в начало условия
+        self.subitems = 0           # v5: пункты «N)», дописанные к задаче
 
     @property
     def key(self):
@@ -344,7 +347,9 @@ def collect(root, files, role, overlay=None, profile=None):
                 continue
             for block in record.get('blocks') or []:
                 out.append((entry, page, record, block))
-    return out if profile == ECON else _header_variants(out)
+    if profile == ECON:
+        return econ_rules.qualifying_blocks(out)
+    return _header_variants(out)
 
 
 def _variant_of_header(block):
@@ -535,19 +540,64 @@ def _header_variants(items):
                     block = dict(block, task_variant=current)
             items[i] = (entry, page, record, block)
     return items
-def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, profile=None):
+def _item_count(task):
+    return max(econ_rules.items_in(join_pieces(task.statement)), task.subitems)
+
+
+def _points(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_subitem(current, block, head, declared):
+    """v5: блок «задание № N» — пункт N) текущей задачи: у задачи есть название,
+    у блока нет, N продолжает её пункты, и либо баллы блока меньше баллов
+    задачи, либо N больше заявленного во вступлении числа задач."""
+    if head is None or not current.title or (block.get('title') or '').strip():
+        return False
+    if head != _item_count(current) + 1:
+        return False
+    mine, theirs = _points(block.get('points')), _points(current.points)
+    if mine is not None and theirs is not None and mine < theirs:
+        return True
+    return declared is not None and head > declared
+
+
+def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, profile=None,
+                keep_keys=None):
     """Комплект → (задания по порядку, отчёт комплекта)."""
     event_id = event['event_id']
     tasks = OrderedDict()
     report = Counter()
     missing_pages = []
     event['preamble'] = []
+    econ = profile == ECON
+    leads_by_number = {}          # v5: номер задания → инструкции раздела
+    section = {'file': None, 'lead': ''}   # v5: инструкция раздела без номеров
+    open_lead = []                # v5: подводка «ответьте на вопросы (3)-(5)» + цитата
 
     def task_for(number, variant='', create=True):
         key = (number, variant)
         if key not in tasks and create:
             tasks[key] = Task(event_id, number, variant)
+            if econ and section['lead'] and section['file'] == current_file:
+                tasks[key].leads.append(section['lead'])
         return tasks.get(key)
+
+    def add_lead(numbers, text):
+        for n in numbers:
+            got = leads_by_number.setdefault(n, [])
+            if text and not any(same_intro(text, seen) for seen in got):
+                got.append(text)
+
+    def declared_count():
+        for text in event['preamble']:
+            m = re.search(r'количеств\w*\s+задач\W{0,3}[–—-]\s*(\d+)|\((\d+)\s+задач', text, re.I)
+            if m:
+                return int(m.group(1) or m.group(2))
+        return None
 
     # 1. Условия (и всё, что лежит в файлах условий / смешанных).
     current = None
@@ -612,6 +662,62 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     last_int = head
                 number = sub_prefix + number
                 block = dict(block, number=number)
+        if econ and block.get('_rules_head') and not any(
+                same_intro(block['_rules_head'], seen) for seen in event['preamble']):
+            event['preamble'].append(block['_rules_head'])     # v5: правила этапа
+        if econ and block.get('_lead'):
+            # v5: инструкция блока отборочного МОШ (служебный блок или начало вопроса).
+            add_lead(block.get('_lead_numbers') or [], block['_lead'])
+        if econ and block.get('_service'):
+            text = block.get('text') or ''
+            if econ_rules.is_rules_text(text, block.get('title') or '') and not any(
+                    same_intro(text, seen) for seen in event['preamble']):
+                event['preamble'].append(text)
+            report['v5: служебный блок — не задание'] += 1
+            continue
+        if (econ and kind == 'task' and _real_number(number)
+                and econ_rules.format_lines(block.get('text') or '', block.get('title') or '')
+                and econ_rules.is_service_text(block.get('text') or '', block.get('title') or '')):
+            # v5: служебный блок с номером («Раздел III (5 вопросов, 20 баллов). Из
+            # нескольких вариантов нужно выбрать ВСЕ верные ответы», mosh-2009-
+            # qualifying-9) — инструкция раздела, не задание.
+            block = dict(block, number='')
+            number = ''
+            report['v5: служебный блок с номером — не задание'] += 1
+        if econ and kind == 'task' and not _real_number(number):
+            text, title = block.get('text') or '', block.get('title') or ''
+            if econ_rules.is_rules_text(text, title):
+                if not any(same_intro(text, seen) for seen in event['preamble']):
+                    event['preamble'].append(text)
+                report['v5: правила этапа → вступление'] += 1
+                continue
+            lines = econ_rules.format_lines(text, title)
+            nums = econ_rules.targets(f'{title}\n{text}')
+            if lines and econ_rules.is_service_text(text, title):
+                lead = '\n\n'.join(lines)
+                if nums:
+                    add_lead(nums, lead)
+                else:
+                    section.update(file=entry['file'], lead=lead)
+                rest = [para for para in re.split(r'\n\s*\n', f'{title}\n\n{text}')
+                        if para.strip() and para.strip() not in lines
+                        and not econ_rules.marker_of({'title': para.strip()})]
+                if rest and current is None:
+                    event['preamble'].append('\n\n'.join(rest))
+                report['v5: инструкция раздела → в условие заданий'] += 1
+                continue
+            if nums and re.search(r'ответьте на вопрос|к заданиям|к вопросам', text, re.I):
+                # Подводка к нескольким вопросам («Прочитайте текст ниже и ответьте на
+                # вопросы (3) - (5)», vp-2026-final-10) — к ним, не к предыдущему.
+                open_lead[:] = [nums, [text]]
+                report['v5: подводка к вопросам'] += 1
+                continue
+            if open_lead:
+                open_lead[1].append(text)
+                continue
+        if econ and open_lead and kind == 'task' and _real_number(number):
+            add_lead(open_lead[0], '\n\n'.join(open_lead[1]))
+            open_lead.clear()
         if kind == 'task' and not _real_number(number):
             # Блок «задание» без номера (или «0», «intro», буква подпункта):
             # до первого задания — вступление комплекта («Время выполнения —
@@ -660,6 +766,16 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     task.number = f'тест-{task.number}'
                     tasks[(task.number, task.task_variant)] = task
                 report['нумерация пошла заново: часть файла — тест'] += 1
+            if econ and current is not None and _is_subitem(current, block, head,
+                                                            declared_count()):
+                # v5: пункт «N)» текущей задачи, размеченный заданием № N.
+                current.statement.append(econ_rules.item_label(head, block.get('points'),
+                                                               block.get('text') or ''))
+                current.subitems = head
+                current.pages.append((entry['file'], page))
+                current.quality.append(record)
+                report['v5: пункт задачи — не задание'] += 1
+                continue
             if head is not None and not sub_prefix:
                 last_int = head
             current = task_for(number, block.get('task_variant') or '')
@@ -678,7 +794,13 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             if target is None:
                 report['продолжение без задания'] += 1
                 continue
-            target.statement.append(block.get('text') or '')
+            text = block.get('text') or ''
+            item = _leading_int(number)
+            if (econ and target is current and item is not None and item > 1
+                    and item == _item_count(current) + 1):
+                text = econ_rules.item_label(item, block.get('points'), text)
+                current.subitems = item
+            target.statement.append(text)
             target.pages.append((entry['file'], page))
             target.quality.append(record)
             report['склеено продолжений'] += 1
@@ -703,8 +825,14 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 report['задание только блоком решения'] += 1
             _attach_answer(tasks, current, block, kind, entry, page, report, profile=profile)
 
+    section['lead'] = ''          # v5: инструкция раздела — только внутри файла условий
     if profile != ECON:
         split_glued(tasks, report)
+    for task in tasks.values():
+        head = _leading_int(task.number.replace('тест-', ''))
+        for text in leads_by_number.get(head, []):
+            if not any(same_intro(text, seen) for seen in task.leads):
+                task.leads.append(text)
 
     # 2. Решения и 3. критерии из своих файлов.
     grades = parse_grades(event.get('grade') or '')
@@ -737,6 +865,23 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
                 continue
+            if block.get('_service'):
+                continue          # v5: служебный блок файла ответов — не решение
+            if (profile == ECON and block.get('_qfile')
+                    and block.get('type') in ('task', 'solution', 'criteria')):
+                # v5: файл ответов отборочного МОШ с блоками — номер по тексту
+                # повторённого вопроса того же варианта (модель путает номера:
+                # «вопрос 1, вар. 3» записан как «2/3», mosh-2025-qualifying-7).
+                variant = block.get('task_variant') or ''
+                same = OrderedDict((k, t) for k, t in tasks.items() if t.task_variant == variant)
+                found = match_by_text(same, block.get('text') or '', '')
+                if found is not None:
+                    if found.number != _block_number(block):
+                        report['v5: номер файла ответов — по тексту вопроса'] += 1
+                    block = dict(block, number=found.number)
+                elif block.get('type') == 'task':
+                    report['v5: вопрос файла ответов без пары — мимо'] += 1
+                    continue
             if entry['page_dir'] in shared:
                 block = _own_grade_number(block, grades)
             if block is None:
@@ -819,6 +964,19 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     if target is not None:
                         follow = (target, number)
                         report['номер файла решений → совместимое задание'] += 1
+                key = (event_id, number, block.get('task_variant') or '')
+                if (target is None and profile == ECON and keep_keys is not None
+                        and key not in keep_keys):
+                    # v5: нового ключа (которого не было в v4) файл ответов не заводит:
+                    # повтор вопроса — к заданию с тем же текстом; блок перечитанной
+                    # страницы без пары — мимо (ключи v4 сохраняются как были).
+                    found = match_by_text(tasks, block.get('text') or '', '')
+                    if found is not None:
+                        target, follow = found, (found, number)
+                        report['v5: повтор вопроса в ответах — по тексту'] += 1
+                    elif block.get('_v5'):
+                        report['v5: перечитанный блок ответов без пары — мимо'] += 1
+                        continue
                 if target is None:
                     target = task_for(number, block.get('task_variant') or '')
                     target.from_solution_only = True
@@ -1171,6 +1329,8 @@ def count_tables(markdown):
 
 def task_record(task, event, model):
     statement = join_pieces(task.statement)
+    if task.leads:
+        statement = '\n\n'.join(task.leads + ([statement] if statement else []))
     solution = '\n\n'.join(t.strip() for t in task.solution if t.strip())
     criteria = '\n\n'.join(t.strip() for t in task.criteria if t.strip())
     pages = task.quality
@@ -1198,6 +1358,7 @@ def task_record(task, event, model):
         'statement_from_solution_file': task.from_solution_only,
         'official': event.get('official', True), 'source': event.get('source', 'official'),
         'digitized_by': {'model': model, 'date': date.today().isoformat()},
+        **({'section_md': '\n\n'.join(task.leads)} if task.leads else {}),
     }
 
 
@@ -1248,7 +1409,8 @@ def completeness(records):
 
 
 def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop=True,
-             overlay=None, out_dir=None, suffix='v2', figures_subdir='figures', profile=None):
+             overlay=None, out_dir=None, suffix='v2', figures_subdir='figures', profile=None,
+             keep_keys=None):
     """Собрать всё. Возвращает сводку; файлы пишет в `out_dir` (по умолчанию
     `digitized`) с именами `reference_problems_<suffix>.jsonl` и т. д.
     Страницы читаются из `digitized`, поверх них — заплатки `overlay`."""
@@ -1282,7 +1444,8 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
             event[key] = files.get(key) or []
         event['event_id'] = event_id
         tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop,
-                                             shared=shared, overlay=overlay, profile=profile)
+                                             shared=shared, overlay=overlay, profile=profile,
+                                             keep_keys=keep_keys)
         records = [task_record(t, event, model) for t in tasks]
         if not records and any(f.get('docx_md') for f in event['task_files']):
             # Условия только в docx (дистанционный тур МОШ 2017/18): текст

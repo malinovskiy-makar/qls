@@ -162,6 +162,9 @@ class Command(BaseCommand):
         asm.add_argument('--layers', default=None, metavar='pages_v3,pages_v5',
                          help='С --suffix vM: несколько слоёв заплаток по порядку (поздний '
                               'перекрывает ранний) → digitized\\vM\\ (v5: pages_v3, затем pages_v5).')
+        asm.add_argument('--keep-keys', default=None, metavar='F',
+                         help='С --layers: ключи (комплект, номер, вариант) этого эталона; файл '
+                              'ответов не заводит задание с новым ключом, если есть пара по тексту.')
         asm.add_argument('--out-dir', default=None, metavar='DIR',
                          help='С --layers: писать сборку сюда (проверка инварианта).')
         asm.add_argument('--overlay', action='store_true',
@@ -492,7 +495,10 @@ class Command(BaseCommand):
                                          patches=name, keep_points=name != 'pages_v3',
                                          check_numbers=name != 'pages_v3')
                       for name in names]
-            extra = {'overlay': triage.LayeredOverlay(layers), 'suffix': options['suffix'],
+            if options.get('keep_keys'):
+                extra['keep_keys'] = {(r['event_id'], r['number'], r.get('task_variant') or '')
+                                      for r in digitize.read_jsonl(Path(options['keep_keys']))}
+            extra = {**extra, 'overlay': triage.LayeredOverlay(layers), 'suffix': options['suffix'],
                      'out_dir': options.get('out_dir') or str(self.digitized / options['suffix'])}
         summary = assemble.assemble(
             str(self.digitized), reference_events, v1_rows, model=transcribe.MODEL,
