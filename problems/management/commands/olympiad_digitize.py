@@ -84,7 +84,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from problems.olympiad_audit import (assemble, digitize, fixes, judge, registry,
+from problems.olympiad_audit import (assemble, digitize, fixes, judge, max_score, registry,
                                      reread_queue, review_pack, sweeps, transcribe, triage)
 
 #: Подкоманда → метод. `transcribe` и `assemble` допишутся сюда же.
@@ -103,6 +103,7 @@ _SUBCOMMANDS = {
     'apply-fixes': '_apply_fixes',
     'sweeps': '_sweeps',
     'reread-queue': '_reread_queue',
+    'max-score': '_max_score',
 }
 
 PROGRESS_EVERY_PAGES = 100
@@ -247,6 +248,11 @@ class Command(BaseCommand):
                         help='Задания из этого файла (по умолчанию vN\\reference_problems_vN.jsonl).')
         sw.add_argument('--out', dest='out_file', metavar='F',
                         help='Куда писать находки (по умолчанию vN\\sweeps_vN.json).')
+        ms = common(sub.add_parser('max-score', help='max_score там, где он выводится однозначно.'))
+        ms.add_argument('--version', required=True, metavar='vN')
+        ms.add_argument('--write', action='store_true',
+                        help='Записать заполненные max_score в vN\\reference_problems_vN.jsonl '
+                             '(без флага — только отчёт).')
         rq = common(sub.add_parser('reread-queue', help='Очередь перечитывания по sweeps и глазам.'))
         rq.add_argument('--version', required=True, metavar='vN')
         rq.add_argument('--eye', required=True, metavar='F',
@@ -867,6 +873,26 @@ class Command(BaseCommand):
         for x in log:
             if not fixes.status_ok(x['status']):
                 self._say(f'  НЕ ПРИМЕНЕНО: {x["status"]} {x["page"]} {x["op"]} «{x["find"]}»')
+
+    def _max_score(self, options):
+        version = options['version']
+        path = self._version_rows_path(version)
+        rows = fixes.read_rows(path)
+        log = max_score.fill(rows)
+        counts = Counter(x[1] for x in log)
+        out = path.parent / f'max_score_{version}.csv'
+        with open(out, 'w', encoding='utf-8-sig', newline='') as handle:
+            writer = csv.writer(handle, delimiter=';')
+            writer.writerow(['event_id', 'number', 'task_variant', 'итог', 'источники', 'было', 'стало'])
+            for key, status, sources, before, after in log:
+                if status != 'none':
+                    writer.writerow([*key, status, '; '.join(f'{k}={v}' for k, v in sources.items()),
+                                     before, after])
+        if options.get('write'):
+            fixes.write_rows(str(path), rows)
+        empty = sum(1 for r in rows if r.get('max_score') in (None, ''))
+        self._say(f'max_score {self.olympiad.slug} {version}: {dict(counts)}; пустых после — {empty} '
+                  f'из {len(rows)}; отчёт {out}{"; записано" if options.get("write") else " (не записано)"}')
 
     def _sweep_layers(self, version, given=None):
         """Заплатки страниц для vN: pages_vK с 2 < K ≤ N, старшая первой."""
