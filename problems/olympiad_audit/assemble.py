@@ -88,6 +88,7 @@ class Task:
         self.from_solution_only = False
         self.leads = []             # v5: инструкции раздела в начало условия
         self.subitems = 0           # v5: пункты «N)», дописанные к задаче
+        self.absorbed = 0           # v5: из них размеченных моделью как задание
 
     @property
     def key(self):
@@ -771,7 +772,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 # v5: пункт «N)» текущей задачи, размеченный заданием № N.
                 current.statement.append(econ_rules.item_label(head, block.get('points'),
                                                                block.get('text') or ''))
-                current.subitems = head
+                current.subitems = current.absorbed = head
                 current.pages.append((entry['file'], page))
                 current.quality.append(record)
                 report['v5: пункт задачи — не задание'] += 1
@@ -861,6 +862,18 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 stream.extend((entry, page, record, part) for part in parts)
             else:
                 stream.append((entry, page, record, block))
+        # v5: файл решений «задача (повтор с названием) → её решение и критерии»:
+        # под повтором задачи T блоки без названия с другим номером — пункты T
+        # («Пункт №3 (7 баллов)», vp-2026-final-11), а не решения задачи № 3.
+        headers = {_block_number(b) for _e, _p, _r, b in stream
+                   if b is not None and b.get('type') == 'task' and (b.get('title') or '').strip()
+                   and _real_number(_block_number(b))
+                   and _find_task(tasks, _block_number(b), '', b.get('task_variant') or '')}
+        # Только у комплекта, где в файле условий нашлись пункты, размеченные
+        # заданиями (_is_subitem), — иначе правило задело бы десятки комплектов.
+        region_mode = (profile == ECON and len(headers) >= 2
+                       and any(t.absorbed for t in tasks.values()))
+        region = None
         for entry, page, record, block in stream:
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
@@ -934,6 +947,15 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                     target.solution_figures.append(figure)
                 continue
             in_statement = kind == 'task'
+            if region_mode and kind == 'task':
+                number = _block_number(block)
+                if (block.get('title') or '').strip() and number in headers:
+                    region = _find_task(tasks, number, '', block.get('task_variant') or '')
+                elif (region is not None and _real_number(number) and number != region.number
+                      and not (block.get('title') or '').strip()):
+                    last = region                 # повтор пункта задачи — мимо
+                    report['v5: пункт задачи в файле решений'] += 1
+                    continue
             if kind == 'task':
                 # Условие, повторённое в файле решений: запоминаем как
                 # последнее задание; если условия нет нигде — берём его.
@@ -1028,6 +1050,11 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, pr
                 force = last
             else:
                 follow = None
+            if (force is None and region is not None and not (block.get('title') or '').strip()
+                    and _real_number(_block_number(block))
+                    and _block_number(block) != region.number):
+                force = region
+                report['v5: пункт задачи в файле решений'] += 1
             last = _attach_answer(tasks, last, block, role if kind == 'task_continuation'
                                   else kind, entry, page, report, force=force,
                                   profile=profile) or last
