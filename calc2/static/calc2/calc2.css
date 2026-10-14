@@ -4083,3 +4083,12 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-letter .katex, #tools-panel .sc-pname .katex, #tools-panel .sc-nrow > label .katex { font-size: 1.05em; }
 #tools-panel .sc-ucard > #cons-custom-row { margin: 0; }
 
+/* ── В: макро (README 8; макет 05_left_Adas). Карточка с полем ЧИСЛА (LRAS «Потенциальный выпуск»): строка поля того
+   же вида, что у формулы (высота 42, фон, рамка), само поле числа — без рамки и без кнопки клавиатуры. ── */
+#tools-panel .fc-card > .crow-formula > input.sc-numfield {
+  flex: 1 1 0; min-width: 0; height: 38px; padding: 6px 2px; margin: 0;
+  border: 0; border-radius: 0; background: transparent; color: var(--text);
+  font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 18px;
+}
+#tools-panel .fc-card > .crow-formula > input.sc-numfield:hover { color: var(--text); }
+

@@ -1,7 +1,7 @@
 /* КАРТОЧКИ ФУНКЦИЙ ЛЕВОЙ ПАНЕЛИ (тихие панели, сессия 5, 14.10.2026; решение владельца «левая панель одна во
    всех моделях и только про условие», Notion …8142…; ADR 0153; README пакета 4, 8).
 
-   Разделы (--only К,М,Б,В,Г,Д) — К, М, Д сессии 6 и модели этапов сессии 5:
+   Разделы (--only К,М,Б,В,Г,Д,Е) — К, М, Д, Е сессии 6 и модели этапов сессии 5:
      Б  ppf, ppfsum, trade, tradeprice (у второй КПВ — поле MathLive и клавиатура, сессия 6, А6);   В  prod, costs (и «Задаю кривые»), plants, isoquant;
      Г  mono-d3, mono-kink (и «Кусочный»), monoexport, mono-nat, mono, mono-d1, labor, labor-mono, labor-union,
         labor-bilat, smallopen.
@@ -31,6 +31,10 @@
       a и b), «Параметры» — цены и доход числами; список переключает все пять видов (щелчком по списку), и «Ответ» у
       каждого вида тот же, что на коде BEFORE (там — выбор в системном списке); ввод a, b, k, цен, дохода и своей
       формулы меняет «Ответ» так же; id органов cons-* на месте; у Слуцкого обозначение P_{x₁} набрано KaTeX, без «…».
+   Е  (сессия 6, этап В) макро: adas, islm, phillips, money, loanable, fx, laffer — общие проверки карточек (поле формулы
+      в карточке, обозначение и имя, id те же, контрольная запись меняет «Ответ» так же, как на коде BEFORE; у phillips
+      карточек нет); плюс: LRAS — поле ЧИСЛА в карточке без кнопки клавиатуры; ни у одной модели макро нет ползунка
+      своей переменной оси (у loanable — буквы r); строки чисел и ползунков — словами слева.
    М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
       Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
@@ -77,6 +81,13 @@ const CASES = [
   ['Г', 'labor-union', '', '', ['curve-expr-1', '90 - L']],
   ['Г', 'labor-bilat', '', '', ['curve-expr-1', '90 - L']],
   ['Г', 'smallopen', '', '', ['curve-expr-1', '90 - Q']],
+  ['Е', 'adas', '', '', ['ma-sras', '5 + 0.5*Y']],
+  ['Е', 'islm', '', '', ['ma-is', '25 - 0.1*Y']],
+  ['Е', 'phillips', '', '', ['ma-pe', '6']],
+  ['Е', 'money', '', '', ['ma-md', '220 - 4*i']],
+  ['Е', 'loanable', '', '', ['ma-ls', '40 + 2*r']],
+  ['Е', 'fx', '', '', ['ma-fxd', '110 - 2*e']],
+  ['Е', 'laffer', '', '', ['ma-lafd', '90 - Q']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
@@ -219,7 +230,9 @@ async function runCase(sec, key, label, extra, ctl, inv, beforeAns) {
   const { ctx, page, errors } = await openAt(BASE);
   await pick(page, key, extra);
   const r = await cardsCheck(page);
-  ok(tag + ': каждое поле формулы в карточке (' + r.cards + ' карточек)', r.cards > 0 && !r.bare.length, 'голые: ' + r.bare.join(', '));
+  // У «Кривой Филлипса» карточек нет (README 8: только «Параметры»).
+  const NO_CARDS = new Set(['phillips']);
+  ok(tag + ': каждое поле формулы в карточке (' + r.cards + ' карточек)', (NO_CARDS.has(key) ? r.cards === 0 : r.cards > 0) && !r.bare.length, 'голые: ' + r.bare.join(', '));
   ok(tag + ': у карточек обозначение KaTeX и имя, имя не обрезается', !r.noSym.length && !r.noName.length && !r.cut.length, JSON.stringify({ noSym: r.noSym, noName: r.noName, cut: r.cut }));
   ok(tag + ': в верхнем ряду карточек только глаз, «⋯», кнопка цвета; значок цвета не нажимается; старой подписи не видно', !r.other.length, r.other.join(' | '));
   const f = await functional(page, r);
@@ -355,7 +368,7 @@ async function kRun(theme) {
     ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', nF > 0 && !f.cut.length, f.cut.slice(0, 6).join(' | '));
     ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', nD > 0 && !f.dot.length, f.dot.slice(0, 6).join(' | '));
     ok(w + 'у кнопки цвета размер нажатия ≥ 26 px', !f.hit.length, f.hit.slice(0, 6).join(' | '));
-    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
+    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
     ok(w + 'ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
@@ -473,6 +486,38 @@ async function dRun(beforeCons) {
   }
 }
 
+/* ── Е: макро (сессия 6, этап В) ── */
+const MACRO_KEYS = ['adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer'];
+const MACRO_AXIS = { adas: ['Y'], islm: ['Y', 'r'], phillips: ['u'], money: ['i'], loanable: ['r'], fx: ['e'], laffer: ['Q', 't'] };
+async function eRun() {
+  const { ctx, page, errors } = await openAt(BASE);
+  for (const key of MACRO_KEYS) {
+    if (KEYS && !KEYS.includes(key)) continue;
+    await pick(page, key);
+    const r = await page.evaluate((axis) => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ''); };
+      const chips = [...document.querySelectorAll('#tools-panel .pchip-param')].filter(vis).map(c => tx(c.querySelector('.pchip-label, .reg-eq') || c));
+      const axisChips = chips.filter(t => axis.some(a => t.startsWith(a + '=')));
+      const lras = document.getElementById('ma-lras');
+      const lc = lras && lras.closest('.fc-card');
+      const lrow = lras && lras.closest('.crow-formula');
+      const kbd = lrow ? [...lrow.querySelectorAll('.f-kbd, .f-help')].filter(vis).length : -1;
+      const rows = [...document.querySelectorAll('#sec-macro .sc-prow, #sec-macro .sc-nrow')].filter(vis).map(f => {
+        const nm = f.querySelector('.sc-pname') || f.querySelector(':scope > label');
+        return tx(nm);
+      });
+      return { chips, axisChips, lras: lras ? { card: !!lc && vis(lc), inRow: !!lrow, kbd, sym: lc ? tx(lc.querySelector('.fc-notation')) : '' } : null, rows };
+    }, MACRO_AXIS[key]);
+    ok(key + ': нет ползунка своей переменной оси (' + MACRO_AXIS[key].join(', ') + ')', !r.axisChips.length, JSON.stringify(r.chips));
+    if (key === 'adas') ok('adas: LRAS — поле числа в карточке, без кнопки клавиатуры (' + JSON.stringify(r.lras) + ')', !!r.lras && r.lras.card && r.lras.inRow && r.lras.kbd === 0 && r.lras.sym === 'LRAS', JSON.stringify(r.lras));
+    const WANT = { phillips: ['Ожидаемаяинфляцияπe', 'Естественнаябезработицаu∗', 'Наклонβ'], money: ['ПредложениеденегMs'], loanable: ['Дефицитбюджета'], fx: ['Курс'], laffer: ['Ставканаосидо'] };
+    if (WANT[key]) ok(key + ': строки «Параметров» словами (' + r.rows.join(' | ') + ')', JSON.stringify(r.rows.filter(x => WANT[key].includes(x))) === JSON.stringify(WANT[key].filter(w => key !== 'fx' || r.rows.includes(w))) && WANT[key].filter(w => key !== 'fx').every(w => r.rows.includes(w)), JSON.stringify(r.rows));
+  }
+  ok('Е: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -521,11 +566,12 @@ for (const name of ENGINES) {
     }
   }
   if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
+  if (want('Е')) { head('Е. Макро: карточки, строки, нет ползунка переменной оси'); await eRun(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;
-    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая', 'Д': 'Потребитель (общие проверки карточек)' }[sec]); last = sec; }
+    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая', 'Д': 'Потребитель (общие проверки карточек)', 'Е': 'Макро (общие проверки карточек)' }[sec]); last = sec; }
     await runCase(sec, key, label, extra, ctl, inv, beforeMap[key + '|' + label]);
   }
   await browser.close();

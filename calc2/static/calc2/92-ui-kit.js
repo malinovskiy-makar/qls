@@ -550,7 +550,9 @@ function hideEmptyGroupTitles() {
 function wrapFieldInCard(field, o) {
   if (!field || field._scCard) return field ? field._scCard : null;
   const inp = document.getElementById(o.input);
-  const fRow = inp && inp.closest('.f-row');
+  /* Вариант «число» (сессия 6, В1: LRAS «Потенциальный выпуск» — поле числа, не формула): в строку карточки встаёт
+     САМО поле числа (тот же узел и id), без кнопки клавиатуры. */
+  const fRow = inp && (o.number ? inp : inp.closest('.f-row'));
   if (!inp || !fRow || !field.contains(fRow)) return null;
   const lab = field.querySelector(':scope > label');
   field.classList.add('fc-card', 'sc-card');
@@ -604,6 +606,7 @@ function wrapFieldInCard(field, o) {
     field._scPre = pre;
   }
   line.appendChild(fRow);
+  if (o.number) inp.classList.add('sc-numfield');
   field.insertBefore(top, field.firstChild);
   if (more) line.after(more);
   // Прежняя подпись: её текст пишет сцена — остаётся, спрятана классом; иначе убирается.
@@ -653,6 +656,11 @@ const SC_CARDS = [
   { m: 'mono-kink', input: 'inp-kp-1', sym: 'D_1', name: 'Верхний кусок', prefix: 'P =', col: 'D' },
   { m: 'mono-kink', input: 'inp-kp-2', sym: 'D_2', name: 'Нижний кусок', prefix: 'P =', col: 'D' },
   { m: 'mono-kink', input: 'inp-kink-mc', sym: '\\mathrm{MC}', name: 'Предельные издержки', prefix: '\\mathrm{MC} =', col: 'S' },
+  // Макро (сессия 6, этап В; README 8; макет 05_left_Adas): без глаза и «⋯» (видимости и меню у этих кривых нет),
+  // точка — простой значок цвета кривой (цвета сцены, 50-scenes-macro.js).
+  { m: 'adas', input: 'ma-lras', sym: '\\mathrm{LRAS}', name: 'Потенциальный выпуск', prefix: 'Y^{*} =', col: 'MC', number: true },
+  { m: 'adas', input: 'ma-sras', sym: '\\mathrm{SRAS}', name: 'Краткосрочное предложение', prefix: 'P =', col: 'S' },
+  { m: 'adas', input: 'ma-ad', sym: '\\mathrm{AD}', name: 'Совокупный спрос', prefix: 'P =', col: 'D' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -688,7 +696,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
