@@ -668,6 +668,8 @@ const SC_CARDS = [
   { m: 'loanable', input: 'ma-ld', sym: 'D', name: 'Частные инвестиции', prefix: 'D =', col: 'D' },
   { m: 'fx', input: 'ma-fxd', sym: 'D', name: 'Спрос на валюту', prefix: 'Q =', col: 'D' },
   { m: 'fx', input: 'ma-fxs', sym: 'S', name: 'Предложение валюты', prefix: 'Q =', col: 'S' },
+  { m: 'laffer', input: 'ma-lafd', sym: 'D', name: 'Спрос', prefix: 'P =', col: 'D' },
+  { m: 'laffer', input: 'ma-lafs', sym: 'S', name: 'Предложение', prefix: 'P =', col: 'S' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -690,7 +692,7 @@ function scAxisLetter(n) {
 }
 /* Подписи строк чисел словами (сессия 6): [id поля] → подпись; $…$ — набор KaTeX. */
 const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход',
-  'ma-ms': 'Предложение денег $M_s$',
+  'ma-ms': 'Предложение денег $M_s$', 'ma-lafmax': 'Ставка на оси до',
   'ma-pe': 'Ожидаемая инфляция $\\pi^{e}$', 'ma-ustar': 'Естественная безработица $u^{*}$', 'ma-beta': 'Наклон $\\beta$' };
 /* Модели без карточек функций (сессия 6, В3: «Кривая Филлипса»): заголовок карточки ввода — «Параметры», а не
    «Функции» (scSync), второго заголовка нет. */
@@ -712,17 +714,17 @@ function scWords(el, text) {
 const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle-x2', 'ppfsum'], ['inp-bundle-y2', 'ppfsum'],
   ['inp-bundle-xt', 'trade'], ['inp-bundle-yt', 'trade'], ['iso-w', 'isoquant'], ['iso-r', 'isoquant'], ['iso-c', 'isoquant'],
   ['inp-nat-fc', 'mono-nat'], ['cons-px', 'consumer'], ['cons-py', 'consumer'], ['cons-i', 'consumer'],
-  ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips'], ['ma-ms', 'money']];
+  ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips'], ['ma-ms', 'money'], ['ma-lafmax', 'laffer']];
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
-  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx']];
+  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
 const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
