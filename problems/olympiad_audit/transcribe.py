@@ -605,6 +605,8 @@ class Transcriber:
         self.sleep = sleep
         self.stats = Counter()
         self.stopped = ''
+        #: Файл хода прогона в корне digitized (очередь v5 пишет свой, не затирая этот).
+        self.progress_name = 'transcribe_progress.json'
 
     def _say(self, text):
         if self.stdout is not None:
@@ -770,6 +772,6 @@ class Transcriber:
                  'minutes': round((time.monotonic() - started) / 60, 1),
                  'stopped': self.stopped, 'final': final,
                  'at': datetime.now().isoformat(timespec='seconds')}
-        self._write(os.path.join(self.root, 'transcribe_progress.json'), state)
+        self._write(os.path.join(self.root, self.progress_name), state)
         self._say(f'  [{state["at"]}] страниц {done}: {dict(self.stats)}; '
                   f'${state["spent_usd_run"]:.4f} за {state["minutes"]} мин')

@@ -208,13 +208,16 @@ def is_date_number(block):
     return bool(re.match(r'^\W*' + re.escape(number) + r'\.(?:19|20)\d\d', text))
 
 
-def compatible_target(tasks, number, variant, last=None):
+def compatible_target(tasks, number, variant, last=None, profile=None):
     """Задание для номера N из файла решений, когда своего N нет: единственный
     совместимый кандидат (`тест-N`, `тест-k.N`, `4.N`); из нескольких — с тем
     же префиксом, что у последнего сопоставленного задания этого файла
     (МОШ-предпринимательство 2013/14, 10-11: критерии «6» за подпунктом кейса
-    «4.5» — это «4.6», а не «тест-6»). Иначе None."""
-    if not _real_number(number):
+    «4.5» — это «4.6», а не «тест-6»). Иначе None.
+
+    В профиле ECON — всегда None: у МОШ 2010/11, 9 кл., задачи 6–10 есть только
+    в файле решений, и номер «6» ушёл бы к вопросу «тест-6» (v5, 14.10.2026)."""
+    if not _real_number(number) or profile == ECON:
         return None
     cands = [t for t in tasks.values() if t.number != number
              and compatible_number(t.number, number) and t.task_variant in (variant, '')]
@@ -307,7 +310,27 @@ def _block_number(block):
     return norm_number(block.get('number')) if block.get('number') not in (None, '') else ''
 
 
-def collect(root, files, role, overlay=None):
+#: Профиль сборки экономики ВП/МОШ (сессия v5, 14.10.2026). Правила, добавленные
+#: после сборки v3 (09.10) для финграмотности и предпринимательства, на экономике
+#: меняли ключи и текст: тем же кодом на тех же заплатках v3 — ключи 38
+#: комплектов МОШ и 8 ВП (mosh-2010-final-11: 50 → 31 задание), а задачи 6–10
+#: МОШ 2010/11, 9 кл. (условия только в файле решений) уходили к вопросам
+#: «тест-6…10». В профиле ECON сборка идёт по правилам v3 (код 3bd9c593 на
+#: заплатках pages_v3 даёт v3 ровно), поверх — только правила v5 (блоки отборочных
+#: МОШ, служебные блоки, пункты задачи). Выключено: вариант из шапки файла,
+#: несколько тестов подряд, сброс нумерации → подпункты, резка склейки, дата-номер,
+#: служебная строка/повтор вступления, таблица критериев по строкам, бланк
+#: ответов, сопоставление по тексту и по совместимому номеру, срез повтора
+#: условия в решении, «номер вне заданий → продолжение».
+ECON = 'econ'
+ECON_SLUGS = ('vp', 'mosh')
+
+
+def profile_for(slug):
+    return ECON if slug in ECON_SLUGS else None
+
+
+def collect(root, files, role, overlay=None, profile=None):
     """Блоки файлов комплекта по порядку страниц: [(файл, страница,
     запись страницы, блок)]. role — tasks/solutions/criteria."""
     out = []
@@ -321,7 +344,7 @@ def collect(root, files, role, overlay=None):
                 continue
             for block in record.get('blocks') or []:
                 out.append((entry, page, record, block))
-    return _header_variants(out)
+    return out if profile == ECON else _header_variants(out)
 
 
 def _variant_of_header(block):
@@ -512,7 +535,7 @@ def _header_variants(items):
                     block = dict(block, task_variant=current)
             items[i] = (entry, page, record, block)
     return items
-def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
+def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None, profile=None):
     """Комплект → (задания по порядку, отчёт комплекта)."""
     event_id = event['event_id']
     tasks = OrderedDict()
@@ -529,7 +552,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
     # 1. Условия (и всё, что лежит в файлах условий / смешанных).
     current = None
     current_file = None
-    for entry, page, record, block in collect(root, event.get('task_files') or [], 'tasks', overlay):
+    for entry, page, record, block in collect(root, event.get('task_files') or [], 'tasks', overlay,
+                                                  profile):
         if entry['file'] != current_file:
             # Продолжение и вступление не переходят через границу файла:
             # у МОШ задачи и тест — два файла одного комплекта.
@@ -543,7 +567,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             # Новый вариант в том же файле — новая нумерация, не «тест → задачи».
             current, file_keys, last_int = None, [], 0
             report['вариант из шапки файла'] += 1
-        if is_date_number(block):
+        if profile != ECON and is_date_number(block):
             # «20.11.2013 Бизнес моей мечты» — дата записи блога в кейсе, номер
             # «20.11» — не номер задания (МОШ-предпринимательство 2013/14).
             block = dict(block, number='')
@@ -554,7 +578,9 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
         number = _block_number(block)
         numbered = kind in ('task', 'task_continuation', 'solution', 'criteria', 'figure') \
             and _real_number(number)
-        if numbered and number.startswith('тест-'):
+        if profile == ECON:
+            pass        # нумерация — по правилам сборки v3 (см. ECON)
+        elif numbered and number.startswith('тест-'):
             # Несколько тестов подряд в файле теста («Тест № 1» 1–15, «Тест № 2»
             # 1–15…, МОШ-предпринимательство 2009/10–2011/12): нумерация снова с
             # 1 — следующий тест, вопросы `тест-<тест>.<вопрос>`, а не слияние.
@@ -592,6 +618,16 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             # 90 минут…»), после — кусок текущего задания («(б) …»), который
             # модель пометила заданием. Пилот ВП: 23 лишних «задания» v2.
             text = block.get('text') or block.get('title') or ''
+            if profile == ECON:
+                if current is None:
+                    event['preamble'].append(text)
+                    report['вступление комплекта'] += 1
+                else:
+                    current.statement.append(block.get('text') or '')
+                    current.pages.append((entry['file'], page))
+                    current.quality.append(record)
+                    report['безномерной кусок → к заданию'] += 1
+                continue
             if is_service_text(text):
                 report['служебная строка — мимо'] += 1
                 continue
@@ -665,9 +701,10 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 current.title = (block.get('title') or '').strip()
                 current.quality.append(record)
                 report['задание только блоком решения'] += 1
-            _attach_answer(tasks, current, block, kind, entry, page, report)
+            _attach_answer(tasks, current, block, kind, entry, page, report, profile=profile)
 
-    split_glued(tasks, report)
+    if profile != ECON:
+        split_glued(tasks, report)
 
     # 2. Решения и 3. критерии из своих файлов.
     grades = parse_grades(event.get('grade') or '')
@@ -683,11 +720,11 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
         follow = None             # (задание, номер) вопроса, найденного по тексту
         in_statement = False      # сразу после повторённого условия
         stream, table_header = [], {}
-        for entry, page, record, block in collect(root, files, role, overlay):
+        for entry, page, record, block in collect(root, files, role, overlay, profile):
             # Таблица критериев одним безномерным блоком (ВП, основы бизнеса:
             # «№ | Формулировка | Критерии | Макс. | Баллы») — по строкам.
-            if (block is not None and block['type'] in ('task', 'task_continuation',
-                                                        'criteria', 'solution')
+            if (profile != ECON and block is not None
+                    and block['type'] in ('task', 'task_continuation', 'criteria', 'solution')
                     and not _real_number(_block_number(block))):
                 parts = explode_table_rows(block, role, table_header.get(entry['file']))
                 if len(parts) > 1 or parts[0] is not block:
@@ -717,7 +754,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 report['задание только из решений (условий нет)'] += 1
             if kind in ('footer', 'noise', 'header'):
                 continue
-            if kind in ('task', 'solution', 'criteria', 'task_continuation'):
+            if profile != ECON and kind in ('task', 'solution', 'criteria', 'task_continuation'):
                 grid = parse_answer_grid(block.get('text') or '')
                 own = _block_number(block)
                 if _real_number(own) and own not in grid:
@@ -761,7 +798,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                 # Текст повторённого вопроса надёжнее номера: в файле ответов
                 # МОШ-предпринимательства вопрос теста «1» — это «тест-1», а
                 # не задача 1 комплекта (номера в файле ответов идут с 1).
-                by_text = match_by_text(tasks, block.get('text') or '', number)
+                by_text = (match_by_text(tasks, block.get('text') or '', number)
+                           if profile != ECON else None)
                 follow = None
                 if by_text is not None and by_text is not target and (
                         target is None or text_score(target, block.get('text') or '')
@@ -777,7 +815,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     continue
                 if target is None:
                     target = compatible_target(tasks, number, block.get('task_variant') or '',
-                                               last)
+                                               last, profile)
                     if target is not None:
                         follow = (target, number)
                         report['номер файла решений → совместимое задание'] += 1
@@ -790,7 +828,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     target.statement.append(block.get('text') or '')
                     target.pages.append((entry['file'], page))
                     target.quality.append(record)
-                elif target.statement and not target.from_solution_only:
+                elif target.statement and not target.from_solution_only and profile != ECON:
                     # «Решебник» МОШ-предпринимательства: условие повторено, а
                     # ответ («СТ. 18») — абзацем в том же блоке: хвост — решение.
                     text = block.get('text') or ''
@@ -808,7 +846,7 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
                     report['ответ теста из файла ответов'] += 1
                 last = target
                 continue
-            if kind == 'task_continuation':
+            if kind == 'task_continuation' and profile != ECON:
                 # Хвост условия, повторённого в файле решений (МОШ: условие →
                 # решение, условие переходит на новую страницу), — не решение.
                 number = _block_number(block)
@@ -833,7 +871,8 @@ def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
             else:
                 follow = None
             last = _attach_answer(tasks, last, block, role if kind == 'task_continuation'
-                                  else kind, entry, page, report, force=force) or last
+                                  else kind, entry, page, report, force=force,
+                                  profile=profile) or last
 
     # Рисунки: вырезка.
     for task in tasks.values():
@@ -1022,7 +1061,7 @@ def _find_task(tasks, number, title, variant=''):
     return best if score >= TITLE_MATCH else None
 
 
-def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
+def _attach_answer(tasks, last, block, kind, entry, page, report, force=None, profile=None):
     """Решение/критерии → задание по номеру, иначе по названию, иначе —
     продолжение предыдущего решения (блок без номера сразу за ним).
 
@@ -1037,10 +1076,10 @@ def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
     how = 'за вопросом' if force is not None else \
         'по номеру' if target is not None and number else 'по названию'
     if target is None and _real_number(number) and not number.startswith('тест-'):
-        test_target = compatible_target(tasks, number, variant, last)
+        test_target = compatible_target(tasks, number, variant, last, profile)
         if test_target is not None:
             target, how = test_target, 'номер → тест-N'
-    if force is None:
+    if force is None and profile != ECON:
         by_text = match_by_text(tasks, block.get('text') or '', number)
         if by_text is not None and by_text is not target and (
                 target is None or text_score(target, block.get('text') or '') < TEXT_OTHER):
@@ -1048,7 +1087,7 @@ def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
     if target is None and not _real_number(number) and last is not None:
         target, how = last, 'продолжение'
     head = _leading_int(number)
-    if target is None and last is not None and head is not None and tasks and             head > max((_leading_int(t.number) or 0) for t in tasks.values()):
+    if target is None and last is not None and head is not None and tasks and profile != ECON and             head > max((_leading_int(t.number) or 0) for t in tasks.values()):
         # Номер больше любого задания комплекта СРАЗУ за блоком того же вида
         # (решение за решением, критерии за критериями, тот же файл, та же или
         # предыдущая страница) — пункт списка внутри него («5)…14)» при
@@ -1063,7 +1102,7 @@ def _attach_answer(tasks, last, block, kind, entry, page, report, force=None):
                                     f'«{(block.get("title") or "")[:40]}»')
         return None
     text = block.get('text') or ''
-    if kind == 'solution' and target.statement and not target.from_solution_only:
+    if kind == 'solution' and target.statement and not target.from_solution_only             and profile != ECON:
         trimmed = strip_statement_echo(text, join_pieces(target.statement))
         if trimmed != text:
             report['повтор условия в начале решения — срезан'] += 1
@@ -1209,7 +1248,7 @@ def completeness(records):
 
 
 def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop=True,
-             overlay=None, out_dir=None, suffix='v2', figures_subdir='figures'):
+             overlay=None, out_dir=None, suffix='v2', figures_subdir='figures', profile=None):
     """Собрать всё. Возвращает сводку; файлы пишет в `out_dir` (по умолчанию
     `digitized`) с именами `reference_problems_<suffix>.jsonl` и т. д.
     Страницы читаются из `digitized`, поверх них — заплатки `overlay`."""
@@ -1243,7 +1282,7 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
             event[key] = files.get(key) or []
         event['event_id'] = event_id
         tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop,
-                                             shared=shared, overlay=overlay)
+                                             shared=shared, overlay=overlay, profile=profile)
         records = [task_record(t, event, model) for t in tasks]
         if not records and any(f.get('docx_md') for f in event['task_files']):
             # Условия только в docx (дистанционный тур МОШ 2017/18): текст

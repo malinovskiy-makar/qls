@@ -110,3 +110,88 @@ def write(path, rows):
 def read(path):
     with open(path, encoding='utf-8-sig', newline='') as f:
         return list(csv.DictReader(f, delimiter=';'))
+
+
+# ── Подсказки для судьи и перечитывания (сессия v5) ──────────────────────
+
+#: Класс автопроверки → что проверить на картинке (человеческими словами).
+CLASS_HINTS = {
+    '1': 'возможна путаница кириллицы и латиницы (А/A, В/B, С/C, Е/E, Р/P, Х/X, У/Y, М/M): '
+         'переменные и обозначения в формулах (P — цена, X, Y — товары) — латиницей; русские '
+         'слова и сокращения русских слов в индексах (Y_{Р} — «Россия») — кириллицей',
+    '2': 'повтор строки «Ответ:» — на картинке, скорее всего, одна',
+    '3': 'строка «Ответ» с числом, которого нет в тексте страницы, — возможно, выдумана',
+    '4': 'сноска: маркер или текст сноски внизу страницы потерян',
+    '5': 'артефакт расшифровки (нечитаемо, мягкий перенос, остаток переноса)',
+    '6': 'слово не найдено ни в словаре, ни в текстовом слое PDF — возможно, искажено',
+    '7': 'на странице рисунок или таблица: таблица — Markdown-таблицей целиком, по ячейкам; '
+         'рисунок/график — блоком figure с рамкой и подписью, числа и подписи на нём — в подписи',
+    '8': 'служебный блок (инструкция раздела) оформлен как задание',
+    '9': 'строки текстового слоя PDF не найдены в расшифровке — возможно, потеряны таблица, '
+         'сноска, вступление или служебная строка',
+}
+
+_EYE_ROW = re.compile(r'^\|\s*([vmoc]\d{2,3})\s*\|\s*([0-9a-f]{16}/p\d+)\s*\|[^|]*\|\s*[^|]*\|\s*(.+?)\s*\|\s*$')
+
+
+def eye_findings(md_text):
+    """Таблицы `EYE_REVIEW_FINDINGS_*.md` → {«<sha16>/pN»: (номер, что исправить)}."""
+    out = {}
+    for line in md_text.splitlines():
+        m = _EYE_ROW.match(line.strip())
+        if m:
+            out[m.group(2)] = (m.group(1), m.group(3))
+    return out
+
+
+def _reason_hint(reason):
+    """(класс автопроверки | None, текст подсказки)."""
+    reason = reason.strip()
+    if reason.startswith('глаза:'):
+        return None, 'сверка глазами: ' + reason[len('глаза:'):].strip()
+    m = re.match(r'авто (\d):\s*(.*)$', reason, re.S)
+    if m:
+        return m.group(1), m.group(2).strip()[:100]
+    return None, reason[:300]
+
+
+def page_hints(queue_rows, eye=None, fixes=None, extra=None, set_name=None):
+    """Подсказки по страницам очереди: {«<sha16>/pN»: [строка, …]}.
+
+    Источники: причины очереди (класс автопроверки — человеческими словами),
+    формулировка сверки глазами (`eye`, приоритетнее короткой причины),
+    правки v4 этой страницы (`fixes`: «на картинке «…», а не «…»») — чтобы
+    перечитывание не вернуло ошибку, уже исправленную в v4, и `extra`
+    (подсказки владельца по сомнительным страницам)."""
+    out = {}
+    for row in queue_rows:
+        if set_name and row['set'] != set_name:
+            continue
+        page = row['page']
+        hints = []
+        if eye and page in eye:
+            hints.append(f'сверка глазами ({eye[page][0]}): {eye[page][1]}')
+        by_class = {}
+        for reason in str(row.get('reasons') or '').split(' || '):
+            if not reason.strip() or reason.startswith('(за пределом'):
+                continue
+            if reason.startswith('глаза:') and eye and page in eye:
+                continue
+            cls, hint = _reason_hint(reason)
+            if cls is None:
+                if hint not in hints:
+                    hints.append(hint)
+            elif hint not in by_class.setdefault(cls, []):
+                by_class[cls].append(hint)
+        for cls, examples in by_class.items():
+            hints.append(f'{CLASS_HINTS.get(cls, "автопроверка")}. Где: '
+                         + '; '.join(f'«{e}»' for e in examples[:5]))
+        for fx in fixes or []:
+            s, fpage, op, find, rep = fx[:5]
+            if (set_name and s != set_name) or fpage != page or op != 'lit' or not rep:
+                continue
+            hints.append(f'на картинке «{rep}», а не «{find}»')
+        for hint in (extra or {}).get(page, []):
+            hints.append(hint)
+        out[page] = hints
+    return out

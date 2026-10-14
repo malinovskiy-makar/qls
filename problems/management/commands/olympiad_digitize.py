@@ -159,6 +159,11 @@ class Command(BaseCommand):
         asm.add_argument('--v3', action='store_true',
                          help='Собрать в НОВУЮ папку v3\\ с заплатками pages_v3 '
                               '(v2 не трогается).')
+        asm.add_argument('--layers', default=None, metavar='pages_v3,pages_v5',
+                         help='С --suffix vM: несколько слоёв заплаток по порядку (поздний '
+                              'перекрывает ранний) → digitized\\vM\\ (v5: pages_v3, затем pages_v5).')
+        asm.add_argument('--out-dir', default=None, metavar='DIR',
+                         help='С --layers: писать сборку сюда (проверка инварианта).')
         asm.add_argument('--overlay', action='store_true',
                          help='С --suffix vM: заплатки pages_vM поверх страниц и plan '
                               'triage_plan.csv; сверка с v<M-1> (тот не трогается).')
@@ -180,7 +185,24 @@ class Command(BaseCommand):
                                 help='Докачка (готовые страницы и так пропускаются).')
             runner.add_argument('--yes', action='store_true',
                                 help='Действительно вызывать модель (без флага — только план).')
+            runner.add_argument('--queue', metavar='CSV',
+                                help='Готовый список страниц (reread_queue_vN.csv: '
+                                     'set;page;priority;n_reasons;reasons) вместо плана triage; '
+                                     'подсказка модели — колонка reasons.')
+            runner.add_argument('--priorities', default='1,2', metavar='1,2',
+                                help='С --queue: какие приоритеты брать.')
+            runner.add_argument('--pages', metavar='F',
+                                help='С --queue: только эти страницы (по строке «<sha16>/pN»; пилот).')
+            runner.add_argument('--eye-md', metavar='F',
+                                help='С --queue: EYE_REVIEW_FINDINGS_*.md — формулировки сверки '
+                                     'глазами в подсказку.')
+            runner.add_argument('--hint-fixes', metavar='F',
+                                help='С --queue: fixes_vN.json — правки страницы в подсказку '
+                                     '(«на картинке «…», а не «…»).')
             if name == 'reread':
+                runner.add_argument('--force-eyes', action='store_true',
+                                    help='С --queue: перечитать и ok_judge-страницы с находкой '
+                                         'сверки глазами.')
                 runner.add_argument('--rejudge-answers', action='store_true',
                                     help='Не перечитывать, а пересудить human-страницы с '
                                          'замечанием про ответ (обе расшифровки).')
@@ -452,10 +474,28 @@ class Command(BaseCommand):
             norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
             extra = {'overlay': triage.PageOverlay(str(self.digitized), norm=norm),
                      'out_dir': str(self.digitized / 'v3'), 'suffix': 'v3'}
+        if options.get('layers'):
+            # v5: pages_v3 (как сборка v3: «норма» ярусов B/C из triage_plan.csv), затем
+            # pages_v5 (перечитывание по очереди; баллы блоков берегутся keep_points).
+            if not options.get('suffix'):
+                raise CommandError('--layers — только с --suffix vM.')
+            plan_path = self.digitized / 'triage_plan.csv'
+            norm = triage.norm_pages(triage.read_plan(plan_path)) if plan_path.is_file() else ()
+            names = [x.strip() for x in options['layers'].split(',') if x.strip()]
+            for name in names:
+                if not (self.digitized / name).is_dir():
+                    self._say(f'  ⚠ слоя {name} нет на диске — пустой слой')
+            layers = [triage.PageOverlay(str(self.digitized), norm=norm if name == 'pages_v3' else (),
+                                         patches=name, keep_points=name != 'pages_v3',
+                                         check_numbers=name != 'pages_v3')
+                      for name in names]
+            extra = {'overlay': triage.LayeredOverlay(layers), 'suffix': options['suffix'],
+                     'out_dir': options.get('out_dir') or str(self.digitized / options['suffix'])}
         summary = assemble.assemble(
             str(self.digitized), reference_events, v1_rows, model=transcribe.MODEL,
             only_events=set(options['events']) if options.get('events') else None,
-            crop=not options.get('no_crop'), **extra)
+            crop=not options.get('no_crop'), profile=assemble.profile_for(self.olympiad.slug),
+            **extra)
         suffix = extra.get('suffix', 'v2')
         out_dir = Path(extra.get('out_dir', self.digitized))
         self._say(f'Сборка {self.olympiad.slug} → {out_dir / f"reference_problems_{suffix}.jsonl"}')
@@ -604,7 +644,93 @@ class Command(BaseCommand):
         if runner.stopped:
             self._say(f'ОСТАНОВЛЕНО: {runner.stopped}')
 
+    # ── judge / reread по готовому списку с подсказкой (v5) ─────────────
+
+    def _queue_setup(self, options):
+        """Очередь → (ключи страниц, приоритеты, подсказки, прежние заплатки, задания)."""
+        if options.get('max_usd') is None:
+            raise CommandError('--max-usd обязателен: потолок расхода фазы в долларах. '
+                               'Ничего не сделано.')
+        if self.base == 'v2':
+            raise CommandError('--queue — с --base vN (N ≥ 3): заплатки pages_v<N+1>, '
+                               'текущая расшифровка — с заплатками pages_v3…pages_vN.')
+        rows = reread_queue.read(options['queue'])
+        wanted = {p.strip() for p in options['priorities'].split(',') if p.strip()}
+        keys, prio = judge.queue_keys(rows, self.olympiad.slug, wanted)
+        if options.get('pages'):
+            with open(options['pages'], encoding='utf-8') as handle:
+                only = {'pages/' + line.strip() for line in handle if line.strip()}
+            keys = [k for k in keys if k in only]
+        eye = None
+        if options.get('eye_md'):
+            eye = reread_queue.eye_findings(Path(options['eye_md']).read_text(encoding='utf-8'))
+        fx = fixes.load_fixes(options['hint_fixes']) if options.get('hint_fixes') else None
+        hints = reread_queue.page_hints(rows, eye=eye, fixes=fx, set_name=self.olympiad.slug)
+        top = int(self.base.lstrip('v'))
+        prior = [f'pages_v{k}' for k in range(3, top + 1) if (self.digitized / f'pages_v{k}').is_dir()]
+        jobs = {job.key: job for job in transcribe.build_jobs(
+            digitize.read_jsonl(self.digitized / 'inventory.jsonl'), str(self.digitized),
+            self.olympiad.olympiad_name)}
+        cost_log = transcribe.CostLog(str(self.digitized / f'queue_cost_{self.patches}.jsonl'))
+        missing = [k for k in keys if k not in jobs]
+        if missing:
+            self._say(f'  ⚠ страниц очереди без картинки/описи: {len(missing)} ({missing[:3]})')
+        return keys, prio, hints, prior, jobs, cost_log, eye
+
+    def _queue_phase(self, options, runner_class, keys, setup, estimate, per_page, label):
+        _all, prio, hints, prior, jobs, cost_log, _eye = setup
+        todo = [jobs[k] for k in keys if k in jobs]
+        if options.get('limit') is not None:
+            todo = todo[:options['limit']]
+        spent, calls = cost_log.total()
+        self._say(f'ПЛАН {label} {self.olympiad.slug} (очередь, база {self.base}, заплатки '
+                  f'{self.patches}, текущая расшифровка: pages + {", ".join(prior) or "—"}): '
+                  f'страниц к вызову {len(todo)}; ≈ ${len(todo) * per_page:.2f} '
+                  f'(≈ ${per_page:.4f} за страницу); потолок ${options["max_usd"]:.2f}; '
+                  f'по журналу очереди уже потрачено ${spent:.4f} за {calls} вызовов.')
+        with_hint = sum(1 for j in todo if hints.get(j.key.partition('/')[2]))
+        self._say(f'  с подсказкой: {with_hint} из {len(todo)}; по приоритетам: '
+                  f'{dict(Counter(prio[j.key] for j in todo))}')
+        if not options.get('yes'):
+            self._say('ПЛАН — ни одного вызова модели. Запуск: тот же вызов с --yes.')
+            return
+        if not todo:
+            self._say('Нечего делать — все страницы готовы.')
+            return
+        provider = transcribe.make_provider()
+        if not provider.is_available():
+            raise CommandError(provider.unavailable_reason() or 'Поставщик недоступен.')
+        runner = runner_class(
+            root=str(self.digitized), provider=provider,
+            budget=transcribe.Budget(options['max_usd'], estimate), cost_log=cost_log,
+            workers=options['workers'], stdout=self.stdout, patches=self.patches,
+            prior=prior, hints=hints, priority=prio)
+        runner.progress_name = f'queue_progress_{self.patches}.json'
+        stats = runner.run(todo)
+        self._say(f'ГОТОВО: {dict(stats)}; потрачено в прогоне ${runner.budget.spent:.4f} '
+                  f'({runner.budget.calls} вызовов).')
+        if runner.stopped:
+            self._say(f'ОСТАНОВЛЕНО: {runner.stopped}')
+
+    def _judge_queue(self, options):
+        setup = self._queue_setup(options)
+        keys = judge.judge_todo(setup[0], str(self.digitized), self.patches)
+        self._queue_phase(options, judge.QueueJudgeRunner, keys, setup, estimate=0.0025,
+                          per_page=0.0015, label='judge')
+
+    def _reread_queue_pages(self, options):
+        setup = self._queue_setup(options)
+        force = set()
+        if options.get('force_eyes'):
+            force = {k for k in setup[0] if any(h.startswith(('сверка глазами', 'сомнение'))
+                                                for h in setup[2].get(k.partition('/')[2], []))}
+        keys = judge.select_for_queue_reread(setup[0], str(self.digitized), self.patches, force)
+        self._queue_phase(options, judge.QueueRereadRunner, keys, setup, estimate=0.006,
+                          per_page=0.0035, label='reread')
+
     def _judge(self, options):
+        if options.get('queue'):
+            return self._judge_queue(options)
         setup = self._runner_setup(options)
         if options.get('redo_answer_artifact'):
             keys = judge.answer_artifact_pages(judge.v3_statuses(str(self.digitized),
@@ -619,6 +745,8 @@ class Command(BaseCommand):
                         per_page=0.0012, label='judge')
 
     def _reread(self, options):
+        if options.get('queue'):
+            return self._reread_queue_pages(options)
         setup = self._runner_setup(options)
         if options.get('rejudge_answers'):
             keys = judge.answer_rejudge_pages(judge.v3_statuses(str(self.digitized),

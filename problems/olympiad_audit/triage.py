@@ -132,8 +132,24 @@ class PageOverlay:
     * страница из `norm` (ярусы B/C вне выборки контроля) — норма.
     """
 
-    def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES):
+    def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES, keep_points=False,
+                 check_numbers=True):
         self.digitized, self.norm, self.patches = digitized, set(norm), patches
+        #: Защита «перечитывание потеряло номера» (13.10). Слой pages_v3 в сборке
+        #: v5 — без неё: так собран v3 (09.10), и сборка v5 с пустым pages_v5
+        #: даёт v3 ровно.
+        self.check_numbers = check_numbers
+        #: v5: у перечитанного блока без баллов баллы берутся у того же блока
+        #: прежней расшифровки (МОШ 2011, 10 кл., «Тест II»: перечитывание
+        #: вернуло шапку теста, но потеряло «2 балла» у вопросов 16–21).
+        self.keep_points = keep_points
+
+    def _take(self, out, patch, base):
+        for key in PATCH_FIELDS:
+            if key in patch:
+                out[key] = patch[key]
+        if self.keep_points and 'blocks' in patch:
+            out['blocks'] = keep_points(base.get('blocks') or [], out['blocks'])
 
     def apply(self, page_dir, page, base):
         if base is None:
@@ -149,7 +165,8 @@ class PageOverlay:
         if status == RESCORE_OK:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status in PATCH_OK:
-            if ((status == 'fixed' or 'blocks' in patch) and 'blocks' in patch
+            if (self.check_numbers and (status == 'fixed' or 'blocks' in patch)
+                    and 'blocks' in patch
                     and not numbers_kept(base.get('blocks'), patch['blocks'])):
                 # Перечитывание поправило текст, но потеряло номера блоков
                 # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
@@ -158,22 +175,50 @@ class PageOverlay:
                            needs_eyes_reasons=['перечитывание потеряло номера'])
                 return out
             if status == 'fixed' or 'blocks' in patch:
-                for key in PATCH_FIELDS:
-                    if key in patch:
-                        out[key] = patch[key]
+                self._take(out, patch, base)
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status == 'human':
             # Расшифровка human-страницы судьёй не подтверждена: берём её, только
             # если «скелет» (тип+номер блоков заданий/решений/критериев) тот же —
             # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
             if 'blocks' in patch and skeleton(patch['blocks']) == skeleton(base.get('blocks')):
-                for key in PATCH_FIELDS:
-                    if key in patch:
-                        out[key] = patch[key]
+                self._take(out, patch, base)
             out.update(needs_eyes=True, status='human')
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status='ok_norm')
         return out
+
+
+class LayeredOverlay:
+    """Несколько слоёв заплаток по порядку (v5: `pages_v3`, затем `pages_v5`):
+    каждый следующий накладывается на результат предыдущего, так что поздний
+    слой перекрывает ранний, а его защиты (скелет, номера) сверяются с уже
+    поправленной страницей."""
+
+    def __init__(self, layers):
+        self.layers = list(layers)
+
+    def apply(self, page_dir, page, base):
+        for layer in self.layers:
+            base = layer.apply(page_dir, page, base)
+        return base
+
+
+def keep_points(base_blocks, new_blocks):
+    """Баллы блока (тип, номер, вариант), потерянные перечитыванием, — из
+    прежней расшифровки; блоки без номера и с баллами не трогаются."""
+    points = {}
+    for b in base_blocks or []:
+        key = (b.get('type'), str(b.get('number') or ''), str(b.get('task_variant') or ''))
+        if key[1] and b.get('points') not in (None, ''):
+            points.setdefault(key, b['points'])
+    out = []
+    for b in new_blocks or []:
+        key = (b.get('type'), str(b.get('number') or ''), str(b.get('task_variant') or ''))
+        if key[1] and b.get('points') in (None, '') and key in points:
+            b = dict(b, points=points[key])
+        out.append(b)
+    return out
 
 
 STRUCTURE_TYPES = ('task', 'task_continuation', 'solution', 'criteria')
