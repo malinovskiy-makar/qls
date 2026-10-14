@@ -666,6 +666,8 @@ const SC_CARDS = [
   { m: 'money', input: 'ma-md', sym: 'M_d', name: 'Спрос на деньги', prefix: 'M =', col: 'D' },
   { m: 'loanable', input: 'ma-ls', sym: 'S', name: 'Сбережения', prefix: 'S =', col: 'S' },
   { m: 'loanable', input: 'ma-ld', sym: 'D', name: 'Частные инвестиции', prefix: 'D =', col: 'D' },
+  { m: 'fx', input: 'ma-fxd', sym: 'D', name: 'Спрос на валюту', prefix: 'Q =', col: 'D' },
+  { m: 'fx', input: 'ma-fxs', sym: 'S', name: 'Предложение валюты', prefix: 'Q =', col: 'S' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -676,7 +678,7 @@ const SC_PROWS = {
   'open-pw-field': ['Мировая цена', 'Pw', 'smallopen'],
   // Сессия 6, Б2: «Новая цена товара x» и P_{x₁} (shortRegulatorName резал «Px₁» до «…», Notion …81b4…).
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
-  'ma-dg-field': ['Дефицит бюджета', '\\Delta G', 'loanable'],
+  'ma-dg-field': ['Дефицит бюджета', '\\Delta G', 'loanable'], 'ma-fx-fixed-field': ['Курс', 'e', 'fx'],
 };
 /* Буква, которая является переменной оси модели макро (r у «Заёмных средств», i, e, Y…), ползунка не получает
    (сессия 6, В5; Notion …8187…): замер claude/panels_s6/dead_r_loanable.json — сдвиг r не меняет ни «Ответ», ни один
@@ -714,13 +716,13 @@ const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
-  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable']];
+  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
 const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
