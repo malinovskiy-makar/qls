@@ -976,7 +976,9 @@ def real_call_cost(model, reply):
 
 NETWORK_RETRIES = 5
 NETWORK_RETRY_BASE_SECONDS = 2  # 2, 4, 8, 16 — растёт на каждой попытке
-RETRYABLE_PROVIDER_ERROR_KINDS = ('other', 'limit')
+# `timeout` и `network` — с 14.10.2026 поставщик различает их сам (раньше оба
+# были `other`), а библиотека больше не повторяет: повтор — здесь.
+RETRYABLE_PROVIDER_ERROR_KINDS = ('other', 'limit', 'timeout', 'network')
 
 
 def make_openai_complete_fn(error_log_path=None, run_id=None, prompt_version=None):

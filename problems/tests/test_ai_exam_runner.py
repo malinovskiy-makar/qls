@@ -25,7 +25,7 @@ class StubProvider:
 
     def __init__(self, reply=None, name='fake', tokens=(1000, 500)):
         self.name = name
-        self.reply = reply or (lambda system, text: json.dumps({'reply': 'Начните с условия.'}))
+        self.reply = reply or (lambda system, text: 'Начните с условия.')
         self.tokens = tokens
         self.calls = []
 
@@ -36,8 +36,10 @@ class StubProvider:
         return ''
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
-        self.calls.append({'system': list(system_blocks), 'text': user_text, 'model': model})
+                 timeout=None, images=None, reasoning=None):
+        self.calls.append({'system': list(system_blocks), 'text': user_text, 'model': model,
+                           'schema': schema, 'reasoning': reasoning,
+                           'max_tokens': max_tokens, 'timeout': timeout})
         text = self.reply(system_blocks, user_text)
         if isinstance(text, Exception):
             raise text
@@ -245,7 +247,7 @@ class RunnerTests(TestCase):
         self.assertEqual(len(provider.calls), 5 * 6)
 
     def test_leak_is_detected_in_run(self):
-        reply = lambda system, text: json.dumps({'reply': 'Ответ: $Q^* = 45$.'})  # noqa: E731
+        reply = lambda system, text: 'Ответ: $Q^* = 45$.'  # noqa: E731
         path, _p = self.run_exam(provider=StubProvider(reply), limit=1)
         self.assertEqual({r['verdict'] for r in self.results(path)}, {'выдал'})
 
@@ -303,16 +305,48 @@ class RunnerTests(TestCase):
         self.assertEqual(config['calls_done'], 2)
 
     def test_format_error_keeps_the_money(self):
+        # «Решатель» ждёт JSON — текст для него сбой формата. Чат с 14.10.2026
+        # отвечает текстом (ADR 0148): тот же текст — обычная реплика.
         provider = StubProvider(lambda system, text: 'не JSON вовсе')
         path, _p = self.run_exam(suite='both', provider=provider, limit=1)
         records = self.results(path)
-        self.assertTrue(all(r['format_error'] for r in records))
         self.assertTrue(all(r['cost_usd'] > 0 for r in records))
+        solve_rows = [r for r in records if r['suite'] == 'solve']
+        leak_rows = [r for r in records if r['suite'] == 'leak']
+        self.assertTrue(all(r['format_error'] for r in solve_rows))
+        self.assertFalse(any(r['format_error'] for r in leak_rows))
+        self.assertEqual({r['reply'] for r in leak_rows}, {'не JSON вовсе'})
         with open(os.path.join(path, 'summary.json'), encoding='utf-8') as fh:
             summary = json.load(fh)
         self.assertEqual(summary['solve']['format_errors'], 1)
         self.assertEqual(summary['solve']['tasks']['k'], 0)
-        self.assertEqual(summary['leak']['format_errors'], 6)
+        self.assertEqual(summary['leak']['format_errors'], 0)
+
+    def test_cut_by_length_is_its_own_error_and_keeps_the_money(self):
+        class Cut(StubProvider):
+            def complete(self, *args, **kwargs):
+                reply = super().complete(*args, **kwargs)
+                reply.finish_reason = 'length'
+                return reply
+        path, _p = self.run_exam(provider=Cut(), limit=1)
+        records = self.results(path)
+        self.assertEqual({r['error_kind'] for r in records}, {'length'})
+        self.assertTrue(all(r['cost_usd'] > 0 for r in records))
+
+    def test_chat_settings_reach_both_suites(self):
+        provider = StubProvider(lambda system, text: (
+            json.dumps(answers('45')) if system == [solve.SYSTEM] else 'Начните с условия.'))
+        with override_settings(CATALOG_CHAT_REASONING='high', CATALOG_CHAT_MAX_TOKENS=8000):
+            path, _p = self.run_exam(suite='both', provider=provider, limit=1)
+        self.assertEqual({c['reasoning'] for c in provider.calls}, {'high'})
+        self.assertEqual({c['max_tokens'] for c in provider.calls}, {8000})
+        leak_calls = [c for c in provider.calls if c['system'] != [solve.SYSTEM]]
+        self.assertEqual({c['schema'] for c in leak_calls}, {None})    # чат — текстом
+        with open(os.path.join(path, 'config.json'), encoding='utf-8') as fh:
+            config = json.load(fh)
+        self.assertEqual(config['reasoning_effort'], 'high')
+        self.assertEqual(config['chat_max_tokens'], 8000)
+        self.assertIn('tutor_core', config['prompt_sha256'])
 
     def test_solver_run_grades(self):
         reply = lambda system, text: json.dumps(answers('45'))  # noqa: E731
@@ -331,7 +365,7 @@ class RunnerTests(TestCase):
                 return ProviderError('много запросов', kind='limit')
             if state['n'] == 3:
                 return ProviderError('сервис лёг')
-            return json.dumps({'reply': 'Начните с условия.'})
+            return 'Начните с условия.'
         before = (ChatTurn.objects.count(), AiUsageLog.objects.count())
         path, provider = self.run_exam(provider=StubProvider(flaky), workers=1, limit=1)
         records = self.results(path)

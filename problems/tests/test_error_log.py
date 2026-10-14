@@ -39,6 +39,10 @@ class FakeAPIConnectionError(Exception):
     pass
 
 
+class FakeAPITimeoutError(FakeAPIConnectionError):
+    """Как у настоящего `openai`: таймаут — подкласс ошибки соединения."""
+
+
 class FakeRateLimitError(Exception):
     pass
 
@@ -72,6 +76,7 @@ def _fake_openai_module(create_fn):
     (GLMProvider), не Responses API (OpenAIProvider у `test_ai_providers.py`)."""
     module = types.ModuleType('openai')
     module.APIConnectionError = FakeAPIConnectionError
+    module.APITimeoutError = FakeAPITimeoutError
     module.RateLimitError = FakeRateLimitError
     module.APIStatusError = FakeAPIStatusError
 

@@ -6,11 +6,15 @@ cache_seconds=0)`: ни `ChatTurn`, ни `AiUsageLog`, расход склады
 файлах прогона. Всё, что ходит в базу (задачи, подпункты), читается в
 главном потоке ДО запуска; в рабочих потоках — только `core.run`.
 
-⚠️ Поставщик оборачивается `GuardedProvider`: `core.run` на отказе
-поставщика пишет строку `AiUsageLog` даже при `log=False` (ветка
-`ProviderError` в `problems/ai/core.py`). Обёртка превращает отказ в
-`CallFailed` — его `core.run` не ловит, строка не пишется, а прогонщик
-знает вид отказа (повтор на `limit`).
+Отказ поставщика приходит как `core.AiUnavailable` с видом и расходом
+(`usage`): с 14.10.2026 `core.run` при `log=False` строку журнала не пишет и
+на отказе (раньше писал, и поставщика приходилось оборачивать
+`GuardedProvider`). Вид `limit` — повтор с паузой.
+
+Модель, уровень рассуждения и потолок токенов — как у чата
+(`CATALOG_CHAT_MODEL`, `CATALOG_CHAT_REASONING`, `CATALOG_CHAT_MAX_TOKENS`),
+и у «Решателя» тоже: экзамен мерит модель в той настройке, в какой её видит
+ученик.
 
 «Утечка» ходит через `catalog.chat.ask_model` — тем же путём, что чат на
 сайте; «Решатель» — своим системным блоком (`problems/ai_exam/solve.py`).
@@ -45,32 +49,6 @@ SMOKE_NOTE = 'проба трубы, ключи не проверены'
 
 class RunRefused(Exception):
     """Прогон не начат: человеческий текст причины, ни одного вызова."""
-
-
-class CallFailed(Exception):
-    def __init__(self, message, kind='other'):
-        super().__init__(message)
-        self.kind = kind
-
-
-class GuardedProvider:
-    """Поставщик, чей отказ НЕ доходит до `core.run` как `ProviderError`."""
-
-    def __init__(self, inner):
-        self.inner = inner
-        self.name = inner.name
-
-    def is_available(self):
-        return self.inner.is_available()
-
-    def unavailable_reason(self):
-        return self.inner.unavailable_reason()
-
-    def complete(self, *args, **kwargs):
-        try:
-            return self.inner.complete(*args, **kwargs)
-        except providers.ProviderError as error:
-            raise CallFailed(str(error), kind=getattr(error, 'kind', 'other'))
 
 
 # ── Наборы задач ────────────────────────────────────────────────────────
@@ -182,16 +160,17 @@ def _usage_fields(usage):
 
 def call_once(job, task, provider, model, timeout):
     """Один вызов → (текст или данные, AiResult). Только `core.run`."""
+    from catalog import chat
+
     if job['suite'] == 'solve':
         text = solve.user_text(task['problem'], task['parts'], job['row']['asks'])
         result = core.run(solve.PROFILE, text, solve.SCHEMA, None,
-                          max_tokens=solve.MAX_TOKENS, cache_seconds=0, check_limit=False,
-                          timeout=timeout or solve.TIMEOUT_SECONDS, provider=provider,
-                          model=model, system=[solve.SYSTEM], parse=solve.parse,
-                          log=False, check_budget=False)
+                          max_tokens=max(solve.MAX_TOKENS, chat.max_tokens()), cache_seconds=0,
+                          check_limit=False, timeout=timeout or solve.TIMEOUT_SECONDS,
+                          provider=provider, model=model, system=[solve.SYSTEM],
+                          parse=solve.parse, log=False, check_budget=False,
+                          reasoning=chat.reasoning())
         return None, result
-    from catalog import chat
-
     mode, homework = {c: (m, h) for c, m, h in leak.CONDITIONS}[job['condition']]
     replica = dict(leak.REPLICAS)[job['replica']]
     return chat.ask_model(task['problem'], task['parts'], replica, [], mode, homework,
@@ -212,17 +191,16 @@ def perform(job, task, provider, model, timeout, sleep=time.sleep):
         try:
             reply, result = call_once(job, task, provider, model, timeout)
             break
-        except CallFailed as exc:
+        except core.AiUnavailable as exc:
             if exc.kind == 'limit' and attempt < len(LIMIT_PAUSES):
                 sleep(LIMIT_PAUSES[attempt])
                 attempt += 1
                 continue
+            # Расход отказа — в строку: оборванный по длине ответ оплачен.
             record.update(error=str(exc)[:300], error_kind=exc.kind, verdict='ошибка')
-        except core.AiUnavailable as exc:
-            record.update(error=str(exc)[:300], error_kind=exc.kind, verdict='ошибка')
-        record.update(_usage_fields(None), retries=attempt,
-                      seconds=round(time.monotonic() - started, 2))
-        return record
+            record.update(_usage_fields(exc.usage), retries=attempt,
+                          seconds=round(time.monotonic() - started, 2))
+            return record
 
     data = result.data or {}
     record.update(_usage_fields(result.usage), retries=attempt,
@@ -285,6 +263,8 @@ def prompt_hashes():
     from catalog import chat
 
     return {'core': _sha(prompts.CORE),
+            'tutor_core': _sha(prompts.TUTOR_CORE),
+            'catalog_chat_reference': _sha(prompts.CATALOG_CHAT_REFERENCE),
             'catalog_chat': _sha(prompts.PROFILES['catalog_chat']),
             'catalog_chat_modes': _sha(prompts.CATALOG_CHAT_MODES),
             'homework_mode': _sha(chat.HOMEWORK_MODE),
@@ -334,6 +314,8 @@ def run(directory, suite, set_name, *, provider, model, limit=None, workers=4,
         max_usd=1.0, label='', yes=False, phrase='', timeout=None, write=print,
         sleep=time.sleep, now=None):
     """Прогон целиком. → папка прогона или None (только план / отказ)."""
+    from catalog import chat
+
     if suite not in SUITES or set_name not in SETS:
         raise RunRefused('неизвестный набор: --suite %s --set %s' % (suite, set_name))
     rows = load_set(directory, set_name, label=label, model=model, phrase=phrase)
@@ -355,18 +337,19 @@ def run(directory, suite, set_name, *, provider, model, limit=None, workers=4,
               'tasks': len(set(solve_ids) | set(leak_ids)), 'solve_ids': solve_ids,
               'leak_ids': leak_ids, 'set_ids': [r['id'] for r in rows],
               'excluded': excluded, 'provider': provider.name, 'model': model,
-              'reasoning_effort': getattr(settings, 'AI_REASONING_EFFORT', ''),
+              'reasoning_effort': chat.reasoning(),
+              'global_reasoning_effort': getattr(settings, 'AI_REASONING_EFFORT', ''),
+              'chat_max_tokens': chat.max_tokens(), 'chat_timeout': chat.timeout_seconds(),
               'git': git_state(), 'prompt_sha256': prompt_hashes(),
               'workers': workers, 'max_usd': max_usd, 'timeout': timeout,
               'calls_planned': len(jobs), 'started_at': now.isoformat()}
     records = []
-    guarded = GuardedProvider(provider)
     with open(os.path.join(path, 'results.jsonl'), 'w', encoding='utf-8') as out:
         def on_record(record):
             records.append(record)
             out.write(json.dumps(record, ensure_ascii=False, default=str) + '\n')
             out.flush()
-        spent, stopped, done = execute(jobs, tasks, guarded, model, workers=workers,
+        spent, stopped, done = execute(jobs, tasks, provider, model, workers=workers,
                                        max_usd=max_usd, timeout=timeout,
                                        on_record=on_record, sleep=sleep)
     config.update(calls_done=done, spent_usd=round(spent, 6), stopped_by_money=stopped,

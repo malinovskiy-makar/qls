@@ -40,7 +40,7 @@ def _capture(store, reply='Начните с функции реакции вт�
         store['text'] = user_text
         store['system'] = ' '.join(system_blocks)
         store['blocks'] = list(system_blocks)
-        return json.dumps({'reply': reply}, ensure_ascii=False)
+        return reply   # чат отвечает текстом (ADR 0148)
     return fake
 
 
@@ -51,9 +51,11 @@ class RecordingProvider(FakeProvider):
         self.calls = []
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         self.calls.append({'model': model, 'images': list(images or []),
-                           'system': list(system_blocks), 'text': user_text})
+                           'system': list(system_blocks), 'text': user_text,
+                           'schema': schema, 'timeout': timeout, 'reasoning': reasoning,
+                           'max_tokens': max_tokens})
         return super().complete(system_blocks, user_text, schema, model, max_tokens,
                                 timeout=timeout, images=images)
 
@@ -202,7 +204,10 @@ class ChatApiTests(TestCase):
 @override_settings(AI_PROVIDER='fake', CATALOG_CHAT_PROVIDER='fake', CATALOG_CHAT_MODEL='glm-5.3',
                    CATALOG_CHAT_VISION_MODEL='glm-5.3-flash', MEDIA_ROOT=MEDIA)
 class ChatModeTests(TestCase):
-    """Режимы: блок режима, эталон только в «Проверь моё решение», P0 в каждом."""
+    """Режимы: своё ядро, блок режима, эталон последним в КАЖДОМ режиме, P0 в каждом.
+
+    До 14.10.2026 эталон видел только режим «Проверь моё решение», а первым
+    блоком шло общее `CORE` (ADR 0148)."""
 
     def setUp(self):
         cache.clear()
@@ -216,29 +221,68 @@ class ChatModeTests(TestCase):
         return self.client.post(reverse('catalog:api_chat'), json.dumps(body),
                                 content_type='application/json')
 
-    def test_each_mode_adds_its_block_and_only_check_sees_the_reference(self):
+    def test_each_mode_adds_its_block_and_every_mode_sees_the_reference(self):
+        header = prompts.CATALOG_CHAT_REFERENCE.split('%s')[0]
         for mode in ('free', 'theory', 'method', 'check'):
             seen = {}
             with self.subTest(mode=mode), override_settings(AI_FAKE_REPLY=_capture(seen)):
                 self._post(message='Помогите с задачей', mode=mode)
                 blocks = seen['blocks']
+                # Постоянное — в начале: ядро репетитора, профиль, режим.
+                self.assertEqual(blocks[0], prompts.TUTOR_CORE)
+                self.assertNotIn(prompts.CORE, blocks)
                 self.assertEqual(blocks[:2], prompts.system_blocks('catalog_chat'))
                 if mode == 'free':
-                    self.assertEqual(len(blocks), 2)
+                    self.assertEqual(len(blocks), 3)
                 else:
                     self.assertEqual(blocks[2], prompts.CATALOG_CHAT_MODES[mode])
-                reference = 'q1 = 30' in seen['system'] and 'ведомый отвечает 15' in seen['system']
-                self.assertEqual(reference, mode == 'check', 'эталон не там, где нужно')
+                    self.assertEqual(len(blocks), 4)
+                # Эталон — последним блоком, во всех режимах.
+                self.assertTrue(blocks[-1].startswith(header), 'эталон не последним блоком')
+                self.assertIn('ОТВЕТ: q1 = 30', blocks[-1])
+                self.assertIn('ведомый отвечает 15', blocks[-1])
                 self.assertFalse('q1 = 30' in seen['text'], 'эталон попал в текст запроса')
+                self.assertNotIn('ведомый отвечает 15', seen['text'])
                 for absent in ('Мария', 'masha@example.org', 'маша'):
                     self.assertFalse(absent in seen['text'] or absent in seen['system'],
                                      'данные профиля ушли в модель: %s' % absent)
+
+    def test_reference_has_parts_and_hides_solutions_under_review(self):
+        from problems.models import ProblemPart
+
+        ProblemPart.objects.create(problem=self.problem, label='б)', statement='Найдите q2.',
+                                   answer='q2 = 15', solution='Ведомый: q2 = (90 - q1)/4.',
+                                   order=1)
+        seen = {}
+        with override_settings(AI_FAKE_REPLY=_capture(seen)):
+            self._post(message='С чего начать?', mode='method')
+        self.assertIn('ПУНКТ б) ОТВЕТ: q2 = 15; РЕШЕНИЕ: Ведомый', seen['blocks'][-1])
+        self.assertNotIn('q2 = 15', seen['text'])
+
+        self.problem.solution_needs_review = True
+        self.problem.save()
+        seen = {}
+        with override_settings(AI_FAKE_REPLY=_capture(seen)):
+            self._post(message='С чего начать?', mode='theory')
+        reference = seen['blocks'][-1]
+        self.assertIn('ОТВЕТ: q1 = 30', reference)       # ответ идёт
+        self.assertIn('ПУНКТ б) ОТВЕТ: q2 = 15', reference)
+        self.assertNotIn('ведомый отвечает 15', reference)  # решение — нет
+        self.assertNotIn('Ведомый: q2', reference)
+
+    def test_without_answer_and_solution_there_is_no_reference_block(self):
+        bare = make_problem('Задача без эталона.', answer='', solution='')
+        seen = {}
+        with override_settings(AI_FAKE_REPLY=_capture(seen)):
+            self._post(problem_id=bare.pk, message='Как быть?', mode='free')
+        self.assertEqual(seen['blocks'], prompts.system_blocks('catalog_chat'))
 
     def test_unknown_mode_is_plain_question(self):
         seen = {}
         with override_settings(AI_FAKE_REPLY=_capture(seen)):
             self._post(message='Что это?', mode='hack')
-        self.assertEqual(len(seen['blocks']), 2)
+        self.assertEqual(len(seen['blocks']), 3)          # ядро, профиль, эталон
+        self.assertNotIn(prompts.CATALOG_CHAT_MODES['method'], seen['blocks'])
         self.assertEqual(ChatTurn.objects.get().mode, 'free')
 
     def test_check_without_text_and_file_is_a_hint_not_a_request(self):
@@ -358,3 +402,48 @@ class ChatVisionTests(TestCase):
                 self.assertEqual(json.loads(resp.content)['error'], 'file')
         self.assertEqual(self.provider.calls, [])
         self.assertFalse(ChatTurn.objects.exists())
+
+    def test_reply_carries_history_text_with_the_transcript(self):
+        """Расшифровка фото — в истории: иначе следующая реплика её теряла."""
+        attachment = self._attach()
+        with override_settings(AI_FAKE_REPLY=_capture({})):
+            data = json.loads(self._post(attachment, message='Где ошибка?').content)
+        expected = 'Где ошибка?\n\n%s\n%s' % (chat.VISION_MARK, SEEN)
+        self.assertEqual(data['history_text'], expected)
+        history = self.client.get(reverse('catalog:api_chat_history',
+                                          args=[self.problem.pk])).json()['turns']
+        self.assertEqual(history[0]['history_text'], expected)
+        self.assertEqual(history[0]['message'], 'Где ошибка?')
+
+    def test_vision_format_failure_keeps_money_and_spares_the_limit(self):
+        attachment = self._attach()
+        remaining = None
+
+        def garbage(system_blocks, user_text):
+            return 'не JSON' if prompts.CATALOG_CHAT_VISION in system_blocks else 'Ответ.'
+        with override_settings(AI_FAKE_REPLY=garbage):
+            data = json.loads(self._post(attachment).content)
+            remaining = chat.core.remaining_today(self.user)
+        self.assertEqual(data['error'], 'format')
+        self.assertIn('неожиданный ответ', data['reply'])
+        self.assertNotIn('домашк', data['reply'])
+        turn = ChatTurn.objects.get()
+        self.assertGreater(turn.cost_usd, 0, 'оплаченный вызов записан с ценой 0')
+        self.assertGreater(turn.vision_output_tokens, 0)
+        log = AiUsageLog.objects.get()
+        self.assertFalse(log.ok)
+        self.assertGreater(log.cost_usd, 0)
+        self.assertEqual(remaining, 30)        # личный лимит не тронут
+
+    def test_chat_and_vision_use_the_chat_ceiling_and_level(self):
+        with override_settings(AI_FAKE_REPLY=_capture({}), CATALOG_CHAT_TIMEOUT_SECONDS=44,
+                               CATALOG_CHAT_REASONING='high', CATALOG_CHAT_MAX_TOKENS=7000,
+                               AI_TIMEOUT_SECONDS=25):
+            self._post(self._attach())
+        vision, talk = self.provider.calls
+        self.assertEqual(vision['timeout'], 44)
+        self.assertLessEqual(talk['timeout'], 44)
+        self.assertGreaterEqual(talk['timeout'], chat.TEXT_STEP_MIN_SECONDS)
+        self.assertEqual((talk['reasoning'], talk['max_tokens'], talk['schema']),
+                         ('high', 7000, None))
+        self.assertIsNone(vision['reasoning'])  # шаг зрения — как раньше

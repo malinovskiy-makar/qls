@@ -50,7 +50,7 @@ def _reply(text):
     def fake(system_blocks, user_text):
         if prompts.CATALOG_CHAT_VISION in system_blocks:
             return json.dumps({'text': 'расшифровка'}, ensure_ascii=False)
-        return json.dumps({'reply': text}, ensure_ascii=False)
+        return text   # чат отвечает текстом (ADR 0148)
     return fake
 
 
@@ -61,7 +61,7 @@ class RecordingProvider(FakeProvider):
         self.calls = []
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         self.calls.append({'system': list(system_blocks), 'text': user_text,
                            'images': list(images or []), 'max_tokens': max_tokens})
         return super().complete(system_blocks, user_text, schema, model, max_tokens,

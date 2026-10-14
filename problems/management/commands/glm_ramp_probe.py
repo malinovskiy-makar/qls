@@ -71,11 +71,11 @@ def make_instrumented_glm_complete_fn(stats, stats_lock):
                     stats['latencies'].append(dt)
                     if error.kind == 'limit':
                         stats['rate_limited'] += 1
-                    elif error.kind == 'other':
+                    elif error.kind in ('other', 'timeout', 'network'):
                         stats['connection_drops'] += 1
                     else:
                         stats['fatal'] += 1
-                if error.kind not in ('limit', 'other') or attempt == MAX_ATTEMPTS:
+                if error.kind not in pilot.RETRYABLE_PROVIDER_ERROR_KINDS or attempt == MAX_ATTEMPTS:
                     raise
                 time.sleep(min(BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)), 30))
         raise last_error

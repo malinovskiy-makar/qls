@@ -18,7 +18,10 @@ def load_tasks(ids):
     Вызывать в главном потоке: дальше в рабочих потоках к базе не ходят.
     """
     out = {}
-    qs = base_queryset('catalog').filter(id__in=list(ids)).prefetch_related('parts')
+    # Рубрика — для эталона чата (`chat.reference_text`): берётся из
+    # предзагрузки, чтобы рабочие потоки не ходили в базу.
+    qs = (base_queryset('catalog').filter(id__in=list(ids))
+          .prefetch_related('parts', 'rubrics__criteria'))
     for problem in qs:
         parts = list(problem.parts.all())
         ordered = sorted(parts, key=lambda p: (p.order, p.label or '', p.id))

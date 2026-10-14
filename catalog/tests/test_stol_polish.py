@@ -209,7 +209,7 @@ class LimitLineTests(TestCase):
     def test_chat_answer_carries_remaining(self):
         """Контракт, на который опирается скрипт: ответ чата несёт остаток."""
         self._spend(10)
-        with self.settings(AI_FAKE_REPLY=json.dumps({'reply': 'Начните с MR = MC.'}, ensure_ascii=False)):
+        with self.settings(AI_FAKE_REPLY='Начните с MR = MC.'):
             resp = self.client.post(reverse('catalog:api_chat'),
                                     json.dumps({'problem_id': self.problem.pk, 'message': 'Как решать?'}),
                                     content_type='application/json')

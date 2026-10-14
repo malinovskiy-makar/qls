@@ -12,10 +12,21 @@
 * КАЖДАЯ реплика пишется в `ChatTurn`, в том числе ошибочная. История для
   модели по-прежнему приходит от клиента — последние шесть реплик.
 
+Сессия «Чат-репетитор, правки 1» (14.10.2026, ADR 0148):
+* ответ — обычным ТЕКСТОМ, а не JSON `{reply}`: формулы TeX больше не ломаются
+  экранированием, сбоев формата у текста нет;
+* первый системный блок — своё ядро репетитора `prompts.TUTOR_CORE`, а не общее
+  `CORE` («ты не источник знаний… ничего не считай»);
+* эталон (ответ, решение, пункты, рубрика) — последним системным блоком во
+  ВСЕХ режимах, не только в «Проверь моё решение»;
+* уровень рассуждения, потолок токенов и времени — свои настройки чата
+  (`CATALOG_CHAT_REASONING`, `CATALOG_CHAT_MAX_TOKENS`,
+  `CATALOG_CHAT_TIMEOUT_SECONDS`).
+
 ⚠️ НАРУЖУ УХОДИТ ТОЛЬКО ТЕКСТ ЗАДАЧИ И РАЗГОВОРА: условие, подпункты, последняя
 попытка ученика и результат её проверки, реплики, картинки приложенного
-решения; в режиме «Проверь моё решение» ещё эталонные ответ и решение — только
-системным блоком. Ни имени, ни почты, ни класса — ничего из профиля (P0).
+решения; эталон задачи — только системным блоком. Ни имени, ни почты, ни
+класса — ничего из профиля (P0).
 """
 from __future__ import annotations
 
@@ -44,8 +55,13 @@ MESSAGE_MAX = 2000
 # ответ посреди слова.
 REPLY_MAX = 8000
 CHECK_REPLY_MAX = 10000
-#: Токены ответа реплики — явно: без них длинный ответ обрезал бы уже поставщик.
+#: Токены ответа реплики по умолчанию — явно: без них длинный ответ обрезал бы
+#: уже поставщик. Настройка — `CATALOG_CHAT_MAX_TOKENS` (`max_tokens()`).
 CHAT_MAX_TOKENS = 3000
+CHAT_REASONING = 'low'
+CHAT_TIMEOUT_SECONDS = 45
+#: Шагу текста после шага зрения остаётся не меньше стольких секунд.
+TEXT_STEP_MIN_SECONDS = 10
 #: Не больше трёх файлов к одной реплике; страниц в модель зрения — всего пять.
 FILES_PER_TURN = 3
 QUOTE_MAX = 300
@@ -72,12 +88,6 @@ BAD_PDF = 'PDF не открылся: пришлите фото страниц.'
 TOO_MANY_FILES = 'Не больше трёх файлов к одной реплике.'
 PAGES_NOTE = 'Смотрю первые пять страниц.'
 
-CHAT_SCHEMA = {
-    'type': 'object',
-    'additionalProperties': False,
-    'required': ['reply'],
-    'properties': {'reply': {'type': 'string'}},
-}
 VISION_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
@@ -95,6 +105,20 @@ IMAGE_TYPES = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
 
 def chat_provider():
     return providers.get_provider(getattr(settings, 'CATALOG_CHAT_PROVIDER', 'glm'))
+
+
+def reasoning():
+    """Уровень рассуждения модели чата — свой, не глобальный AI_REASONING_EFFORT."""
+    return getattr(settings, 'CATALOG_CHAT_REASONING', '') or CHAT_REASONING
+
+
+def max_tokens():
+    return int(getattr(settings, 'CATALOG_CHAT_MAX_TOKENS', 0) or CHAT_MAX_TOKENS)
+
+
+def timeout_seconds():
+    """Потолок одного вызова чата и шага зрения (меньше 60 с nginx)."""
+    return int(getattr(settings, 'CATALOG_CHAT_TIMEOUT_SECONDS', 0) or CHAT_TIMEOUT_SECONDS)
 
 
 def is_available():
@@ -133,6 +157,18 @@ def clean_history(history):
         if text:
             out.append({'role': role, 'text': text})
     return out[-HISTORY_LIMIT:]
+
+
+def history_text(message, vision_text=''):
+    """Реплика ученика для истории: вопрос плюс расшифровка фото.
+
+    Без расшифровки следующая реплика теряла бы, что было на фото. Длина — как
+    у любой реплики истории (`MESSAGE_MAX`): `clean_history` всё равно режет.
+    """
+    text = (message or '').strip()
+    if (vision_text or '').strip():
+        text = '%s\n\n%s\n%s' % (text, VISION_MARK, vision_text.strip())
+    return text[:MESSAGE_MAX]
 
 
 def cut_reply(text, limit):
@@ -195,15 +231,67 @@ def build_prompt(problem, parts, message, history, last_attempt=None, homework=F
     return '\n'.join(lines)
 
 
-def system_for(problem, mode):
-    """Системные блоки реплики: ядро, профиль чата, блок режима, эталон при проверке."""
+def _label(part):
+    return (part.label or '').strip().rstrip(').') or '?'
+
+
+def reference_text(problem, parts):
+    """Эталон задачи для системного блока: ответ, решение, пункты, рубрика.
+
+    По образцу `catalog/attempts.py::build_prompt`: `solution_needs_review`
+    — решения (и задачи, и пунктов) не идут, ответы идут. Решения вместе —
+    не длиннее `REFERENCE_MAX`, чтобы одна реплика не стоила как десять.
+    Ничего нет — пустая строка, и блока эталона не будет вовсе.
+
+    ⚠️ Рубрика — `problem.rubrics.all()`: в рабочих потоках экзамена она
+    берётся из `prefetch_related` (`problems/ai_exam/loader.py`), а не базой.
+    """
+    review = problem.solution_needs_review
+    budget = REFERENCE_MAX
+    lines = []
+    if (problem.answer or '').strip():
+        lines.append('ОТВЕТ: ' + problem.answer.strip())
+    solution = '' if review else (problem.solution or '').strip()[:budget]
+    budget -= len(solution)
+    if solution:
+        lines += ['РЕШЕНИЕ:', solution]
+    for part in parts:
+        part_solution = '' if review else (part.solution or '').strip()[:max(budget, 0)]
+        budget -= len(part_solution)
+        if (part.answer or '').strip() or part_solution:
+            lines.append('ПУНКТ %s) ОТВЕТ: %s%s' % (
+                _label(part), (part.answer or '').strip() or 'не указан',
+                ('; РЕШЕНИЕ: ' + part_solution) if part_solution else ''))
+    criteria = ['- %s (%s б.)%s' % (c.name, c.max_points,
+                                     (': ' + c.description) if c.description else '')
+                for rubric in problem.rubrics.all() for c in rubric.criteria.all()]
+    if criteria:
+        lines += ['РУБРИКА:'] + criteria
+    return '\n'.join(lines)
+
+
+def topic_canon(problem):
+    """Место под раздел канона темы (метод решения из базы знаний). Пока пусто:
+    канон — отдельная работа шага 1 стратегии ИИ. Блок идёт перед эталоном."""
+    return ''
+
+
+def system_for(problem, mode, parts=None):
+    """Системные блоки реплики, постоянное — в начале (кэш у GLM — по началу).
+
+    `TUTOR_CORE` → профиль `catalog_chat` → блок режима → [канон темы] → эталон.
+    Эталон — во ВСЕХ режимах (14.10.2026; раньше только в «Проверь»), и только
+    здесь: в тексте запроса его нет (P0-сторож чата).
+    """
     blocks = prompts.system_blocks(PROFILE)
     if mode in prompts.CATALOG_CHAT_MODES:
         blocks.append(prompts.CATALOG_CHAT_MODES[mode])
-    if mode == 'check':
-        blocks.append(prompts.CATALOG_CHAT_REFERENCE % (
-            (problem.answer or '').strip() or 'не указан',
-            (problem.solution or '').strip()[:REFERENCE_MAX] or 'не указано'))
+    canon = topic_canon(problem)
+    if canon:
+        blocks.append(canon)
+    reference = reference_text(problem, list(problem.parts.all()) if parts is None else parts)
+    if reference:
+        blocks.append(prompts.CATALOG_CHAT_REFERENCE % reference)
     return blocks
 
 
@@ -325,8 +413,9 @@ def ask_model(problem, parts, text, history, mode, homework, *, user=None,
     ЖЕ путём, что и чат на сайте, а не его копией. Ни базы, ни `ChatTurn`
     здесь нет — `parts` и `homework` вызывающий готовит сам.
 
-    Пустой ответ не ошибка ЗДЕСЬ: `answer()` сначала записывает токены и
-    деньги реплики, а потом уже отказывает «Помощник не ответил».
+    Ответ — ТЕКСТ (`schema=None`, ADR 0148). `parse` экзамена может вернуть
+    словарь `{reply}` — тогда текст берётся из него. Пустой и оборванный
+    потолком токенов ответ — `AiUnavailable` из `core.run` с расходом в `usage`.
     """
     mode = mode if mode in MODES else 'free'
     provider = provider if provider is not None else chat_provider()
@@ -338,17 +427,40 @@ def ask_model(problem, parts, text, history, mode, homework, *, user=None,
     # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
     # кэша считается по тексту запроса — та же реплика в другом режиме
     # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
-    result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
-                      provider=provider, model=model, system=system_for(problem, mode),
-                      cache_seconds=0, max_tokens=CHAT_MAX_TOKENS, log=log,
+    result = core.run(PROFILE, prompt, None, user, images=images,
+                      provider=provider, model=model, system=system_for(problem, mode, parts),
+                      cache_seconds=0, max_tokens=max_tokens(), log=log,
                       check_budget=check_budget, check_limit=check_limit, parse=parse,
-                      timeout=timeout)
-    return str((result.data or {}).get('reply') or '').strip(), result
+                      timeout=timeout or timeout_seconds(), reasoning=reasoning())
+    data = result.data
+    reply = data.get('reply') if isinstance(data, dict) else data
+    return str(reply or '').strip(), result
+
+
+def _usage_into(turn, usage, vision=False):
+    """Токены и деньги вызова — в реплику; `usage` бывает и у отказа
+    (`AiUnavailable.usage`): сбой формата оплачен, и в журнале он не ноль."""
+    usage = usage or {}
+    if vision:
+        turn.vision_input_tokens = usage.get('input_tokens', 0)
+        turn.vision_output_tokens = usage.get('output_tokens', 0)
+    else:
+        turn.input_tokens = usage.get('input_tokens', 0)
+        turn.output_tokens = usage.get('output_tokens', 0)
+    turn.cost_usd += Decimal(str(usage.get('cost_usd', 0) or 0))
 
 
 def answer(problem, message, history, user, last_attempt=None, mode='free',
            attachments=(), thread=None, quote='', quote_source='statement'):
-    """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
+    """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`."""
+    return answer_turn(problem, message, history, user, last_attempt=last_attempt, mode=mode,
+                       attachments=attachments, thread=thread, quote=quote,
+                       quote_source=quote_source).reply
+
+
+def answer_turn(problem, message, history, user, last_attempt=None, mode='free',
+                attachments=(), thread=None, quote='', quote_source='statement'):
+    """Одна реплика помощника → записанный `ChatTurn`. Поднимает `core.AiUnavailable`.
 
     `attachments` — до FILES_PER_TURN своих вложений; картинки со всех подряд,
     всего не больше VISION_PAGES_MAX страниц (больше — честная приписка).
@@ -356,7 +468,13 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
     до 18.09 читается по нему.
 
     ⚠️ `ChatTurn` пишется ВСЕГДА — и с ответом, и с ошибкой: журнал нужен как
-    раз для разбора неудач (нечитаемое фото, отказ поставщика, лимит).
+    раз для разбора неудач (нечитаемое фото, отказ поставщика, лимит). Токены
+    и деньги переносятся и при отказе, если вызов был оплачен (сбой формата,
+    пустой или оборванный ответ) — `AiUnavailable.usage`.
+
+    Время: шаг зрения и шаг текста делят один потолок `timeout_seconds()` —
+    чтобы реплика с фото не перевалила за 60 с nginx; шагу текста остаётся
+    не меньше `TEXT_STEP_MIN_SECONDS`.
     """
     from problems.models_platform import ChatTurn
 
@@ -370,17 +488,23 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
                     quote=quote or '', quote_source=quote_source if quote else '',
                     provider=provider.name, model=model or '')
     started = time.monotonic()
+    limit = timeout_seconds()
     try:
         note = pages_note(attachments)
         text, images = ('%s\n\n%s' % (message, note)) if note else message, None
         if attachments:
             pictures = attachment_images(*attachments)
             if pictures and vision_model:
-                seen = core.run(
-                    PROFILE, 'Перепиши дословно всё, что на этих фото или страницах. '
-                    'Картинок %d, sha256 %s.' % (len(pictures), _digest(pictures)),
-                    VISION_SCHEMA, user, images=pictures, provider=provider,
-                    model=vision_model, system=[prompts.CORE, prompts.CATALOG_CHAT_VISION])
+                try:
+                    seen = core.run(
+                        PROFILE, 'Перепиши дословно всё, что на этих фото или страницах. '
+                        'Картинок %d, sha256 %s.' % (len(pictures), _digest(pictures)),
+                        VISION_SCHEMA, user, images=pictures, provider=provider,
+                        model=vision_model, system=[prompts.CORE, prompts.CATALOG_CHAT_VISION],
+                        timeout=limit)
+                except core.AiUnavailable as exc:
+                    _usage_into(turn, exc.usage, vision=True)
+                    raise
                 turn.vision_text = str((seen.data or {}).get('text') or '').strip()
                 turn.vision_input_tokens = (seen.usage or {}).get('input_tokens', 0)
                 turn.vision_output_tokens = (seen.usage or {}).get('output_tokens', 0)
@@ -391,17 +515,23 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
                 images = pictures
                 text = '%s\n\n[фото: картинок %d, sha256 %s]' % (text, len(pictures),
                                                                  _digest(pictures))
-        reply, result = ask_model(problem, list(problem.parts.all()), text, history, mode,
-                                  in_active_homework(user, problem), user=user,
-                                  last_attempt=last_attempt, images=images, quote=quote,
-                                  quote_source=quote_source, provider=provider, model=model)
+        left = max(TEXT_STEP_MIN_SECONDS, int(limit - (time.monotonic() - started)))
+        try:
+            reply, result = ask_model(problem, list(problem.parts.all()), text, history, mode,
+                                      in_active_homework(user, problem), user=user,
+                                      last_attempt=last_attempt, images=images, quote=quote,
+                                      quote_source=quote_source, provider=provider,
+                                      model=model, timeout=min(limit, left))
+        except core.AiUnavailable as exc:
+            _usage_into(turn, exc.usage)
+            raise
         turn.input_tokens = (result.usage or {}).get('input_tokens', 0)
         turn.output_tokens = (result.usage or {}).get('output_tokens', 0)
         turn.cost_usd += _spent(result)
         if not reply:
-            raise core.AiUnavailable('Помощник не ответил. Попробуйте спросить иначе.')
+            raise core.AiUnavailable(core.EMPTY_TEXT, kind='empty')
         turn.reply = cut_reply(reply, CHECK_REPLY_MAX if mode == 'check' else REPLY_MAX)
-        return turn.reply
+        return turn
     except core.AiUnavailable as exc:
         turn.error = ('%s: %s' % (exc.kind, exc))[:500]
         raise

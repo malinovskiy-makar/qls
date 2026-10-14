@@ -16,6 +16,17 @@
 
     AI_PROVIDER = 'fake'
     AI_FAKE_REPLY = '{"rows": [...]}'   # или функция (profile, text) → str
+
+⚠️ НИ ОДИН ПОСТАВЩИК НЕ ПОВТОРЯЕТ ЗАПРОС САМ (14.10.2026). Библиотеки
+`openai` и `anthropic` по умолчанию повторяют ещё дважды (таймаут, обрыв,
+408/409/429/5xx), и до этой даты так и было: один вопрос чата ждал до
+3 × 25 с и оплачивался трижды. Теперь клиенты создаются с `max_retries=0`;
+повтор, если он нужен, решает вызывающий код (прогонщик экзамена, пилот
+обогащения), а не библиотека.
+
+`schema=None` — ответ ТЕКСТОМ: без `response_format` и без приписки про
+JSON (чат на странице задачи, ADR 0148). `reasoning` — уровень рассуждения
+НА ВЫЗОВ; не задан — глобальный `AI_REASONING_EFFORT`.
 """
 import json
 import logging
@@ -38,11 +49,15 @@ class Reply(object):
     остаётся `None`. `None` и 0.0 здесь РАЗНОЕ: `None` — «поставщик не
     сказал, считай по прайсу», ноль — «вызов бесплатный». Слить их
     значило бы молча занижать жёсткий счётчик бюджета.
+
+    `finish_reason` — почему модель остановилась; `'length'` — упёрлась в
+    `max_tokens` и ответ оборван (у GLM рассуждение входит в тот же
+    потолок). `None` — поставщик не сказал.
     """
 
     def __init__(self, text, input_tokens=0, output_tokens=0,
                  cache_write_tokens=0, cache_read_tokens=0,
-                 reasoning_tokens=0, cost_usd=None):
+                 reasoning_tokens=0, cost_usd=None, finish_reason=None):
         self.text = text
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
@@ -50,6 +65,7 @@ class Reply(object):
         self.cache_read_tokens = cache_read_tokens
         self.reasoning_tokens = reasoning_tokens
         self.cost_usd = cost_usd
+        self.finish_reason = finish_reason
 
 
 logger = logging.getLogger(__name__)
@@ -110,9 +126,20 @@ class BaseProvider(object):
         raise NotImplementedError
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         raise NotImplementedError
 
+    #: Обрыв связи (вид `network`). «связаться» — по этому слову отчёт беты
+    #: узнаёт вид потери (`problems/ai_beta/metrics.py::error_kind`).
+    NETWORK_TEXT = ('Не удалось связаться с сервисом модели. Проверьте сеть '
+                    'и попробуйте ещё раз.')
+
+    @staticmethod
+    def _timeout_text(timeout):
+        """Потолок времени (вид `timeout`): «занял больше» и «прерван» —
+        слова, по которым его узнаёт отчёт беты."""
+        return ('Ответ занял больше %s секунд и прерван. Попробуйте ещё раз.'
+                % (int(timeout) if timeout else 'положенных'))
 
     def _fail(self, error, text, kind='other'):
         """Записать причину в журнал и вернуть человеческий отказ.
@@ -158,7 +185,7 @@ class AnthropicProvider(BaseProvider):
         return ''
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         """⚠️ КЭШИРУЕТСЯ ТОЛЬКО ПЕРВЫЙ БЛОК — неизменное ядро.
 
         Пометка стоит на нём, потому что скидка даётся на ПРЕФИКС запроса:
@@ -186,29 +213,25 @@ class AnthropicProvider(BaseProvider):
                     'data': image['data']}})
             content.append({'type': 'text', 'text': user_text})
 
-        client = anthropic.Anthropic(api_key=self.api_key())
+        # Без схемы — ответ текстом (чат): `output_config` не передаётся.
+        extra = ({'output_config': {'format': {'type': 'json_schema', 'schema': schema}}}
+                 if schema is not None else {})
+        client = anthropic.Anthropic(api_key=self.api_key(), max_retries=0)
         try:
             response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
                 system=system,
                 messages=[{'role': 'user', 'content': content}],
-                output_config={'format': {'type': 'json_schema',
-                                          'schema': schema}},
                 timeout=timeout,
+                **extra,
             )
         except anthropic.APITimeoutError as error:
             # Потолок времени (ADR 0079): ученику — что делать, а не «сеть».
             # Ветка стоит ПЕРЕД APIConnectionError: таймаут — его подкласс.
-            raise self._fail(
-                error,
-                'Ответ занял больше %s секунд и прерван. Попробуйте '
-                'отправить ещё раз.' % (int(timeout) if timeout else 'положенных'))
+            raise self._fail(error, self._timeout_text(timeout), kind='timeout')
         except anthropic.APIConnectionError as error:
-            raise self._fail(
-                error,
-                'Не удалось связаться с сервисом разбора запроса. Проверьте '
-                'сеть или соберите домашку вручную.')
+            raise self._fail(error, self.NETWORK_TEXT, kind='network')
         except anthropic.RateLimitError as error:
             raise self._fail(
                 error,
@@ -239,6 +262,8 @@ class AnthropicProvider(BaseProvider):
             cache_write_tokens=getattr(
                 usage, 'cache_creation_input_tokens', 0) or 0,
             cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+            finish_reason=('length' if getattr(response, 'stop_reason', None) == 'max_tokens'
+                           else getattr(response, 'stop_reason', None)),
         )
 
 
@@ -306,7 +331,7 @@ class OpenAIProvider(BaseProvider):
                 self.CACHE_MIN_TOKENS, approx)
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         """⚠️ СХЕМА СТРОГАЯ (`strict: true`) — иначе ответ не принимается.
 
         Всё, что модель написала мимо схемы, отбрасывается на стороне
@@ -328,9 +353,13 @@ class OpenAIProvider(BaseProvider):
 
         self._warn_if_cache_too_short(system_blocks)
 
-        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        effort = reasoning or getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        # Без схемы — ответ текстом: формат `text` не передаётся.
+        extra = ({'text': {'format': {'type': 'json_schema', 'name': 'reply',
+                                      'strict': True, 'schema': schema}}}
+                 if schema is not None else {})
 
-        client = openai.OpenAI(api_key=self.api_key())
+        client = openai.OpenAI(api_key=self.api_key(), max_retries=0)
         try:
             response = client.responses.create(
                 model=model,
@@ -338,17 +367,14 @@ class OpenAIProvider(BaseProvider):
                 instructions='\n\n'.join(system_blocks),
                 input=self._input_payload(user_text, images),
                 reasoning={'effort': effort},
-                text={'format': {'type': 'json_schema',
-                                 'name': 'reply',
-                                 'strict': True,
-                                 'schema': schema}},
                 timeout=timeout,
+                **extra,
             )
+        except openai.APITimeoutError as error:
+            # Ветка ПЕРЕД APIConnectionError: таймаут — его подкласс.
+            raise self._fail(error, self._timeout_text(timeout), kind='timeout')
         except openai.APIConnectionError as error:
-            raise self._fail(
-                error,
-                'Не удалось связаться с сервисом разбора запроса. Проверьте '
-                'сеть или соберите домашку вручную.')
+            raise self._fail(error, self.NETWORK_TEXT, kind='network')
         except openai.RateLimitError as error:
             raise self._fail(
                 error,
@@ -413,6 +439,13 @@ class OpenAIProvider(BaseProvider):
         out_details = getattr(usage, 'output_tokens_details', None)
         reasoning = _num(out_details, 'reasoning_tokens')
 
+        # Обрыв по потолку токенов у Responses API — `status: incomplete`
+        # с причиной `max_output_tokens`; приводим к общему `length`.
+        details = getattr(response, 'incomplete_details', None)
+        finish = ('length' if getattr(response, 'status', None) == 'incomplete'
+                  and getattr(details, 'reason', None) == 'max_output_tokens'
+                  else getattr(response, 'status', None))
+
         return Reply(
             text=_output_text(response),
             # Кэш вычитается из входа — см. докстринг класса.
@@ -421,6 +454,7 @@ class OpenAIProvider(BaseProvider):
             cache_write_tokens=cache_write,
             cache_read_tokens=cache_read,
             reasoning_tokens=reasoning,
+            finish_reason=finish,
         )
 
 
@@ -447,6 +481,16 @@ def _output_text(response):
             if piece:
                 parts.append(piece)
     return ''.join(parts)
+
+
+def _choice(response):
+    """Текст и причина остановки первого варианта `chat.completions`."""
+    choices = getattr(response, 'choices', None) or []
+    if not choices:
+        return '', None
+    message = getattr(choices[0], 'message', None)
+    return (getattr(message, 'content', None) or '',
+            getattr(choices[0], 'finish_reason', None))
 
 
 class GLMProvider(BaseProvider):
@@ -527,13 +571,19 @@ class GLMProvider(BaseProvider):
         return content
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         import openai
 
         from django.conf import settings
 
-        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
-        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
+        effort = reasoning or getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        # Без схемы (чат, ADR 0148) — ни приписки про JSON, ни `response_format`:
+        # модель пишет обычный текст с TeX, и формулы не ломаются экранированием.
+        instructions = '\n\n'.join(system_blocks)
+        extra = {}
+        if schema is not None:
+            instructions += self._schema_instruction(schema)
+            extra['response_format'] = {'type': 'json_object'}
 
         # ⚠️ GLM-5.3-Flash ВСЕГДА рассуждает — `thinking.type: disabled`
         # отклоняется API кодом 1210 («This model always engages in
@@ -545,7 +595,8 @@ class GLMProvider(BaseProvider):
         extra_body['reasoning_effort'] = effort if effort in (
             'low', 'high', 'max') else 'low'
 
-        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL,
+                               max_retries=0)
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -554,15 +605,17 @@ class GLMProvider(BaseProvider):
                     {'role': 'system', 'content': instructions},
                     {'role': 'user', 'content': self._user_content(user_text, images)},
                 ],
-                response_format={'type': 'json_object'},
                 extra_body=extra_body,
                 timeout=timeout,
+                **extra,
             )
+        except openai.APITimeoutError as error:
+            # Ветка ПЕРЕД APIConnectionError: таймаут — его подкласс. До
+            # 14.10.2026 ветки не было, и ученик на таймауте читал «не удалось
+            # связаться… соберите домашку вручную».
+            raise self._fail(error, self._timeout_text(timeout), kind='timeout')
         except openai.APIConnectionError as error:
-            raise self._fail(
-                error,
-                'Не удалось связаться с сервисом разбора запроса. Проверьте '
-                'сеть или соберите домашку вручную.')
+            raise self._fail(error, self.NETWORK_TEXT, kind='network')
         except openai.RateLimitError as error:
             raise self._fail(
                 error,
@@ -607,11 +660,7 @@ class GLMProvider(BaseProvider):
         out_details = getattr(usage, 'completion_tokens_details', None)
         reasoning = _num(out_details, 'reasoning_tokens')
 
-        text = ''
-        choices = getattr(response, 'choices', None) or []
-        if choices:
-            message = getattr(choices[0], 'message', None)
-            text = getattr(message, 'content', None) or ''
+        text, finish = _choice(response)
 
         return Reply(
             text=text,
@@ -619,6 +668,7 @@ class GLMProvider(BaseProvider):
             output_tokens=output,
             cache_read_tokens=cache_read,
             reasoning_tokens=reasoning,
+            finish_reason=finish,
         )
 
 
@@ -676,7 +726,7 @@ class DeepSeekProvider(BaseProvider):
                 % json.dumps(schema, ensure_ascii=False))
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         """⚠️ УРОВЕНЬ РАССУЖДЕНИЯ ЗДЕСЬ РЕШАЕТ ДЕНЬГИ, А НЕ ВКУС.
 
         DeepSeek V4 Pro по умолчанию рассуждает, и рассуждение
@@ -693,9 +743,14 @@ class DeepSeekProvider(BaseProvider):
 
         from django.conf import settings
 
-        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
-        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
-        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        effort = reasoning or getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        instructions = '\n\n'.join(system_blocks)
+        extra = {}
+        if schema is not None:
+            instructions += self._schema_instruction(schema)
+            extra['response_format'] = {'type': 'json_object'}
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL,
+                               max_retries=0)
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -704,12 +759,15 @@ class DeepSeekProvider(BaseProvider):
                     {'role': 'system', 'content': instructions},
                     {'role': 'user', 'content': user_text},
                 ],
-                response_format={'type': 'json_object'},
                 extra_body={'reasoning_effort': effort},
                 timeout=timeout,
+                **extra,
             )
+        except openai.APITimeoutError as error:
+            raise self._fail(error, self._timeout_text(timeout), kind='timeout')
         except openai.APIConnectionError as error:
-            raise self._fail(error, 'DeepSeek не ответил.')
+            raise self._fail(error, 'DeepSeek не ответил: не удалось связаться.',
+                             kind='network')
         except openai.RateLimitError as error:
             raise self._fail(error, 'DeepSeek ограничил частоту запросов.',
                              kind='limit')
@@ -730,11 +788,7 @@ class DeepSeekProvider(BaseProvider):
         reasoning = _num(getattr(usage, 'completion_tokens_details', None),
                          'reasoning_tokens')
 
-        text = ''
-        choices = getattr(response, 'choices', None) or []
-        if choices:
-            message = getattr(choices[0], 'message', None)
-            text = getattr(message, 'content', None) or ''
+        text, finish = _choice(response)
 
         return Reply(
             text=text,
@@ -742,6 +796,7 @@ class DeepSeekProvider(BaseProvider):
             output_tokens=output,
             cache_read_tokens=cache_read,
             reasoning_tokens=reasoning,
+            finish_reason=finish,
         )
 
 
@@ -818,11 +873,16 @@ class OpenRouterProvider(BaseProvider):
                 % json.dumps(schema, ensure_ascii=False))
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         import openai
 
-        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
-        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        instructions = '\n\n'.join(system_blocks)
+        extra = {}
+        if schema is not None:
+            instructions += self._schema_instruction(schema)
+            extra['response_format'] = {'type': 'json_object'}
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL,
+                               max_retries=0)
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -831,12 +891,15 @@ class OpenRouterProvider(BaseProvider):
                     {'role': 'system', 'content': instructions},
                     {'role': 'user', 'content': user_text},
                 ],
-                response_format={'type': 'json_object'},
                 extra_body={'usage': {'include': True}},
                 timeout=timeout,
+                **extra,
             )
+        except openai.APITimeoutError as error:
+            raise self._fail(error, self._timeout_text(timeout), kind='timeout')
         except openai.APIConnectionError as error:
-            raise self._fail(error, 'Посредник OpenRouter не ответил.')
+            raise self._fail(error, 'Посредник OpenRouter не ответил: не удалось связаться.',
+                             kind='network')
         except openai.RateLimitError as error:
             raise self._fail(error, 'OpenRouter ограничил частоту запросов.',
                              kind='limit')
@@ -863,11 +926,7 @@ class OpenRouterProvider(BaseProvider):
         cost = getattr(usage, 'cost', None)
         cost = float(cost) if isinstance(cost, (int, float)) else None
 
-        text = ''
-        choices = getattr(response, 'choices', None) or []
-        if choices:
-            message = getattr(choices[0], 'message', None)
-            text = getattr(message, 'content', None) or ''
+        text, finish = _choice(response)
 
         return Reply(
             text=text,
@@ -876,6 +935,7 @@ class OpenRouterProvider(BaseProvider):
             cache_read_tokens=cache_read,
             reasoning_tokens=reasoning,
             cost_usd=cost,
+            finish_reason=finish,
         )
 
 
@@ -895,7 +955,7 @@ class FakeProvider(BaseProvider):
         return ''
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None, images=None):
+                 timeout=None, images=None, reasoning=None):
         from django.conf import settings
 
         # Медленный подставной ИИ для стенда нагрузки: держит поток, как
@@ -904,6 +964,8 @@ class FakeProvider(BaseProvider):
         if delay > 0:
             time.sleep(delay)
         self.last_images = list(images or [])
+        self.last_reasoning = reasoning
+        self.last_schema = schema
         reply = getattr(settings, 'AI_FAKE_REPLY', None)
         if callable(reply):
             reply = reply(system_blocks, user_text)

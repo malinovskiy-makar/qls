@@ -40,6 +40,7 @@ ERROR_KINDS = (
     ('cost_cap', 'дневной потолок расходов'),
     ('format', 'сбой формата («неожиданный ответ»)'),
     ('empty', 'пустой ответ'),
+    ('length', 'обрыв по длине (потолок токенов)'),
     ('timeout', 'обрыв по времени'),
     ('network', 'связь'),
     ('other', 'прочее'),
@@ -150,6 +151,9 @@ def error_kind(error, latency_ms=None, timeout_ms=None):
         return 'format'
     if 'Помощник не ответил' in text:
         return 'empty'
+    # Ответ текстом (14.10.2026, ADR 0148): обрыв потолком токенов — свой вид.
+    if 'потолок длины' in text:
+        return 'length'
     if 'занял больше' in text or 'прерван' in text:
         return 'timeout'
     if 'связаться' in text:

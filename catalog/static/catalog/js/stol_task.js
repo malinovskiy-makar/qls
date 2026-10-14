@@ -482,8 +482,11 @@
             line.textContent = d.note;
             wait.appendChild(line);
           }
-          history.push({ role: 'me', text: text }, { role: 'ai', text: reply });
-          history = history.slice(-HISTORY_LIMIT);
+          /* Ошибка — не реплика помощника: в историю для модели не идёт. */
+          if (!d.error) {
+            history.push({ role: 'me', text: d.history_text || text }, { role: 'ai', text: reply });
+            history = history.slice(-HISTORY_LIMIT);
+          }
         }).catch(function () { wait.textContent = 'Не получилось ответить, попробуйте ещё раз.'; });
       }).catch(function (err) { showFiles(); bubble(false, err.message || 'Не удалось загрузить файл, попробуйте ещё раз.'); });
     }
@@ -551,7 +554,7 @@
           (d.turns || []).forEach(function (turn) {
             bubble(true, turn.message, { files: turn.attachments, quote: turn.quote });
             bubble(false, turn.reply);
-            history.push({ role: 'me', text: turn.message }, { role: 'ai', text: turn.reply });
+            history.push({ role: 'me', text: turn.history_text || turn.message }, { role: 'ai', text: turn.reply });
           });
           history = history.slice(-HISTORY_LIMIT);
         })

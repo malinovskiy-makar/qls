@@ -398,6 +398,18 @@ CATALOG_CHAT_PROVIDER = os.environ.get('CATALOG_CHAT_PROVIDER', 'glm').strip()
 CATALOG_CHAT_MODEL = os.environ.get('CATALOG_CHAT_MODEL', 'glm-5.3').strip()
 CATALOG_CHAT_VISION_MODEL = os.environ.get(
     'CATALOG_CHAT_VISION_MODEL', 'glm-5.3-flash').strip()
+# Свои у чата, а не глобальные AI_* (сессия «Чат-репетитор, правки 1»,
+# 14.10.2026, ADR 0148): глобальным уровнем рассуждения живут ещё умный
+# поиск и обогащение. Умолчания = поведение до правки (GLM при
+# AI_REASONING_EFFORT=none шлёт `low`; 3 000 токенов); менять — по итогам
+# экзамена ИИ. ⚠️ У GLM рассуждение входит в completion_tokens: при `high`
+# 3 000 может не хватить — ответ оборвётся (отказ `length`).
+CATALOG_CHAT_REASONING = os.environ.get('CATALOG_CHAT_REASONING', 'low').strip() or 'low'
+CATALOG_CHAT_MAX_TOKENS = int(os.environ.get('CATALOG_CHAT_MAX_TOKENS', '3000').strip() or 3000)
+# Потолок одного вызова чата (и шага зрения), секунд. Меньше 60 с у nginx и
+# gunicorn: ученик должен увидеть наш текст «занял больше…», а не 504.
+CATALOG_CHAT_TIMEOUT_SECONDS = int(
+    os.environ.get('CATALOG_CHAT_TIMEOUT_SECONDS', '45').strip() or 45)
 
 # ─── Порог близости смыслового поиска ────────────────────────────────────
 #

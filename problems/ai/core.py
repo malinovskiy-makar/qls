@@ -59,13 +59,32 @@ class AiUnavailable(Exception):
     """Модель недоступна или выключена. Текст уже человеческий.
 
     `kind` — вид отказа для экрана: `no_key` (доступ не настроен или ключ не
-    принят), `limit` (кончилась суточная квота), `other` (всё прочее).
-    Экран по нему выбирает совет; сам текст исключения идёт в журнал.
+    принят), `limit` (кончилась суточная квота), `timeout` (потолок
+    времени), `network` (обрыв связи), `format` (ответ не разобрался),
+    `empty` (пустой ответ), `length` (ответ оборван потолком токенов),
+    `other` (всё прочее). Экран по нему выбирает совет; незнакомый вид
+    экраны читают как `other`. Сам текст исключения идёт в журнал.
+
+    `usage` — расход вызова, если до поставщика дошли (словарь, как
+    `AiResult.usage`): при сбое формата вызов ОПЛАЧЕН, и вызывающий
+    (чат) переносит токены и деньги в свой журнал (14.10.2026; до этого
+    реплика со сбоем формата писалась в `ChatTurn` с ценой 0).
     """
 
-    def __init__(self, message, kind='other'):
+    def __init__(self, message, kind='other', usage=None):
         super(AiUnavailable, self).__init__(message)
         self.kind = kind
+        self.usage = usage
+
+
+#: Тексты отказов разбора — без «соберите домашку»: их видит и ученик в
+#: чате. Подстроки «неожиданный ответ» и «Помощник не ответил» читает отчёт
+#: беты (`problems/ai_beta/metrics.py::error_kind`) — не менять.
+FORMAT_TEXT = ('Модель прислала неожиданный ответ — разобрать его не '
+               'получилось. Попробуйте ещё раз.')
+EMPTY_TEXT = 'Помощник не ответил. Попробуйте спросить иначе.'
+LENGTH_TEXT = ('Ответ упёрся в потолок длины и оборвался. Попробуйте '
+               'спросить короче или по частям.')
 
 
 class AiResult(object):
@@ -200,8 +219,16 @@ def _cache_key(profile, model, user_text):
 def run(profile, user_text, schema, user, max_tokens=None,
         cache_seconds=None, check_limit=True, timeout=None, images=None,
         provider=None, model=None, system=None, parse=None, log=True,
-        check_budget=True):
+        check_budget=True, reasoning=None):
     """Выполнить задачу `profile` и вернуть разобранную структуру.
+
+    `schema=None` — ответ ТЕКСТОМ (чат на странице задачи, ADR 0148):
+    поставщик не просит JSON, `AiResult.data` — строка ответа (или то,
+    что вернул `parse`). Пустой ответ — отказ `empty`, ответ, оборванный
+    потолком токенов (`finish_reason == 'length'`), — отказ `length`.
+
+    `reasoning` — уровень рассуждения на ЭТОТ вызов (`low`/`high`/`max`…);
+    не задан — глобальный `AI_REASONING_EFFORT`, как раньше.
 
     `user_text` — ВСЁ переменное: описание, параметры, подсказки из банка.
     В системную часть ничего переменного не попадает никогда (см.
@@ -280,40 +307,80 @@ def run(profile, user_text, schema, user, max_tokens=None,
             % daily_cost_cap(profile), kind='limit')
 
     blocks = system if system is not None else system_blocks(profile)
+    # Уровень рассуждения уходит поставщику, только если задан: старые
+    # подставные поставщики в тестах этого аргумента не знают.
+    extra = {'reasoning': reasoning} if reasoning else {}
     started = time.monotonic()
     try:
         reply = provider.complete(
             blocks, user_text, schema, model,
             max_tokens or _setting('AI_MAX_TOKENS', DEFAULT_MAX_TOKENS),
-            timeout=timeout or timeout_seconds(), images=images or None)
+            timeout=timeout or timeout_seconds(), images=images or None, **extra)
     except providers.ProviderError as error:
-        _log(user, profile, provider.name, model, None,
-             time.monotonic() - started, ok=False, note=str(error)[:290])
-        raise AiUnavailable(str(error), kind=getattr(error, 'kind', 'other'))
+        seconds = time.monotonic() - started
+        # ⚠️ `log=False` уважается и здесь (14.10.2026): раньше строка отказа
+        # писалась всегда, и сортировщик поиска из рабочего потока открывал
+        # соединение с базой, которое никто не закрывал. Сведения об отказе
+        # уходят вызывающему в `AiUnavailable.usage`.
+        if log:
+            usage = _log(user, profile, provider.name, model, None, seconds,
+                         ok=False, note=str(error)[:290])
+        else:
+            usage = _usage_of(profile, provider.name, model, providers.Reply(''),
+                              seconds, ok=False)
+        raise AiUnavailable(str(error), kind=getattr(error, 'kind', 'other'),
+                            usage=usage)
 
     seconds = time.monotonic() - started
-    usage = (_log(user, profile, provider.name, model, reply, seconds) if log
-             else _usage_of(profile, provider.name, model, reply, seconds))
-
-    try:
-        data = parse(reply.text) if parse else json.loads(reply.text)
-    except ValueError:
-        # Мусор вместо структуры — это не «поломка сервера», а «модель
-        # ответила не тем». Репетитору нужен понятный выход, а не трассировка.
-        logger.warning('Модель вернула не JSON (профиль %s)', profile)
-        raise AiUnavailable(
-            'Разбор запроса вернул неожиданный ответ. Попробуйте описать '
-            'домашку иначе или соберите её вручную.')
-    if not isinstance(data, dict):
-        raise AiUnavailable(
-            'Разбор запроса вернул неожиданный ответ. Попробуйте описать '
-            'домашку иначе или соберите её вручную.')
+    data, failure = _read(reply, schema, parse)
+    if failure:
+        logger.warning('Ответ модели не принят (%s, профиль %s)', failure[0], profile)
+    # ⚠️ Строка расхода пишется ПОСЛЕ разбора (14.10.2026): сбой разбора —
+    # `ok=False`, но с ценой. Деньги видит суточный денежный потолок
+    # (`spent_today` считает все строки), а личный лимит (`used_today` —
+    # только `ok=True`) за неразобранный ответ не списывается. Раньше
+    # строка писалась `ok=True` ДО разбора.
+    ok = failure is None
+    note = '' if ok else failure[1][:290]
+    usage = (_log(user, profile, provider.name, model, reply, seconds, ok=ok, note=note)
+             if log else _usage_of(profile, provider.name, model, reply, seconds, ok=ok))
+    if failure:
+        raise AiUnavailable(failure[1], kind=failure[0], usage=usage)
 
     result = AiResult(data, usage, cached=False)
     cache.set(key, {'data': data, 'usage': usage},
               cache_seconds if cache_seconds is not None
               else _setting('AI_CACHE_SECONDS', DEFAULT_CACHE_SECONDS))
     return result
+
+
+def _read(reply, schema, parse):
+    """Ответ поставщика → (данные, None) или (None, (вид отказа, текст)).
+
+    Без схемы — текст как есть (или `parse(текст)`); пустой и оборванный
+    потолком токенов — отказы. Со схемой — `parse` или строгий `json.loads`,
+    ожидается объект; оборванный JSON — `length`, а не «неожиданный ответ».
+    """
+    cut = getattr(reply, 'finish_reason', None) == 'length'
+    text = reply.text or ''
+    if schema is None:
+        if cut:
+            return None, ('length', LENGTH_TEXT)
+        if not text.strip():
+            return None, ('empty', EMPTY_TEXT)
+        if not parse:
+            return text.strip(), None
+    try:
+        data = parse(text) if parse else json.loads(text)
+    except ValueError:
+        # Мусор вместо структуры — это не «поломка сервера», а «модель
+        # ответила не тем». Человеку нужен понятный выход, а не трассировка.
+        data = None
+    if schema is not None and not isinstance(data, dict):
+        return None, (('length', LENGTH_TEXT) if cut else ('format', FORMAT_TEXT))
+    if data is None:
+        return None, ('format', FORMAT_TEXT)
+    return data, None
 
 
 def _cost(model, reply):

@@ -1270,9 +1270,9 @@ def api_chat(request):
         last_attempt = last_attempt.filter(created_at__gt=since)
     last_attempt = last_attempt.order_by('-created_at').first()
     try:
-        reply = chat.answer(problem, message, data.get('history'), request.user,
-                            last_attempt=last_attempt, mode=mode, attachments=attachments,
-                            thread=thread, quote=quote, quote_source=quote_source)
+        turn = chat.answer_turn(problem, message, data.get('history'), request.user,
+                                last_attempt=last_attempt, mode=mode, attachments=attachments,
+                                thread=thread, quote=quote, quote_source=quote_source)
     except ai.AiUnavailable as exc:
         # Дневной денежный потолок чата и суточный лимит обращений — оба «limit»,
         # а сказать ученику надо разное.
@@ -1280,7 +1280,10 @@ def api_chat(request):
             return JsonResponse({'error': 'budget', 'reply': chat.BUDGET_TEXT})
         message_text = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
         return JsonResponse({'error': exc.kind, 'reply': message_text})
-    answer = {'reply': reply, 'remaining': ai.remaining_today(request.user)}
+    # `history_text` — реплика ученика для истории клиента: с расшифровкой
+    # фото, иначе следующая реплика не знала бы, что было на фото.
+    answer = {'reply': turn.reply, 'remaining': ai.remaining_today(request.user),
+              'history_text': chat.history_text(message, turn.vision_text)}
     note = chat.pages_note(attachments)
     if note:
         answer['note'] = note
@@ -1346,6 +1349,7 @@ def api_chat_history(request, problem_id):
     turns = turns.order_by('-created_at', '-pk')[:CHAT_HISTORY_MAX]
     return JsonResponse({'turns': [
         {'message': t.user_text, 'reply': t.reply, 'mode': t.mode,
+         'history_text': chat.history_text(t.user_text, t.vision_text),
          'quote': t.quote, 'quote_source': t.quote_source,
          'ts': t.created_at.isoformat(),
          'attachments': [{'id': a.pk, 'name': a.name, 'mime': a.mime,

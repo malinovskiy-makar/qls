@@ -83,6 +83,10 @@ class FakeAPIConnectionError(Exception):
     pass
 
 
+class FakeAPITimeoutError(FakeAPIConnectionError):
+    """Как у настоящего `openai`: таймаут — подкласс ошибки соединения."""
+
+
 class FakeRateLimitError(Exception):
     pass
 
@@ -97,6 +101,7 @@ def _fake_openai_module(responses):
     """Подставной модуль `openai` в sys.modules — пакета в окружении нет."""
     module = types.ModuleType('openai')
     module.APIConnectionError = FakeAPIConnectionError
+    module.APITimeoutError = FakeAPITimeoutError
     module.RateLimitError = FakeRateLimitError
     module.APIStatusError = FakeAPIStatusError
     module.OpenAI = lambda **kwargs: _FakeOpenAIClient(responses)

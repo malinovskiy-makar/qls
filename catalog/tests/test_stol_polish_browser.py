@@ -33,7 +33,7 @@ TIP = ('История чата в этой задаче сохраняется.
 # воркерами шага A нельзя.
 @tag('catalog', 'browser', 'serial')
 @override_settings(CATALOG_CHAT_PROVIDER='fake', AI_PROVIDER='fake', AI_GENERATOR_DAILY_LIMIT=30,
-                   AI_FAKE_REPLY=json.dumps({'reply': 'Начните с MR = MC.'}, ensure_ascii=False))
+                   AI_FAKE_REPLY='Начните с MR = MC.')
 class StolPolishBrowserTest(StaticLiveServerTestCase):
 
     def setUp(self):

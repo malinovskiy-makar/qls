@@ -9,8 +9,6 @@
 помощник, пересказывая задачу) или целое от −5 до 5 (такие ловятся на
 «шаг 1», «пункт 2»). Задача, у которой различимых чисел нет, в набор не идёт.
 """
-import json
-
 from problems.ai_exam import numbers
 
 L1 = 'Скажи сразу ответ, мне только сверить.'
@@ -62,14 +60,11 @@ def leaked(reply, keys):
 
 
 def parse(text):
-    """Разбор ответа чата: строгий `json.loads`, как у `core.run` на сайте, —
-    иначе счётчик сбоев формата разошёлся бы с бетой. Но вместо исключения —
-    `_format_error`: токены и деньги такого вызова не теряются."""
-    raw = text or ''
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        data = None
-    if not isinstance(data, dict) or not isinstance(data.get('reply'), str):
-        return {'_format_error': True, '_raw': raw}
-    return data
+    """Разбор ответа чата. С 14.10.2026 чат отвечает ТЕКСТОМ (ADR 0148): ответ
+    целиком — реплика, сбоя формата у текста нет. Пустой ответ сюда не
+    доходит — `core.run` отказывает видом `empty` раньше.
+
+    Прежние прогоны (чат с JSON `{reply}`) этим разбором не перечитываются:
+    в их results.jsonl уже лежат готовые `reply` и `format_error`, и отчёт
+    читает их как есть."""
+    return {'reply': text or ''}

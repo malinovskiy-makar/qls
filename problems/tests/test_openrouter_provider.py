@@ -79,6 +79,10 @@ class FakeAPIConnectionError(Exception):
     pass
 
 
+class FakeAPITimeoutError(FakeAPIConnectionError):
+    """Как у настоящего `openai`: таймаут — подкласс ошибки соединения."""
+
+
 class FakeRateLimitError(Exception):
     pass
 
@@ -100,6 +104,7 @@ def _fake_openai_module(completions):
 
     module.OpenAI = factory
     module.APIConnectionError = FakeAPIConnectionError
+    module.APITimeoutError = FakeAPITimeoutError
     module.RateLimitError = FakeRateLimitError
     module.APIStatusError = FakeAPIStatusError
     return module
@@ -198,9 +203,14 @@ class FailureTests(_Mixin, TestCase):
     def test_лимит_частоты_даёт_limit(self):
         self.assertEqual(self.run_error(FakeRateLimitError()).kind, 'limit')
 
-    def test_сеть_не_ответила_даёт_other(self):
+    def test_сеть_не_ответила_даёт_network(self):
+        # С 14.10.2026 обрыв связи — свой вид, а не `other`.
         self.assertEqual(self.run_error(
-            FakeAPIConnectionError()).kind, 'other')
+            FakeAPIConnectionError()).kind, 'network')
+
+    def test_таймаут_даёт_timeout(self):
+        self.assertEqual(self.run_error(
+            FakeAPITimeoutError()).kind, 'timeout')
 
     def test_сырое_исключение_сохраняется_для_журнала_отказов(self):
         # Урок run2: журнал только успехов сделал полтора часа отказов
