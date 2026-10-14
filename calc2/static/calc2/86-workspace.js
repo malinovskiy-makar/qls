@@ -178,9 +178,13 @@ function moveExplanations() {
      labor-mono, consumer и cons-slutsky), а базовая сцена у них одна: после
      «Рынка труда» «Монопсония» показывала чужой разбор, и модель открывалась
      по-разному в зависимости от того, что открывали до неё. */
+  /* ⚠️ И ТЕКСТ ПОЯСНЕНИЙ «УСЛОВИЯ» (тихие панели 14.10): с 14.10 они тоже идут в «Разбор»
+     (conditionNotesToExplain), а меняются без табло — у внешнего эффекта абзац свой на
+     каждый знак. Без этого «Разбор» держал прежний абзац (state_probe, ext). */
   const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '')
               + '|' + String(STATE.sceneKey || '')
-              + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '');
+              + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '')
+              + '|' + conditionNotesSig();
   const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
   if (!changed && to._explainFor === scene && to.children.length) return;
   to._explainFor = scene;
@@ -251,9 +255,25 @@ function moveExplanations() {
    Видимость — сценой (hidden, display: none, scoped-off): чужие модели не попадают.
    Абзацы встают после вступления, перед вопросами; уже стоящий текст второй раз не
    кладётся. */
+/* Подпись пояснений «Условия», видимых сценой: по ней «Разбор» знает, что пора собраться заново. */
+function conditionNotesSig() {
+  const root = document.getElementById('tools-panel');
+  if (!root) return '';
+  let out = '';
+  root.querySelectorAll('.hint, .hint-pop [data-explain]').forEach(n => {
+    for (let a = n; a && a !== root; a = a.parentElement) {
+      if (a.hidden || (a.style && a.style.display === 'none') || a.classList.contains('scoped-off')) return;
+    }
+    out += (n.textContent || '').length + ':' + (n.textContent || '').slice(0, 40) + ';';
+  });
+  return out;
+}
 function conditionNotesToExplain(to) {
   const root = document.getElementById('tools-panel');
   if (!root || !to) return;
+  /* Пересобирается целиком при каждом вызове: зовут его и сборка «Разбора», и сборка
+     «Ответа» (кадром позже — сцены правят текст своих абзацев уже после «Разбора»). */
+  to.querySelectorAll(':scope > .ex-from-cond').forEach(n => n.remove());
   const norm = (t) => String(t || '').replace(/[\s\u00a0\u202f\u2009\u200b]+/g, ' ').trim();
   const key = (t) => norm(t).replace(/\s+/g, '').slice(0, 60);
   const sceneHidden = (w) => {

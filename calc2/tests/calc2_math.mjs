@@ -5842,7 +5842,9 @@ const CASES = [
             var e = document.getElementById(id);
             return e ? e.textContent : '';
           }).join(' ').replace(/\s+/g, ' ');
-          var note = document.querySelector('#ex-body .sb-note, #info-ppfsum .sb-note');
+          // Врезка самой сцены: перенесённые пояснения «Ответа» и «Условия» (.ex-from-answer, .ex-from-cond,
+          // тихие панели 14.10) стоят первыми и разбором сцены не считаются.
+          var note = document.querySelector('#ex-body .sb-note:not(.ex-from-answer):not(.ex-from-cond), #info-ppfsum .sb-note');
           var noteLen = note ? note.textContent.replace(/\s+/g, ' ').trim().length : 0;
           /* Исходники калькулятора: ищем текст врезки во всех файлах сразу. */
           var srcs = Array.prototype.map.call(document.querySelectorAll('script[src]'),

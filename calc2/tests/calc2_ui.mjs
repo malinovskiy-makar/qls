@@ -495,7 +495,9 @@ await t('кривая добавляется настоящим щелчком �
     STATE.curves[0].expr === '100 - Q' || JSON.stringify(STATE.curves.map(c => c.expr)));
 });
 
-await t('кнопка открывает клавиатуру из трёх разделов', async () => {
+/* С 14.10 у клавиатуры поля четвёртый раздел «Как писать» (таблица записи из прежней кнопки «Как писать
+   формулы», решение «никаких подсказок», Notion …81eb…; ADR 0151): разделов 4. */
+await t('кнопка открывает клавиатуру из четырёх разделов (+ «Как писать»)', async () => {
   await page.evaluate(() => __FH().click());
   await page.waitForTimeout(250);
   return await page.evaluate(() => {
@@ -504,7 +506,8 @@ await t('кнопка открывает клавиатуру из трёх ра
     const tabs = kb.querySelectorAll('.mkbd-tab').length;
     const active = kb.querySelectorAll('.mkbd-pane.active').length;
     const keys = kb.querySelectorAll('.mk').length;
-    return (tabs === 3 && active === 1 && keys > 60) || `разделов ${tabs}, открыт ${active}, клавиш ${keys}`;
+    const howto = [...kb.querySelectorAll('.mkbd-tab')].some(t => t.textContent.trim() === 'Как писать');
+    return (tabs === 4 && howto && active === 1 && keys > 60) || `разделов ${tabs}, «Как писать» ${howto}, открыт ${active}, клавиш ${keys}`;
   });
 });
 
@@ -877,10 +880,14 @@ await t('регуляторы сцены живут в «Условии», в «
    Вес 700 у чисел таблиц (канон 1.2.2, DESIGN.md 5.1) для «Ответа» снят:
    иначе в колонке было бы два начертания значений. Число отличается от
    подписи кеглем, шрифтом и цветом. */
+/* С 14.10 повторы «Ответа» спрятаны (тихие панели, README пакета calc2_panels_20261014, 5): у сцены бывает, что
+   все строки табло стоят главными числами. Тогда меряем главную строку (подпись и значение). */
 await t('в «Ответе» число крупнее подписи и набрано формульным шрифтом', () => page.evaluate(() => {
   const row = [...document.querySelectorAll('#sb-body .stat')].find(r => r.getClientRects().length);
-  const b = row && row.querySelector(':scope > b'), s = row && row.querySelector(':scope > span');
-  if (!b || !s) return 'нет видимых строк в табло';
+  const cell = [...document.querySelectorAll('#ans-hero .ans-cell')].find(r => r.getClientRects().length);
+  const b = row ? row.querySelector(':scope > b') : (cell && cell.querySelector('.ans-line'));
+  const s = row ? row.querySelector(':scope > span') : (cell && cell.querySelector('.ans-lab'));
+  if (!b || !s) return 'нет видимых строк ни в табло, ни в главных числах';
   const cb = getComputedStyle(b), cs = getComputedStyle(s);
   const bs = parseFloat(cb.fontSize), ss = parseFloat(cs.fontSize);
   const fam = cb.fontFamily.split(',')[0].replace(/["']/g, '').trim();

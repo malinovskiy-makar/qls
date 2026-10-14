@@ -527,6 +527,8 @@ function buildAnswer() {
   buildSegNote();
   buildStatus();
   buildBurden();
+  // Абзацы «Условия» в «Разборе» — по их тексту сейчас (сцена правит его после сборки «Разбора»).
+  if (typeof conditionNotesToExplain === 'function') conditionNotesToExplain(document.getElementById('ex-body'));
   buildExplainAccordion();
   // Строка главных чисел над холстом (760–1239 px, «Ответ» выезжает).
   const strip = document.getElementById('ans-strip');

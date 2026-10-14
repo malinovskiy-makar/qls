@@ -100,8 +100,10 @@ if (want('А')) {
     return { border: card.borderTopColor, shadow: card.boxShadow, accent: getComputedStyle(document.body).getPropertyValue('--accent').trim(),
       esc: esc && esc.getClientRects().length ? esc.textContent.trim() : '' };
   });
-  ok('признаки режима: рамка карточки акцентом, подпись «Esc: выйти из режима»',
-    sig.shadow !== 'none' && sig.esc === 'Esc: выйти из режима', JSON.stringify(sig));
+  /* С 14.10 подписи «Esc: выйти из режима» на экране нет (закрытый список README пакета calc2_panels_20261014,
+     10.3; решение «никаких подсказок», Notion …81eb…): Esc работает, надписи о нём нет. */
+  ok('признаки режима: рамка карточки акцентом, подписи «Esc: выйти из режима» нет',
+    sig.shadow !== 'none' && sig.esc === '', JSON.stringify(sig));
   await clickModel(page, 30, 70);
   const m = await page.evaluate(() => {
     const done = (STATE.marks || []).filter(x => !x.pending);

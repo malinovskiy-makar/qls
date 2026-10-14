@@ -173,6 +173,13 @@ function ipDots() {
     hintsLive: hints.length,
     // Подсказка, оставшаяся обычным абзацем: якоря ей не нашлось, и это законно.
     hintsShown: hints.filter(function (h) { return !h.classList.contains('hint-hidden'); }).length,
+    // С 14.10 (решение «никаких подсказок», Notion …81eb…) знака «?» нет: живая подсказка — в «Разборе».
+    hintsInEx: (function () {
+      var ex = document.getElementById('ex-body');
+      var n = function (e) { var c = e.cloneNode(true); [].slice.call(c.querySelectorAll('.katex-mathml, annotation')).forEach(function (x) { x.remove(); }); return c.textContent.replace(/\\s+/g, ''); };
+      var all = ex ? n(ex) : '';
+      return hints.filter(function (h) { return all.indexOf(n(h).slice(0, 60)) >= 0; }).length;
+    })(),
   };
 }
 `;
@@ -694,8 +701,11 @@ if (need('В') || need('V')) {
        осознанное поведение, ему тут не место ломаться. Дефект был обратный:
        вопросиков БОЛЬШЕ, чем подсказок, вплоть до трёх при нуле живых. */
     flag(sc + ': видимых «?» не больше живых подсказок', v.dots <= v.hintsLive, `${v.dots} > ${v.hintsLive}`);
-    flag(sc + ': каждая живая подсказка либо под знаком, либо видна абзацем',
-      v.hintsLive === 0 || v.dots > 0 || v.hintsShown > 0, `подсказок ${v.hintsLive}, знаков ${v.dots}, абзацем ${v.hintsShown}`);
+    /* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, решение «никаких подсказок», Notion …81eb…; ADR 0151): было «каждая
+       живая подсказка под знаком «?» или видна абзацем». Знаков больше нет: каждая живая подсказка «Условия»
+       стоит абзацем в «Разборе», в самом «Условии» её не видно. */
+    flag(sc + ': каждая живая подсказка «Условия» — в «Разборе», знаков «?» нет',
+      v.dots === 0 && v.hintsShown === 0 && v.hintsInEx === v.hintsLive, `подсказок ${v.hintsLive}, в «Разборе» ${v.hintsInEx}, знаков ${v.dots}, абзацем ${v.hintsShown}`);
   }
 }
 

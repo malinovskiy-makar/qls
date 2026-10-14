@@ -387,50 +387,30 @@ await t('(ж) левый край дорожек всех ползунков п�
 
 // (б) Подсказка: наведение показывает, уход прячет, клавиатура тоже
 //     показывает, и формула внутри набрана математикой.
-await t('(б) подсказка живёт по наведению, доступна с клавиатуры и несёт формулу', async () => {
+/* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, решение владельца «никаких подсказок», Notion …81eb…; ADR 0151): было
+   «подсказка живёт по наведению, доступна с клавиатуры и несёт формулу». Плашки больше нет: ни наведение, ни
+   фокус с клавиатуры её не показывают, а текст data-tip — невидимая подпись aria-label для диктора. */
+await t('(б) подсказки нет: наведение и фокус с клавиатуры плашку не показывают, текст — в aria-label', async () => {
   await page.evaluate(() => { resetSceneMemory(); pickScene('mono'); });
   await page.waitForTimeout(500);
-  await page.evaluate(() => {
-    setToolsOpen(true);
-    document.querySelectorAll('.fold-btn[aria-controls]').forEach(b => {
-      const bd = document.getElementById(b.getAttribute('aria-controls'));
-      if (bd) { bd.classList.add('open'); b.setAttribute('aria-expanded', 'true'); }
-    });
-  });
-  await page.waitForTimeout(400);
-  // Ищем видимую подсказку, в которой ЕСТЬ математика (доллары).
   const found = await page.evaluate(() => {
     const el = Array.from(document.querySelectorAll('[data-tip*="$"]'))
       .find(e => e.getBoundingClientRect().width > 1);
     if (!el) return null;
     el.setAttribute('data-probe-tip', '1');
-    return el.getAttribute('data-tip');
+    return { tip: el.getAttribute('data-tip'), aria: el.getAttribute('aria-label') || '' };
   });
-  if (!found) return 'ни одной видимой подсказки с формулой не нашлось';
+  if (!found) return 'ни одного видимого узла с data-tip и формулой не нашлось';
+  if (!found.aria.trim() || /\$/.test(found.aria)) return `aria-label «${found.aria}» пустой или с долларами (data-tip «${found.tip}»)`;
+  const tipShown = () => page.evaluate(() => { const t = document.getElementById('hint-tip'); return !!(t && getComputedStyle(t).display !== 'none' && t.getClientRects().length); });
   const h = await page.$('[data-probe-tip]');
   await h.hover();
   await page.waitForTimeout(250);
-  const shown = await page.evaluate(() => {
-    const t = document.getElementById('hint-tip');
-    if (!t) return { нет: true };
-    return { display: getComputedStyle(t).display, формул: t.querySelectorAll('.katex').length };
-  });
-  if (shown.нет) return 'узла #hint-tip нет вовсе';
-  if (shown.display === 'none') return 'наведение подсказку не показало';
-  if (!shown.формул) return `подсказка «${found}» показана, но формула НЕ набрана (узлов KaTeX 0)`;
-  // Уход мыши гасит.
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(250);
-  const gone = await page.evaluate(() =>
-    getComputedStyle(document.getElementById('hint-tip')).display);
-  if (gone !== 'none') return 'мышь ушла, а подсказка осталась на экране';
-  // Клавиатура: флаг «работают с клавиатуры» поднимает Tab, потом фокус.
+  if (await tipShown()) return 'наведение показало плашку';
   await page.keyboard.press('Tab');
   await page.evaluate(() => { document.querySelector('[data-probe-tip]').focus(); });
   await page.waitForTimeout(250);
-  const kb = await page.evaluate(() =>
-    getComputedStyle(document.getElementById('hint-tip')).display);
-  if (kb === 'none') return 'фокус с клавиатуры подсказку не показал';
+  if (await tipShown()) return 'фокус с клавиатуры показал плашку';
   return true;
 });
 
@@ -610,8 +590,10 @@ await t('(ж) обозначений обычным шрифтом на экра
      Осталось одно место: «W_s» в подсказке монопсонии — обозначение написано
      через подчёркивание, и разбор его намеренно не берёт (подчёркивание может
      быть частью имени). Потолок держит долг на виду: вырос — красное, упал —
-     тоже красное, потому что потолок забыли опустить. */
-  const CEILING = 1;
+     тоже красное, потому что потолок забыли опустить.
+     14.10 (тихие панели): 1 → 0 — подсказка монопсонии с «W_s» больше не на экране (её текст в «Разборе»,
+     решение «никаких подсказок», Notion …81eb…). */
+  const CEILING = 0;
   if (all.length > CEILING)
     return `случаев ${all.length}, потолок ${CEILING} — долг ВЫРОС на ${all.length - CEILING}: `
            + all.slice(0, 5).join(' | ');

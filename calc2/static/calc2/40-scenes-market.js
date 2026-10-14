@@ -3315,6 +3315,7 @@ function drawExtScenario() {
 
 // Табло внешнего эффекта: Qрын/Qопт, DWL, налог Пигу, новое равновесие.
 function updateExtPanel() {
+  syncExtHint();
   const box = document.getElementById('info-ext'); if (!box) return;
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Рыночное равновесие не найдено.</div>'; return; }
@@ -3385,14 +3386,22 @@ function syncSocialFields() {
     const e = document.getElementById('inp-' + k);
     if (e) e.disabled = !STATE[k + 'On'];
   });
+  syncExtHint();
+}
+
+/* Пояснение внешнего эффекта — по состоянию (msbOn, mscOn), а не по щелчку: с 14.10 оно
+   стоит в «Разборе» (тихие панели, conditionNotesToExplain), и после «Отменить», ссылки
+   или автосохранения текст обязан совпасть с моделью (state_probe, ext). Зовётся и из
+   табло внешнего эффекта (updateExtPanel), то есть на каждой перерисовке. */
+function syncExtHint() {
   const hint = document.getElementById('ext-hint');
-  if (hint) {
-    hint.innerHTML = (!STATE.msbOn && !STATE.mscOn)
-      ? 'Спрос это предельная выгода частного лица, предложение это его предельные издержки. ' +
-        'Пока MSB и MSC выключены, общественные кривые совпадают с частными: оптимум там же, где рынок.'
-      : 'Общественный оптимум там, где MSB&nbsp;=&nbsp;MSC, а рынок приходит туда, где D&nbsp;=&nbsp;S. ' +
-        'Расстояние между ними и есть потери от внешнего эффекта.';
-  }
+  if (!hint) return;
+  const html = (!STATE.msbOn && !STATE.mscOn)
+    ? 'Спрос это предельная выгода частного лица, предложение это его предельные издержки. ' +
+      'Пока MSB и MSC выключены, общественные кривые совпадают с частными: оптимум там же, где рынок.'
+    : 'Общественный оптимум там, где MSB&nbsp;=&nbsp;MSC, а рынок приходит туда, где D&nbsp;=&nbsp;S. ' +
+      'Расстояние между ними и есть потери от внешнего эффекта.';
+  if (hint._html !== html) { hint._html = html; hint.innerHTML = html; }
 }
 
 // Умолчание общественной кривой — формула её частной пары (MSB = D, MSC = S).
