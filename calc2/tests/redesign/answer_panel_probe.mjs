@@ -89,7 +89,7 @@ const geo = (page) => page.evaluate(() => {
     hidden: document.body.classList.contains('ans-hidden'), col: R(col), card: R(document.querySelector('.cv-card')),
     hideShown: shown(hide), hide: shown(hide) ? R(hide) : null, hideParent: hide && hide.parentElement === col,
     rail: shown(rail), inner: shown(inner),
-    rot: hide ? getComputedStyle(hide.querySelector('svg')).transform : '',
+    rot: hide && hide.querySelector('svg') ? getComputedStyle(hide.querySelector('svg')).transform : 'нет шеврона',
     aria: hide ? [hide.getAttribute('aria-label'), hide.getAttribute('aria-expanded'), rail.getAttribute('aria-label')] : [],
     tips: [hide && hide.hasAttribute('data-tip'), rail && rail.hasAttribute('data-tip')],
     railText: rail ? rail.textContent.replace(/\s+/g, '') : '',
@@ -106,7 +106,10 @@ const histState = (page) => page.evaluate(async () => {
   delete s.state.legendSpot; delete s.state.crosses;
   return { undo: h.undo.length, redo: h.redo.length, can: JSON.stringify(historyCan()), link: await shareLinkOf(s) };
 });
-const overlap = (a, b) => a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+/* Пересечение с зазором: стрелка не должна и касаться кнопок панели холста (без запаса 24 px у .cv-bar
+   «Развернуть график» кончается ровно там, где начинается стрелка). */
+const GAP = 4;
+const overlap = (a, b) => a && b && a.l - GAP < b.r && b.l < a.r + GAP && a.t - GAP < b.b && b.t < a.b + GAP;
 
 /* Сводка открытой колонки: видимый текст, строки, таблицы, стопки. */
 const colSummary = (page) => page.evaluate(() => {
@@ -142,7 +145,7 @@ async function sectionA() {
       g0.rot !== 'none' && g0.aria[1] === 'false' && /Показать/.test(g0.aria[0]), JSON.stringify(g0.aria) + ' ' + g0.rot);
     ok(W + ': у стрелки и полоски нет data-tip, у полоски есть aria-label, в полоске только «Ответ»',
       !g0.tips[0] && !g0.tips[1] && !!g0.aria[2] && g0.railText === 'Ответ', JSON.stringify({ tips: g0.tips, rail: g0.railText }));
-    ok(W + ': закрыт — стрелка не пересекается с кнопками .cv-bar', !g0.bar.some(b => overlap(b, g0.hide)),
+    ok(W + ': закрыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)', !g0.bar.some(b => overlap(b, g0.hide)),
       JSON.stringify(g0.bar.filter(b => overlap(b, g0.hide))));
     const h0 = await histState(page);
     const card0 = g0.card.w;
@@ -153,7 +156,7 @@ async function sectionA() {
     ok(W + ': открыт — «›» на левом краю колонки (центр ±2, верх 12 ± 2), aria-expanded true',
       g1.hideShown && Math.abs((g1.hide.l + g1.hide.r) / 2 - g1.col.l) <= 2 && Math.abs(g1.hide.t - g1.col.t - 12) <= 2 && g1.rot === 'none' && g1.aria[1] === 'true',
       JSON.stringify({ hide: g1.hide, col: g1.col, rot: g1.rot, aria: g1.aria }));
-    ok(W + ': открыт — стрелка не пересекается с кнопками .cv-bar', !g1.bar.some(b => overlap(b, g1.hide)),
+    ok(W + ': открыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)', !g1.bar.some(b => overlap(b, g1.hide)),
       JSON.stringify(g1.bar.filter(b => overlap(b, g1.hide))));
     ok(W + ': видимых .col-note нет', g1.colNotes === 0, String(g1.colNotes));
     const h1 = await histState(page);
