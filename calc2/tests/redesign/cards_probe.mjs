@@ -1,7 +1,7 @@
 /* КАРТОЧКИ ФУНКЦИЙ ЛЕВОЙ ПАНЕЛИ (тихие панели, сессия 5, 14.10.2026; решение владельца «левая панель одна во
    всех моделях и только про условие», Notion …8142…; ADR 0153; README пакета 4, 8).
 
-   Разделы (--only К,М,Б,В,Г) — К и М сессии 6 и модели этапов сессии 5:
+   Разделы (--only К,М,Б,В,Г,Д) — К, М, Д сессии 6 и модели этапов сессии 5:
      Б  ppf, ppfsum, trade, tradeprice (у второй КПВ — поле MathLive и клавиатура, сессия 6, А6);   В  prod, costs (и «Задаю кривые»), plants, isoquant;
      Г  mono-d3, mono-kink (и «Кусочный»), monoexport, mono-nat, mono, mono-d1, labor, labor-mono, labor-union,
         labor-bilat, smallopen.
@@ -27,6 +27,10 @@
       видимого числа строки параметров вид плашки (фон --surface-2, рамка 1 px --border, радиус 6, цифры справа,
       76 ± 1 × 36 ± 1, без пунктира) — в светлой и тёмной теме.
 
+   Д  (сессия 6, Б1–Б2) consumer, cons-slutsky: карточка U «Полезность» (обозначение и имя, список вида, формула вида,
+      a и b), «Параметры» — цены и доход числами; список переключает все пять видов (щелчком по списку), и «Ответ» у
+      каждого вида тот же, что на коде BEFORE (там — выбор в системном списке); ввод a, b, k, цен, дохода и своей
+      формулы меняет «Ответ» так же; id органов cons-* на месте; у Слуцкого обозначение P_{x₁} набрано KaTeX, без «…».
    М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
       Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
@@ -73,6 +77,8 @@ const CASES = [
   ['Г', 'labor-union', '', '', ['curve-expr-1', '90 - L']],
   ['Г', 'labor-bilat', '', '', ['curve-expr-1', '90 - L']],
   ['Г', 'smallopen', '', '', ['curve-expr-1', '90 - Q']],
+  ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
+  ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
 
 const ALL42 = 'm-graph m-transform m-optimum m-tangent m-minmax m-constraint ppf ppfsum trade tradeprice sd sdsum taxes ceil quota elast ext prod costs plants isoquant mono mono-nat mono-d1 mono-d3 mono-kink labor labor-mono labor-union labor-bilat smallopen monoexport consumer cons-slutsky adas islm phillips money loanable fx ineq laffer'.split(' ');
@@ -121,10 +127,12 @@ async function typeAndRead(page, id, expr) {
   const was = await page.evaluate((id) => { const i = document.getElementById(id); return i ? i.value : null; }, id);
   if (was == null) return { missing: true };
   const before = await answerNums(page);
-  await page.evaluate(([id, v]) => setFieldValue(document.getElementById(id), v), [id, expr]);
+  // Ввод и уход из поля: input (мост MathLive шлёт его) и change (поле «Своей формулы» потребителя слушает только его).
+  const put = ([id, v]) => { const e = document.getElementById(id); setFieldValue(e, v); e.dispatchEvent(new Event('change', { bubbles: true })); };
+  await page.evaluate(put, [id, expr]);
   await page.waitForTimeout(700);
   const after = await answerNums(page);
-  await page.evaluate(([id, v]) => setFieldValue(document.getElementById(id), v), [id, was]);
+  await page.evaluate(put, [id, was]);
   await page.waitForTimeout(500);
   const back = await answerNums(page);
   return { before, after, back };
@@ -396,6 +404,75 @@ async function mRun() {
   await ctx.close();
 }
 
+/* ── Д: потребитель (сессия 6, Б1–Б2) ── */
+const CONS_IDS = ['cons-type', 'cons-a', 'cons-b', 'cons-k', 'cons-custom', 'cons-px', 'cons-py', 'cons-i', 'cons-a-lbl', 'cons-b-lbl', 'cons-ab-row', 'cons-k-row', 'cons-custom-row'];
+const CONS_TYPES = [['cobb', 'Кобб-Дуглас'], ['subs', 'Совершенные субституты'], ['compl', 'Совершенные комплементы'], ['quasi', 'Квазилинейные'], ['custom', 'Своя формула']];
+// Шаги ввода: [вид, id, значение] — число через change (как у человека: ввод и уход из поля).
+const CONS_STEPS = [['cobb', 'cons-a', '0.3'], ['cobb', 'cons-b', '0.7'], ['cobb', 'cons-px', '2'], ['cobb', 'cons-py', '3'], ['cobb', 'cons-i', '150'], ['subs', 'cons-a', '3'], ['quasi', 'cons-k', '3']];
+async function consSeries(page, viaUi) {
+  const out = {};
+  for (const [t, word] of CONS_TYPES) {
+    if (viaUi) {
+      await page.evaluate(() => { const b = document.querySelector('#sec-consumer .sc-ucard .sel-btn'); if (b) b.click(); });
+      await page.waitForTimeout(150);
+      const clicked = await page.evaluate((w) => { const it = [...document.querySelectorAll('.sel-menu .sel-item')].find(x => x.textContent.trim() === w); if (it) { it.click(); return true; } return false; }, word);
+      if (!clicked) { out[t] = 'нет пункта «' + word + '»'; continue; }
+    } else await page.evaluate((t) => { const s = document.getElementById('cons-type'); s.value = t; s.dispatchEvent(new Event('change', { bubbles: true })); }, t);
+    await page.waitForTimeout(600);
+    out[t] = await answerNums(page);
+  }
+  for (const [t, id, v] of CONS_STEPS) {
+    await page.evaluate((t) => { const s = document.getElementById('cons-type'); if (s.value !== t) { s.value = t; s.dispatchEvent(new Event('change', { bubbles: true })); } }, t);
+    await page.waitForTimeout(400);
+    await page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]);
+    await page.waitForTimeout(500);
+    out[t + ':' + id + '=' + v] = await answerNums(page);
+  }
+  return out;
+}
+async function dRun(beforeCons) {
+  for (const key of ['consumer', 'cons-slutsky']) {
+    if (KEYS && !KEYS.includes(key)) continue;
+    const { ctx, page, errors } = await openAt(BASE);
+    await pick(page, key);
+    const look = await page.evaluate(() => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+      const card = document.querySelector('#sec-consumer .sc-ucard');
+      const sym = card && card.querySelector('.crow-top .fc-notation');
+      const nm = card && card.querySelector('.crow-top .fc-name');
+      const btns = card ? [...card.querySelectorAll(':scope > .crow-top button')].filter(vis).length : -1;
+      const sel = card && card.querySelector('.sel-btn .sel-text');
+      const fml = card && card.querySelector('.sc-ufml');
+      const lets = card ? [...card.querySelectorAll('.sc-letter')].filter(vis).map(tx) : [];
+      const nums = [...document.querySelectorAll('#sec-consumer .sc-nrow')].filter(vis).map(f => tx(f.querySelector('label')));
+      const nativeShown = vis(document.getElementById('cons-type'));
+      const px1 = document.querySelector('#cons-px1-row .reg-eq');
+      const pn = document.querySelector('#cons-px1-row .sc-pname');
+      return { card: !!card && vis(card), sym: sym ? tx(sym) : '', symKatex: !!(sym && sym.querySelector('.katex')), name: nm ? tx(nm) : '', btns,
+        sel: sel && vis(sel) ? tx(sel) : '', fml: fml && vis(fml) ? tx(fml) : '', fmlKatex: !!(fml && fml.querySelector('.katex')), lets, nums, nativeShown,
+        px1: px1 && vis(px1) ? { text: tx(px1), katex: !!px1.querySelector('.katex'), html: px1.innerHTML.includes('msub') || !!px1.querySelector('.msupsub') } : null,
+        pname: pn && vis(pn) ? tx(pn) : '' };
+    });
+    ok(key + ': карточка U «Полезность» — обозначение KaTeX и имя, в верхнем ряду ни глаза, ни «⋯» (' + JSON.stringify([look.sym, look.name, look.btns]) + ')', look.card && look.sym === 'U' && look.symKatex && look.name === 'Полезность' && look.btns === 0, JSON.stringify(look));
+    ok(key + ': в карточке список вида словами, формула вида KaTeX, a и b буквами; системного списка не видно', look.sel === 'Кобб-Дуглас' && look.fmlKatex && /U=/.test(look.fml.replace(/\s/g, '')) && look.lets.join(',') === 'a,b' && !look.nativeShown, JSON.stringify(look));
+    ok(key + ': «Параметры» — «Цена товара x», «Цена товара y», «Доход» строками чисел', look.nums.join('|') === 'Цена товара x|Цена товара y|Доход', look.nums.join('|'));
+    if (key === 'cons-slutsky') ok(key + ': строка «Новая цена товара x», обозначение P_{x₁} набрано KaTeX, многоточия нет (' + JSON.stringify(look.px1) + ')', look.pname === 'Новая цена товара x' && !!look.px1 && look.px1.katex && look.px1.html && !/…|\.\.\./.test(look.px1.text) && /^Px1=4$/.test(look.px1.text.replace(/\s/g, '')), JSON.stringify({ px1: look.px1, pname: look.pname }));
+    const miss = await page.evaluate((ids) => ids.filter(id => !document.getElementById(id)), CONS_IDS);
+    ok(key + ': id органов cons-* на месте (' + CONS_IDS.length + ')', !miss.length, miss.join(', '));
+    const now = await consSeries(page, true);
+    const was = beforeCons && beforeCons[key];
+    if (!was) ok(key + ': «Ответ» по видам и вводу — сравнение с кодом до сессии НЕ ПРОВЕРЕНО (нет BEFORE)', false, '');
+    else {
+      const diff = Object.keys(was).filter(k => was[k] !== now[k]);
+      const moved = Object.keys(now).filter((k, i, a) => i > 0 && now[k] !== now[a[i - 1]]).length;
+      ok(key + ': список переключает 5 видов, ввод a, b, k, цен и дохода — «Ответ» тот же, что на коде до сессии (' + Object.keys(was).length + ' замеров, менялся ' + moved + ' раз)', !diff.length && moved >= 8, diff.map(k => k + ': было ' + String(was[k]).slice(0, 60) + ' / стало ' + String(now[k]).slice(0, 60)).slice(0, 3).join(' | '));
+    }
+    ok(key + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -414,6 +491,16 @@ try {
       await ctx.close();
     }
     if (want('К')) beforeMap.kCases = await kCases(BEFORE);
+    if (want('Д')) {
+      beforeMap.cons = {};
+      for (const key of ['consumer', 'cons-slutsky']) {
+        if (KEYS && !KEYS.includes(key)) continue;
+        const { ctx, page } = await openAt(BEFORE);
+        await pick(page, key);
+        beforeMap.cons[key] = await consSeries(page, false);
+        await ctx.close();
+      }
+    }
   } else console.log('\n!!! сервер BEFORE (' + BEFORE + ') недоступен — сравнение ввода с кодом до обёртки НЕ ПРОВЕРЕНО');
   await b0.close();
 } catch (e) { console.log('!!! замер «до» не удался: ' + String(e).slice(0, 160)); }
@@ -433,11 +520,12 @@ for (const name of ENGINES) {
       ok('К: кусочная запись карточки — как на коде до сессии (' + JSON.stringify(now) + ')', !!now && now.tall && (!was || JSON.stringify(now) === JSON.stringify(was)), 'было ' + JSON.stringify(was || 'BEFORE недоступен'));
     }
   }
+  if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;
-    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая' }[sec]); last = sec; }
+    if (sec !== last) { head(sec + '. ' + { 'Б': 'КПВ и торговля', 'В': 'Фирма', 'Г': 'Монополия, труд, малая открытая', 'Д': 'Потребитель (общие проверки карточек)' }[sec]); last = sec; }
     await runCase(sec, key, label, extra, ctl, inv, beforeMap[key + '|' + label]);
   }
   await browser.close();

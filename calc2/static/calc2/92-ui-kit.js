@@ -662,20 +662,31 @@ const SC_PROWS = {
   'union-wage-field': ['Зарплата профсоюза', 'W', 'labor'], 'labmin-field': ['Минимальная зарплата', 'W_min', 'labor'],
   'open-pw-field': ['Мировая цена', 'Pw', 'smallopen'],
 };
+/* Подписи строк чисел словами (сессия 6): [id поля] → подпись; $…$ — набор KaTeX. */
+const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход' };
+/* Слова с формулами: «Цена товара $x$» — текст и KaTeX кусками (подпись строки, имя ползунка). */
+function scWords(el, text) {
+  el.textContent = '';
+  String(text).split(/(\$[^$]+\$)/).forEach(part => {
+    if (!part) return;
+    if (/^\$[^$]+\$$/.test(part)) { const k = document.createElement('span'); k.className = 'sc-tex'; katexInto(k, part.slice(1, -1)); el.appendChild(k); }
+    else el.appendChild(document.createTextNode(part));
+  });
+}
 // Строки чисел (подпись слева, поле 76 × 36 справа): [id поля, модель].
 const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle-x2', 'ppfsum'], ['inp-bundle-y2', 'ppfsum'],
   ['inp-bundle-xt', 'trade'], ['inp-bundle-yt', 'trade'], ['iso-w', 'isoquant'], ['iso-r', 'isoquant'], ['iso-c', 'isoquant'],
-  ['inp-nat-fc', 'mono-nat']];
+  ['inp-nat-fc', 'mono-nat'], ['cons-px', 'consumer'], ['cons-py', 'consumer'], ['cons-i', 'consumer']];
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
-  ['open-pw-field', 'smallopen']];
+  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
 const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -683,7 +694,7 @@ function scParamAnchor(el) {
   // «Рыночная цена» в «Издержках» стоит своим блоком с чертой сверху — заголовок встаёт перед блоком.
   if (el.id === 'chk-lr') { const l = el.closest('label'); return (l && l.parentElement && l.parentElement.id !== 'costs-pane-costs') ? l.parentElement : l; }
   if (el.type === 'checkbox') return el.closest('label') || el;
-  if (el.id === 'iso-w') return el.closest('.row') || el.closest('.field');
+  if (el.id === 'iso-w' || el.id === 'cons-px') return el.closest('.row') || el.closest('.field');
   if (el.tagName === 'INPUT') return el.closest('.field') || el;
   return el;
 }
@@ -696,13 +707,14 @@ function scSetup() {
     const menu = (o.menu || []).map(x => (typeof x === 'function' ? x() : x));
     wrapFieldInCard(field, Object.assign({}, o, { menu }));
   });
+  if (scOn('consumer')) scConsumerCard();
   Object.keys(SC_PROWS).forEach(id => {
     const f = document.getElementById(id);
     if (!f || f._scRow || !scProw(id)) return;
     f._scRow = true;
     f.classList.add('sc-prow');
     const nm = document.createElement('span');
-    nm.className = 'sc-pname'; nm.textContent = SC_PROWS[id][0];
+    nm.className = 'sc-pname'; scWords(nm, SC_PROWS[id][0]);
     f.insertBefore(nm, f.firstChild);
   });
   SC_NROWS.forEach(([id, m]) => {
@@ -711,6 +723,8 @@ function scSetup() {
     const f = i && i.closest('.field');
     if (!f) return;
     f.classList.add('sc-nrow');
+    const lab = SC_NLABELS[id] && f.querySelector(':scope > label');
+    if (lab && !lab._scWords) { lab._scWords = true; scWords(lab, SC_NLABELS[id]); }
     const row = f.parentElement;
     if (row && row.classList.contains('row')) row.classList.add('sc-nrows');
   });
@@ -761,8 +775,84 @@ function scSetup() {
 // По состоянию на каждой перерисовке: смысл карточек «Дискриминации» / «Внешнего рынка», цвета значков.
 function scSync() {
   document.querySelectorAll('#tools-panel .sc-card').forEach(paintCard);
+  scConsumerSync();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
+}
+
+/* ═══ Карточка U «Полезность» (сессия 6, Б1–Б2; README 4, 8; макет 05_left_Consumer; ADR 0154) ═══
+   У полезности нет одного поля формулы — вид задаётся списком, параметры числами, «Своя формула» полем. Карточка —
+   новый узел без id (вид); органы с id ПЕРЕЕЗЖАЮТ в неё узлами: поле списка вида (cons-type, системный select под
+   upgradeSelect), строки a и b (cons-ab-row), k (cons-k-row), своя формула (cons-custom-row). Их видимость ставит
+   сцена (applyConsumerTypeUI) инлайновым display — не трогаем. Подписи a, b пишет сцена (cons-a-lbl, cons-b-lbl:
+   «a (степень x)») — остаются, спрятаны классом; рядом буквы KaTeX. Точка — цвет кривых безразличия простым
+   значком (выбор цвета — в «Виде», строка «Веер кривых безразличия»); глаза и «⋯» нет (веер — в «Виде»). */
+const CONS_TYPE_TEX = {
+  cobb: 'U = x^{a}\\cdot y^{b}', subs: 'U = a\\cdot x + b\\cdot y',
+  compl: 'U = \\min(x/a,\\ y/b)', quasi: 'U = x + k\\cdot\\sqrt{y}',
+};
+function scConsumerCard() {
+  const sec = document.getElementById('sec-consumer');
+  const sel = document.getElementById('cons-type');
+  const typeField = sel && sel.closest('.field');
+  const firstRow = document.getElementById('cons-px') && document.getElementById('cons-px').closest('.row');
+  if (!sec || !typeField || !firstRow || sec._scU) return;
+  sec._scU = true;
+  if (typeof upgradeSelect === 'function') upgradeSelect('cons-type', 'Вид полезности');
+  const card = document.createElement('div');
+  card.className = 'fc-card sc-card sc-ucard';
+  const top = document.createElement('div'); top.className = 'crow-top';
+  const dot = document.createElement('span'); dot.className = 'fc-dot'; dot.setAttribute('aria-hidden', 'true');
+  const sym = document.createElement('span'); sym.className = 'fc-notation sc-sym';
+  const name = document.createElement('span'); name.className = 'fc-name sc-name'; name.textContent = 'Полезность';
+  katexInto(sym, 'U');
+  top.append(dot, sym, name);
+  const tl = typeField.querySelector(':scope > label'); if (tl) tl.classList.add('sc-old-label');
+  typeField.classList.add('sc-utype');
+  const fml = document.createElement('div'); fml.className = 'sc-ufml'; fml.setAttribute('aria-hidden', 'true');
+  card.append(top, typeField, fml);
+  // a и b — буквой KaTeX и числом плашкой в одну строку; k — так же.
+  const letterRow = (inpId, letter) => {
+    const i = document.getElementById(inpId); const f = i && i.closest('.field');
+    if (!f) return;
+    const l = f.querySelector(':scope > label'); if (l) l.classList.add('sc-old-label');
+    const k = document.createElement('span'); k.className = 'sc-letter'; katexInto(k, letter);
+    f.insertBefore(k, i);
+    f.classList.add('sc-lrow');
+    i.classList.add('sc-num');
+  };
+  letterRow('cons-a', 'a'); letterRow('cons-b', 'b'); letterRow('cons-k', 'k');
+  ['cons-ab-row', 'cons-k-row'].forEach(id => { const e = document.getElementById(id); if (e) card.appendChild(e); });
+  // Своя формула: строка поля карточки (приставка «U =», поле MathLive, клавиатура) — сам узел cons-custom-row.
+  const cr = document.getElementById('cons-custom-row');
+  if (cr) {
+    const l = cr.querySelector(':scope > label'); if (l) l.classList.add('sc-old-label');
+    const fr = cr.querySelector('.f-row');
+    if (fr && !cr.querySelector('.fc-prefix')) {
+      const pre = document.createElement('span'); pre.className = 'fc-prefix'; pre.setAttribute('aria-hidden', 'true');
+      katexInto(pre, 'U(x,\\,y)\\,=');
+      fr.before(pre);
+    }
+    cr.classList.add('crow-formula');
+    card.appendChild(cr);
+  }
+  firstRow.before(card);
+  scConsumerSync();
+}
+function scConsumerSync() {
+  const card = document.querySelector('#sec-consumer .sc-ucard');
+  if (!card) return;
+  const t = STATE.consType;
+  // Сцена ставит вид свойством (setConsumerType: sel.value = t) без события — кнопка списка перерисовывается здесь.
+  const sel = document.getElementById('cons-type');
+  if (sel && sel._paint) sel._paint();
+  const fml = card.querySelector('.sc-ufml');
+  const tex = CONS_TYPE_TEX[t] || '';
+  if (fml && fml._tex !== tex) { fml._tex = tex; if (tex) katexInto(fml, tex); else fml.textContent = ''; }
+  if (fml) fml.classList.toggle('sc-off', !tex);   // у своей формулы формулы вида нет — её место занимает поле
+  const dot = card.querySelector('.fc-dot');
+  const col = COL.indiff || '';
+  if (dot && dot._col !== col) { dot._col = col; dot.style.background = col; }
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из

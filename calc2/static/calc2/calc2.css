@@ -3907,7 +3907,7 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .fc-add { font-size: 14px !important; font-weight: 500 !important; color: var(--text2); }
 #tools-panel .seg-btn, #pts-panel .seg-btn, #wrench-pop .seg-btn, #tools-panel .tgl-lab,
 #tools-panel .btn, #tools-panel .btn-quiet, #pts-panel .btn, #pts-panel .btn-quiet, #pts-panel .pts-done,
-#wrench-pop .btn, #wrench-pop .btn-quiet, #tools-panel .sel-btn, #pts-panel .sel-btn, #pts-panel .ac-cbtn, #tools-panel .ac-cbtn {
+#wrench-pop .btn, #wrench-pop .btn-quiet, #tools-panel .sel-btn:not(.sc-ucard .sel-btn), #pts-panel .sel-btn, #pts-panel .ac-cbtn, #tools-panel .ac-cbtn {
   font-size: 13px !important; font-weight: 600 !important;
 }
 #tools-panel .param-bound, #tools-panel .param-kill, #pts-panel .param-bound {
@@ -4059,3 +4059,26 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-nrow > input:focus-visible, #tools-panel input.sc-num:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* А5: раздел внутри блока табло («С МРОТ» на рынке труда) — заголовок раздела «Ответа» 14 / 600 с чертой сверху. */
 #params-panel #sb-body .sb-subsec { margin: 18px 0 10px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); }
+
+/* ── Б1–Б2: карточка U «Полезность» (scConsumerCard, 92-ui-kit.js; макет 05_left_Consumer). Список вида — в виде
+   поля (README 4: список на 4+ вариантов остаётся списком, без синевы; лесенка «кнопки 13 / 600» сужена исключением
+   для него), под ним формула вида KaTeX, ниже a и b (k) буквой и числом плашкой; своя формула — строка поля. ── */
+#tools-panel .sc-ucard > .sc-utype { margin: 0; }
+#tools-panel .sc-ucard > .sc-utype > label.sc-old-label,
+#tools-panel .sc-ucard > #cons-custom-row > label.sc-old-label,
+#tools-panel .sc-ucard .sc-lrow > label.sc-old-label { display: none; }
+#tools-panel .sc-ucard .sel-btn {
+  width: 100%; height: 40px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+  font-size: 14px; font-weight: 500;
+}
+#tools-panel .sc-ucard > .sc-ufml { padding: 2px 2px 0; font-size: 17px; line-height: 1.4; color: var(--text); }
+#tools-panel .sc-ucard > .sc-ufml .katex { font-size: 1em; }
+#tools-panel .sc-ucard > .sc-ufml.sc-off { display: none; }
+#tools-panel .sc-ucard > #cons-ab-row { gap: 12px; margin: 0; }
+#tools-panel .sc-ucard .sc-lrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; min-width: 0; }
+#tools-panel .sc-ucard > #cons-k-row.sc-lrow { justify-content: flex-start; gap: 18px; }
+#tools-panel .sc-letter { padding-left: 2px; font-size: 17px; color: var(--text2); }
+#tools-panel .sc-letter .katex, #tools-panel .sc-pname .katex, #tools-panel .sc-nrow > label .katex { font-size: 1.05em; }
+#tools-panel .sc-ucard > #cons-custom-row { margin: 0; }
+

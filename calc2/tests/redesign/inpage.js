@@ -463,7 +463,18 @@
     const el = all.filter(x => roleOf(x) === m[2])[+(m[3] || 0)];
     return el && (any || visible(el)) ? el : null;
   }
+  /* Системный список под upgradeSelect (сессия 6: «Вид полезности» cons-type): сам select спрятан
+     (.sel-native-hidden), выбирают кнопкой-списком .sel-btn прямо перед ним — она и есть орган по ключу «#id». */
+  function findUpgradedSelect(key) {
+    const m = /^#([\w-]+)$/.exec(key);
+    const s = m && document.getElementById(m[1]);
+    if (!s || s.tagName !== 'SELECT' || !s.classList.contains('sel-native-hidden')) return null;
+    const b = s.previousElementSibling;
+    return b && b.classList.contains('sel-btn') && visible(b) ? b : null;
+  }
   function findControl(key) {
+    const us = findUpgradedSelect(key);
+    if (us) return us;
     const v = /^#params-(curves|extra)>/.test(key) && document.querySelector('.crow-sliders .pchip[data-pult-box]') ? findPultVirtual(key) : null;
     if (v) return v;
     const mv = findMovedVirtual(key);
