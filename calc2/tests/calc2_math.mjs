@@ -2438,7 +2438,9 @@ const CASES = [
                     atcQ: (STATE.minATC||{}).Q, shown: !!realMin(STATE.minAVC) };
           STATE.costsTC = '20*Q'; redrawAll();
           var b = { avc: (STATE.minAVC||{}).kind, atc: (STATE.minATC||{}).kind };
-          var txt = (document.getElementById('info-costs')||{}).innerText || '';
+          /* Пояснение блока табло с 14.10 стоит в «Разборе» (решение …81eb…, README пакета
+             calc2_panels_20261014, 5): в «Ответе» оно спрятано, ищем там, где его читают. */
+          var txt = ((document.getElementById('info-costs')||{}).innerText || '') + ' ' + ((document.getElementById('ex-body')||{}).textContent || '');
           return { a1: a.avc === 'boundary' ? 1 : 0, a2: a.atc === 'interior' ? 1 : 0,
                    atcQ: a.atcQ, shown: a.shown ? 1 : 0,
                    b1: b.avc === 'flat' ? 1 : 0, b2: b.atc === 'flat' ? 1 : 0,
@@ -2531,10 +2533,12 @@ const CASES = [
           setS('10 + Q');
           STATE.elastQS = 10; redrawAll();
           var lin = STATE.elastS || {};
-          var t1 = (document.getElementById('info-elast') || {}).innerText || '';
+          // Пояснение — в «Разборе» (с 14.10, решение …81eb…): ищем и там.
+          var exT = function () { return ((document.getElementById('info-elast') || {}).innerText || '') + ' ' + ((document.getElementById('ex-body') || {}).textContent || ''); };
+          var t1 = exT();
           setS('Q^2');
           STATE.elastQS = 10; redrawAll();
-          var t2 = (document.getElementById('info-elast') || {}).innerText || '';
+          var t2 = exT();
           return {
             Es: lin.absEs,
             // «эластично» стоит РЯДОМ с «положительный перехват», а не «неэластично».

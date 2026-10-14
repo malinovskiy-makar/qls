@@ -49,11 +49,14 @@ for (const key of keys) {
     const cells = [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => {
       const src = c.dataset.src || '';
       let srcVal = null, srcLab = '';
-      const m = /^([\w-]+)#(\d+)$/.exec(src);
+      /* «блок#номер» или «блок#номер.часть» (естественная монополия, 14.10: строка
+         «(ATC(Qm); прибыль) = (40; 800)» — две ячейки): ячейка сверяется с частью. */
+      const m = /^([\w-]+)#(\d+)(?:\.(\d+))?$/.exec(src);
       if (m) {
         const blk = document.getElementById(m[1]);
         const row = blk ? [...blk.querySelectorAll('.stat')][+m[2]] : null;
         if (row) { srcVal = t(row.querySelector(':scope > b')); srcLab = t(row.querySelector(':scope > span')); }
+        if (row && m[3]) srcVal = srcVal.replace(/^\(|\)$/g, '').split(';').map(x => x.trim())[+m[3] - 1];
         if (row && !row.classList.contains('is-hero')) srcVal = '(строка не помечена is-hero)';
       }
       return { src, cap: t(c.querySelector('.ans-lab')), not: t(c.querySelector('.ans-not')), val: t(c.querySelector('.ans-val')), was: t(c.querySelector('.ans-was')), srcVal, srcLab };

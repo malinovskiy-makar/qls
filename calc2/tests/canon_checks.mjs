@@ -277,11 +277,18 @@ const inPage = (theme) => {
        в размерах нового сайта (14,5 / 13,5 / 17 px), и шкала для /calc2/
        расширена ЗАКРЫТЫМ списком из восьми сочетаний. Кегль округляется до
        целого: 13,5 считается как 14, 14,5 как 15. Других сочетаний нет. */
-    '14/500', '15/400', '15/500', '16/400', '16/600', '17/600', '19/600', '32/600']);
+    '14/500', '15/400', '15/500', '16/400', '16/600', '17/600', '19/600', '32/600',
+    /* Тихие панели 14.10 (решение владельца «шрифт панелей — вариант A», Notion …81d6…; пакет
+       claude/mockups/calc2_panels_20261014, README 3): заголовок колонки 18 / 600; главные числа «Ответа»
+       20 px — KaTeX, а текстовое значение («нет», «L = 10, MP = 300») тем же кеглем 20 / 400. */
+    '18/600', '20/400']);
   all.forEach(el => {
     const own = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').trim();
     if (own.length < 2 || inNav(el) || el.closest('svg') || el.closest('.katex')) return;
     const c = getComputedStyle(el);
+    /* Кегль 0 — текст, которого на экране нет: подпись строки таблицы «Ответа» показана словами
+       (::before с data-word), исходный код подписи (CS, PS…) остаётся в ячейке для паритета (README 5). */
+    if (parseFloat(c.fontSize) === 0) return;
     const k = Math.round(parseFloat(c.fontSize)) + '/' + (parseInt(c.fontWeight, 10) || 400);
     if (!SCALE.has(k)) add('type_scale', name(el) + ' ' + k);
   });

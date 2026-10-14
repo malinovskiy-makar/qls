@@ -54,8 +54,16 @@ const HERO = {
   'costs': [['info-costs', 4], ['info-costs', 6]],
   'plants': [['info-plants', 0], ['info-plants', 1], ['info-plants', 2], ['info-plants', 3]],
   'isoquant': [['info-iso', 0], ['info-iso', 1]],
-  'mono': [['info-mono', 0], ['info-mono', 1], ['info-mono', 4], ['info-mono', 5]],
-  'mono-nat': [['info-mono', 0], ['info-mono', 1], ['info-nat', 2]],
+  /* Подписи монополии — названиями величин, а не «Монополия» / «Потребитель» из
+     подписи табло «Qm (монополия)» (карточка Notion …8196…, 14.10). */
+  'mono': [['info-mono', 0, null, ['Выпуск монополиста', 'Qm']], ['info-mono', 1, null, ['Цена монополиста', 'Pm']],
+    ['info-mono', 4, null, ['Потери общества', 'DWL']], ['info-mono', 5, null, ['Излишек потребителя', 'CS']]],
+  /* Естественная монополия: строка табло «(ATC(Qm); прибыль) = (40; 800)» — две
+     величины. Режем в «Ответе», не в сцене (строку табло читает паритет): пятый
+     элемент — части ячеек [подпись, обозначение, TeX обозначения], data-src
+     «info-nat#2.1», «#2.2» (карточка …8121…). */
+  'mono-nat': [['info-mono', 0, null, ['Выпуск монополиста', 'Qm']], ['info-mono', 1, null, ['Цена монополиста', 'Pm']],
+    ['info-nat', 2, null, null, [['Средние издержки', 'ATC(Qm)', '\\mathrm{ATC}(Q_m)'], ['Прибыль', '', '']]]],
   'mono-d1': [['info-mono', 0], ['info-mono', 1]],
   'mono-d3': [['info-d3', 0], ['info-d3', 1]],
   'mono-kink': [['info-kink', 0], ['info-kink', 1], ['info-kink', 2]],
@@ -150,7 +158,7 @@ function txRow(blkId, label) {
       const cells = [...tr.children];
       if (cells.length < 3 || plainText(cells[0]) !== label) continue;
       const col = (name) => { const i = head.indexOf(name); return i > 0 ? plainText(cells[i]) : ''; };
-      return { before: col('До'), after: col('После'), delta: col('Δ') };
+      return { before: col('До'), after: col('После'), delta: col('Δ'), tr };
     }
   }
   return null;
@@ -270,15 +278,21 @@ function answerGroupHead(g) {
 
 /* Строка об отрезке ответа под шапкой (только «Математика» и «Построение
    графиков», у «С ограничением» отрезка нет): числа живые, из _ansSeg. */
+/* Вторая фраза строки об отрезке — пояснение: она живёт в «Разборе»
+   (answerNotesToExplain, 86-workspace.js; тихие панели 14.10, README 5). */
+const SEG_NOTE_SCALE = 'Масштаб графика на ответ не влияет.';
+function segNoteOn() {
+  const row = document.getElementById('ans-seg-row');
+  return !!(answerIsMath() && typeof _ansSeg !== 'undefined' && _ansSeg && row && row.style.display !== 'none');
+}
 function buildSegNote() {
   const note = document.getElementById('ans-seg-note');
   if (!note) return;
-  const row = document.getElementById('ans-seg-row');
-  const on = answerIsMath() && typeof _ansSeg !== 'undefined' && _ansSeg && row && row.style.display !== 'none';
+  const on = segNoteOn();
   note.hidden = !on;
   if (!on) { note.textContent = ''; return; }
   const f = (typeof ansFmt === 'function') ? ansFmt : fmt;
-  note.textContent = 'Ищем на отрезке $x$ от ' + f(_ansSeg.a) + ' до ' + f(_ansSeg.b) + '. Масштаб графика на ответ не влияет.';
+  note.textContent = 'Ищем на отрезке $x$ от ' + f(_ansSeg.a) + ' до ' + f(_ansSeg.b) + '.';
   if (typeof renderMathIn === 'function') renderMathIn(note);
 }
 
@@ -310,10 +324,14 @@ function hideDrainedBlocks() {
     }
     return true;
   };
+  /* С 14.10 — у ЛЮБОГО блока, не только с главными строками: пояснения ушли в
+     «Разбор», повторы спрятаны, и блок, где кроме заголовка ничего не осталось
+     («Вмешательство» монополии с одной заметкой «Двигайте ставку…»), не
+     показывается (README пакета calc2_panels_20261014, 5). */
   [...sb.children].forEach(blk => {
     if (!blk.id) return;
     blk.classList.remove('ans-drained');
-    if (!blk.querySelector('.stat.is-hero, .stat[data-ans-head], .stat.ans-dup')) return;
+    if (!blk.children.length) return;
     const left = [...blk.querySelectorAll('*')].some(el => !el.closest('.section-title, .katex-mathml')
       && ownText(el) && shownIn(el, blk));
     if (!left) blk.classList.add('ans-drained');
@@ -386,6 +404,7 @@ function buildAnswer() {
   if (sig === _answerSig && marks === _answerMarks) return;
   _answerSig = sig;
   document.querySelectorAll('#sb-body .stat.is-hero').forEach(s => s.classList.remove('is-hero'));
+  document.querySelectorAll('#sb-body tr.ans-trdup').forEach(s => s.classList.remove('ans-trdup'));
   host.innerHTML = '';
   const spec = HERO[STATE.sceneKey];
   const cells = [];
@@ -408,6 +427,16 @@ function buildAnswer() {
       const lab = row.querySelector(':scope > span'), val = row.querySelector(':scope > b');
       if (!val || !plainText(val)) return;
       row.classList.add('is-hero');
+      const parts = h[4];
+      if (parts) {
+        // Пара «(40; 800)» — по ячейке на часть; текст значения — побайтно часть строки табло.
+        const vals = plainText(val).replace(/^\(|\)$/g, '').split(';').map(x => x.trim());
+        parts.forEach((pt, k) => {
+          if (vals[k] == null || vals[k] === '') return;
+          cells.push({ src: blkId + '#' + i + '.' + (k + 1), blk, row, labText: pt[0], valText: vals[k], over: [pt[0], pt[1], pt[2]], group: row.dataset.ansGroup || '', tx: null });
+        });
+        return;
+      }
       cells.push({ src: blkId + '#' + i, blk, row, lab, val, over, group: row.dataset.ansGroup || '', tx: tbl ? txRow(blkId, tbl) : null });
     } else {
       // Главное число из таблицы «До / После / Δ» (потери общества у налогов).
@@ -456,7 +485,21 @@ function buildAnswer() {
     const box = document.createElement('div');
     box.className = 'ans-group';
     if (g.head || g.html || g.title) box.appendChild(answerGroupHead(g));
-    g.cells.forEach(c => box.appendChild(answerRow(c, isMath)));
+    /* Строки группы — на подложке (тихие панели 14.10, README 5 «Вид»): обёртка
+       .ans-rows — новый узел ВНУТРИ .ans-group, классы строк и data-src прежние. */
+    const rows = document.createElement('div');
+    rows.className = 'ans-rows';
+    g.cells.forEach(c => {
+      const row = answerRow(c, isMath);
+      /* Повтор — один раз (README 5): строка таблицы «До / После» прячется, только
+         если главная ячейка показывает И её «после», И её «до» (изменение «50 − 10»
+         собрано из этой самой строки). У потолка и квоты в HERO нет метки строки
+         таблицы — их строки Q остаются. Класс на <tr> — атрибут: наблюдатель табло
+         его пропускает. */
+      if (c.tx && c.tx.tr && row.querySelector('.ans-was')) c.tx.tr.classList.add('ans-trdup');
+      rows.appendChild(row);
+    });
+    box.appendChild(rows);
     host.appendChild(box);
   });
   /* «Свои площади» (решение владельца 13.10, ADR 0148): посчитанные человеком
@@ -470,11 +513,14 @@ function buildAnswer() {
     const box = document.createElement('div');
     box.className = 'ans-group ans-own';
     box.appendChild(answerGroupHead({ title: 'Свои площади' }));
+    const rows = document.createElement('div');
+    rows.className = 'ans-rows';
     own.forEach(r => {
       const row = answerRow({ src: 'area#' + r.id, labText: r.label, valText: fmt(r.value), over: [r.label, ''] }, false);
       row.classList.add('ans-own-cell');
-      box.appendChild(row);
+      rows.appendChild(row);
     });
+    box.appendChild(rows);
     host.appendChild(box);
   }
   host.hidden = !cells.length && !own.length;
@@ -496,8 +542,110 @@ function buildAnswer() {
   }
   // Обозначения в подписях строк («Весь ресурс на X») — формулой, как во всей панели.
   if (typeof markNotationsIn === 'function') markNotationsIn(host);
+  decorateTables();
+  hideEchoes();
   hideDrainedBlocks();
   if (typeof applySelf === 'function') applySelf();
+  markFirstSection();
+}
+
+/* Повторы «Ответа» — один раз (тихие панели 14.10, README 5 «Повторы»):
+   · строка-эхо входа «Условия» в блоке вмешательства («Налог t = 20»);
+   · «Бремя / Выигрыш покупателя и продавца», когда видна полоса «Кто несёт налог»;
+   · блок «Излишки … до вмешательства» (#info-areas), если каждая его величина
+     стоит в столбце «до» таблицы (CS, PS, SW; «CS + PS» квоты — это SW).
+   Только классы (атрибуты): узлы табло «Ответ» не пишет. */
+const ECHO_RE = /^(Налог t|Субсидия s|Ставка τ)/;
+const BURDEN_RE = /^(Бремя|Выигрыш) (покупателя|продавца)$/;
+function hideEchoes() {
+  const tx = document.getElementById('info-tax');
+  const burdenOn = !!(document.getElementById('ans-burden') && !document.getElementById('ans-burden').hidden);
+  if (tx) statRows(tx).forEach(r => {
+    const lab = plainText(r.querySelector(':scope > span'));
+    r.classList.toggle('ans-echo', ECHO_RE.test(lab) || (burdenOn && BURDEN_RE.test(lab)));
+  });
+  const areas = document.getElementById('info-areas');
+  if (!areas) return;
+  areas.classList.remove('ans-intable');
+  const num = (s) => { const m = String(s || '').replace(/[\s\u00a0\u202f\u2009]/g, '').replace(/−/g, '-').match(/-?\d+(?:[.,]\d+)?/g); return m ? m[m.length - 1] : null; };
+  const before = new Map();
+  document.querySelectorAll('#sb-body table.tx-table').forEach(t => {
+    const head = [...(t.querySelector('tr') || { children: [] }).children].map(plainText);
+    const iB = head.indexOf('До');
+    if (iB < 1) return;
+    t.querySelectorAll('tr').forEach(tr => {
+      let k = plainText(tr.children[0]).replace(/\s+/g, '');
+      if (k === 'CS+PS') k = 'SW';
+      if (tr.children[iB]) before.set(k, num(plainText(tr.children[iB])));
+    });
+  });
+  if (!before.size) return;
+  const rows = statRows(areas);
+  const all = rows.length > 0 && rows.every(r => {
+    const m = /^(CS|PS|SW)\b/.exec(plainText(r.querySelector(':scope > span')));
+    return !!m && before.get(m[1]) != null && before.get(m[1]) === num(plainText(r.querySelector(':scope > b')));
+  });
+  if (all) areas.classList.add('ans-intable');
+}
+
+/* Разделы колонки разделены чертой сверху; первый ВИДИМЫЙ раздел её не несёт
+   (класс .ans-sec-first). Видимость — по вычисленному стилю, не по раскладке:
+   колонка бывает спрятана (ADR 0150). */
+function markFirstSection() {
+  const shown = (el) => {
+    for (let n = el; n && !n.classList.contains('side-inner'); n = n.parentElement) {
+      if (n.hidden) return false;
+      if (getComputedStyle(n).display === 'none') return false;
+    }
+    return true;
+  };
+  let first = null, prev = null;
+  document.querySelectorAll('#ans-hero > .ans-group, #ans-burden, #sb-body > [id], #explain').forEach(el => {
+    el.classList.remove('ans-sec-first', 'ans-sec-joined');
+    if (!shown(el)) return;
+    if (!first) first = el;
+    /* Остаток блока табло — продолжение последней группы главных чисел (.ans-cont,
+       без своего заголовка): сразу за ней он идёт без черты, частью того же раздела. */
+    if (el.classList.contains('ans-cont') && prev && prev.classList.contains('ans-group')) el.classList.add('ans-sec-joined');
+    prev = el;
+  });
+  if (first) first.classList.add('ans-sec-first');
+}
+
+/* Таблицы «До / После» табло в «Ответе» (тихие панели 14.10, README 5 «Вид»).
+   Подписи строк — СЛОВАМИ: атрибут data-word у ячейки и CSS ::before; текст
+   ячейки (CS, PS, «Бюджет (сбор)», SW) НЕ меняется — по нему ищут строки txRow и
+   HERO, его читают паритет, «Сначала сам» и приборы. Столбец «Δ» помечен и не
+   виден: изменение главных величин стоит под главными числами. Заголовок
+   раздела вмешательства с таблицей — «До и после налога / субсидии /
+   вмешательства». ⚠️ В табло меняются только АТРИБУТЫ: наблюдатель табло их
+   пропускает, запись узлов зациклила бы пересборку. */
+const TX_WORDS = {
+  CS: 'Излишек потребителя', PS: 'Излишек производителя', 'Бюджет (сбор)': 'Налоговые сборы',
+  'Бюджет (расход)': 'Расходы бюджета', DWL: 'Потери общества', SW: 'Общественное благосостояние',
+};
+function decorateTables() {
+  const sb = document.getElementById('sb-body');
+  if (!sb) return;
+  sb.querySelectorAll('table.tx-table').forEach(t => {
+    const head = t.querySelector('tr');
+    const dCol = head ? [...head.children].findIndex(c => plainText(c) === 'Δ') : -1;
+    t.querySelectorAll('tr').forEach(tr => {
+      [...tr.children].forEach((c, i) => c.classList.toggle('tx-delta', i === dCol && dCol > 0));
+      const first = tr.children[0];
+      if (!first || first.tagName !== 'TD') return;
+      const w = TX_WORDS[plainText(first)];
+      if (w) { if (first.dataset.word !== w) first.dataset.word = w; }
+      else if (first.hasAttribute('data-word')) first.removeAttribute('data-word');
+    });
+  });
+  const tx = document.getElementById('info-tax');
+  if (tx) {
+    const hasTable = [...tx.querySelectorAll('table.tx-table tr:first-child th')].some(th => /^(До|Было)$/.test(plainText(th)));
+    const it = STATE.intervType;
+    const h = !hasTable ? '' : (it === 'tax' ? 'До и после налога' : it === 'subsidy' ? 'До и после субсидии' : 'До и после вмешательства');
+    if (h) { if (tx.dataset.head !== h) tx.dataset.head = h; } else if (tx.hasAttribute('data-head')) tx.removeAttribute('data-head');
+  }
 }
 
 /* Строка «Ответа»: подпись слева, значение справа, изменение «50 − 10» под значением.
@@ -526,7 +674,7 @@ function answerRow(c, isMath) {
   if (parts.not && !isMath) {
     const n = document.createElement('span'); n.className = 'ans-not';
     // Обозначение — всегда формулой (правило 46 DESIGN.md): «Q∗» → Q*, «X0» → X₀.
-    const tex = notationTex(parts.not);
+    const tex = (c.over && c.over[2]) || notationTex(parts.not);
     if (tex && typeof katexInto === 'function') katexInto(n, tex);
     else if (typeof paintNotation === 'function') paintNotation(n, parts.not); else n.textContent = parts.not;
     const eq = document.createElement('span'); eq.className = 'ans-eq'; eq.textContent = '=';
@@ -551,21 +699,29 @@ function answerRow(c, isMath) {
 /* «Кто несёт налог» / «Кому достаётся субсидия» (README макета, 8.5): доли
    из бремени, которое сцена уже посчитала (STATE.incBuyer, incSeller —
    40-scenes-market.js). Нет вмешательства или нет исходного рынка — нет секции. */
+function burdenOn() {
+  const b = +STATE.incBuyer, s = +STATE.incSeller;
+  return /^(taxes|tax|tax-adv)$/.test(STATE.sceneKey) && STATE.taxActive && !STATE.taxNoBase
+    && isFinite(b) && isFinite(s) && Math.abs(b) + Math.abs(s) > 1e-9;
+}
+/* Строка-пояснение под полосой бремени — в «Разборе» (answerNotesToExplain). */
+function burdenNoteText() {
+  if (!burdenOn()) return '';
+  const form = (typeof taxFormKey === 'function') ? taxFormKey() : 'unit';
+  return (form && form !== 'unit') ? 'При налоге долей от цены клин растёт вместе с ценой.'
+    : 'Не зависит от того, кто платит по закону: переключите сторону, и числа не изменятся.';
+}
 function buildBurden() {
   const box = document.getElementById('ans-burden');
   if (!box) return;
-  const k = STATE.sceneKey;
   const b = +STATE.incBuyer, s = +STATE.incSeller;
-  const on = /^(taxes|tax|tax-adv)$/.test(k) && STATE.taxActive && !STATE.taxNoBase
-    && isFinite(b) && isFinite(s) && Math.abs(b) + Math.abs(s) > 1e-9;
+  const on = burdenOn();
   box.hidden = !on;
   if (!on) { box.innerHTML = ''; return; }
   const sub = STATE.intervType === 'subsidy';
   const tot = Math.abs(b) + Math.abs(s);
   const pb = Math.abs(b) / tot * 100, ps = 100 - pb;
   const pct = (x) => fmt(Math.round(x)) + '\u202f%';
-  const form = (typeof taxFormKey === 'function') ? taxFormKey() : 'unit';
-  const pctForm = !!(form && form !== 'unit');
   box.innerHTML = '';
   const h = document.createElement('h3'); h.className = 'col-sub'; h.textContent = sub ? 'Кому достаётся субсидия' : 'Кто несёт налог';
   const bar = document.createElement('div'); bar.className = 'burden-bar';
@@ -581,10 +737,8 @@ function buildBurden() {
     c.append(n, x); return c;
   };
   cols.append(col('is-buyer', 'Покупатели', b, pb), col('is-seller', 'Продавцы', s, ps));
-  const note = document.createElement('div'); note.className = 'burden-note';
-  note.textContent = pctForm ? 'При налоге долей от цены клин растёт вместе с ценой.'
-    : 'Не зависит от того, кто платит по закону: переключите сторону, и числа не изменятся.';
-  box.append(h, bar, cols, note);
+  // Пояснение под полосой — в «Разборе» (burdenNoteText); здесь только числа.
+  box.append(h, bar, cols);
 }
 
 /* Статус словами: предупреждения сцены строкой над числами (канон 2.5:

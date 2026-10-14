@@ -4,14 +4,14 @@
      Р  строки по всем моделям на 1440 и 1280: значение не перенесено и не
         вылезает за колонку; подписей в три строки и больше нет; двухэтажные
         строки (подпись сверху, значение под ней) перечисляются по моделям;
-     К  один видимый кегль у всех цифр значений колонки (разброс ≤ 0,5 px) и
-        одно начертание; один кегль у всех подписей;
+     К  две ступени кегля цифр значений (с 14.10, README пакета calc2_panels_20261014, 5): главные
+        20 px, прочие 16 px (разброс ≤ 0,5 px); одно начертание; один кегль у всех подписей;
      П  паритет: тексты главных значений и «было · Δ» те же, что в эталоне
         answer_baseline_20261009.json (замер фазы −1), у sd плюс три строки
         «Излишки»; ни одна величина не показана в колонке дважды;
      Г  «Построение графиков», x^2-4 и x+2: две группы кривых по 4 строки и
         группа «Пересечения кривых» с одной строкой «f и g» → (−2; 0); (3; 5);
-        строка об отрезке ответа под шапкой с живыми числами;
+        строка об отрезке ответа под шапкой с живыми числами (вторая фраза — в «Разборе»);
      Т  телефон 390: горизонтальной прокрутки нет ни в одной модели (вкладка
         «Ответ»); полоса главных чисел на 1000 px — по пункту на главную строку;
      В  левая колонка: кнопки кривых площади (по кнопке на кривую во всех
@@ -142,7 +142,7 @@ window.__ar = {
         // Индексы и степени обозначений (MC₁, x²) — не числа ответа.
         if (!el || el.closest('.katex-mathml, .ans-was, .msupsub') || !__ar.vis(el)) continue;
         const cs = getComputedStyle(el);
-        out.push({ fs: parseFloat(cs.fontSize), fam: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(),
+        out.push({ hero: !!el.closest('#ans-hero'), fs: parseFloat(cs.fontSize), fam: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(),
           w: cs.fontWeight, st: cs.fontStyle, txt: n.nodeValue.slice(0, 12) });
       }
     });
@@ -215,7 +215,16 @@ if (want('Р') || want('К') || want('П')) {
       (await page.evaluate(() => __ar.digits())).forEach(d => digs.push(Object.assign({ key }, d)));
       (await page.evaluate(() => __ar.labelSizes())).forEach(s => labs.push({ key, s }));
       if (W === 1440) {
-        const cells = await page.evaluate(() => __ar.cells());
+        /* Естественная монополия (карточка Notion …8121…, 14.10): строка табло «(ATC(Qm); прибыль) = (40; 800)»
+           в «Ответе» — две ячейки info-nat#2.1, #2.2. Для сверки с эталоном склеиваем их обратно в пару. */
+        const cells = (await page.evaluate(() => __ar.cells())).reduce((acc, c) => {
+          const m = /^(.+#\d+)\.(\d+)$/.exec(c.src || '');
+          if (!m) { acc.push(c); return acc; }
+          const last = acc[acc.length - 1];
+          if (m[2] === '1' || !last || last.src !== m[1]) acc.push(Object.assign({}, c, { src: m[1], val: '(' + c.val + ';' }));
+          else last.val += c.val;
+          return acc;
+        }, []).map(c => /;$/.test(c.val) ? c : (/^\(/.test(c.val) && !/\)$/.test(c.val) ? Object.assign(c, { val: c.val + ')' }) : c));
         const base = BASELINE[key] || [];
         const extra = key === 'sd' ? 3 : 0;
         if (cells.length !== base.length + extra) par.push(key + ': главных строк ' + cells.length + ', в эталоне ' + base.length + (extra ? ' + ' + extra : ''));
@@ -240,12 +249,18 @@ if (want('Р') || want('К') || want('П')) {
       console.log('  ИНФО ' + W + ': двухэтажных строк ' + two.length + (two.length ? ' — ' + two.join(' | ') : ''));
     }
     if (want('К')) {
-      const sizes = digs.map(d => d.fs);
-      const lo = Math.min(...sizes), hi = Math.max(...sizes);
-      const odd = digs.filter(d => Math.abs(d.fs - 16) > 0.5);
-      const oddBy = new Map(); odd.forEach(d => oddBy.set(d.fs + '/' + d.w, (oddBy.get(d.fs + '/' + d.w) || []).concat(d.key + ' «' + d.txt + '»')));
-      ok(W + ': кегль цифр значений один (разброс ≤ 0,5 px)', hi - lo <= 0.5,
-        lo + '…' + hi + ' px' + (odd.length ? '; не 16: ' + [...oddBy].map(([k, v]) => k + ' ×' + v.length + ' (' + v.slice(0, 4).join(', ') + ')').join(' | ') : ''));
+      /* Две ступени значений (тихие панели 14.10, README пакета calc2_panels_20261014, раздел 5): главные
+         числа (#ans-hero) — 20 px, остальные строки «Ответа» и табло — 16 px; было «один кегль у всех». */
+      const tier = (want) => {
+        const ds = digs.filter(d => d.hero === (want === 20));
+        const sizes = ds.map(d => d.fs);
+        const lo = Math.min(...sizes), hi = Math.max(...sizes);
+        const odd = ds.filter(d => Math.abs(d.fs - want) > 0.5);
+        const oddBy = new Map(); odd.forEach(d => oddBy.set(d.fs + '/' + d.w, (oddBy.get(d.fs + '/' + d.w) || []).concat(d.key + ' «' + d.txt + '»')));
+        ok(W + ': кегль цифр ' + (want === 20 ? 'главных чисел 20' : 'остальных значений 16') + ' px (разброс ≤ 0,5 px)', ds.length > 0 && hi - lo <= 0.5 && !odd.length,
+          lo + '…' + hi + ' px' + (odd.length ? '; не ' + want + ': ' + [...oddBy].map(([k, v]) => k + ' ×' + v.length + ' (' + v.slice(0, 4).join(', ') + ')').join(' | ') : ''));
+      };
+      tier(20); tier(16);
       const faces = new Map();
       digs.forEach(d => { const k = d.fam + '/' + d.w + '/' + d.st; faces.set(k, (faces.get(k) || []).concat(d.key + ' «' + d.txt + '»')); });
       ok(W + ': начертание цифр значений одно', faces.size === 1, [...faces].map(([k, v]) => k + ' (' + v.length + ': ' + v.slice(0, 3).join(', ') + ')').join(' | '));
@@ -287,7 +302,10 @@ if (want('Г')) {
     cr ? JSON.stringify(cr.rows) : 'группы нет');
   ok('значения кривой f: −2; 2 · −4 · нет · (0; −4)', fg[0] && fg[0].rows.map(r => norm(r.val)).join('|') === '-2;2|-4|нет|(0;-4)', fg[0] && fg[0].rows.map(r => r.val).join(' | '));
   const note = await page.evaluate(() => __ar.t(document.getElementById('ans-seg-note')));
-  ok('строка об отрезке: «Ищем на отрезке x от −5 до 5…»', norm(note) === norm('Ищем на отрезке x от −5 до 5. Масштаб графика на ответ не влияет.'), note);
+  // Вторая фраза («Масштаб графика на ответ не влияет») — пояснение, она в «Разборе» (тихие панели 14.10, README 5).
+  ok('строка об отрезке: «Ищем на отрезке x от −5 до 5.»', norm(note) === norm('Ищем на отрезке x от −5 до 5.'), note);
+  const exScale = await page.evaluate(() => (document.getElementById('ex-body').textContent || '').includes('Масштаб графика на ответ не влияет.'));
+  ok('вторая фраза строки об отрезке — в «Разборе»', exScale);
   await page.evaluate(() => { STATE.ansHand = true; STATE.ansA = -3; STATE.ansB = 4; redrawAll(); });
   await settle(page);
   const note2 = await page.evaluate(() => __ar.t(document.getElementById('ans-seg-note')));

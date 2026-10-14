@@ -239,6 +239,57 @@ function moveExplanations() {
     const ih = intervHintHtml();
     if (ih) to.insertAdjacentHTML('afterbegin', ih);
   }
+  answerNotesToExplain(from, to);
+}
+
+/* Пояснения «Ответа» — в «Разбор» (тихие панели 14.10, решение владельца
+   «объяснения только в «Разборе»», Notion …81eb…; README пакета 5). Заметки
+   блоков табло (.hint, .muted), строка под полосой бремени и вторая фраза строки
+   об отрезке уходят из «Ответа» (там их прячет стиль) и КОПИРУЮТСЯ сюда первыми
+   абзацами, без повторов: текст, уже стоящий в «Разборе», второй раз не кладётся.
+   Источник в табло остаётся — его читают печать, паритет и проверки. Заметка,
+   которую спрятала сама сцена (hidden, display: none, scoped-off), не идёт.
+   «до вмешательства государства» (.scope-note) не копируется: блок «Излишки» при
+   ней повторяет столбец «до» таблицы и спрятан (hideEchoes). */
+function answerNotesToExplain(from, to) {
+  if (!from || !to) return;
+  const norm = (t) => String(t || '').replace(/[\s\u00a0\u202f\u2009\u200b]+/g, ' ').trim();
+  const key = (t) => norm(t).replace(/\s+/g, '').slice(0, 60);
+  const sceneHidden = (w) => {
+    for (let n = w; n && n !== from; n = n.parentElement) {
+      if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return true;
+    }
+    return false;
+  };
+  /* Порядок — как в колонке: строка об отрезке (под шапкой), заметки блоков, чьи
+     строки стоят в главных числах (HERO), строка бремени, остальные блоки по порядку. */
+  // Блок с главными СТРОКАМИ (номер или '*'); строка таблицы «До / После» (налог, DWL) блок не поднимает.
+  const heroBlocks = new Set(((typeof HERO !== 'undefined' && HERO[STATE.sceneKey]) || [])
+    .filter(h => typeof h[1] === 'number' || h[1] === '*').map(h => h[0]));
+  const first = [], rest = [];
+  from.querySelectorAll('.hint, .muted').forEach(n => {
+    if (n.closest('.sb-note-src') || sceneHidden(n)) return;
+    const c = n.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    if (!norm(c.textContent)) return;
+    const blk = n.closest('#sb-body > [id]');
+    (blk && heroBlocks.has(blk.id) ? first : rest).push({ html: n.innerHTML, text: c.textContent });
+  });
+  const items = [];
+  if (typeof segNoteOn === 'function' && segNoteOn()) items.push({ html: SEG_NOTE_SCALE, text: SEG_NOTE_SCALE });
+  items.push(...first);
+  if (typeof burdenNoteText === 'function') { const b = burdenNoteText(); if (b) items.push({ html: b, text: b }); }
+  items.push(...rest);
+  if (!items.length) return;
+  const have = key(to.textContent);
+  const seen = new Set();
+  const ps = items.filter(it => {
+    const k = key(it.text);
+    if (!k || seen.has(k) || have.indexOf(k) >= 0) return false;
+    seen.add(k);
+    return true;
+  }).map(it => '<p>' + it.html + '</p>').join('');
+  if (ps) to.insertAdjacentHTML('afterbegin', '<div class="sb-note ex-from-answer">' + ps + '</div>');
 }
 
 /* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.
@@ -1101,7 +1152,7 @@ function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
    постоянная проверка.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const FF_MAX_PX = 15;   // канонический кегль записи: крупнее чисел табло (13)
+const FF_MAX_PX = 22;   // кегль записи в «Ответе» (тихие панели 14.10, README 5; было 15). Отступление ADR 0048 прежнее
 const FF_MIN_PX = 13;   // ниже НЕ опускаемся — подгонку до 10 владелец забраковал
 /* Кегль УСЛОВИЯ участка (решение владельца 31.08): 11 px в покое, 10 px —
    первый шаг отступления при нехватке ширины. Условие набирается своим KaTeX

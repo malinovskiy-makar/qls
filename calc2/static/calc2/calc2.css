@@ -3769,3 +3769,94 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
   display: inline; margin: 0; font-size: inherit; text-transform: none; letter-spacing: 0;
 }
 #ex-body .sb-note p.ex-q > b { display: block; }
+
+/* ── Этап Б: «Ответ» — вид (README пакета 3–5; лесенка A, решение …81d6…) ───────
+   Токены: --seg-on (нажатый сегмент), --track (дорожка, полоса бремени). */
+:root { --seg-on: #fffef7; --track: rgba(45, 45, 45, .16); }
+[data-theme="dark"] { --seg-on: #3a3631; --track: rgba(255, 255, 255, .17); }
+
+/* Шапка колонки: 64 px, черта снизу, «Ответ» 18 / 600; колонка 18 px по бокам. */
+#params-panel .col-head { min-height: 64px; height: 64px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--border-soft); }
+#params-panel .col-head h2 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+@media (min-width: 1240px) { #params-panel .col-head { padding-left: 34px; } }
+#params-panel .side-scroll { padding: 0 18px 84px; }
+#params-panel #sb-fold { padding-top: 18px; }
+@media (max-width: 759px) {
+  body.ph-ex #params-panel .col-head h2::after { font-size: 18px; }
+}
+
+/* Разделы: заголовок 14 / 600, 18 px сверху и снизу, черта между разделами, без
+   рамок-карточек. Первый видимый раздел черты не несёт (.ans-sec-first, buildAnswer). */
+#ans-hero > .ans-group, #params-panel #ans-burden, #params-panel #sb-body > [id], #params-panel #explain {
+  border-top: 1px solid var(--border-soft); padding-top: 18px;
+}
+#ans-hero > .ans-group.ans-sec-first, #params-panel #ans-burden.ans-sec-first,
+#params-panel #sb-body > [id].ans-sec-first, #params-panel #explain.ans-sec-first,
+#params-panel #sb-body > [id].ans-sec-joined { border-top: 0; padding-top: 0; }
+#params-panel #explain { margin-top: 18px; padding-top: 0; }
+#params-panel .ans-ghead, #params-panel .ans-burden .col-sub, #params-panel #sb-body .section-title,
+#params-panel #sec-eq .section-title, #params-panel #sb-body > [id]::before {
+  margin: 0 0 10px; padding: 0; border: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text);
+  text-transform: none; letter-spacing: 0;
+}
+#params-panel #info-tax[data-head]:not(:empty)::before { content: attr(data-head); }
+
+/* Главные числа: строки на подложке --surface-2 (радиус 10, поля 0 14), строка 11 px
+   сверху и снизу, черта --border-soft между строками; подпись 14 / 500 --text2,
+   значение KaTeX 20 px, изменение «50 − 10» 12 / 500 --text3. */
+.ans-rows { background: var(--surface-2); border-radius: 10px; padding: 0 14px; min-width: 0; }
+#ans-hero .ans-rows > .ans-cell { min-height: 0; padding: 11px 0; border-bottom: 1px solid var(--border-soft); }
+#ans-hero .ans-rows > .ans-cell:last-child { border-bottom: 0; }
+#params-panel .ans-lab, #params-panel .sb-body .stat > span, #params-panel .sb-body .stat.stat-eq > span {
+  font-size: 14px; font-weight: 500; color: var(--text2);
+}
+#ans-hero .ans-line { font-size: 20px; }
+#ans-hero .ans-was { font-size: 12px; font-weight: 500; color: var(--text3); }
+
+/* «Кто несёт налог»: полоса 8 px (--track, заполнение --text2), имена 12 / 500
+   --text3 с образцом 10 px, значения 14 / 600. */
+#params-panel .burden-bar { height: 8px; background: var(--track); border-radius: var(--r-pill); }
+#params-panel .burden-b { background: var(--text2); }
+#params-panel .burden-cols { margin-top: 10px; }
+#params-panel .burden-name { font-size: 12px; font-weight: 500; color: var(--text3); gap: 6px; }
+#params-panel .burden-name::before { width: 10px; height: 10px; border-radius: 3px; background: var(--text2); }
+#params-panel .is-seller .burden-name::before { background: var(--track); }
+#params-panel .burden-val { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+/* «Итоговая функция»: заголовок раздела и тихая «Копировать» (30 px, рамка, 13 / 600)
+   в строку; подпись 14 / 500; запись 22 px (подгонка FF_MAX_PX = 22, ADR 0048). */
+#info-final .ff { padding: 0; border: 0; border-radius: 0; background: transparent; }
+#info-final .ff-top { align-items: center; }
+#info-final .ff-eyebrow { font-size: 14px; font-weight: 600; color: var(--text); }
+#info-final .ff-copy, #info-final .ff-expand {
+  height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; font-size: 13px; font-weight: 600; color: var(--text); line-height: 28px;
+}
+#info-final .ff-name { margin-top: 10px; font-size: 14px; font-weight: 500; color: var(--text2); }
+#info-final .ff-math { margin-top: 6px; font-size: 22px; }
+
+/* Таблицы «До / После»: справа «до», «после» 12 / 500 --text3; строки 14 / 500;
+   числа без жирного (до --text2, после --text); столбец «Δ» не виден. Подпись строки
+   словами — ::before с data-word, исходный текст ячейки font-size: 0 (decorateTables). */
+#params-panel .tx-table { width: 100%; margin-top: 0; border-collapse: collapse; }
+#params-panel .tx-table th { font-size: 12px; font-weight: 500; color: var(--text3); text-transform: lowercase; text-align: right; border: 0; padding: 0 0 6px 10px; }
+#params-panel .tx-table td { font-size: 14px; font-weight: 500; border: 0; padding: 8px 0 8px 10px; line-height: 1.55; }
+#params-panel .tx-table td:first-child { padding-left: 0; color: var(--text2); text-align: left; }
+#params-panel .tx-table td:not(:first-child) { text-align: right; font-weight: 400; color: var(--text2); white-space: nowrap; }
+#params-panel .tx-table td:nth-child(3) { font-weight: 400; color: var(--text); }
+#params-panel .tx-table .tx-delta { display: none; }
+#params-panel .tx-table td[data-word] { font-size: 0; }
+#params-panel .tx-table td[data-word]::before { content: attr(data-word); font-size: 14px; font-weight: 500; color: var(--text2); }
+/* Повторы — один раз (hideEchoes, 94-answer.js; README 5). Правила «спрятать» —
+   после вида строк и таблиц выше. */
+#params-panel #sb-body tr.ans-trdup, #params-panel #sb-body .stat.ans-echo, #params-panel #sb-body .ans-intable { display: none !important; }
+/* Пояснения «Ответа» — в «Разборе» (answerNotesToExplain, 86-workspace.js): в табло
+   источники остаются, но не видны. Остаются: .warn (строка статуса), «Ищем на
+   отрезке…», вердикты «Сначала сам», #self-gate. */
+#params-panel #sb-body .hint, #params-panel #sb-body .muted, #params-panel #sb-body .scope-note { display: none !important; }
+/* «до», «после» — в строке заголовка раздела «До и после …» (макет 09): строка
+   заголовков таблицы поднята на высоту заголовка, её левая ячейка пустая. */
+#params-panel #info-tax[data-head] .tx-table { margin-top: -30px; }
+/* «Сначала сам» на подложке: строка уже на поля подложки (14 + 14), «Проверить» ужата
+   по бокам, чтобы поле осталось не уже 60 % строки (self_probe). */
+#ans-hero .ans-rows .self-row .self-check { padding: 0 10px; }

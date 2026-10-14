@@ -332,6 +332,258 @@ async function sectionB() {
   }
 }
 
+/* ── Этап Б (14.10, README 3–5): вид, повторы, пояснения ───────────────────────── */
+/* Открытая страница одной темы и ширины; модели меняются pickScene без перезагрузки. */
+async function openThemed(W, theme) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  await ctx.addInitScript((t) => { try { localStorage.clear(); localStorage.setItem('theme', t); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} }, theme);
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+  await page.goto(BASE + '/calc2/', { waitUntil: 'load', timeout: 40000 });
+  await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined', null, { timeout: 40000 });
+  await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
+  return { ctx, page, errors };
+}
+async function pick(page, key, extra) {
+  await page.evaluate(([k, x]) => { resetSceneMemory(); pickScene(k); closePicker(); if (x) (new Function(x))(); redrawAll(); }, [key, extra || '']);
+  await settle(page, 450);
+}
+/* Вид колонки «Ответ»: что не так по README 4–5 (пусто — всё так). */
+const viewIssues = (page) => page.evaluate(() => {
+  const out = [];
+  const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+  const cs = (e) => getComputedStyle(e);
+  const tok = (name) => { const d = document.createElement('div'); d.style.color = 'var(' + name + ')'; document.getElementById('params-panel').appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+  const tokBg = (name) => { const d = document.createElement('div'); d.style.background = 'var(' + name + ')'; document.getElementById('params-panel').appendChild(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; };
+  const T2 = tok('--text2'), T3 = tok('--text3'), S2 = tokBg('--surface-2');
+  const fw = (e) => String(cs(e).fontWeight), fz = (e) => parseFloat(cs(e).fontSize);
+  const want = (e, size, weight, color, what) => {
+    if (!vis(e)) return;
+    if (Math.abs(fz(e) - size) > 0.5 || (weight && fw(e) !== String(weight)) || (color && cs(e).color !== color))
+      out.push(what + ': ' + fz(e) + '/' + fw(e) + (color && cs(e).color !== color ? ' ' + cs(e).color : '') + ' «' + (e.textContent || '').trim().slice(0, 30) + '»');
+  };
+  const head = document.querySelector('#params-panel .col-head');
+  if (Math.abs(head.getBoundingClientRect().height - 64) > 1 || cs(head).borderBottomWidth !== '1px') out.push('шапка: ' + head.getBoundingClientRect().height + ' ' + cs(head).borderBottomWidth);
+  want(head.querySelector('h2'), 18, 600, null, 'заголовок «Ответ»');
+  document.querySelectorAll('#ans-hero .ans-ghead').forEach(e => want(e, 14, 600, null, 'заголовок группы'));
+  document.querySelectorAll('#ans-hero .ans-rows').forEach(e => {
+    if (!vis(e)) return;
+    const c = cs(e);
+    if (c.backgroundColor !== S2 || c.borderTopLeftRadius !== '10px' || c.paddingLeft !== '14px' || c.paddingRight !== '14px' || c.paddingTop !== '0px') out.push('подложка: ' + c.backgroundColor + ' / ' + S2 + ' r' + c.borderTopLeftRadius + ' p' + c.padding);
+    const cells = [...e.querySelectorAll(':scope > .ans-cell')].filter(vis);
+    cells.forEach((r, i) => {
+      const rc = cs(r);
+      if (rc.paddingTop !== '11px' || rc.paddingBottom !== '11px') out.push('строка: поля ' + rc.paddingTop + '/' + rc.paddingBottom);
+      if (i < cells.length - 1 && rc.borderBottomWidth !== '1px') out.push('строка: нет черты между строками');
+    });
+  });
+  document.querySelectorAll('#ans-hero .ans-lab').forEach(e => want(e, 14, 500, T2, 'подпись главной строки'));
+  document.querySelectorAll('#ans-hero .ans-line').forEach(e => want(e, 20, null, null, 'значение главной строки'));
+  document.querySelectorAll('#ans-hero .ans-was').forEach(e => want(e, 12, 500, T3, 'изменение «50 − 10»'));
+  document.querySelectorAll('#params-panel #sb-body .stat > b').forEach(e => { if (!e.closest('.stat-stack')) want(e, 16, null, null, 'значение строки табло'); });
+  document.querySelectorAll('#params-panel #sb-body .stat > span').forEach(e => want(e, 14, 500, T2, 'подпись строки табло'));
+  const bur = document.getElementById('ans-burden');
+  if (vis(bur)) {
+    want(bur.querySelector('.col-sub'), 14, 600, null, 'заголовок бремени');
+    const bar = bur.querySelector('.burden-bar');
+    if (Math.abs(bar.getBoundingClientRect().height - 8) > 0.5) out.push('полоса бремени ' + bar.getBoundingClientRect().height);
+    bur.querySelectorAll('.burden-name').forEach(e => want(e, 12, 500, T3, 'имя бремени'));
+    bur.querySelectorAll('.burden-val').forEach(e => want(e, 14, 600, null, 'значение бремени'));
+  }
+  const ff = document.querySelector('#info-final .ff');
+  if (vis(ff)) {
+    want(ff.querySelector('.ff-eyebrow'), 14, 600, null, '«Итоговая функция»');
+    const cp = ff.querySelector('.ff-copy');
+    if (vis(cp)) { want(cp, 13, 600, null, '«Копировать»'); if (Math.abs(cp.getBoundingClientRect().height - 30) > 1) out.push('«Копировать» высотой ' + cp.getBoundingClientRect().height); }
+    want(ff.querySelector('.ff-name'), 14, 500, T2, 'подпись итоговой функции');
+    const m = ff.querySelector('.ff-math');
+    if (vis(m) && !(fz(m) <= 22.5 && fz(m) >= 21.5) && !m.style.fontSize) out.push('запись итоговой функции ' + fz(m) + ' px');
+  }
+  // Разделы: черта 1 px сверху у каждого видимого, кроме первого.
+  const secs = [...document.querySelectorAll('#ans-hero > .ans-group, #ans-burden, #sb-body > [id], #explain')].filter(vis);
+  // Продолжение последней группы главных чисел сразу за ней (.ans-sec-joined) — часть того же раздела.
+  secs.forEach((e, i) => { const b = cs(e).borderTopWidth; if (i > 0 && b !== '1px' && !e.classList.contains('ans-sec-joined')) out.push('раздел без черты: ' + (e.id || e.className)); if ((i === 0 || e.classList.contains('ans-sec-joined')) && b !== '0px') out.push('первый / присоединённый раздел с чертой: ' + (e.id || e.className)); });
+  // Таблицы.
+  document.querySelectorAll('#params-panel .tx-table').forEach(t => {
+    if (!vis(t)) return;
+    t.querySelectorAll('th').forEach(e => { if (vis(e) && e.textContent.trim()) want(e, 12, 500, T3, 'заголовок столбца'); });
+    t.querySelectorAll('td').forEach((e, i) => {
+      if (!vis(e)) return;
+      if (e.matches('.tx-delta')) { out.push('видна ячейка «Δ»'); return; }
+      if (e.dataset.word) {
+        const bc = getComputedStyle(e, '::before');
+        if (bc.content !== '"' + e.dataset.word + '"' || parseFloat(bc.fontSize) !== 14 || bc.fontWeight !== '500') out.push('подпись словами: ' + bc.content + ' ' + bc.fontSize);
+        if (fz(e) !== 0) out.push('исходная подпись видна: ' + e.textContent);
+      } else if (e === e.parentElement.children[0]) want(e, 14, 500, null, 'подпись строки таблицы');
+      else { want(e, 14, null, null, 'число таблицы'); if (fw(e) !== '400') out.push('число таблицы жирное: ' + e.textContent); }
+    });
+  });
+  // Нижняя строка не накрыта круглой кнопкой чата (прокрутка колонки до низа).
+  return out;
+});
+const overflowList = (page) => page.evaluate(() => {
+  const out = [];
+  document.querySelectorAll('#params-panel > .side-inner *').forEach(e => {
+    if (!e.getClientRects().length || getComputedStyle(e).visibility === 'hidden') return;
+    if (e.closest('.katex-mathml')) return;
+    if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible') out.push(e.tagName + ' «' + (e.textContent || '').trim().slice(0, 30) + '»');
+  });
+  return out;
+});
+const fabCover = (page) => page.evaluate(async () => {
+  const sc = document.querySelector('#params-panel .side-scroll');
+  sc.scrollTop = sc.scrollHeight;
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const fab = document.querySelector('.tg-fab');
+  if (!fab || !fab.getClientRects().length) return '';
+  const f = fab.getBoundingClientRect();
+  const rows = [...document.querySelectorAll('#params-panel .ans-cell, #params-panel #sb-body .stat, #params-panel .tx-table tr, #ex-bar')].filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
+  const hit = rows.filter(e => { const r = e.getBoundingClientRect(); return r.bottom > f.top + 1 && r.top < f.bottom - 1 && r.right > f.left + 1 && r.left < f.right - 1 && r.bottom <= sc.getBoundingClientRect().bottom; });
+  sc.scrollTop = 0;
+  return hit.map(e => (e.textContent || '').trim().slice(0, 30)).join(' | ');
+});
+
+async function sectionV() {
+  head('В. «Ответ»: вид (подложка, разделы, лесенка A, таблицы словами)');
+  const before = {};
+  // «Новых вылезаний нет»: база — тот же обход на коде до этапа (CALC2_BASE_BEFORE), если задан.
+  const BEFORE = process.env.CALC2_BASE_BEFORE || '';
+  for (const W of [1440, 1280]) {
+    for (const theme of ['light', 'dark']) {
+      const { ctx, page, errors } = await openThemed(W, theme);
+      const bad = [], over = [], fab = [];
+      for (const key of KEYS) {
+        await pick(page, key);
+        (await viewIssues(page)).forEach(x => bad.push(key + ': ' + x));
+        if (theme === 'light') (await overflowList(page)).forEach(x => over.push(key + ': ' + x));
+        if (theme === 'light') { const f = await fabCover(page); if (f) fab.push(key + ': ' + f); }
+      }
+      ok(W + ' ' + theme + ': ' + KEYS.length + ' моделей — вид «Ответа» по README 4–5', !bad.length, bad.length + ': ' + bad.slice(0, 10).join(' | '));
+      if (theme === 'light') {
+        ok(W + ': нижняя строка не накрыта кнопкой чата', !fab.length, fab.slice(0, 5).join(' | '));
+        before[W] = over;
+      }
+      ok(W + ' ' + theme + ': ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+      await ctx.close();
+    }
+    if (BEFORE) {
+      const keep = BASE;
+      BASE_SWAP.v = BEFORE;
+      const { ctx, page } = await openThemedAt(BEFORE, W, 'light');
+      const was = new Set();
+      for (const key of KEYS) { await pick(page, key); (await overflowList(page)).forEach(x => was.add(key + ': ' + x)); }
+      await ctx.close();
+      const fresh = before[W].filter(x => !was.has(x));
+      ok(W + ': новых вылезаний за ширину нет (база — ' + BEFORE + ')', !fresh.length, fresh.slice(0, 6).join(' | ') + ' (до: ' + was.size + ', после: ' + before[W].length + ')');
+      void keep;
+    } else console.log('  ИНФО ' + W + ': вылезаний ' + before[W].length + (before[W].length ? ' — ' + before[W].slice(0, 4).join(' | ') : '') + ' (база «до» не задана: CALC2_BASE_BEFORE)');
+  }
+}
+const BASE_SWAP = { v: '' };
+async function openThemedAt(base, W, theme) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  await ctx.addInitScript((t) => { try { localStorage.clear(); localStorage.setItem('theme', t); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} }, theme);
+  const page = await ctx.newPage();
+  await page.goto(base + '/calc2/', { waitUntil: 'load', timeout: 40000 });
+  await page.waitForFunction(() => typeof pickScene === 'function', null, { timeout: 40000 });
+  return { ctx, page };
+}
+
+/* Видимые строки таблицы «До / После» колонки: подпись (как на экране) и числа. */
+const tableRows = (page) => page.evaluate(() => {
+  const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+  const t = document.querySelector('#info-tax .tx-table');
+  if (!t || !vis(t)) return [];
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+  return [...t.querySelectorAll('tr')].slice(1).filter(vis).map(tr => {
+    const c = [...tr.children].filter(vis);
+    const w = c[0].dataset.word || tx(c[0]);
+    return { word: w, text: tx(c[0]), before: tx(c[1]), after: tx(c[2]) };
+  });
+});
+const n = (s) => +String(s || '').replace(/[\s   ]/g, '').replace('−', '-').replace(',', '.');
+
+async function sectionV2() {
+  head('В2. Повторы — один раз');
+  const { ctx, page, errors } = await openThemed(1440, 'light');
+  await pick(page, 'taxes');
+  const rows = await tableRows(page);
+  const words = rows.map(r => r.word).join(' | ');
+  ok('taxes: «До и после налога» — ровно 4 строки словами', words === 'Излишек потребителя | Излишек производителя | Налоговые сборы | Общественное благосостояние', words);
+  ok('taxes: текст ячеек табло прежний (CS, PS, «Бюджет (сбор)», SW)', rows.map(r => r.text).join('|') === 'CS|PS|Бюджет (сбор)|SW', rows.map(r => r.text).join('|'));
+  ok('taxes: числа 1 250 → 800, 1 250 → 800, 0 → 800, 2 500 → 2 400',
+    rows.map(r => n(r.before) + '→' + n(r.after)).join(' ') === '1250→800 1250→800 0→800 2500→2400', rows.map(r => r.before + '→' + r.after).join(' '));
+  const head1 = await page.evaluate(() => getComputedStyle(document.getElementById('info-tax'), '::before').content);
+  ok('taxes: заголовок раздела «До и после налога»', head1 === '"До и после налога"', head1);
+  const hidden = await page.evaluate(() => {
+    const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+    const txt = [...document.querySelectorAll('#params-panel #sb-body .stat')].filter(vis).map(s => s.textContent);
+    return { echo: txt.filter(t => /Налог t|Бремя/.test(t)), areas: vis(document.getElementById('info-areas')) };
+  });
+  ok('taxes: нет видимых «Налог t», «Бремя …», блока «Излишки … до вмешательства»', !hidden.echo.length && !hidden.areas, JSON.stringify(hidden));
+  for (const [label, x] of [['налог 20', "setType('tax'); setTaxForm('unit'); setTax(20);"], ['налог 50', "setType('tax'); setTaxForm('unit'); setTax(50);"],
+    ['субсидия 20', "setType('subsidy'); setTaxForm('unit'); setTax(20);"], ['НДС 20 %', "setType('tax'); setTaxForm('vat'); setTax(20);"]]) {
+    await pick(page, 'taxes', x);
+    const r = await page.evaluate(() => {
+      const t = document.querySelector('#info-tax .tx-table');
+      const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); };
+      const get = (lab) => { const tr = [...t.querySelectorAll('tr')].find(x => x.children[0] && tx(x.children[0]) === lab); return tr ? [tx(tr.children[1]), tx(tr.children[2])] : null; };
+      return { sw: get('SW'), dwl: get('DWL'), cs: get('CS'), ps: get('PS'), b: get('Бюджет (сбор)') || get('Бюджет (расход)'), state: [STATE.cs + STATE.ps, STATE.csTax + STATE.psTax + STATE.budget, STATE.dwl] };
+    });
+    const okId = r.sw && r.dwl && Math.abs(r.state[1] - (r.state[0] - r.state[2])) < 1e-6 && n(r.sw[1]) === n(fmt0(r.state[0] - r.state[2]));
+    ok(label + ': SW после = до − DWL (' + (r.sw && r.sw.join(' → ')) + ', DWL ' + (r.dwl && r.dwl[1]) + ')', !!okId, JSON.stringify(r));
+  }
+  for (const key of ['quota', 'ceil']) {
+    await pick(page, key);
+    const rr = await tableRows(page);
+    ok(key + ': строка Q видна (её «до» в главных числах нет)', rr.some(r => /^Q/.test(r.text)), rr.map(r => r.text).join('|'));
+  }
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+// Число как на экране (fmt страницы недоступен из node): 2 знака, без хвостовых нулей.
+const fmt0 = (x) => String(Math.round(x * 100) / 100);
+
+async function sectionV3() {
+  head('В3. Пояснения в «Разбор», подписи монополии, естественная монополия');
+  const { ctx, page, errors } = await openThemed(1440, 'light');
+  await pick(page, 'taxes');
+  const ex = await page.evaluate(() => {
+    const c = document.getElementById('ex-body').cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    const ps = [...c.querySelectorAll('.sb-note')].flatMap(nt => nt.querySelector('p') ? [...nt.querySelectorAll(':scope > p')] : [nt]).map(p => p.textContent.replace(/\s+/g, ' ').trim());
+    return { ps, q: document.querySelectorAll('#ex-body p.ex-q').length };
+  });
+  const start = ['Цена покупателя и цена продавца разошлись', 'Не зависит от того, кто платит по закону', 'Результат не зависит от того'];
+  ok('taxes: «Разбор» начинается ушедшими заметками, по одной', start.every((t, i) => ex.ps[i] && ex.ps[i].startsWith(t)) && start.every(t => ex.ps.filter(p => p.startsWith(t)).length === 1), ex.ps.slice(0, 4).map(p => p.slice(0, 40)).join(' | '));
+  ok('taxes: дальше прежнее вступление и 4 вопроса', /^Потоварный налог/.test(ex.ps[3] || '') && ex.q === 4, (ex.ps[3] || '').slice(0, 40) + ' / ' + ex.q);
+  const quiet = [];
+  for (const key of KEYS) {
+    await pick(page, key);
+    const v = await page.evaluate(() => [...document.querySelectorAll('#params-panel > .side-inner .hint, #params-panel > .side-inner .scope-note, #params-panel > .side-inner .muted, #params-panel > .side-inner .burden-note')]
+      .filter(e => !e.closest('#ex-body') && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden').map(e => e.className + ' «' + e.textContent.trim().slice(0, 30) + '»'));
+    v.forEach(x => quiet.push(key + ': ' + x));
+  }
+  ok(KEYS.length + ' моделей: в колонке нет видимых .hint / .scope-note / .muted / .burden-note', !quiet.length, quiet.slice(0, 6).join(' | '));
+  const cells = async (key) => { await pick(page, key); return page.evaluate(() => {
+    const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ''); };
+    return [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => ({ lab: c.querySelector('.ans-lab').textContent.trim(), val: tx(c.querySelector('.ans-val')), src: c.dataset.src }));
+  }); };
+  const mono = await cells('mono');
+  ok('mono: «Выпуск монополиста» 40, «Цена монополиста» 60, «Потери общества» 800, «Излишек потребителя» 800',
+    mono.map(c => c.lab + ' ' + c.val).join('|') === 'Выпуск монополиста 40|Цена монополиста 60|Потери общества 800|Излишек потребителя 800', mono.map(c => c.lab + ' ' + c.val).join('|'));
+  const nat = await cells('mono-nat');
+  const nm = nat.filter(c => /^info-nat#2\.\d$/.test(c.src));
+  ok('mono-nat: «Выпуск монополиста», «Цена монополиста»; две ячейки «Средние издержки» 40 и «Прибыль» 800 (info-nat#2.1, #2.2)',
+    nat[0] && nat[0].lab === 'Выпуск монополиста' && nat[1].lab === 'Цена монополиста' && nm.length === 2 && nm[0].lab === 'Средние издержки' && nm[0].val === '40' && nm[1].lab === 'Прибыль' && nm[1].val === '800',
+    JSON.stringify(nat));
+  const nlab = await page.evaluate(() => [...document.querySelectorAll('#ans-hero .ans-lab')].map(e => e.textContent.trim()));
+  ok('монополия: подписей «Монополия», «Потребитель», «Цена», «Потери» нет', !nlab.some(l => /^(Монополия|Потребитель|Цена|Потери)$/.test(l)), nlab.join('|'));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 for (const name of ENGINES) {
   eng = name;
   try { browser = await pw[name].launch(); } catch (e) {
@@ -341,6 +593,9 @@ for (const name of ENGINES) {
   if (want('А')) await sectionA();
   if (want('А2')) await sectionA2();
   if (want('Б')) await sectionB();
+  if (want('В')) await sectionV();
+  if (want('В2')) await sectionV2();
+  if (want('В3')) await sectionV3();
   await browser.close();
 }
 console.log('\nИТОГ answer_panel_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));

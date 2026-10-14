@@ -3004,6 +3004,11 @@ function updateTaxPanel() {
     ['CS', STATE.cs, STATE.csTax],
     ['PS', STATE.ps, STATE.psTax],
     [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', 0, STATE.budget],
+    /* Общественное благосостояние — в таблице (тихие панели 14.10, README 5):
+       до = CS + PS; после = CS + PS + сбор (при субсидии budget < 0 — минус
+       расход). Тождество: после = до − DWL. Тогда блок «Излишки … до
+       вмешательства» целиком повторяет столбец «до» и в «Ответе» не нужен. */
+    ['SW', STATE.cs + STATE.ps, STATE.csTax + STATE.psTax + STATE.budget],
     ['DWL', 0, STATE.dwl],
   ];
   const pf = pctForm();

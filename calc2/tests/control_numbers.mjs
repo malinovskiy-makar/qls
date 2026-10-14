@@ -961,8 +961,10 @@ const PANEL = `
   /* Абзац ПРО ВМЕШАТЕЛЬСТВО, а не весь разбор сцены. Общий рассказ сцены
      «Потолок и пол цены» законно называет оба случая сразу, поэтому искать
      в нём слово «дефицит» бессмысленно: оно там есть всегда. */
+  /* С 14.10 первыми в «Разборе» стоят заметки, ушедшие из «Ответа» (.ex-from-answer, тихие панели,
+     README пакета calc2_panels_20261014, 5); абзац про вмешательство — первый после них. */
   var intervPara = function () {
-    var e = document.querySelector('#ex-body .sb-note');
+    var e = document.querySelector('#ex-body .sb-note:not(.ex-from-answer)');
     return e ? (e.textContent || '').replace(/\\s+/g, ' ').trim() : '';
   };
   var panelText = function () {
