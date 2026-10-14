@@ -670,6 +670,9 @@ const SC_CARDS = [
   { m: 'fx', input: 'ma-fxs', sym: 'S', name: 'Предложение валюты', prefix: 'Q =', col: 'S' },
   { m: 'laffer', input: 'ma-lafd', sym: 'D', name: 'Спрос', prefix: 'P =', col: 'D' },
   { m: 'laffer', input: 'ma-lafs', sym: 'S', name: 'Предложение', prefix: 'P =', col: 'S' },
+  // Математика (сессия 6, Г3): «Деформации», «Оптимум», «Касательная» — общее поле f (подпись math-f-label пишет
+  // сюжет — остаётся спрятанной). Точка — цвет кривой f; у «Касательной» — кнопка цвета tanF (scMathSync).
+  { m: 'm-math', input: 'inp-mathf', sym: 'f', name: 'Функция', prefix: 'y =', col: () => (STATE.mathSub === 'tangent' ? COL.tanF : COL.D), keepLabel: true },
   // Неравенство (сессия 6, Г1): способ «Формула» — карточка L.
   { m: 'ineq', input: 'ineq-formula', sym: 'L', name: 'Функция Лоренца', prefix: 'L(p) =', col: 'S' },
 ];
@@ -683,7 +686,7 @@ const SC_PROWS = {
   // Сессия 6, Б2: «Новая цена товара x» и P_{x₁} (shortRegulatorName резал «Px₁» до «…», Notion …81b4…).
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
   'ma-dg-field': ['Дефицит бюджета', '\\Delta G', 'loanable'], 'ma-fx-fixed-field': ['Курс', 'e', 'fx'],
-  'ineq-alpha-field': ['Параметр', '\\alpha', 'ineq'],
+  'ineq-alpha-field': ['Параметр', '\\alpha', 'ineq'], 'mathx0-field': ['Точка', 'x_0', 'm-math'],
 };
 /* Буква, которая является переменной оси модели макро (r у «Заёмных средств», i, e, Y…), ползунка не получает
    (сессия 6, В5; Notion …8187…): замер claude/panels_s6/dead_r_loanable.json — сдвиг r не меняет ни «Ответ», ни один
@@ -727,7 +730,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -750,6 +753,7 @@ function scSetup() {
   });
   if (scOn('consumer')) scConsumerCard();
   if (scOn('ineq')) scIneqSetup();
+  if (scOn('m-math')) scMathSetup();
   Object.keys(SC_PROWS).forEach(id => {
     const f = document.getElementById(id);
     if (!f || f._scRow || !scProw(id)) return;
@@ -827,6 +831,8 @@ function scSync() {
   scConsumerSync();
   scIneqSync();
   scGraphRows();
+  scMathSync();
+  scParamsCont();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
 }
@@ -1038,6 +1044,65 @@ function scGraphSync(box) {
     const eq = !!(inp && /=/.test(String(inp.value || '')));
     p.pre.classList.toggle('sc-gone', eq);   // уравнение — без приставки
   });
+}
+
+/* ═══ «Математика»: «Деформации», «Оптимум», «Касательная» (сессия 6, Г3) ═══
+   У «Касательной» выбор цвета f (кнопка cpick data-col="tanF", была в группе «Цвета кривых») — точка-кнопка карточки f
+   (узел переезжает; в других сюжетах — простой значок цвета кривой). Группа «Цвета кривых» — простой <label>, его
+   hideEmptyGroupTitles не видит: когда обе строки переехали (f — в карточку, f′ — в «Вид»), группа прячется явно.
+   «Шаг Δx» — строка параметра (дорожка внутри data-no-regulator, upgradeRegulator её не берёт: здесь только вид). */
+function scMathSetup() {
+  const card = document.getElementById('math-row-f');
+  const pick = document.querySelector('#math-pane-tangent .cpick[data-col="tanF"]');
+  if (card && card._scCard && pick && !pick._scMoved) {
+    pick._scMoved = true;
+    const lab = pick.closest('label');
+    const grp = lab && lab.closest('.field');
+    pick.classList.add('sc-dot-slot', 'sc-tanf');
+    card._scCard.top.insertBefore(pick, card._scCard.top.firstChild);
+    if (lab) lab.classList.add('sc-gone');
+    if (grp) grp.classList.add('sc-mcolors');
+  }
+  const f = document.getElementById('mathdx-field'), sl = document.getElementById('mathdx-slider');
+  if (f && sl && !f._scRow) {
+    f._scRow = true;
+    f.classList.add('sc-prow', 'sc-prow-own');
+    const lab = f.querySelector(':scope > label'); if (lab) lab.classList.add('sc-old-label');
+    const nm = document.createElement('span'); nm.className = 'sc-pname'; nm.textContent = 'Шаг';
+    const val = document.createElement('span'); val.className = 'sc-pval'; val.setAttribute('aria-hidden', 'true');
+    f.insertBefore(val, f.firstChild); f.insertBefore(nm, val);
+    sl.addEventListener('input', scMathSync);
+  }
+  scMathSync();
+}
+function scMathSync() {
+  const card = document.getElementById('math-row-f');
+  const c = card && card._scCard;
+  if (c) {
+    const tan = STATE.mathSub === 'tangent';
+    const pick = c.top.querySelector('.sc-tanf');
+    if (pick) pick.classList.toggle('sc-gone', !tan);
+    if (c.dot) c.dot.classList.toggle('sc-gone', tan);
+  }
+  const grp = document.querySelector('#math-pane-tangent .sc-mcolors');
+  if (grp) {
+    // Видимый орган в группе остался? (строка f′ уехала в «Вид» — на её месте заглушка .vg-home)
+    const left = [...grp.querySelectorAll('input, button, .cpick')].some(e => !e.closest('.sc-gone, .vg-home') && getComputedStyle(e).display !== 'none');
+    grp.classList.toggle('sc-gone', !left);
+  }
+  const sl = document.getElementById('mathdx-slider'); const f = sl && sl.closest('.sc-prow-own');
+  if (f) { const v = f.querySelector('.sc-pval'); const tex = '\\Delta x = ' + fmt(+sl.value); if (v && v._tex !== tex) { v._tex = tex; katexInto(v, tex); } }
+}
+/* Раздел ползунков «Параметры» (#sec-params) идёт ПРОДОЛЖЕНИЕМ «Параметров» карточки ввода, если там уже есть такой
+   заголовок (строка отрезка ответа, .sc-sec): два заголовка «Параметры» подряд читались как ошибка. Класс на узле с id
+   — не инлайновый стиль: в форму модели не идёт. */
+function scParamsCont() {
+  const sp = document.getElementById('sec-params'), si = document.getElementById('sec-input');
+  if (!sp || !si) return;
+  const shown = (e) => { for (let n = e; n && n !== si; n = n.parentElement) { const cs = getComputedStyle(n); if (n.hidden || cs.display === 'none') return false; } return true; };
+  const head = [...si.querySelectorAll('.sc-sec, #ans-seg-row')].some(e => !e.classList.contains('grp-empty') && shown(e));
+  const on = head && getComputedStyle(sp).display !== 'none';
+  if (sp.classList.contains('sc-cont') !== on) sp.classList.toggle('sc-cont', on);
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из

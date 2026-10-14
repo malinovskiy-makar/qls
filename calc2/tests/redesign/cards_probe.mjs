@@ -93,6 +93,9 @@ const CASES = [
   ['Е', 'laffer', '', '', ['ma-lafd', '90 - Q']],
   ['Ж', 'ineq', 'Формула', "setIneqInput('formula');", ['ineq-formula', 'p^3']],
   ['Ж', 'm-graph', '', '', ['@graph', 'x^2 - 9']],
+  ['Ж', 'm-transform', '', '', ['inp-mathf', 'x^3']],
+  ['Ж', 'm-optimum', '', '', ['inp-mathf', 'x^2 - 2*x']],
+  ['Ж', 'm-tangent', '', '', ['inp-mathf', 'x^3']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];

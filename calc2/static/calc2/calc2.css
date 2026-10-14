@@ -4121,3 +4121,9 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-gcard > .crow-formula > .f-slot { display: contents; }
 #tools-panel .sc-gcard .fc-menu > .grow-name { width: 100%; }
 
+/* ── Г3: «Математика» (scMathSetup, 92-ui-kit.js). Кнопка цвета f у «Касательной» — точка карточки; группа «Цвета
+   кривых» без органов — не видна. Раздел ползунков продолжает «Параметры» карточки ввода (scParamsCont). ── */
+#tools-panel .fc-card .sc-gone, #tools-panel .sc-mcolors.sc-gone, #tools-panel label.sc-gone { display: none; }
+#tools-panel #sec-params.sc-cont { border-top: 0; padding-top: 0; }
+#tools-panel #sec-params.sc-cont > h3.sec-head { display: none; }
+

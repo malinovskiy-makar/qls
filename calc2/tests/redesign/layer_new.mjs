@@ -62,6 +62,10 @@ const RENAME = {
   '#ineq-redist-pane>button.tgl-sw': '#ineq-rd-tax',
   /* (у) список «Число групп» → сегмент «5 групп | 10 групп» (сессия 6, Г1): кнопки без id пишут в прежний список. */
   '#ineq-pane-groups>button.sel-btn': '#ineq-pane-groups>button.seg-btn',
+  /* Сессия 6, Г3: кнопка цвета f «Касательной» переехала из группы «Цвета кривых» точкой карточки f (#math-row-f);
+     кнопка цвета f′ уехала в «Вид» ещё в сессии 4 (заглушка .vg-home) и в обходе панели стала первой. */
+  '#math-pane-tangent>button.swatch': '#math-row-f>button.swatch',
+  '#math-pane-tangent>button.swatch[1]': '#math-pane-tangent>button.swatch',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];
