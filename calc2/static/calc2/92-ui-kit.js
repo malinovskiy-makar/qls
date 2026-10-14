@@ -690,6 +690,11 @@ const SC_PROWS = {
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
   'ma-dg-field': ['Дефицит бюджета', '\\Delta G', 'loanable'], 'ma-fx-fixed-field': ['Курс', 'e', 'fx'],
   'ineq-alpha-field': ['Параметр', '\\alpha', 'ineq'], 'mathx0-field': ['Точка', 'x_0', 'm-math'],
+  // Д3: вмешательство государства. Буква ставки и «%» — от каскада (rateLetter, shortRegulatorName), цена — от
+  // подписи каскада (pc-letter: Pc у потолка, Pf у пола).
+  'tax-field': ['Ставка', 't', 'd3'],
+  'pc-field': ['Цена', () => ((document.getElementById('pc-letter') || {}).textContent || 'P'), 'd3'],
+  'quota-field': ['Объём квоты', 'Q_{\\text{к}}', 'd3'], 'quota-price-field': ['Цена внутри коридора', 'P_k', 'd3'],
 };
 /* Буква, которая является переменной оси модели макро (r у «Заёмных средств», i, e, Y…), ползунка не получает
    (сессия 6, В5; Notion …8187…): замер claude/panels_s6/dead_r_loanable.json — сдвиг r не меняет ни «Ответ», ни один
@@ -729,13 +734,13 @@ const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['pp
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
   ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
-const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint']];
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint'], ['tsb-seller', 'd3']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2']);
+  'd1', 'd2', 'd3']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -845,6 +850,7 @@ function scSync() {
   scMathSync();
   scMmRows();
   scPchips();
+  scIntervSync();
   scParamsCont();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
@@ -1206,6 +1212,32 @@ function scPchips() {
     if (b.children[0].textContent !== t0) b.children[0].textContent = t0;
     if (b.children[1].textContent !== t1) b.children[1].textContent = t1;
   });
+}
+
+/* ═══ Д3: «Вмешательство государства» (#sec-tax; макеты 05_left_Mono, 06_left_taxes) ═══
+   Полоса вида из пяти видимых кнопок — в две строки 3 + 2; из одной видимой (у «Квот» только «Квота») — не
+   показывается: выбирать не из чего (allow сверки и буква «м» паритета). Подписи «Вид налога:» / «Налог платит:»
+   пишет каскад (taxkind-label, taxside-label) — прячутся классом, видом «вне потока» (инлайновые display и кегль у
+   узлов с id — в форме модели и старых ссылках, их не трогаем). Ряд стороны: слева одно слово («Платит» у налога,
+   «Получает» у субсидии), справа сегмент «Продавец | Покупатель» (тумблер спрятан, SC_SEGS). */
+function scIntervSync() {
+  if (!scOn('d3')) return;
+  const b0 = document.getElementById('seg-tax');
+  const seg = b0 && b0.closest('.seg');
+  if (seg) {
+    // Видимые кнопки — по вычисленному стилю (часть прячут классом маршрута модели, не инлайновым display).
+    const n = [...seg.querySelectorAll(':scope > .seg-btn')].filter(b => !b.hidden && getComputedStyle(b).display !== 'none').length;
+    if (seg.dataset.n !== String(n)) seg.dataset.n = String(n);
+  }
+  ['taxkind-label', 'taxside-label'].forEach(id => { const l = document.getElementById(id); if (l && !l.classList.contains('sc-vh')) l.classList.add('sc-vh'); });
+  const row = document.getElementById('taxside-row');
+  if (row) {
+    if (!row.classList.contains('sc-siderow')) row.classList.add('sc-siderow');
+    let w = row.querySelector(':scope > .sc-sidelab');
+    if (!w) { w = document.createElement('span'); w.className = 'sc-sidelab'; row.insertBefore(w, row.firstChild); }
+    const t = STATE.intervType === 'subsidy' ? 'Получает' : 'Платит';
+    if (w.textContent !== t) w.textContent = t;
+  }
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из

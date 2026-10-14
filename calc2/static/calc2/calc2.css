@@ -4167,3 +4167,16 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 
 /* Ползунки раздела «Параметры» — по левому краю колонки, как строки «Условия» (у #params-body был свой отступ 14 px). */
 #tools-panel #params-body { padding-left: 0; padding-right: 0; }
+
+/* ── Д3: вмешательство государства (scIntervSync). Полоса из пяти видимых — 3 + 2, из одной — не показывается.
+   Подписи каскада «Вид налога:», «Налог платит:» — вне потока и невидимы (их инлайновые display и кегль — в форме
+   модели, не трогаем). Ряд стороны: слово слева, сегмент справа. ── */
+#tools-panel #sec-tax .seg[data-n="5"] { display: grid; grid-template-columns: repeat(6, 1fr); }
+#tools-panel #sec-tax .seg[data-n="5"] > .seg-btn:nth-child(-n+3) { grid-column: span 2; }
+#tools-panel #sec-tax .seg[data-n="5"] > .seg-btn:nth-child(n+4) { grid-column: span 3; }
+#tools-panel #sec-tax .seg[data-n="1"] { display: none; }
+#tools-panel .sc-vh { position: absolute; visibility: hidden; pointer-events: none; width: 1px; height: 1px; overflow: hidden; }
+#tools-panel #taxside-row.sc-siderow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#tools-panel #taxside-row > .sc-sidelab { font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel #taxside-row > .seg.sc-seg { margin: 0; }
+

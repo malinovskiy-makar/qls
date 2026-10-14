@@ -1,0 +1,5 @@
+{
+ "consumer": { "ids": ["cons-type"] },
+ "cons-slutsky": { "ids": ["cons-type"] },
+ "quota": { "ids": ["seg-quota"] }
+}

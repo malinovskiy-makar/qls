@@ -49,7 +49,7 @@ export const FATES = [
   [/hint-btn|help-dot|^#btn-howto$/, 'убран', 'п', '', 'redesign/quiet_probe.mjs: видимых .hint-btn, .help-dot, #btn-howto — 0'],
   [/^#info-areacalc>button\.swatch/, 'заменён', 'р', 'кнопка цвета .vg-pick строки закраски в «Виде графика»', 'redesign/view_probe.mjs: строка у каждой закраски'],
   [/^#ineq-pane-groups>button\.sel-btn$/, 'заменён', 'у', 'сегмент «5 групп | 10 групп» (#ineq-pane-groups>button.seg-btn)', 'redesign/cards_probe.mjs Ж: щелчок по сегменту даёт тот же «Ответ», что выбор в списке на коде до сессии'],
-  [/^#(costs-pane-costs|mono-kink-pane|union-pane|ineq-redist-pane|math-pane-minmax|math-pane-constraint)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
+  [/^#(costs-pane-costs|mono-kink-pane|union-pane|ineq-redist-pane|math-pane-minmax|math-pane-constraint|taxside-row)>button\.tgl-sw$/, 'заменён', 'с', 'сегмент: кнопки #cm-tc / #cm-curves, #ki-indiv / #ki-piece, #un-monopoly / #un-wagefloor', 'redesign/parity_quick.mjs: орган — левая кнопка полосы (layer_new.mapKey); redesign/cards_probe.mjs'],
 ];
 /* Судьбы, которые зависят от МОДЕЛИ (ключ органа общий для всех моделей): [модель, выражение, судьба, буква, чем
    заменён, чем проверено]. Без модели (parity.mjs, compare.mjs) не действуют. */
