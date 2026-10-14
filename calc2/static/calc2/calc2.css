@@ -4155,3 +4155,15 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-bounds { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--text3); }
 #tools-panel .sc-prow-own > .sc-bounds { grid-column: 1 / -1; }
 
+/* ── Д2: буквы формул (.pchip-param, scPchips): «Параметр» слева, «a = 1» справа, крестик — тихая кнопка 26 px. ── */
+#tools-panel .pchip.sc-pchip .param-eq:not(.reg-eq) { grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .pchip.sc-pchip .param-eq .katex { font-size: 1em; }
+#tools-panel .pchip.sc-pchip .param-kill {
+  grid-column: 3; align-self: center; width: 26px; height: 26px; min-width: 26px; padding: 0; margin: 0 -4px 0 0;
+  display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text3); line-height: 1;
+}
+#tools-panel .pchip.sc-pchip .param-kill:hover { color: var(--text); background: var(--chip-bg); }
+
+/* Ползунки раздела «Параметры» — по левому краю колонки, как строки «Условия» (у #params-body был свой отступ 14 px). */
+#tools-panel #params-body { padding-left: 0; padding-right: 0; }

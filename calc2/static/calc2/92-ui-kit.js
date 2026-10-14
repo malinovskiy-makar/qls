@@ -735,7 +735,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1']);
+  'd1', 'd2']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -1181,6 +1181,16 @@ function scPchips() {
       const nm = document.createElement('span'); nm.className = 'sc-pname'; nm.textContent = 'Сдвиг';
       top.insertBefore(nm, top.querySelector('.reg-eq') || top.firstChild);
       if (ch._regSync) ch._regSync();
+    }
+  });
+  /* Д2 — буквы формул (.pchip-param): слева «Параметр», справа «a = 1» (пишет buildParamChip), крестик «свернуть» —
+     тихая кнопка-значок 26 px (подпись для диктора — aria-label из data-tip). */
+  if (scOn('d2')) tp.querySelectorAll('.pchip.pchip-param').forEach(ch => {
+    if (!ch.classList.contains('sc-pchip')) ch.classList.add('sc-pchip');
+    const top = ch.querySelector(':scope > .pchip-top');
+    if (top && !top.querySelector('.sc-pname')) {
+      const nm = document.createElement('span'); nm.className = 'sc-pname'; nm.textContent = 'Параметр';
+      top.insertBefore(nm, top.firstChild);
     }
   });
   if (scOn('d1')) ['ineq-tau', 'ineq-transfer', 'mathdx-slider', 'ineq-master-slider'].forEach(id => {
