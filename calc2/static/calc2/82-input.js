@@ -1703,6 +1703,7 @@ const FORMULA_FIELD_KINDS = {
   'inp-cmc': 'MC', 'inp-catc': 'ATC', 'inp-cavc': 'ATC',
   'ineq-formula': 'MATHF',
   'inp-ppft': 'PPF',   // строки стран собираются на лету и оснащаются там же
+  'inp-ppf2b': 'PPF',  // вторая КПВ «Сравнить с другой КПВ» — та же оснастка, что у первой (сессия 6, А6; Notion …8138…)
   'inp-tb1': 'PPF', 'inp-tb2': 'PPF',
   'ma-sras': 'MACRO', 'ma-ad': 'MACRO', 'ma-md': 'MACRO', 'ma-ls': 'MACRO',
   'ma-ld': 'MACRO', 'ma-fxd': 'MACRO', 'ma-fxs': 'MACRO',
