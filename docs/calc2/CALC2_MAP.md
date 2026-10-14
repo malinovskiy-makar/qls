@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-14. HEAD: `bd90b57c`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-15. HEAD: `1f2b8a7c`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,8 +343,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2293 | 184.4 | шаблон |
-| `calc2/static/calc2/calc2.css` | 4036 | 300.6 | CSS |
+| `calc2/templates/calc2/calc2.html` | 2293 | 184.3 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4198 | 316.7 | CSS |
 | `calc2/static/calc2/previews.json` | 44 | 30.7 | json |
 | `calc2/static/calc2/00-config.js` | 576 | 49.8 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
@@ -353,31 +353,31 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/40-scenes-market.js` | 3778 | 271.0 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 1832 | 133.9 | JS |
 | `calc2/static/calc2/44-scenes-firm.js` | 1204 | 79.8 | JS |
-| `calc2/static/calc2/46-scenes-labor.js` | 755 | 54.4 | JS |
+| `calc2/static/calc2/46-scenes-labor.js` | 759 | 55.1 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 265 | 16.3 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 425 | 28.9 | JS |
 | `calc2/static/calc2/52-modes.js` | 956 | 65.5 | JS |
 | `calc2/static/calc2/54-scenes-ppf.js` | 3275 | 211.8 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 555 | 36.3 | JS |
-| `calc2/static/calc2/60-overlays.js` | 4796 | 304.0 | JS |
+| `calc2/static/calc2/60-overlays.js` | 4798 | 304.4 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2084 | 135.9 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1661 | 127.7 | JS |
 | `calc2/static/calc2/80-ui.js` | 696 | 43.1 | JS |
-| `calc2/static/calc2/82-input.js` | 2235 | 132.0 | JS |
+| `calc2/static/calc2/82-input.js` | 2265 | 134.8 | JS |
 | `calc2/static/calc2/84-picker.js` | 580 | 43.9 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2156 | 140.9 | JS |
-| `calc2/static/calc2/88-params.js` | 1962 | 133.2 | JS |
+| `calc2/static/calc2/88-params.js` | 1984 | 135.7 | JS |
 | `calc2/static/calc2/89-model-state.js` | 357 | 23.0 | JS |
-| `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
+| `calc2/static/calc2/90-explain.js` | 381 | 62.9 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
-| `calc2/static/calc2/92-ui-kit.js` | 788 | 51.0 | JS |
+| `calc2/static/calc2/92-ui-kit.js` | 1315 | 90.2 | JS |
 | `calc2/static/calc2/93-shell.js` | 282 | 17.0 | JS |
 | `calc2/static/calc2/94-answer.js` | 910 | 58.2 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 470 | 26.7 | JS |
 | `calc2/static/calc2/96-self.js` | 322 | 21.4 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 35 файлов, 44102 строк, 3081.2 КБ.**
+**Итого: 35 файлов, 44849 строк, 3142.7 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -847,7 +847,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 586 — `updateLaborBilateralPanel`
 - строка 602 — `setLaborStruct`
 - строка 625 — `updateLaborPanel`
-- строка 716 — `redrawLabor`
+- строка 720 — `redrawLabor`
 
 #### `calc2/static/calc2/48-scenes-consumer.js`
 
@@ -1067,180 +1067,180 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 80 — `redrawScene`
 - строка 227 — `redrawGraphMode`
 - строка 239 — `renderMmRows`
-- строка 284 — `graphRowsBox`
-- строка 287 — `renderGraphRows`
-- строка 305 — `graphError`
-- строка 312 — `buildGraphRow`
-- строка 394 — `equipGraphRows`
-- строка 402 — `graphRowInput`
-- строка 447 — `mainScales`
-- строка 458 — `drawOverlays`
-- строка 566 — `guardedPanelIds`
-- строка 570 — `guardPanelBoxes`
-- строка 606 — `panelsChangedSinceLastPass`
-- строка 611 — `markPanelsChanged`
-- строка 614 — `flushPendingPanelClears`
-- строка 623 — `refreshAnalyticsPanel`
-- строка 651 — `typesetStats`
-- строка 703 — `addStatSign`
-- строка 716 — `statToTex`
-- строка 754 — `katexVisibleText`
-- строка 760 — `restatWide`
-- строка 806 — `statInkWidth`
-- строка 814 — `statTooWide`
-- строка 823 — `statPieces`
-- строка 858 — `texAbbrev`
-- строка 864 — `renderMathIn`
-- строка 907 — `areaKey`
-- строка 912 — `subDigits`
-- строка 917 — `applyAreaColors`
-- строка 927 — `currentAreas`
-- строка 945 — `areaOfPathEl`
-- строка 1007 — `areaShort`
-- строка 1016 — `drawLegend`
-- строка 1079 — `floatRects`
-- строка 1099 — `legendCorner`
-- строка 1176 — `viewWindow`
-- строка 1188 — `axisWords`
-- строка 1194 — `crossPoints`
-- строка 1296 — `invalidateKeyTargets`
-- строка 1299 — `kinksOf`
-- строка 1347 — `keyTargets`
-- строка 1522 — `snapVertexAt`
-- строка 1554 — `markPanelId`
-- строка 1574 — `armedPanelId`
-- строка 1580 — `drawCrossPoints`
-- строка 1729 — `armCurve`
-- строка 1735 — `disarmCurve`
-- строка 1743 — `keyPointLit`
-- строка 1756 — `drawCurveHits`
-- строка 1794 — `pinKeyPoint`
-- строка 1814 — `hoverLabel`
-- строка 1825 — `drawRoller`
-- строка 1846 — `rollerTargetAt`
-- строка 1876 — `rollerClampX`
-- строка 1895 — `rollerMove`
-- строка 1911 — `showRollTip`
-- строка 1934 — `hideRollTip`
-- строка 1943 — `rollerOff`
-- строка 1954 — `curveRightEdge`
-- строка 1979 — `axisXLetter`
-- строка 1989 — `axisLetter`
-- строка 2002 — `armVerts`
-- строка 2043 — `markServiceNodes`
-- строка 2060 — `syncCanvasMode`
-- строка 2082 — `leaveCanvasMode`
-- строка 2088 — `finishCanvasMode`
-- строка 2093 — `addAreaVert`
-- строка 2106 — `vertPanels`
-- строка 2109 — `vertsMixed`
-- строка 2111 — `clearAreaVerts`
-- строка 2117 — `renderVertList`
-- строка 2189 — `syncAreaCalcButton`
-- строка 2215 — `areaPickedCurve`
-- строка 2224 — `areaCurveRange`
-- строка 2242 — `syncAreaRangeLabel`
-- строка 2281 — `freshenVertNames`
-- строка 2297 — `drawAreaVerts`
-- строка 2370 — `areaTargets`
-- строка 2374 — `calcAreaUnderCurve`
-- строка 2387 — `ringArea`
-- строка 2397 — `segCross`
-- строка 2404 — `ringSelfCrosses`
-- строка 2426 — `angleRing`
-- строка 2432 — `bestAreaRing`
-- строка 2462 — `calcAreaPolygon`
-- строка 2479 — `AREA_PALETTE`
-- строка 2481 — `runAreaCalc`
-- строка 2502 — `clearAreaCalc`
-- строка 2509 — `drawAreaCalc`
-- строка 2545 — `updateAreaCalcPanel`
-- строка 2646 — `syncAreaCalcUI`
-- строка 2685 — `updateQuickArea`
-- строка 2695 — `curveNameInto`
-- строка 2699 — `buildAreaCurveButtons`
-- строка 2733 — `pickAreaCurve`
-- строка 2741 — `syncAreaCurveButtons`
-- строка 2760 — `setAreaCalcMode`
-- строка 2775 — `closeAreaBuild`
-- строка 2781 — `cancelAreaBuild`
-- строка 2792 — `finishPolyBuild`
-- строка 2803 — `wireFolds`
-- строка 2828 — `wireAreaCalc`
-- строка 2867 — `paramsAllowed`
-- строка 2892 — `isReservedName`
-- строка 2932 — `expandImplicitMul`
-- строка 2978 — `visibleSvgText`
-- строка 3004 — `chartLabelSource`
-- строка 3014 — `chartLabelBase`
-- строка 3031 — `chartLabelKind`
-- строка 3045 — `typesetChartLabels`
-- строка 3073 — `prepExpr`
-- строка 3091 — `texToPlain`
-- строка 3117 — `sceneReservedKey`
-- строка 3121 — `freeSymbols`
-- строка 3139 — `freeSymbolsUncached`
-- строка 3167 — `sceneReserved`
-- строка 3190 — `sceneExtraParams`
-- строка 3196 — `paramValue`
-- строка 3202 — `paramScope`
-- строка 3212 — `scopeFor`
-- строка 3219 — `evalWithParams`
-- строка 3230 — `syncParams`
-- строка 3286 — `buildParamChip`
-- строка 3411 — `initSceneColorPickers`
-- строка 3423 — `syncSceneColorPickers`
-- строка 3431 — `syncAxisPlaceholders`
-- строка 3446 — `titleAnchorPx`
-- строка 3456 — `drawGraphTitle`
-- строка 3495 — `editGraphTitleOnCanvas`
-- строка 3540 — `normHex`
-- строка 3562 — `paletteSix`
-- строка 3570 — `closeColorMenu`
-- строка 3584 — `onDocClosePick`
-- строка 3588 — `onEscClosePick`
-- строка 3604 — `paletteTwelve`
-- строка 3605 — `makeColorPicker`
-- строка 3717 — `autoCurveName`
-- строка 3726 — `curveShortName`
-- строка 3736 — `markCaption`
-- строка 3745 — `drawMarks`
-- строка 3845 — `snapTargets`
-- строка 3853 — `snapTargetsAll`
-- строка 3981 — `macroSnapTargets`
-- строка 4000 — `consumerSnapTargets`
-- строка 4029 — `ineqSnapTargets`
-- строка 4043 — `mathSnapTargets`
-- строка 4108 — `tradeSnapTargets`
-- строка 4129 — `axisSnapAt`
-- строка 4149 — `snapDistPx`
-- строка 4170 — `snapPointAt`
-- строка 4213 — `showSnapHint`
-- строка 4232 — `armMark`
-- строка 4245 — `cancelMarkDraft`
-- строка 4285 — `resetDecor`
-- строка 4377 — `_undoCopyChild`
-- строка 4391 — `_undoCopy`
-- строка 4411 — `pushUndo`
-- строка 4422 — `undoLast`
-- строка 4439 — `clearUndo`
-- строка 4446 — `forgetSceneSnapshot`
-- строка 4448 — `resetSceneMemory`
-- строка 4459 — `saveSceneSnapshot`
-- строка 4472 — `restoreSceneSnapshot`
-- строка 4497 — `keyOnText`
-- строка 4504 — `markOnText`
-- строка 4515 — `addMarkAt`
-- строка 4554 — `colorDist`
-- строка 4563 — `drawnStrokeColors`
-- строка 4579 — `nextMarkColor`
-- строка 4595 — `newMark`
-- строка 4609 — `pendingMark`
-- строка 4612 — `startMarkDraft`
-- строка 4621 — `markSnapFn`
-- строка 4631 — `renderMarkList`
-- строка 4644 — `ensureAddMarkButton`
-- строка 4655 — `buildMarkRow`
+- строка 285 — `graphRowsBox`
+- строка 288 — `renderGraphRows`
+- строка 307 — `graphError`
+- строка 314 — `buildGraphRow`
+- строка 396 — `equipGraphRows`
+- строка 404 — `graphRowInput`
+- строка 449 — `mainScales`
+- строка 460 — `drawOverlays`
+- строка 568 — `guardedPanelIds`
+- строка 572 — `guardPanelBoxes`
+- строка 608 — `panelsChangedSinceLastPass`
+- строка 613 — `markPanelsChanged`
+- строка 616 — `flushPendingPanelClears`
+- строка 625 — `refreshAnalyticsPanel`
+- строка 653 — `typesetStats`
+- строка 705 — `addStatSign`
+- строка 718 — `statToTex`
+- строка 756 — `katexVisibleText`
+- строка 762 — `restatWide`
+- строка 808 — `statInkWidth`
+- строка 816 — `statTooWide`
+- строка 825 — `statPieces`
+- строка 860 — `texAbbrev`
+- строка 866 — `renderMathIn`
+- строка 909 — `areaKey`
+- строка 914 — `subDigits`
+- строка 919 — `applyAreaColors`
+- строка 929 — `currentAreas`
+- строка 947 — `areaOfPathEl`
+- строка 1009 — `areaShort`
+- строка 1018 — `drawLegend`
+- строка 1081 — `floatRects`
+- строка 1101 — `legendCorner`
+- строка 1178 — `viewWindow`
+- строка 1190 — `axisWords`
+- строка 1196 — `crossPoints`
+- строка 1298 — `invalidateKeyTargets`
+- строка 1301 — `kinksOf`
+- строка 1349 — `keyTargets`
+- строка 1524 — `snapVertexAt`
+- строка 1556 — `markPanelId`
+- строка 1576 — `armedPanelId`
+- строка 1582 — `drawCrossPoints`
+- строка 1731 — `armCurve`
+- строка 1737 — `disarmCurve`
+- строка 1745 — `keyPointLit`
+- строка 1758 — `drawCurveHits`
+- строка 1796 — `pinKeyPoint`
+- строка 1816 — `hoverLabel`
+- строка 1827 — `drawRoller`
+- строка 1848 — `rollerTargetAt`
+- строка 1878 — `rollerClampX`
+- строка 1897 — `rollerMove`
+- строка 1913 — `showRollTip`
+- строка 1936 — `hideRollTip`
+- строка 1945 — `rollerOff`
+- строка 1956 — `curveRightEdge`
+- строка 1981 — `axisXLetter`
+- строка 1991 — `axisLetter`
+- строка 2004 — `armVerts`
+- строка 2045 — `markServiceNodes`
+- строка 2062 — `syncCanvasMode`
+- строка 2084 — `leaveCanvasMode`
+- строка 2090 — `finishCanvasMode`
+- строка 2095 — `addAreaVert`
+- строка 2108 — `vertPanels`
+- строка 2111 — `vertsMixed`
+- строка 2113 — `clearAreaVerts`
+- строка 2119 — `renderVertList`
+- строка 2191 — `syncAreaCalcButton`
+- строка 2217 — `areaPickedCurve`
+- строка 2226 — `areaCurveRange`
+- строка 2244 — `syncAreaRangeLabel`
+- строка 2283 — `freshenVertNames`
+- строка 2299 — `drawAreaVerts`
+- строка 2372 — `areaTargets`
+- строка 2376 — `calcAreaUnderCurve`
+- строка 2389 — `ringArea`
+- строка 2399 — `segCross`
+- строка 2406 — `ringSelfCrosses`
+- строка 2428 — `angleRing`
+- строка 2434 — `bestAreaRing`
+- строка 2464 — `calcAreaPolygon`
+- строка 2481 — `AREA_PALETTE`
+- строка 2483 — `runAreaCalc`
+- строка 2504 — `clearAreaCalc`
+- строка 2511 — `drawAreaCalc`
+- строка 2547 — `updateAreaCalcPanel`
+- строка 2648 — `syncAreaCalcUI`
+- строка 2687 — `updateQuickArea`
+- строка 2697 — `curveNameInto`
+- строка 2701 — `buildAreaCurveButtons`
+- строка 2735 — `pickAreaCurve`
+- строка 2743 — `syncAreaCurveButtons`
+- строка 2762 — `setAreaCalcMode`
+- строка 2777 — `closeAreaBuild`
+- строка 2783 — `cancelAreaBuild`
+- строка 2794 — `finishPolyBuild`
+- строка 2805 — `wireFolds`
+- строка 2830 — `wireAreaCalc`
+- строка 2869 — `paramsAllowed`
+- строка 2894 — `isReservedName`
+- строка 2934 — `expandImplicitMul`
+- строка 2980 — `visibleSvgText`
+- строка 3006 — `chartLabelSource`
+- строка 3016 — `chartLabelBase`
+- строка 3033 — `chartLabelKind`
+- строка 3047 — `typesetChartLabels`
+- строка 3075 — `prepExpr`
+- строка 3093 — `texToPlain`
+- строка 3119 — `sceneReservedKey`
+- строка 3123 — `freeSymbols`
+- строка 3141 — `freeSymbolsUncached`
+- строка 3169 — `sceneReserved`
+- строка 3192 — `sceneExtraParams`
+- строка 3198 — `paramValue`
+- строка 3204 — `paramScope`
+- строка 3214 — `scopeFor`
+- строка 3221 — `evalWithParams`
+- строка 3232 — `syncParams`
+- строка 3288 — `buildParamChip`
+- строка 3413 — `initSceneColorPickers`
+- строка 3425 — `syncSceneColorPickers`
+- строка 3433 — `syncAxisPlaceholders`
+- строка 3448 — `titleAnchorPx`
+- строка 3458 — `drawGraphTitle`
+- строка 3497 — `editGraphTitleOnCanvas`
+- строка 3542 — `normHex`
+- строка 3564 — `paletteSix`
+- строка 3572 — `closeColorMenu`
+- строка 3586 — `onDocClosePick`
+- строка 3590 — `onEscClosePick`
+- строка 3606 — `paletteTwelve`
+- строка 3607 — `makeColorPicker`
+- строка 3719 — `autoCurveName`
+- строка 3728 — `curveShortName`
+- строка 3738 — `markCaption`
+- строка 3747 — `drawMarks`
+- строка 3847 — `snapTargets`
+- строка 3855 — `snapTargetsAll`
+- строка 3983 — `macroSnapTargets`
+- строка 4002 — `consumerSnapTargets`
+- строка 4031 — `ineqSnapTargets`
+- строка 4045 — `mathSnapTargets`
+- строка 4110 — `tradeSnapTargets`
+- строка 4131 — `axisSnapAt`
+- строка 4151 — `snapDistPx`
+- строка 4172 — `snapPointAt`
+- строка 4215 — `showSnapHint`
+- строка 4234 — `armMark`
+- строка 4247 — `cancelMarkDraft`
+- строка 4287 — `resetDecor`
+- строка 4379 — `_undoCopyChild`
+- строка 4393 — `_undoCopy`
+- строка 4413 — `pushUndo`
+- строка 4424 — `undoLast`
+- строка 4441 — `clearUndo`
+- строка 4448 — `forgetSceneSnapshot`
+- строка 4450 — `resetSceneMemory`
+- строка 4461 — `saveSceneSnapshot`
+- строка 4474 — `restoreSceneSnapshot`
+- строка 4499 — `keyOnText`
+- строка 4506 — `markOnText`
+- строка 4517 — `addMarkAt`
+- строка 4556 — `colorDist`
+- строка 4565 — `drawnStrokeColors`
+- строка 4581 — `nextMarkColor`
+- строка 4597 — `newMark`
+- строка 4611 — `pendingMark`
+- строка 4614 — `startMarkDraft`
+- строка 4623 — `markSnapFn`
+- строка 4633 — `renderMarkList`
+- строка 4646 — `ensureAddMarkButton`
+- строка 4657 — `buildMarkRow`
 
 #### `calc2/static/calc2/70-scenes-math.js`
 
@@ -1427,44 +1427,44 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 973 — `condChainToCases`
 - строка 995 — `mathToLatexField`
 - строка 1017 — `upgradeFormulaField`
-- строка 1066 — `fitFormulaField`
-- строка 1117 — `fitFormulaFields`
-- строка 1120 — `fitFormulaFieldsSoon`
-- строка 1135 — `fieldOnScreen`
-- строка 1147 — `flushMathfieldsSoon`
-- строка 1153 — `flushMathfields`
-- строка 1187 — `katexSafe`
-- строка 1223 — `katexInto`
-- строка 1238 — `placeholderTex`
-- строка 1247 — `texSafeText`
-- строка 1251 — `buildMathfield`
-- строка 1429 — `setFormulaFieldQuiet`
-- строка 1451 — `insertIntoField`
-- строка 1470 — `keyboardAdapter`
-- строка 1472 — `insert`
-- строка 1473 — `deleteBack`
-- строка 1478 — `clear`
-- строка 1482 — `piecewise`
-- строка 1491 — `buildKeyboard`
-- строка 1501 — `addHowToTab`
-- строка 1538 — `closeAllKeyboardsExcept`
-- строка 1577 — `formulaInputError`
-- строка 1600 — `markFormulaField`
-- строка 1607 — `onFormulaInput`
-- строка 1629 — `scheduleParamsSync`
-- строка 1635 — `registerFormulaField`
-- строка 1652 — `fieldActive`
-- строка 1661 — `liveFormulaTexts`
-- строка 1688 — `equipFormulaField`
-- строка 1725 — `equipAllFormulaFields`
-- строка 1729 — `attachFormulaHelp`
-- строка 1919 — `makeEditableValue`
-- строка 2024 — `makeToggle`
-- строка 2066 — `segToToggle`
-- строка 2098 — `closeAllSelectMenus`
-- строка 2102 — `upgradeSelect`
-- строка 2203 — `upgradeTextField`
-- строка 2226 — `upgradeTextFieldsIn`
+- строка 1067 — `fitFormulaField`
+- строка 1141 — `fitFormulaFields`
+- строка 1144 — `fitFormulaFieldsSoon`
+- строка 1164 — `fieldOnScreen`
+- строка 1176 — `flushMathfieldsSoon`
+- строка 1182 — `flushMathfields`
+- строка 1216 — `katexSafe`
+- строка 1252 — `katexInto`
+- строка 1267 — `placeholderTex`
+- строка 1276 — `texSafeText`
+- строка 1280 — `buildMathfield`
+- строка 1458 — `setFormulaFieldQuiet`
+- строка 1480 — `insertIntoField`
+- строка 1499 — `keyboardAdapter`
+- строка 1501 — `insert`
+- строка 1502 — `deleteBack`
+- строка 1507 — `clear`
+- строка 1511 — `piecewise`
+- строка 1520 — `buildKeyboard`
+- строка 1530 — `addHowToTab`
+- строка 1567 — `closeAllKeyboardsExcept`
+- строка 1606 — `formulaInputError`
+- строка 1629 — `markFormulaField`
+- строка 1636 — `onFormulaInput`
+- строка 1658 — `scheduleParamsSync`
+- строка 1664 — `registerFormulaField`
+- строка 1681 — `fieldActive`
+- строка 1690 — `liveFormulaTexts`
+- строка 1718 — `equipFormulaField`
+- строка 1755 — `equipAllFormulaFields`
+- строка 1759 — `attachFormulaHelp`
+- строка 1949 — `makeEditableValue`
+- строка 2054 — `makeToggle`
+- строка 2096 — `segToToggle`
+- строка 2128 — `closeAllSelectMenus`
+- строка 2132 — `upgradeSelect`
+- строка 2233 — `upgradeTextField`
+- строка 2256 — `upgradeTextFieldsIn`
 
 #### `calc2/static/calc2/84-picker.js`
 
@@ -1562,39 +1562,40 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 229 — `pultCurveSig`
 - строка 239 — `paintEqLabel`
 - строка 254 — `texifyName`
-- строка 280 — `editEqValue`
-- строка 347 — `centerBandOn`
-- строка 351 — `pullIntoBand`
-- строка 355 — `attachBoundsEditor`
-- строка 437 — `refreshRegulators`
-- строка 448 — `makePchip`
-- строка 476 — `curveShiftBase`
-- строка 486 — `pultShiftHalf`
-- строка 490 — `resetPultShiftHalf`
-- строка 493 — `buildPultCurveChips`
-- строка 583 — `syncPultCurveValues`
-- строка 606 — `capturePultHome`
-- строка 613 — `capturePultHomes`
-- строка 618 — `returnPultHome`
-- строка 630 — `syncPultRegulators`
-- строка 659 — `upgradeRegulator`
-- строка 823 — `shortRegulatorName`
-- строка 849 — `ppfLinearFormula`
-- строка 855 — `ppfInterceptsOf`
-- строка 863 — `ppfSetSingle`
-- строка 871 — `ppfSetSum`
-- строка 891 — `addPultXChip`
-- строка 918 — `buildPultExtra`
-- строка 950 — `ineqParseIncomes`
-- строка 953 — `ineqMasterRebase`
-- строка 958 — `ineqMasterScale`
-- строка 976 — `ineqMasterApply`
-- строка 988 — `ineqMasterDetach`
-- строка 993 — `buildIneqMasterChip`
-- строка 1005 — `showPult`
-- строка 1032 — `updatePult`
-- строка 1064 — `liveFormula`
-- строка 1074 — `wireControls`
+- строка 282 — `editEqValue`
+- строка 349 — `centerBandOn`
+- строка 353 — `pullIntoBand`
+- строка 357 — `attachBoundsEditor`
+- строка 439 — `refreshRegulators`
+- строка 450 — `makePchip`
+- строка 478 — `curveShiftBase`
+- строка 488 — `pultShiftHalf`
+- строка 492 — `resetPultShiftHalf`
+- строка 495 — `buildPultCurveChips`
+- строка 586 — `syncPultCurveValues`
+- строка 609 — `capturePultHome`
+- строка 616 — `capturePultHomes`
+- строка 621 — `returnPultHome`
+- строка 633 — `syncPultRegulators`
+- строка 662 — `upgradeRegulator`
+- строка 842 — `boundText`
+- строка 843 — `shortRegulatorName`
+- строка 869 — `ppfLinearFormula`
+- строка 875 — `ppfInterceptsOf`
+- строка 883 — `ppfSetSingle`
+- строка 891 — `ppfSetSum`
+- строка 911 — `addPultXChip`
+- строка 938 — `buildPultExtra`
+- строка 971 — `ineqParseIncomes`
+- строка 974 — `ineqMasterRebase`
+- строка 979 — `ineqMasterScale`
+- строка 997 — `ineqMasterApply`
+- строка 1009 — `ineqMasterDetach`
+- строка 1014 — `buildIneqMasterChip`
+- строка 1027 — `showPult`
+- строка 1054 — `updatePult`
+- строка 1086 — `liveFormula`
+- строка 1096 — `wireControls`
 
 #### `calc2/static/calc2/89-model-state.js`
 
@@ -1687,14 +1688,34 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 426 — `syncOnChart`
 - строка 522 — `hideEmptyGroupTitles`
 - строка 550 — `wrapFieldInCard`
-- строка 617 — `paintCard`
-- строка 679 — `scOn`
-- строка 680 — `scProw`
-- строка 681 — `scParamAnchor`
-- строка 690 — `scSetup`
-- строка 762 — `scSync`
-- строка 771 — `applyAreaHidden`
-- строка 785 — `vgFormIds`
+- строка 620 — `paintCard`
+- строка 706 — `scAxisLetter`
+- строка 716 — `SC_NO_FUNCS`
+- строка 717 — `scFirstCardName`
+- строка 722 — `scWords`
+- строка 747 — `scOn`
+- строка 748 — `scProw`
+- строка 749 — `scParamAnchor`
+- строка 758 — `scSetup`
+- строка 820 — `scStepper`
+- строка 844 — `scSync`
+- строка 883 — `scConsumerCard`
+- строка 933 — `scConsumerSync`
+- строка 954 — `scIneqSetup`
+- строка 991 — `scIneqSync`
+- строка 1018 — `scGraphRows`
+- строка 1057 — `scGraphSync`
+- строка 1086 — `scMathSetup`
+- строка 1110 — `scMathSync`
+- строка 1131 — `scParamsCont`
+- строка 1146 — `scMinmaxSetup`
+- строка 1158 — `scMmRows`
+- строка 1190 — `scValueOnly`
+- строка 1193 — `scPchips`
+- строка 1237 — `scIntervSync`
+- строка 1262 — `scExtCards`
+- строка 1298 — `applyAreaHidden`
+- строка 1312 — `vgFormIds`
 
 #### `calc2/static/calc2/93-shell.js`
 
@@ -1793,6 +1814,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1322.**
+**Итого функций в индексе: 1343.**
 
 <!-- AUTO:END -->
