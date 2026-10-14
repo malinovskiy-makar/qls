@@ -4996,13 +4996,15 @@ const CASES = [
           var wantSum = raw.indexOf('D') >= 0 ? 1 : 0;
           /* Полное имя обязано остаться в панели: обозначение его не заменяет,
              а сопровождает. Иначе связь холста со списком теряется. */
-          var names = [].slice.call(document.querySelectorAll('#curve-list .curve-row span.curve-name'))
+          /* С 14.10 (ADR 0152) строки суммарных кривых живут в «Виде графика», раздел «На графике». */
+          var ROWS = '#curve-list .curve-row, #wrench-pop .vg-onchart .curve-row';
+          var names = [].slice.call(document.querySelectorAll(ROWS.replace(/curve-row/g, 'curve-row span.curve-name')))
             .map(function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); });
           var full = names.filter(function (s) { return /групп/.test(s) || /рыночн/.test(s); }).length;
-          var tags = document.querySelectorAll('#curve-list .crow-tag').length;
+          var tags = document.querySelectorAll(ROWS.replace(/\.curve-row/g, ' .crow-tag')).length;
           /* Строка суммарной кривой не должна выглядеть обломком: поля формулы
              у неё нет и быть не может, но пустое место надо объяснить. */
-          var autos = document.querySelectorAll('#curve-list .crow-auto').length;
+          var autos = document.querySelectorAll(ROWS.replace(/\.curve-row/g, ' .crow-auto')).length;
           return { longOnes: longOnes, wantD1: wantD1, wantSum: wantSum,
                    full: full, tags: tags, autos: autos };`,
     checks: [['подписей длиннее четырёх знаков на холсте', 'longOnes', 0, 0],

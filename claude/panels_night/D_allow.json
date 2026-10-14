@@ -1,0 +1,5 @@
+{
+  "labor": { "ids": ["chk-cs", "chk-ps"] },
+  "labor-mono": { "ids": ["chk-cs", "chk-ps"] },
+  "mono-d1": { "ids": ["chk-ps"] }
+}
