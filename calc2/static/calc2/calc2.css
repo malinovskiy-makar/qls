@@ -4185,3 +4185,7 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
    своё имя человека — менять её нельзя. ── */
 #tools-panel #curve-list .fc-card .fc-name::first-letter { text-transform: uppercase; }
 
+/* ── Д6: MSB и MSC карточками (scExtCards). Строка-контейнер — карточка: столбцом; поле — в строке формулы. ── */
+#tools-panel .sc-extcard { flex-direction: column; align-items: stretch; margin-bottom: 8px; }
+#tools-panel .sc-extcard > .crow-formula > .f-wrap { flex: 1 1 0; min-width: 0; display: flex; }
+

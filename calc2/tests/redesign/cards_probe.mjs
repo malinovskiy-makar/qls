@@ -757,8 +757,9 @@ async function zExt(viaEye, base) {
   else await page.evaluate(() => document.getElementById('chk-msb').click());
   await page.waitForTimeout(800);
   const p1 = await pic(page), a1 = await answerNums(page);
+  const eye = await page.evaluate(() => { const b = document.querySelector('#tools-panel .sc-extcard .fc-eye'); return b ? b.getAttribute('aria-pressed') : null; });
   await ctx.close();
-  return { picChanged: p0 !== p1, ans: a1, ansChanged: a0 !== a1, p1 };
+  return { picChanged: p0 !== p1, ans: a1, ansChanged: a0 !== a1, p1, eye };
 }
 
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
@@ -822,7 +823,7 @@ for (const name of ENGINES) {
     await zRun();
     if (!KEYS || KEYS.includes('ext')) {
       const now = await zExt(true, BASE), was = beforeMap.ext;
-      ok('З: ext — глаз MSB меняет картинку и «Ответ» так же, как галочка до правки', now.picChanged && (!was || (was.picChanged && now.ans === was.ans && now.p1 === was.p1)), JSON.stringify({ now: { pic: now.picChanged, ans: now.ans.slice(0, 80) }, was: was && { pic: was.picChanged, ans: was.ans.slice(0, 80) } }));
+      ok('З: ext — глаз MSB меняет картинку и «Ответ» так же, как галочка до правки; глаз показывает «включено»', now.picChanged && now.eye === 'true' && (!was || (was.picChanged && now.ans === was.ans && now.p1 === was.p1)), JSON.stringify({ now: { pic: now.picChanged, ans: now.ans.slice(0, 80) }, was: was && { pic: was.picChanged, ans: was.ans.slice(0, 80) } }));
     }
   }
   if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); await zhMinmax(); }

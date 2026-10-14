@@ -63,6 +63,10 @@ const RENAME = {
   '#math-pane-minmax>button.tgl-sw': '#mm-min',
   '#math-pane-constraint>button.tgl-sw': '#mc-max',
   '#taxside-row>button.tgl-sw': '#tsb-seller',
+  /* (ж) Сессия 6, Д6: галочки MSB, MSC «Внешних эффектов» → глаз карточки (README 8; галочка — источник правды,
+     спрятана; глаз щёлкает по ней). */
+  '#chk-msb': '#social-curves>button.fc-eye',
+  '#chk-msc': '#social-curves>button.fc-eye[1]',
   /* (у) список «Число групп» → сегмент «5 групп | 10 групп» (сессия 6, Г1): кнопки без id пишут в прежний список. */
   '#ineq-pane-groups>button.sel-btn': '#ineq-pane-groups>button.seg-btn',
   /* Сессия 6, Г3: кнопка цвета f «Касательной» переехала из группы «Цвета кривых» точкой карточки f (#math-row-f);

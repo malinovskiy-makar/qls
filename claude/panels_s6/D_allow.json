@@ -1,5 +1,23 @@
 {
- "consumer": { "ids": ["cons-type"] },
- "cons-slutsky": { "ids": ["cons-type"] },
- "quota": { "ids": ["seg-quota"] }
+ "consumer": {
+  "ids": [
+   "cons-type"
+  ]
+ },
+ "cons-slutsky": {
+  "ids": [
+   "cons-type"
+  ]
+ },
+ "quota": {
+  "ids": [
+   "seg-quota"
+  ]
+ },
+ "ext": {
+  "ids": [
+   "chk-msb",
+   "chk-msc"
+  ]
+ }
 }

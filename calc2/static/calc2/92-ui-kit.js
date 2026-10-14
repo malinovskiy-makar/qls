@@ -743,7 +743,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3', 'd4', 'd5']);
+  'd1', 'd2', 'd3', 'd4', 'd5', 'd6']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -857,6 +857,7 @@ function scSync() {
   scMmRows();
   scPchips();
   scIntervSync();
+  scExtCards();
   // Слова строки ползунка, которые зависят от состояния («Квота ввоза / вывоза»), — на каждой перерисовке.
   Object.keys(SC_PROWS).forEach(id => {
     const w = SC_PROWS[id][0]; if (typeof w !== 'function' || !scProw(id)) return;
@@ -1250,6 +1251,44 @@ function scIntervSync() {
     const t = STATE.intervType === 'subsidy' ? 'Получает' : 'Платит';
     if (w.textContent !== t) w.textContent = t;
   }
+}
+
+/* ═══ Д6: «Внешние эффекты» — MSB и MSC карточками (README 8: «ext: MSB, MSC — карточки, галочка — их глаз») ═══
+   У полей нет предка .field: карточкой становится их строка-контейнер (div вокруг галочки и поля), id прежние.
+   Галочка (chk-msb, chk-msc) остаётся источником правды и прячется; глаз (кнопка без id, вид) щёлкает по ней —
+   тот же обработчик, история, ссылка. Поле выключено, пока кривая выключена, — как было. */
+const SC_EXT = [['inp-msb', 'chk-msb', '\\mathrm{MSB}', 'Общественная выгода', 'MR'], ['inp-msc', 'chk-msc', '\\mathrm{MSC}', 'Общественные издержки', 'reg']];
+function scExtCards() {
+  if (!scOn('d6')) return;
+  SC_EXT.forEach(([iid, cid, symTex, name, col]) => {
+    const inp = document.getElementById(iid), chk = document.getElementById(cid);
+    const fw = inp && inp.closest('.f-wrap'); const row = inp && (inp.closest('.sc-extcard') || (fw && fw.parentElement));
+    if (!row || !chk || !row.contains(chk)) return;
+    if (!row._scExt) {
+      row._scExt = true;
+      row.classList.add('fc-card', 'sc-card', 'sc-extcard');
+      row.style.alignItems = ''; row.style.gap = '';   // узел без id: инлайновый вид — не модель
+      const lab = chk.closest('label'); if (lab) lab.classList.add('sc-vh');
+      const top = document.createElement('div'); top.className = 'crow-top';
+      const dot = document.createElement('span'); dot.className = 'fc-dot'; dot.setAttribute('aria-hidden', 'true'); dot.style.background = COL[col] || '';
+      const sym = document.createElement('span'); sym.className = 'fc-notation sc-sym'; katexInto(sym, symTex);
+      const nm = document.createElement('span'); nm.className = 'fc-name sc-name'; nm.textContent = name;
+      const eye = document.createElement('button'); eye.type = 'button'; eye.className = 'fc-eye fc-ico';
+      eye.addEventListener('click', () => chk.click());
+      top.append(dot, sym, nm, eye);
+      const line = document.createElement('div'); line.className = 'crow-formula';
+      const pre = document.createElement('span'); pre.className = 'fc-prefix'; pre.setAttribute('aria-hidden', 'true'); katexInto(pre, 'P\\,=');
+      fw.before(line); line.append(pre, fw);
+      row.insertBefore(top, row.firstChild);
+      row._scEye = eye;
+    }
+    const on = !!chk.checked, eye = row._scEye;
+    if (eye && eye._on !== on) {
+      eye._on = on; eye.innerHTML = on ? ICON_EYE : ICON_EYE_OFF;
+      eye.setAttribute('aria-pressed', on ? 'true' : 'false');
+      eye.setAttribute('aria-label', (on ? 'Спрятать' : 'Показать') + ' кривую ' + symTex.replace(/\\mathrm\{(.*)\}/, '$1'));
+    }
+  });
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из
