@@ -3899,7 +3899,7 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 }
 #tools-panel label, #tools-panel .field > label, #tools-panel label.chk, #tools-panel .fc-name, #tools-panel .curve-name:not(.fc-notation),
 #tools-panel .show-name, #tools-panel .show-name .nowrap, #tools-panel .edval-text, #tools-panel .pchip-label,
-#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note):not(.fc-notation):not(.fc-prefix),
+#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note):not(.fc-notation):not(.fc-prefix):not(.sc-letter),
 #wrench-pop label, #wrench-pop label.chk, #wrench-pop .wrench-field span, #pts-panel .area-row span, #pts-panel .area-name-fixed,
 #pts-panel .mark-on, .fc-menu .fc-mi {
   font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
@@ -4079,6 +4079,7 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .sc-ucard .sc-lrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; min-width: 0; }
 #tools-panel .sc-ucard > #cons-k-row.sc-lrow { justify-content: flex-start; gap: 18px; }
 #tools-panel .sc-letter { padding-left: 2px; font-size: 17px; color: var(--text2); }
+#tools-panel .sc-ucard .sel-caret { font-size: 16px; color: var(--text2); }
 #tools-panel .sc-letter .katex, #tools-panel .sc-pname .katex, #tools-panel .sc-nrow > label .katex { font-size: 1.05em; }
 #tools-panel .sc-ucard > #cons-custom-row { margin: 0; }
 
