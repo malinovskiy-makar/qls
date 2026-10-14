@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-14 (сессия 2 финграм/бизнес: mosh-entrepreneurship, event_for, разбор «на глаза» для эталонов v1, auto_publish_ok)
+> **Обновлён:** 2026-10-14 (сессия И2, часть 1: импорт из эталона `import_olympiad_reference`, автопубликация, `merge_enrichment_import`)
 > **Статус:** актуален
 
 # Аудит олимпиад по официальному эталону
@@ -448,9 +448,85 @@ manage.py olympiad_digitize assemble --olympiad X --suffix v2 --overlay   # → 
 пересборкой кодом коммита 08b17dbd и сверено поле в поле с 1 514 строками
 `import_queue.jsonl` сессии 1 (`tools\s2_restore_v1.py`).
 
+## Импорт из эталона (`import_olympiad_reference`, ADR 0149)
+
+Эталон v2 и дальше (markdown, пункты, рисунки, решение, ответ, критерии) →
+банк. Вход — `import_queue_vN.jsonl` или сам `reference_problems_vN.jsonl`;
+олимпиада — любая из реестра. Старый `apply_olympiad_audit --import` — только
+для v1 (нарезка PDF), им больше не импортировать.
+
+```bash
+# 0. справочник Source «…: официальный архив» (один раз на олимпиаду)
+olympiad_official_sources --olympiad vp-fingram [--apply]
+# 1. кандидаты гибридного поиска (BGE-M3 локально, ~2 мин на 100 строк) → <подпапка>\import_journal\bank_candidates.json
+import_olympiad_reference --olympiad vp-fingram --queue <подпапка>\import_queue_v2.jsonl --build-candidates
+# 2. сухой прогон: plan.csv, human_tasks_import.csv, link_review.csv, журнал *_dryrun.json
+import_olympiad_reference --olympiad vp-fingram --queue <подпапка>\import_queue_v2.jsonl
+# 3. запись (после стоп-гейта) и откат
+import_olympiad_reference ... --apply --yes-i-have-owner-approval
+import_olympiad_reference --olympiad vp-fingram --rollback <журнал.json> --apply --yes-i-have-owner-approval
+# 4. обогащение новых задач (только файлы) и переливка только в них
+glm_enrich_run --ids-file <новые id> --max-cost 1.0 --raw-out … --parsed-out … --battle-manifest … --fallback-parsed <нет файла>
+merge_enrichment_import --parsed <run_parsed без problem_type>.jsonl --protect-out <csv> --source-tag run2b [--apply]
+```
+
+**Действия плана:** создать (видимо или скрыто) · близнец (то же задание
+соседнего класса того же сезона — вторая привязка к той же новой задаче) ·
+привязать к задаче банка · на проверку · пропустить. Сумма = строк очереди —
+инвариант, иначе запись запрещена.
+
+**Видимость без человека.** `auto_publish_ok` строки + KaTeX новых текстов
+без ошибок + все файлы рисунков → `published`, `human_review=approved` через
+`ReviewVerdict` perfect, `reviewer='auto:strict_check'`, пакет
+`auto_import_<слаг>_<дата>`. Иначе `draft` + `hidden_pending_review` и строка в
+`human_tasks_import.csv`. Причины автопубликации — в `OlympiadRef.raw_meta.auto_publish`.
+
+**Привязка** — кандидаты: гибрид сайта top-20 + подсказки очереди;
+подтверждение: сходство или вхождение ≥ 0,90 и числовой отпечаток (решение
+02.09). 0,80–0,90, другая олимпиада или год, конфликт класса без близнеца,
+слабые числа, несогласные числа → `link_review.csv`. «Комплект одной
+задачей» (SolveHub хранит ВП-бизнес так): ≥ 2 заданий одного комплекта целиком
+в одной задаче банка → одна строка `OlympiadRef` с `raw_meta.kit_numbers`,
+остальные — «входит в комплект». Дописываются только ПУСТЫЕ `answer` /
+`solution`, только при совпадении целого текста и только у markdown-задач.
+
+**Правила текста** (`problems/olympiad_audit/reference_import.py`):
+хвостовой список пунктов → `ProblemPart` (вырезается из условия, баллы → `points`),
+вплетённые пункты остаются в условии; критерии — раздел «Критерии оценивания»
+в конце решения; рисунок — маркер после абзаца, за которым он стоит на
+странице PDF; разметка под рендерер (`<br>`, `<u>`, `#`, `---`); адрес PDF —
+процентной записью из `download_plan.csv`, не локальный путь.
+
+**Откат** — ТОЛЬКО журналом (`--rollback`): удаляются созданные задачи,
+подпункты, рисунки, привязки, вердикты; дописанные поля возвращаются в пустые,
+если с записи их никто не менял. ⚠️ НЕ `human_review_mark --revert` — он
+очищает ревью у всех задач банка.
+
+### Ловушки импорта
+- ⚠️ **Пункты эталона уже стоят в `statement_md`.** Ключ сравнения с банком
+  без проверки задваивал хвост — вхождение в задачу-комплект падало до 0,74
+  при дословном совпадении (`bank_match.task_text` дописывает только пункты,
+  которых в условии нет).
+- ⚠️ **Разряды чисел.** Эталон пишет «300 000», банк — `300000`, `70\,000`,
+  `70~000`: без склейки числовой отпечаток не совпадал у 24 верных пар SolveHub.
+- ⚠️ **Вариант задания** (`task_variant`) хранится в `record_id`
+  (`official:<ev>:<№>:<вариант>`) и `raw_meta.official_task_variant` — без
+  этого строки «№3» и «№3, вариант а» при повторе склеивались.
+- ⚠️ **`glm_enrich_run --max-cost` считает по акционной цене** (0,075/0,25 за
+  млн), настоящая в `AI_PRICES` вдвое выше: потолок $2 = `--max-cost 1.0`.
+- ⚠️ **`merge_enrichment_v2` для свежего импорта не годится:** кодовые
+  особенности и перевод старых `problem_type` он считает по всему банку и
+  переписывает `problem_type`/`content_status` импорта — `merge_enrichment_import`.
+- ⚠️ **`build_embeddings --stale` идёт по всей базе:** на 14.10 устаревших
+  чужих векторов 499 (SolveHub, тексты правлены 28–30.08, векторы от 09.09) —
+  импорт их не трогал, пересчитывал только свои 124 задачи.
+- ⚠️ **Скрытая задача на `/catalog/problem/<id>/` — 404 даже админу**;
+  смотреть в `/admin/problems/problem/<id>/change/`.
+
 ## Следующая олимпиада
 
-Переиспользуется как есть: `apply_olympiad_audit` целиком (режимы, защиты,
+Импорт из эталона — `import_olympiad_reference` (раздел выше). Остальное
+переиспользуется как есть: `apply_olympiad_audit` целиком (режимы, защиты,
 журнал, откат), правило близнецов, чистка PDF, вырезка рисунков (скрипт
 сессии 3 — координаты прямоугольника задаются руками по странице).
 Дописать под олимпиаду: запись в реестре `problems/olympiad_audit/registry.py`

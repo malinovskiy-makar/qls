@@ -240,6 +240,9 @@ olympiad_official_sources --olympiad vp|mosh [--apply]  # Source «официа�
 apply_olympiad_audit --olympiad vp|mosh --new-refs|--update-existing|--import|--delete-refs|--rollback F  # итоги аудита
                                   # олимпиады по официальному эталону: сухой по умолчанию, запись --apply
                                   # --yes-i-have-owner-approval, журнал и откат (docs/OLYMPIAD_AUDIT.md, ADR 0141)
+import_olympiad_reference --olympiad X --queue F [--build-candidates|--apply …|--rollback J]  # эталон v2 → банк:
+                                  # создать/привязать/на проверку, автопубликация уверенных (ADR 0149); v1-импорт выше — только старый
+merge_enrichment_import --parsed F --protect-out C [--apply]  # обогащение только задач журнала, поля импорта не переписывает
 olympiad_digitize inventory|render|transcribe|rescore|assemble --olympiad X  # эталон v2 зрячей моделью; transcribe —
                                   # деньги: без --yes только план, --max-usd обязателен; в базу не пишет
                                   # + очередь «на глаза»: triage|judge|reread|report|review-pack|control-pack, assemble --v3
