@@ -93,6 +93,8 @@ function init() {
   initSceneColorPickers();
   // «На графике» в «Виде графика»: галочки картинки переезжают узлами (92-ui-kit.js, ADR 0152).
   if (typeof vgSetup === 'function') vgSetup();
+  // Карточки функций для голых полей сцен, строки параметров, сегменты (92-ui-kit.js, сессия 5, ADR 0153).
+  if (typeof scSetup === 'function') scSetup();
   renderCurveList();
   redrawAll();
   syncViewFields();

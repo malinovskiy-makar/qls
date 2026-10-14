@@ -3897,9 +3897,9 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #wrench-pop .wrench-title, #tools-panel .curve-group-title, #tools-panel .vsub {
   font-size: 14px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--text);
 }
-#tools-panel label, #tools-panel .field > label, #tools-panel label.chk, #tools-panel .fc-name, #tools-panel .curve-name,
+#tools-panel label, #tools-panel .field > label, #tools-panel label.chk, #tools-panel .fc-name, #tools-panel .curve-name:not(.fc-notation),
 #tools-panel .show-name, #tools-panel .show-name .nowrap, #tools-panel .edval-text, #tools-panel .pchip-label,
-#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note),
+#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note):not(.fc-notation):not(.fc-prefix),
 #wrench-pop label, #wrench-pop label.chk, #wrench-pop .wrench-field span, #pts-panel .area-row span, #pts-panel .area-name-fixed,
 #pts-panel .mark-on, .fc-menu .fc-mi {
   font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
@@ -3963,3 +3963,74 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
    (были сплошной стеной строк). */
 #ex-body .ex-from-cond > p, #ex-body .ex-from-answer > p { margin: 0 0 10px; }
 #ex-body .ex-from-cond > p:last-child, #ex-body .ex-from-answer > p:last-child { margin-bottom: 0; }
+
+/* Б0: карточка функции для полей сцен (wrapFieldInCard, 92-ui-kit.js) — тот же вид, что карточка списка кривых:
+   рамка 1 px --border, радиус 10, поля 8 8 10 12, фон --surface; верхний ряд мин. 30 px, зазор 8; точка 16 px с
+   кольцом; обозначение KaTeX 19 px; имя 14 / 500 --text2, переносится (не обрезается); поле формулы 42 px. */
+#tools-panel .sc-card {
+  display: flex; flex-direction: column; gap: 8px; margin: 0 0 8px;
+  padding: 8px 8px 10px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+#tools-panel .fc-card > .crow-top { min-height: 30px; gap: 8px; }
+#tools-panel .fc-card .fc-notation { font-size: 19px; }
+#tools-panel .fc-card .fc-notation .katex { font-size: 1em; }
+#tools-panel .fc-card .fc-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+#tools-panel .fc-card .fc-dot {
+  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; margin: 0 2px 0 4px;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong);
+}
+#tools-panel .fc-card .sc-dot-slot { display: inline-flex; flex: 0 0 auto; }
+#tools-panel .fc-card .sc-dot-slot:empty { display: none; }
+#tools-panel .fc-card .crow-gear { margin-left: auto; }
+#tools-panel .fc-card .fc-eye + .crow-gear { margin-left: 0; }
+#tools-panel .sc-card > .crow-formula { min-height: 42px; }
+#tools-panel .sc-card > .crow-formula { flex-wrap: nowrap; }
+#tools-panel .sc-card > .crow-formula > .f-row { flex: 1 1 0; min-width: 0; width: auto; }
+#tools-panel .sc-old-label { display: none; }
+
+/* Строка параметра (README 4): подпись слева 14 / 500 --text2, «имя = значение» справа KaTeX 17 px, ниже
+   дорожка во всю ширину, под ней пределы 12 / 500 --text3 (меню границ по щелчку — как было). */
+#tools-panel .sc-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; row-gap: 6px; }
+#tools-panel .sc-prow > .sc-pname { grid-row: 1; grid-column: 1; font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel .sc-prow > .reg-eq { grid-row: 1; grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .sc-prow > :not(.sc-pname):not(.reg-eq) { grid-column: 1 / -1; }
+#tools-panel .sc-prow .param-track { display: grid; grid-template-columns: 1fr 1fr; row-gap: 4px; flex: 1 1 auto; }
+#tools-panel .sc-prow .param-track > input[type=range] { grid-column: 1 / -1; grid-row: 1; width: 100%; margin: 0; }
+#tools-panel .sc-prow .param-track > .param-bound { grid-row: 2; font-size: 12px; font-weight: 500; color: var(--text3); }
+#tools-panel .sc-prow .param-track > .param-bound:first-child { justify-self: start; }
+#tools-panel .sc-prow .param-track > .param-bound:last-child { justify-self: end; }
+/* Число (README 4): подпись слева, поле 76 × 36 справа. */
+#tools-panel .sc-nrows { display: block; }
+#tools-panel .sc-nrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+#tools-panel .sc-nrow > label { margin: 0; }
+#tools-panel .sc-nrow > input { flex: 0 0 76px; width: 76px; height: 36px; }
+/* Раздел «Параметры» внутри панели модели — заголовок 14 / 600 с чертой сверху, как «Вмешательство государства». */
+#tools-panel .sc-sec { margin: 18px 0 10px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 14px; font-weight: 600; color: var(--text); }
+#tools-panel .sc-sec.grp-empty { display: none; }
+/* Сегменты вместо пары подписей с тумблером (README 4). Полоса-источник (.seg с кнопками и их id) прятана
+   тумблером инлайновым display: none — её и показываем (стиль сильнее инлайнового только с !important; сам
+   инлайновый стиль не трогаем: он в форме модели и в старых ссылках), тумблер прячем классом обёртки. */
+#tools-panel .seg.sc-seg { display: flex !important; }
+#tools-panel .tgl.sc-tgl-off { display: none; }
+/* Степпер «Сколько КПВ»: «−», число, «+»; кнопки 32 × 32 с рамкой. Поле числа — прежнее (хранитель значения). */
+#tools-panel .sc-stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+#tools-panel .sc-step { width: 32px; height: 32px; border: 0; background: transparent; color: var(--text2); font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; }
+#tools-panel .sc-step:hover { color: var(--text); }
+#tools-panel .sc-stepper > input { width: 32px; height: 32px; border: 0; background: transparent; text-align: center; padding: 0; font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 17px; -moz-appearance: textfield; }
+#tools-panel .sc-stepper > input::-webkit-inner-spin-button, #tools-panel .sc-stepper > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#tools-panel .sc-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+/* «Добавить …» пунктиром (README 4): 40 px, рамка 1 px пунктиром --border-strong, радиус 10, 14 / 500 --text2, «+». */
+#tools-panel #btn-ppf-compare {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin: 0 0 8px;
+  border: 1px dashed var(--border-strong); border-radius: 10px; background: transparent; font-size: 14px; font-weight: 500; color: var(--text2);
+}
+#tools-panel #btn-ppf-compare::before { content: '+'; font-size: 16px; line-height: 1; }
+#tools-panel #btn-ppf-compare[data-on="1"]::before { content: '−'; }
+/* Блок «Рыночная цена» «Издержек» несёт свою черту инлайновым стилем шаблона: черту даёт заголовок «Параметры». */
+#costs-pane-costs > .sc-sec + div { margin-top: 0 !important; padding-top: 0 !important; border-top: 0 !important; }
+/* Поле формулы карточки сцены — 16 px: длинные записи сцен («Q³ − 6·Q² + 15·Q + 18») с приставкой «TC =» иначе
+   режутся краем (подгонка кегля fitFormulaField сжимает только кусочные записи). */
+#tools-panel .sc-card > .crow-formula math-field,
+#tools-panel .sc-card > .crow-formula .f-typeset,
+#tools-panel .sc-card > .crow-formula .f-slot > input { font-size: 16px; }

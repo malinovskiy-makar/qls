@@ -2228,6 +2228,12 @@ function renderPpfSumRows() {
     wrap.append(lab, row);
     box.appendChild(wrap);
     equipFormulaField(inp.id, 'PPF');
+    /* Карточка функции (сессия 5, ADR 0153): строка собирается здесь заново при каждой смене числа кривых, поэтому
+       и в карточку оборачивается здесь; цвет — точкой-кнопкой, подпись на графике — в «⋯». */
+    if (typeof wrapFieldInCard === 'function' && scOn('ppfsum')) {
+      nameInp._scMenuLab = 'Подпись на графике';
+      wrapFieldInCard(wrap, { input: inp.id, sym: '\\text{КПВ}_{' + (i + 1) + '}', name: 'Участник ' + (i + 1), slotEl: pick, menu: [nameInp] });
+    }
   }
 }
 

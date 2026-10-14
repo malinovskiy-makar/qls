@@ -831,6 +831,8 @@ function shortRegulatorName(id, raw) {
      меняется одним движением мировой цены. Поэтому имени в готовом списке нет
      — его каждый раз спрашивают у модели, как и букву ставки. */
   if (id === 'open-quota-field' && typeof openQuotaName === 'function') return openQuotaName();
+  // Строка параметра (сессия 5): слова слева пишет .sc-pname, здесь только обозначение (SC_PROWS, 92-ui-kit.js).
+  if (typeof scProw === 'function' && scProw(id)) return scProw(id)[1];
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
   if (!s) return 'Значение';

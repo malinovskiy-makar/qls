@@ -509,6 +509,7 @@ function syncOnChart() {
   box.querySelectorAll('.vg-sub').forEach(h => { h.hidden = !(h.dataset.vg === 'curves' ? c && (a || m) : a && (c || m)); });
   box.hidden = !(c || a || m);
   hideEmptyGroupTitles();
+  if (typeof scSync === 'function') scSync();   // карточки полей сцен (сессия 5)
 }
 /* Заголовок группы «Условия», под которым не осталось ни одного видимого органа, не показывается (правка А3 по
    приёмке 14.10, сессия 5): галочки картинки уехали в «Вид» (ADR 0152), а «Средние и предельные затраты», «Полные
@@ -537,6 +538,233 @@ function hideEmptyGroupTitles() {
     t.classList.toggle('grp-empty', !hasOrgan(group));
   });
 }
+/* ═══ КАРТОЧКИ ФУНКЦИЙ ДЛЯ «ГОЛЫХ» ПОЛЕЙ СЦЕН (тихие панели, сессия 5; README пакета 4, 8; ADR 0153) ═══
+   Поле формулы сцены (КПВ, торговля, фирма, монополия) получает тот же вид, что карточка кривой из списка
+   (renderCurveList, 80-ui.js): верхний ряд — точка цвета, обозначение KaTeX, имя, «⋯»; ниже поле с приставкой.
+   Обёртка — НА МЕСТЕ: узел .field сам становится карточкой, поле, его id, обработчики, оснастка
+   (equipFormulaField, fitFormulaField), живая запись (liveFormulaTexts) и видимость от сцен — прежние;
+   переносятся только узлы (подпись поля на графике — в «⋯», кнопка цвета — в верхний ряд), новых id нет.
+   Глаз ставится только там, где у кривой есть видимость (у полей сцен её нет: видимость кривых, которые
+   модель строит сама, — в «Виде», решение …8142…); «⋯» — только если в меню есть пункты; точка-кнопка — если у
+   кривой свой выбор цвета (swatch-slot), иначе простой значок цвета роли. */
+function wrapFieldInCard(field, o) {
+  if (!field || field._scCard) return field ? field._scCard : null;
+  const inp = document.getElementById(o.input);
+  const fRow = inp && inp.closest('.f-row');
+  if (!inp || !fRow || !field.contains(fRow)) return null;
+  const lab = field.querySelector(':scope > label');
+  field.classList.add('fc-card', 'sc-card');
+  const top = document.createElement('div');
+  top.className = 'crow-top';
+  // Точка цвета: свой выбор цвета (узел-слот переезжает из подписи) или значок цвета роли.
+  /* Слот выбора цвета (узел с id) переезжает в верхний ряд, даже пустой: у КПВ выбора цвета сейчас нет (слоты
+     ppf-color* пусты), тогда рядом встаёт простой значок цвета кривой. */
+  let dot = o.slot ? document.getElementById(o.slot) : (o.slotEl || null);
+  let slot = null;
+  if (dot) { dot.classList.add('sc-dot-slot'); if (!dot.children.length && o.col) { slot = dot; dot = null; } }
+  if (!dot && o.col) { dot = document.createElement('span'); dot.className = 'fc-dot'; dot.setAttribute('aria-hidden', 'true'); }
+  const sym = document.createElement('span');
+  sym.className = 'fc-notation sc-sym';
+  const name = document.createElement('span');
+  name.className = 'fc-name sc-name';
+  if (slot) top.appendChild(slot);
+  if (dot) top.appendChild(dot);
+  top.append(sym, name);
+  // Меню «⋯»: только если есть что положить.
+  let more = null;
+  const items = (o.menu || []).map(x => (typeof x === 'string' ? document.getElementById(x) : x)).filter(Boolean);
+  if (items.length) {
+    more = document.createElement('div');
+    more.className = 'crow-more fc-menu';
+    more.setAttribute('role', 'dialog');
+    more.setAttribute('aria-label', 'Настройки: ' + (o.name || ''));
+    items.forEach(n => {
+      if (n.tagName === 'BUTTON') { n.classList.add('fc-mi'); more.appendChild(n); return; }   // кнопка пунктом меню
+      const l = document.createElement('div');
+      l.className = 'fc-menu-lab'; l.textContent = n._scMenuLab || 'Подпись на графике';
+      more.append(l, n);
+    });
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.className = 'btn-icon crow-gear fc-ico';
+    gear.setAttribute('aria-label', 'Настройки: ' + (o.name || ''));
+    gear.setAttribute('aria-haspopup', 'dialog');
+    gear.setAttribute('aria-expanded', 'false');
+    gear.innerHTML = ICON_DOTS;
+    gear.addEventListener('click', (e) => { e.stopPropagation(); if (more.classList.contains('open')) { closeFcMenu(); return; } openFcMenu(gear, more); });
+    top.appendChild(gear);
+  }
+  // Строка формулы: приставка и прежний ряд поля (f-row: поле, клавиатура).
+  const line = document.createElement('div');
+  line.className = 'crow-formula';
+  fRow.before(line);
+  if (o.prefix) {
+    const pre = document.createElement('span');
+    pre.className = 'fc-prefix'; pre.setAttribute('aria-hidden', 'true');
+    line.appendChild(pre);
+    field._scPre = pre;
+  }
+  line.appendChild(fRow);
+  field.insertBefore(top, field.firstChild);
+  if (more) line.after(more);
+  // Прежняя подпись: её текст пишет сцена — остаётся, спрятана классом; иначе убирается.
+  if (lab) { if (o.keepLabel) lab.classList.add('sc-old-label'); else lab.remove(); }
+  field._scCard = { o, dot, sym, name, top, more };
+  paintCard(field);
+  return field._scCard;
+}
+/* Обозначение, имя, приставка и цвет значка — по состоянию (у «Монополиста и внешнего рынка» поля те же, что у
+   дискриминации 3-й степени, а смысл другой): зовётся на каждой перерисовке. */
+function paintCard(field) {
+  const c = field._scCard; if (!c) return;
+  const v = (x) => (typeof x === 'function' ? x() : x);
+  const sym = v(c.o.sym), name = v(c.o.name), pre = v(c.o.prefix);
+  if (c.sym._tex !== sym) { c.sym._tex = sym; katexInto(c.sym, sym); }
+  if (c.name.textContent !== name) c.name.textContent = name;
+  if (field._scPre && field._scPre._tex !== pre) { field._scPre._tex = pre; katexInto(field._scPre, String(pre).replace(' =', '\\,=')); }
+  if (c.dot && c.dot.classList.contains('fc-dot')) {
+    const cv = v(c.o.col), col = COL[cv] || cv || '';   // ключ палитры COL или сам цвет
+    if (c.dot._col !== col) { c.dot._col = col; c.dot.style.background = col; }
+  }
+}
+
+/* Карточки моделей сессии 5 (README 8): поле → обозначение, имя, приставка, цвет, «⋯». */
+const SC_CARDS = [
+  { m: 'ppf', input: 'inp-ppf', sym: '\\text{КПВ}', name: 'Производственные возможности', slot: 'ppf-color1', col: () => STATE.ppfColor1 || COL.D, menu: ['ppf-name1-row'] },
+  { m: 'ppf', input: 'inp-ppf2b', sym: '\\text{КПВ}_2', name: 'Для сравнения', slot: 'ppf-color2', col: () => STATE.ppfColor2 || COL.S, menu: [() => { const i = document.getElementById('inp-ppf-name2'); return i && i.closest('.field'); }] },
+  { m: 'trade', input: 'inp-ppft', sym: '\\text{КПВ}', name: 'Страна', prefix: 'Y =', col: 'D' },
+  { m: 'tradeprice', input: 'inp-tb1', sym: '\\text{КПВ}_1', name: 'Страна 1', prefix: 'Y =', col: 'D' },
+  { m: 'tradeprice', input: 'inp-tb2', sym: '\\text{КПВ}_2', name: 'Страна 2', prefix: 'Y =', col: 'S' },
+  { m: 'prod', input: 'inp-prod', sym: '\\mathrm{TP}', name: 'Производственная функция', prefix: 'Q =', col: 'prodTP' },
+  { m: 'costs', input: 'inp-tc', sym: '\\mathrm{TC}', name: 'Суммарные затраты', prefix: '\\mathrm{TC} =', col: 'costTC', menu: ['btn-costs-preset'] },
+  { m: 'costs', input: 'inp-cmc', sym: '\\mathrm{MC}', name: 'Предельные затраты', prefix: '\\mathrm{MC} =', col: 'costMC' },
+  { m: 'costs', input: 'inp-catc', sym: '\\mathrm{ATC}', name: 'Средние общие', prefix: '\\mathrm{ATC} =', col: 'costATC' },
+  { m: 'costs', input: 'inp-cavc', sym: '\\mathrm{AVC}', name: 'Средние переменные', prefix: '\\mathrm{AVC} =', col: 'costAVC' },
+  { m: 'plants', input: 'inp-pl1', sym: '\\mathrm{TC}_1', name: 'Завод 1', prefix: '\\mathrm{TC}_1 =', col: 'tax' },
+  { m: 'plants', input: 'inp-pl2', sym: '\\mathrm{TC}_2', name: 'Завод 2', prefix: '\\mathrm{TC}_2 =', col: 'reg' },
+  { m: 'isoquant', input: 'inp-iso', sym: 'Q', name: 'Производственная функция', prefix: 'Q =', col: 'isoq' },
+  // «Монополист и внешний рынок» — те же поля, что у дискриминации 3-й степени (STATE.d3World): подписи пишет
+  // сцена (applyD3WorldLabels) — они остаются спрятанными, карточка берёт смысл по состоянию.
+  { m: 'mono-d3', input: 'inp-d3-1', sym: () => (STATE.d3World ? 'D' : 'D_1'), name: () => (STATE.d3World ? 'Внутренний спрос' : 'Спрос рынка 1'), prefix: 'P =', col: 'D', keepLabel: true },
+  { m: 'mono-d3', input: 'inp-d3-2', sym: () => (STATE.d3World ? 'P_w' : 'D_2'), name: () => (STATE.d3World ? 'Мировая цена' : 'Спрос рынка 2'), prefix: () => (STATE.d3World ? 'P_w =' : 'P ='), col: () => (STATE.d3World ? 'reg' : 'D'), keepLabel: true },
+  { m: 'mono-d3', input: 'inp-d3-mc', sym: '\\mathrm{MC}', name: () => (STATE.d3World ? 'Предельные издержки от общего выпуска' : 'Предельные издержки'), prefix: '\\mathrm{MC} =', col: 'S', keepLabel: true },
+  { m: 'mono-kink', input: 'inp-ki-1', sym: 'D_1', name: 'Спрос 1', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-ki-2', sym: 'D_2', name: 'Спрос 2', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-ki-3', sym: 'D_3', name: 'Спрос 3, необязательно', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-kp-1', sym: 'D_1', name: 'Верхний кусок', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-kp-2', sym: 'D_2', name: 'Нижний кусок', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-kink-mc', sym: '\\mathrm{MC}', name: 'Предельные издержки', prefix: '\\mathrm{MC} =', col: 'S' },
+];
+/* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
+   берёт shortRegulatorName (88-params.js) отсюда. */
+const SC_PROWS = {
+  'ppft-price-field': ['Мировая цена', 'Px/Py', 'trade'], 'tb-price-field': ['Мировая цена', 'Pw', 'tradeprice'],
+  'lr-price-field': ['Цена', 'P', 'costs'], 'pl-q-field': ['Совокупный выпуск', 'Q', 'plants'],
+  'union-wage-field': ['Зарплата профсоюза', 'W', 'labor'], 'labmin-field': ['Минимальная зарплата', 'W_min', 'labor'],
+  'open-pw-field': ['Мировая цена', 'Pw', 'smallopen'],
+};
+// Строки чисел (подпись слева, поле 76 × 36 справа): [id поля, модель].
+const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle-x2', 'ppfsum'], ['inp-bundle-y2', 'ppfsum'],
+  ['inp-bundle-xt', 'trade'], ['inp-bundle-yt', 'trade'], ['iso-w', 'isoquant'], ['iso-r', 'isoquant'], ['iso-c', 'isoquant'],
+  ['inp-nat-fc', 'mono-nat']];
+// Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
+const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
+  ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
+  ['open-pw-field', 'smallopen']];
+// Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
+/* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
+   модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
+   'labor' — все четыре модели рынка труда. */
+const SC_ON = new Set([]);
+const scOn = (m) => SC_ON.has(m);
+function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
+function scParamAnchor(el) {
+  if (!el) return null;
+  // «Рыночная цена» в «Издержках» стоит своим блоком с чертой сверху — заголовок встаёт перед блоком.
+  if (el.id === 'chk-lr') { const l = el.closest('label'); return (l && l.parentElement && l.parentElement.id !== 'costs-pane-costs') ? l.parentElement : l; }
+  if (el.type === 'checkbox') return el.closest('label') || el;
+  if (el.id === 'iso-w') return el.closest('.row') || el.closest('.field');
+  if (el.tagName === 'INPUT') return el.closest('.field') || el;
+  return el;
+}
+function scSetup() {
+  SC_CARDS.forEach(o => {
+    if (!scOn(o.m)) return;
+    const inp = document.getElementById(o.input);
+    const field = inp && inp.closest('.field');
+    if (!field) return;
+    const menu = (o.menu || []).map(x => (typeof x === 'function' ? x() : x));
+    wrapFieldInCard(field, Object.assign({}, o, { menu }));
+  });
+  Object.keys(SC_PROWS).forEach(id => {
+    const f = document.getElementById(id);
+    if (!f || f._scRow || !scProw(id)) return;
+    f._scRow = true;
+    f.classList.add('sc-prow');
+    const nm = document.createElement('span');
+    nm.className = 'sc-pname'; nm.textContent = SC_PROWS[id][0];
+    f.insertBefore(nm, f.firstChild);
+  });
+  SC_NROWS.forEach(([id, m]) => {
+    if (!scOn(m)) return;
+    const i = document.getElementById(id);
+    const f = i && i.closest('.field');
+    if (!f) return;
+    f.classList.add('sc-nrow');
+    const row = f.parentElement;
+    if (row && row.classList.contains('row')) row.classList.add('sc-nrows');
+  });
+  SC_PARAM_HEAD.forEach(([id, m]) => {
+    if (!scOn(m)) return;
+    const a = scParamAnchor(document.getElementById(id));
+    if (!a || (a.previousElementSibling && a.previousElementSibling.classList.contains('sc-sec'))) return;
+    const h = document.createElement('div');
+    h.className = 'section-title sc-sec'; h.textContent = 'Параметры';
+    a.before(h);
+  });
+  SC_SEGS.forEach(([id, m]) => {
+    if (!scOn(m)) return;
+    const b = document.getElementById(id);
+    const seg = b && b.closest('.seg');
+    if (!seg) return;
+    seg.classList.add('sc-seg');
+    if (seg._tgl) seg._tgl.classList.add('sc-tgl-off');
+  });
+  // «Сравнить с другой КПВ» — пунктирной «Добавить …» после второй карточки.
+  const cmp = document.getElementById('btn-ppf-compare'), second = document.getElementById('ppf-second');
+  if (scOn('ppf') && cmp && second && second.nextElementSibling !== cmp) second.after(cmp);
+  // «Сколько КПВ»: степпер вокруг прежнего поля числа (оно хранит значение и слушает ввод).
+  const n = document.getElementById('inp-ppfsum-n');
+  if (scOn('ppfsum') && n && !n._scStep) {
+    n._scStep = true;
+    const f = n.closest('.field');
+    if (f) f.classList.add('sc-step-row');
+    const box = document.createElement('span');
+    box.className = 'sc-stepper';
+    n.before(box);
+    const step = (d, label) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sc-step'; b.textContent = d < 0 ? '−' : '+';
+      b.setAttribute('aria-label', label);
+      b.addEventListener('click', () => {
+        const lo = +n.min || 2, hi = +n.max || 5, v = Math.max(lo, Math.min(hi, (parseInt(n.value, 10) || lo) + d));
+        if (String(v) === n.value) return;
+        n.value = String(v);
+        n.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      return b;
+    };
+    box.append(step(-1, 'Меньше КПВ'), n, step(1, 'Больше КПВ'));
+  }
+  scSync();
+}
+// По состоянию на каждой перерисовке: смысл карточек «Дискриминации» / «Внешнего рынка», цвета значков.
+function scSync() {
+  document.querySelectorAll('#tools-panel .sc-card').forEach(paintCard);
+  const cmp = document.getElementById('btn-ppf-compare');
+  if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
+}
+
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из
    холста до легенды, PNG и .tex (они собирают то, что нарисовано). Протяжки (клин налога) —
    отдельные узлы без data-legend, они остаются. Зовётся из drawOverlays рядом с applyAreaColors. */
