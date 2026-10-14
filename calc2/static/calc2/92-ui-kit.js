@@ -800,7 +800,9 @@ function scConsumerCard() {
   const firstRow = document.getElementById('cons-px') && document.getElementById('cons-px').closest('.row');
   if (!sec || !typeField || !firstRow || sec._scU) return;
   sec._scU = true;
-  if (typeof upgradeSelect === 'function') upgradeSelect('cons-type', 'Вид полезности');
+  // Без data-tip (подсказок нет, решение …81eb…): подпись для диктора — aria-label кнопки.
+  if (typeof upgradeSelect === 'function') upgradeSelect('cons-type');
+  if (sel.previousElementSibling && sel.previousElementSibling.classList.contains('sel-btn')) sel.previousElementSibling.setAttribute('aria-label', 'Вид полезности');
   const card = document.createElement('div');
   card.className = 'fc-card sc-card sc-ucard';
   const top = document.createElement('div'); top.className = 'crow-top';
