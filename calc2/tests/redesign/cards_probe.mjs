@@ -678,7 +678,7 @@ const zLook = (page) => page.evaluate(() => {
     const tag = (row && (row.id || (row.querySelector('[id]') || {}).id)) || sl.id || '?';
     const words = row && (row.querySelector('.sc-pname') || row.querySelector(':scope > .pchip-top > .pchip-label:not(.param-eq)'));
     const val = row && (row.querySelector('.reg-eq, .param-eq, .sc-pval') || row.querySelector(':scope > .pchip-top > .pchip-val'));
-    const b = [...(row ? row.querySelectorAll('.param-bound, .sc-bounds > span') : [])].filter(shown);
+    const b = [...(row ? row.querySelectorAll('.param-bound, .sc-bounds > *') : [])].filter(shown);
     const issues = [];
     if (!words || !shown(words) || !tx(words)) issues.push('нет слов слева');
     if (!val || !shown(val) || !tx(val)) issues.push('нет значения справа');

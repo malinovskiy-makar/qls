@@ -87,7 +87,10 @@ async function sectionA() {
       const shown = (id) => { const e = document.getElementById(id); if (!e) return false; const box = e.type === 'checkbox' ? (e.closest('label') || e) : e; return vis(box); };
       const view = P.filter(id => { const e = document.getElementById(id); return e && e.closest('#wrench-pop .vg-onchart') && shown(id); });
       const leftPic = P.filter(id => { const e = document.getElementById(id); return e && e.closest('#tools-panel') && shown(id); });
-      const condLeft = C.filter(id => { const e = document.getElementById(id); return e && e.closest('#tools-panel') && shown(id); });
+      /* Галочки MSB, MSC «Внешних эффектов» — глаз своей карточки (сессия 6, Д6; README 8: «галочка — их глаз»):
+         галочка спрятана и осталась источником правды, на экране условие задаёт глаз карточки. */
+      const eyeOf = (id) => { const e = document.getElementById(id); const c = e && e.closest('.sc-extcard'); const b = c && c.querySelector('.crow-top .fc-eye'); return !!(b && vis(b)); };
+      const condLeft = C.filter(id => { const e = document.getElementById(id); return e && e.closest('#tools-panel') && (shown(id) || eyeOf(id)); });
       return { view, leftPic, condLeft };
     }, [PICTURE, CONDITION]);
     await closeView(page);
@@ -292,8 +295,9 @@ async function rowsOf(page) {
     return [...document.querySelectorAll(sel)].map((r, i) => {
       if (!vis(r)) return null;
       const has = (q) => [...r.querySelectorAll(q)].some(vis);
+      /* «seg» — полоса сегмента вместо тумблера (сессия 6, Д8: «Суммарные TC | Предельные MC» заводов). */
       const kind = r.querySelector('input[type=checkbox]') && vis(r.querySelector('input[type=checkbox]').closest('label') || r) ? 'chk'
-        : has('.tgl-sw') ? 'tgl' : has('.fc-eye') ? 'eye' : has('.cpick-btn') ? 'color' : has('.edval-text') ? 'name' : null;
+        : has('.tgl-sw') ? 'tgl' : has('.seg-btn') ? 'seg' : has('.fc-eye') ? 'eye' : has('.cpick-btn') ? 'color' : has('.edval-text') ? 'name' : null;
       return kind ? { i, kind, name: r.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) } : null;
     }).filter(Boolean);
   }, ROW_SEL);
@@ -323,6 +327,7 @@ async function actOnRow(page, row) {
   const el = h.asElement();
   if (row.kind === 'chk') { const inp = await el.$('input[type=checkbox]'); await inp.click({ force: true }); }
   else if (row.kind === 'tgl') { const t = await el.$('.tgl-sw'); await t.click(); }
+  else if (row.kind === 'seg') { const t = await el.$('.seg-btn:not(.active)'); if (t) await t.click(); }
   else if (row.kind === 'eye') { const t = await el.$('.fc-eye'); await t.click(); }
   else if (row.kind === 'color') {
     const t = await el.$('.cpick-btn'); await t.click();

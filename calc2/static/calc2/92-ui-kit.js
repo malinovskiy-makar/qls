@@ -737,13 +737,13 @@ const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['pp
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['union-pane', 'labor'],
   ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer'], ['chk-elast-s', 'd7']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
-const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint'], ['tsb-seller', 'd3']];
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint'], ['tsb-seller', 'd3'], ['plv-tc', 'd8']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7']);
+  'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -1218,7 +1218,8 @@ function scPchips() {
     let b = sl.nextElementSibling;
     if (!b || !b.classList.contains('sc-bounds')) {
       b = document.createElement('div'); b.className = 'sc-bounds'; b.setAttribute('aria-hidden', 'true');
-      b.append(document.createElement('span'), document.createElement('span'));
+      // <small>, а не <span>: лесенка «Условия» ставит 14 px всем span внутри .field (пределы — ступень 12 / 500).
+      b.append(document.createElement('small'), document.createElement('small'));
       sl.after(b);
     }
     const t0 = boundText(+sl.min), t1 = boundText(+sl.max);

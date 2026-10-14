@@ -63,6 +63,7 @@ const RENAME = {
   '#math-pane-minmax>button.tgl-sw': '#mm-min',
   '#math-pane-constraint>button.tgl-sw': '#mc-max',
   '#taxside-row>button.tgl-sw': '#tsb-seller',
+  '#costs-pane-plants>button.tgl-sw': '#plv-tc',   // тумблер заводов в «Виде» → сегмент (сессия 6, Д8)
   /* (ж) Сессия 6, Д6: галочки MSB, MSC «Внешних эффектов» → глаз карточки (README 8; галочка — источник правды,
      спрятана; глаз щёлкает по ней). */
   '#chk-msb': '#social-curves>button.fc-eye',
