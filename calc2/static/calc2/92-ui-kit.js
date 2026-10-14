@@ -682,9 +682,9 @@ const SC_CARDS = [
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
 const SC_PROWS = {
-  'ppft-price-field': ['Мировая цена', 'Px/Py', 'trade'], 'tb-price-field': ['Мировая цена', 'Pw', 'tradeprice'],
+  'ppft-price-field': ['Мировая цена', 'P_x/P_y', 'trade'], 'tb-price-field': ['Мировая цена', 'Pw', 'tradeprice'],
   'lr-price-field': ['Цена', 'P', 'costs'], 'pl-q-field': ['Совокупный выпуск', 'Q', 'plants'],
-  'union-wage-field': ['Зарплата профсоюза', 'W', 'labor'], 'labmin-field': ['Минимальная зарплата', 'W_min', 'labor'],
+  'union-wage-field': ['Зарплата профсоюза', 'W', 'labor'], 'labmin-field': ['Уровень', 'W_min', 'labor'],
   'open-pw-field': ['Мировая цена', 'Pw', 'smallopen'],
   // Сессия 6, Б2: «Новая цена товара x» и P_{x₁} (shortRegulatorName резал «Px₁» до «…», Notion …81b4…).
   'cons-px1-row': ['Новая цена товара $x$', 'P_{x_1}', 'consumer'],
@@ -734,8 +734,8 @@ const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle
   ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips'], ['ma-ms', 'money'], ['ma-lafmax', 'laffer']];
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
-  ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
-  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
+  ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['union-pane', 'labor'],
+  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer'], ['chk-elast-s', 'd7']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
 const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax'], ['mc-max', 'm-constraint'], ['tsb-seller', 'd3']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
@@ -743,7 +743,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3', 'd4', 'd5', 'd6']);
+  'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {

@@ -264,7 +264,7 @@ function texifyName(name) {
      \\text{} целиком — на экране стояло бы «D_1» с настоящим подчёркиванием
      вместо индекса (замер 25.08). */
   // Готовая запись TeX («P_{x_1}», «\Delta G» — строки параметров сессии 6) — как есть.
-  if (/^[A-Za-z]_\{.+\}$/.test(s) || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s)) return s;
+  if (/^[A-Za-z]_\{.+\}$/.test(s) || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s) || /^[A-Za-z]_[a-z]\/[A-Za-z]_[a-z]$/.test(s)) return s;
   const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
   if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
   /* Экономическое сокращение из заглавных (MC, ATC, DWL, MSB…) — одно обозначение

@@ -19,7 +19,7 @@ echo "сверка: $(tail -1 $OUT/compare.txt)"
 node calc2/tests/redesign/parity_quick.mjs > $OUT/parity.log 2>&1 || r=1; echo "паритет: $(tail -1 $OUT/parity.log)"
 node calc2/tests/redesign/state_probe.mjs > $OUT/state.log 2>&1 || r=1; echo "состояние: $(tail -1 $OUT/state.log)"
 node calc2/tests/control_numbers.mjs > $OUT/cn.log 2>&1 || r=1; echo "контрольные числа: $(tail -1 $OUT/cn.log)"
-ENGINES=chromium KEYS="$CARDKEYS" node calc2/tests/redesign/cards_probe.mjs ${CARDONLY:+--only $CARDONLY} > $OUT/cards.log 2>&1 || r=1; echo "cards_probe: $(tail -1 $OUT/cards.log)"
+ENGINES=chromium KEYS="$CARDKEYS" node calc2/tests/redesign/cards_probe.mjs ${CARDONLY:+--only} $CARDONLY > $OUT/cards.log 2>&1 || r=1; echo "cards_probe: $(tail -1 $OUT/cards.log)"
 grep -h -E "FAIL|✗" $OUT/*.log $OUT/compare.txt | head -8
 echo "КОД $r"
 exit $r

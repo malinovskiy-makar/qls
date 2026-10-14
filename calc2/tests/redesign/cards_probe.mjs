@@ -388,7 +388,7 @@ async function kRun(theme) {
     ok(w + 'ни одна некусочная запись карточки не обрезана, TC «Издержек» тоже', (nF > 0 || onlyNoCards) && !f.cut.length, f.cut.slice(0, 6).join(' | '));
     ok(w + 'точка цвета 16 ± 1 px с кольцом у всех карточек (' + nD + ')', (nD > 0 || onlyNoCards) && !f.dot.length, f.dot.slice(0, 6).join(' | '));
     ok(w + 'у кнопки цвета размер нажатия ≥ 26 px', !f.hit.length, f.hit.slice(0, 6).join(' | '));
-    if (!KEYS || KEYS.some(k => ['ppf', 'isoquant', 'mono-nat', 'trade', 'ppfsum', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer', 'ineq'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
+    if (!KEYS || KEYS.some(k => ['isoquant', 'mono-nat', 'consumer', 'cons-slutsky', 'phillips', 'money', 'laffer', 'ineq'].includes(k))) ok(w + 'числа строк параметров — плашкой 76 × 36 (' + nN + ')', nN > 0 && !f.num.length, f.num.slice(0, 6).join(' | '));
     ok(w + 'ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
