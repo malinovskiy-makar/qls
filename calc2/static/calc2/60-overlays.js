@@ -276,6 +276,7 @@ function renderMmRows() {
     if (!inp.id) inp.id = 'mm-f' + i;
     equipFormulaField(inp.id, 'MATHF');
   }
+  if (typeof scMmRows === 'function') scMmRows();   // строка — карточка f₁, f₂ … (тихие панели, сессия 6, Г4)
 }
 
 /* Список функций как в графопостроителе: внизу всегда одна пустая строка.

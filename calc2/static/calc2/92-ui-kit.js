@@ -726,11 +726,11 @@ const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['pp
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
   ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money'], ['ma-dg-field', 'loanable'], ['ma-fx-fixed', 'fx'], ['ma-lafmax', 'laffer']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
-const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq']];
+const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor'], ['ineq-rd-tax', 'ineq'], ['mm-min', 'm-minmax']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
@@ -754,6 +754,7 @@ function scSetup() {
   if (scOn('consumer')) scConsumerCard();
   if (scOn('ineq')) scIneqSetup();
   if (scOn('m-math')) scMathSetup();
+  if (scOn('m-minmax')) scMinmaxSetup();
   Object.keys(SC_PROWS).forEach(id => {
     const f = document.getElementById(id);
     if (!f || f._scRow || !scProw(id)) return;
@@ -794,29 +795,34 @@ function scSetup() {
   const cmp = document.getElementById('btn-ppf-compare'), second = document.getElementById('ppf-second');
   if (scOn('ppf') && cmp && second && second.nextElementSibling !== cmp) second.after(cmp);
   // «Сколько КПВ»: степпер вокруг прежнего поля числа (оно хранит значение и слушает ввод).
-  const n = document.getElementById('inp-ppfsum-n');
-  if (scOn('ppfsum') && n && !n._scStep) {
-    n._scStep = true;
-    const f = n.closest('.field');
-    if (f) f.classList.add('sc-step-row');
-    const box = document.createElement('span');
-    box.className = 'sc-stepper';
-    n.before(box);
-    const step = (d, label) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'sc-step'; b.textContent = d < 0 ? '−' : '+';
-      b.setAttribute('aria-label', label);
-      b.addEventListener('click', () => {
-        const lo = +n.min || 2, hi = +n.max || 5, v = Math.max(lo, Math.min(hi, (parseInt(n.value, 10) || lo) + d));
-        if (String(v) === n.value) return;
-        n.value = String(v);
-        n.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      return b;
-    };
-    box.append(step(-1, 'Меньше КПВ'), n, step(1, 'Больше КПВ'));
-  }
+  if (scOn('ppfsum')) scStepper('inp-ppfsum-n', 2, 5, 'Меньше КПВ', 'Больше КПВ');
+  // «Сколько функций» (сессия 6, Г4) — тот же степпер.
+  if (scOn('m-minmax')) scStepper('mm-count', 2, 8, 'Меньше функций', 'Больше функций');
   scSync();
+}
+/* Степпер «−, число, +» вокруг прежнего поля числа: поле — хранитель значения и слушает ввод (событие input). */
+function scStepper(id, lo0, hi0, minus, plus) {
+  const n = document.getElementById(id);
+  if (!n || n._scStep) return;
+  n._scStep = true;
+  const f = n.closest('.field');
+  if (f) f.classList.add('sc-step-row');
+  const box = document.createElement('span');
+  box.className = 'sc-stepper';
+  n.before(box);
+  const step = (d, label) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sc-step'; b.textContent = d < 0 ? '−' : '+';
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', () => {
+      const lo = +n.min || lo0, hi = +n.max || hi0, v = Math.max(lo, Math.min(hi, (parseInt(n.value, 10) || lo) + d));
+      if (String(v) === n.value) return;
+      n.value = String(v);
+      n.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    return b;
+  };
+  box.append(step(-1, minus), n, step(1, plus));
 }
 // По состоянию на каждой перерисовке: смысл карточек «Дискриминации» / «Внешнего рынка», цвета значков.
 function scSync() {
@@ -832,6 +838,7 @@ function scSync() {
   scIneqSync();
   scGraphRows();
   scMathSync();
+  scMmRows();
   scParamsCont();
   const cmp = document.getElementById('btn-ppf-compare');
   if (cmp) { const on = STATE.ppfCompare ? '1' : '0'; if (cmp.dataset.on !== on) cmp.dataset.on = on; }
@@ -1103,6 +1110,50 @@ function scParamsCont() {
   const head = [...si.querySelectorAll('.sc-sec, #ans-seg-row')].some(e => !e.classList.contains('grp-empty') && shown(e));
   const on = head && getComputedStyle(sp).display !== 'none';
   if (sp.classList.contains('sc-cont') !== on) sp.classList.toggle('sc-cont', on);
+}
+
+/* ═══ «Функции min и max» (сессия 6, Г4) ═══
+   Строки функций (renderMmRows, 60-overlays.js) пересобираются при каждой смене числа функций — оборачиваем там же
+   и на перерисовке: строка (.field) сама становится карточкой f₁, f₂ … «Функция»; кнопка цвета строки — точкой-кнопкой,
+   поле (тот же узел, id mm-fN) — строкой поля с «y =». «Цвет итоговой кривой» (data-col="mmZ") — в «Вид», в строку
+   итоговой кривой рядом с «Как назвать результат» (README 7). ⚠️ Известный баг (Notion, «Надо»): первое «Отменить»
+   после загрузки возвращает спрятанное поле mm-f0 — здесь не чиним. */
+function scMinmaxSetup() {
+  const z = document.querySelector('#math-pane-minmax .cpick[data-col="mmZ"]');
+  const nameRow = document.getElementById('mm-name') && document.getElementById('mm-name').closest('.vg-row');
+  if (z && nameRow && !z._scMoved) {
+    z._scMoved = true;
+    const lab = z.closest('label'); const grp = lab && lab.closest('.field');
+    z.classList.add('sc-zpick');
+    nameRow.insertBefore(z, nameRow.firstChild);
+    if (grp) grp.classList.add('sc-gone');
+  }
+  scMmRows();
+}
+function scMmRows() {
+  const box = document.getElementById('mm-rows');
+  if (!box || !scOn('m-minmax')) return;
+  [...box.children].forEach((row, i) => {
+    if (row._scMm || !row.classList.contains('field')) return;
+    const grow = row.querySelector(':scope > .grow');
+    const pick = grow && grow.querySelector(':scope > .cpick');
+    const fwrap = grow && grow.querySelector(':scope > .f-slot');
+    if (!fwrap) return;
+    row._scMm = true;
+    row.classList.add('fc-card', 'sc-card', 'sc-mmcard');
+    const lab = row.querySelector(':scope > label'); if (lab) lab.classList.add('sc-old-label');
+    const top = document.createElement('div'); top.className = 'crow-top';
+    const sym = document.createElement('span'); sym.className = 'fc-notation sc-sym'; katexInto(sym, 'f_{' + (i + 1) + '}');
+    const nm = document.createElement('span'); nm.className = 'fc-name sc-name'; nm.textContent = 'Функция';
+    if (pick) { pick.classList.add('sc-dot-slot'); top.appendChild(pick); }
+    top.append(sym, nm);
+    const line = document.createElement('div'); line.className = 'crow-formula';
+    const pre = document.createElement('span'); pre.className = 'fc-prefix'; pre.setAttribute('aria-hidden', 'true'); katexInto(pre, 'y\\,=');
+    line.append(pre, fwrap);
+    row.insertBefore(top, row.firstChild);
+    top.after(line);
+    grow.classList.add('sc-gone');
+  });
 }
 
 /* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из

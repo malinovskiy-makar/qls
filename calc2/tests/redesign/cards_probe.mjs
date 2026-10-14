@@ -96,6 +96,7 @@ const CASES = [
   ['Ж', 'm-transform', '', '', ['inp-mathf', 'x^3']],
   ['Ж', 'm-optimum', '', '', ['inp-mathf', 'x^2 - 2*x']],
   ['Ж', 'm-tangent', '', '', ['inp-mathf', 'x^3']],
+  ['Ж', 'm-minmax', '', '', ['mm-f1', '2*x']],
   ['Д', 'consumer', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
   ['Д', 'cons-slutsky', 'своя формула', "setConsumerType('custom');", ['cons-custom', 'x^0.3 * y^0.7']],
 ];
@@ -618,6 +619,41 @@ async function zhGraph() {
   await ctx.close();
 }
 
+async function zhMinmax() {
+  if (KEYS && !KEYS.includes('m-minmax')) return;
+  const { ctx, page, errors } = await openAt(BASE);
+  await pick(page, 'm-minmax');
+  // Свежая загрузка → «Отменить» трогаем только после своего шага (известный баг mm-f0 — в Notion; сравниваем число
+  // карточек и STATE.mmCount, а не всю форму).
+  const st = () => page.evaluate(() => ({ cards: [...document.querySelectorAll('#mm-rows > .fc-card')].filter(e => e.getClientRects().length).length, n: STATE.mmCount,
+    syms: [...document.querySelectorAll('#mm-rows > .fc-card .crow-top .fc-notation')].map(e => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s​]+/g, ''); }).join(',') }));
+  const s0 = await st();
+  const plus = await page.$('#math-pane-minmax .sc-stepper .sc-step:last-child');
+  if (plus) { await plus.click(); await page.waitForTimeout(900); }
+  const s1 = await st();
+  ok('m-minmax: степпер «+» 2 → 3 добавляет карточку f₃ (' + JSON.stringify([s0, s1]) + ')', !!plus && s0.cards === 2 && s0.n === 2 && s1.cards === 3 && s1.n === 3 && s1.syms === 'f1,f2,f3', JSON.stringify([s0, s1]));
+  await page.click('#btn-undo'); await page.waitForTimeout(900);
+  const s2 = await st();
+  ok('m-minmax: «Отменить» убирает f₃ (' + JSON.stringify(s2) + ')', s2.cards === 2 && s2.n === 2, JSON.stringify(s2));
+  // Цвет итоговой кривой Z — в «Виде», строкой Z рядом с «Как назвать результат», и перекрашивает линию.
+  const p0 = await pic(page);
+  await page.click('#btn-view'); await page.waitForTimeout(300);
+  const zb = await page.$('#wrench-pop .vg-row .sc-zpick .cpick-btn');
+  let p1 = p0;
+  if (zb) {
+    await zb.click(); await page.waitForTimeout(200);
+    const sw = await page.$('.cpick-menu .cpick-sw[aria-checked="false"]');
+    if (sw) { await sw.click(); await page.waitForTimeout(600); }
+    p1 = await pic(page);
+  }
+  const zRow = await page.evaluate(() => { const b = document.querySelector('#wrench-pop .sc-zpick'); const r = b && b.closest('.vg-row'); return r ? r.textContent.replace(/\s+/g, ' ').trim() : ''; });
+  ok('m-minmax: «Цвет итоговой кривой» — в «Виде» в строке «Как назвать результат», выбор цвета перекрашивает линию', !!zb && /Как назвать результат/.test(zRow) && p1 !== p0, JSON.stringify({ zRow, changed: p1 !== p0 }));
+  const shown = await page.evaluate(() => [...document.querySelectorAll('#tools-panel [data-col="mmZ"], #tools-panel .cpick[data-col="mmZ"]')].some(e => e.getClientRects().length));
+  ok('m-minmax: в «Условии» цвета итоговой кривой нет', !shown, '');
+  ok('m-minmax: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 const inv = fs.existsSync(INV) ? JSON.parse(fs.readFileSync(INV, 'utf8')).models : null;
 // «До обёртки»: контрольная запись на сервере BEFORE (Chromium, один раз).
 const beforeMap = {};
@@ -673,7 +709,7 @@ for (const name of ENGINES) {
   }
   if (want('Д')) { head('Д. Потребитель: карточка U, «Параметры»'); await dRun(beforeMap.cons); }
   if (want('Е')) { head('Е. Макро: карточки, строки, нет ползунка переменной оси'); await eRun(); }
-  if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); }
+  if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); await zhMinmax(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {

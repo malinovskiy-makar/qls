@@ -60,6 +60,7 @@ const RENAME = {
   '#mono-kink-pane>button.tgl-sw': '#ki-indiv',
   '#union-pane>button.tgl-sw': '#un-monopoly',
   '#ineq-redist-pane>button.tgl-sw': '#ineq-rd-tax',
+  '#math-pane-minmax>button.tgl-sw': '#mm-min',
   /* (у) список «Число групп» → сегмент «5 групп | 10 групп» (сессия 6, Г1): кнопки без id пишут в прежний список. */
   '#ineq-pane-groups>button.sel-btn': '#ineq-pane-groups>button.seg-btn',
   /* Сессия 6, Г3: кнопка цвета f «Касательной» переехала из группы «Цвета кривых» точкой карточки f (#math-row-f);
