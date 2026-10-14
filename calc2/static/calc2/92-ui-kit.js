@@ -663,6 +663,7 @@ const SC_CARDS = [
   { m: 'adas', input: 'ma-ad', sym: '\\mathrm{AD}', name: 'Совокупный спрос', prefix: 'P =', col: 'D' },
   { m: 'islm', input: 'ma-is', sym: '\\mathrm{IS}', name: 'Равновесие рынка товаров', prefix: 'r =', col: 'D' },
   { m: 'islm', input: 'ma-lm', sym: '\\mathrm{LM}', name: 'Равновесие денежного рынка', prefix: 'r =', col: 'S' },
+  { m: 'money', input: 'ma-md', sym: 'M_d', name: 'Спрос на деньги', prefix: 'M =', col: 'D' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -676,6 +677,7 @@ const SC_PROWS = {
 };
 /* Подписи строк чисел словами (сессия 6): [id поля] → подпись; $…$ — набор KaTeX. */
 const SC_NLABELS = { 'cons-px': 'Цена товара $x$', 'cons-py': 'Цена товара $y$', 'cons-i': 'Доход',
+  'ma-ms': 'Предложение денег $M_s$',
   'ma-pe': 'Ожидаемая инфляция $\\pi^{e}$', 'ma-ustar': 'Естественная безработица $u^{*}$', 'ma-beta': 'Наклон $\\beta$' };
 /* Модели без карточек функций (сессия 6, В3: «Кривая Филлипса»): заголовок карточки ввода — «Параметры», а не
    «Функции» (scSync), второго заголовка нет. */
@@ -697,17 +699,17 @@ function scWords(el, text) {
 const SC_NROWS = [['inp-bundle-x', 'ppf'], ['inp-bundle-y', 'ppf'], ['inp-bundle-x2', 'ppfsum'], ['inp-bundle-y2', 'ppfsum'],
   ['inp-bundle-xt', 'trade'], ['inp-bundle-yt', 'trade'], ['iso-w', 'isoquant'], ['iso-r', 'isoquant'], ['iso-c', 'isoquant'],
   ['inp-nat-fc', 'mono-nat'], ['cons-px', 'consumer'], ['cons-py', 'consumer'], ['cons-i', 'consumer'],
-  ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips']];
+  ['ma-pe', 'phillips'], ['ma-ustar', 'phillips'], ['ma-beta', 'phillips'], ['ma-ms', 'money']];
 // Раздел «Параметры»: заголовок встаёт перед первым узлом параметров панели модели — [id, модель].
 const SC_PARAM_HEAD = [['chk-bundle-1', 'ppf'], ['chk-bundle-2', 'ppfsum'], ['ppft-price-field', 'trade'], ['tb-price-field', 'tradeprice'],
   ['chk-lr', 'costs'], ['pl-q-field', 'plants'], ['iso-w', 'isoquant'], ['inp-nat-fc', 'mono-nat'], ['labmin-block', 'labor'],
-  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer']];
+  ['open-pw-field', 'smallopen'], ['cons-px', 'consumer'], ['ma-ms', 'money']];
 // Сегменты вместо тумблера пары подписей: [id левой кнопки полосы, модель].
 const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 'labor']];
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
