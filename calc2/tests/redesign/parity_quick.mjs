@@ -111,6 +111,17 @@ for (const key of keys) {
        Режим открывается ОДИН раз на модель, а не на орган: иначе быстрый паритет
        шёл 287 с вместо 16 (предел Django-теста — 120). */
     let left = out;
+    /* «На графике» в «Виде графика» (ADR 0152): галочки картинки переехали туда узлами — орган достижим
+       открытием окна «Вид графика». Окно открывается один раз на модель. */
+    if (left.length) {
+      const vb = document.getElementById('btn-view');
+      if (vb && !document.getElementById('wrench-pop').classList.contains('open')) {
+        vb.click(); await new Promise(r => setTimeout(r, 60));
+        left = left.filter(k => !window.__RD.findControl(k.mapped));
+        if (typeof closePop === 'function') closePop();
+        const w = document.getElementById('wrench-pop'); if (w.classList.contains('open')) vb.click();
+      }
+    }
     if (left.length && typeof setPtsMode === 'function') {
       const tick = () => new Promise(r => setTimeout(r, 40));
       const sweep = () => { left = left.filter(k => !window.__RD.findControl(k.mapped)); };
@@ -125,7 +136,8 @@ for (const key of keys) {
     return left.map(k => k.orig);
   }, want.filter(k => {
     const f = fateOf(k);
-    return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдк]$/.test(f.letter)));
+    // «р» (ADR 0152): образец цвета закраски переехал строкой «На графике» — его стережёт view_probe.
+    return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдкр]$/.test(f.letter)));
   }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })));
   checks += want.length;
   res.forEach(k => { bad++; issues.push(key + ': орган ' + k + ' не найден'); });

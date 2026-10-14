@@ -71,6 +71,7 @@ function redrawAll() {
   // а не на каждом кадре протяжки.
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
   if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
+  if (typeof syncOnChart === 'function') syncOnChart();           // «На графике» в «Виде графика» (92-ui-kit.js, ADR 0152)
   if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
   markServiceNodes();
   if (typeof selfCanvas === 'function') selfCanvas();   // «Сначала сам»: обозначения вместо чисел (96-self.js)
@@ -477,6 +478,7 @@ function drawOverlays() {
     ? (activePanel() ? activePanel().id : '') : crossPanel);
   STATE.crosses = crossPoints(crossPanel);
   if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
+  if (typeof applyAreaHidden === 'function') applyAreaHidden();   // спрятанные закраски «Вида» (ADR 0152)
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
   drawAreaVerts();           // набранные вершины будущей площади
@@ -2556,7 +2558,10 @@ function updateAreaCalcPanel() {
      площадь стояла дважды: S₁ без крестика и S₁ с крестиком, с одним числом. */
   const mine = {};
   (list || []).forEach(r => { mine[areaKey(r.label)] = 1; });
-  const scene = currentAreas().filter(e => !mine[e.key]);
+  /* С 14.10 (тихие панели, этап Г, ADR 0152) строки закрасок модели здесь не стоят: их цвет и видимость —
+     в «Виде графика» («На графике»), числа — в «Ответе» (закрытый список README пакета, 10.6). Остаются
+     свои площади. */
+  const scene = [];
   box.innerHTML = '';
   if (!list.length && !scene.length) return;
 
@@ -4265,7 +4270,7 @@ const SCENE_DEFAULTS = {
   // Заливки и цвета.
   showCS: true, showPS: true, showGhost: false,
   showMonoCS: true, showMonoPS: true, showMonoVC: false,
-  colorOverride: {}, areaColor: {}, titlePos: null,   // своё место названия (доли поля, Н22)
+  colorOverride: {}, areaColor: {}, areaHidden: [], titlePos: null,   // своё место названия (доли поля, Н22)
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
   quadSaved: null,            // окно до включения первой четверти (обратный ход тумблера)

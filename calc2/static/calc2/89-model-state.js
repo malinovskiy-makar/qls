@@ -72,6 +72,12 @@ function plainCopy(v, depth) {
 // Стрелка «Ответа» и полоска — тоже вид (ADR 0148, 0150): ни истории, ни ссылки.
 // Полоса «Разбор» (#ex-bar) — вид (ADR 0150): свёрнутость не шаг истории.
 const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc', 'ans-hide', 'ans-rail', 'ex-bar']);
+/* Тумблеры — в порядке разметки на загрузке (штамп _tgIdx ставит vgSetup до переезда тумблера заводов
+   в «Вид графика», ADR 0152): старые ссылки и сохранения применяются к тем же тумблерам. */
+function togglesInOrder() {
+  const all = [...document.querySelectorAll('.app .tgl-sw')];
+  return all.map((el, i) => [el._tgIdx != null ? el._tgIdx : 1e6 + i, el]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+}
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];
@@ -98,8 +104,8 @@ function captureForm() {
     }
     out[el.id] = r;
   });
-  // Тумблеры segToToggle (99-boot.js) без id: по порядку в разметке.
-  out['@toggles'] = [...document.querySelectorAll('.app .tgl-sw')].map(el => [el.className, el.getAttribute('aria-checked')]);
+  // Тумблеры segToToggle (99-boot.js) без id: по порядку в разметке НА ЗАГРУЗКЕ (togglesInOrder).
+  out['@toggles'] = togglesInOrder().map(el => [el.className, el.getAttribute('aria-checked')]);
   return out;
 }
 function applyForm(f) {
@@ -130,7 +136,7 @@ function applyForm(f) {
     if ('cls' in r && el.className !== r.cls) el.className = r.cls;
     if (r.aria) Object.entries(r.aria).forEach(([a, v]) => { if (el.getAttribute(a) !== v) el.setAttribute(a, v); });
   });
-  const tg = [...document.querySelectorAll('.app .tgl-sw')];
+  const tg = togglesInOrder();
   /* Тумблеры применяются по номеру. Сохранение или ссылка, сделанные при
      другом их числе (10.2026: «Под кривой | Между точками» стал сегментом,
      ADR 0144), сдвинули бы все номера — такой список не применяем: тумблер и

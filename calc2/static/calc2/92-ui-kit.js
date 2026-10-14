@@ -311,6 +311,15 @@ function syncShowSection() {
     });
   }
   ['CS', 'PS', 'VC'].forEach(k => { if (colors[k]) seen[k] = colors[k]; });
+  /* С 14.10 (этап Г, ADR 0152) строки CS и PS живут в «Виде графика» и видны, только если модель
+     рисует ИМЕННО их закраску (полное имя): у рынка труда «Излишек фирм» короче тоже «CS», но
+     сцена труда признаки showCS / showPS не читает — галочки были мёртвыми. Там строки
+     закрасок общие (STATE.areaHidden). */
+  const full = {};
+  if (typeof svg !== 'undefined' && svg) svg.selectAll('[data-legend]').each(function () { full[areaKey(this.getAttribute('data-legend'))] = 1; });
+  if (Array.isArray(_vgDrawnKeys)) _vgDrawnKeys.forEach(k => { full[k] = 1; });
+  const FULL = { CS: 'Излишек потребителя (CS)', PS: 'Излишек производителя (PS)' };
+  const marketScene = !/^labor/.test(String(STATE.sceneKey || ''));
   const rows = [['show-cs-row', 'chk-cs', 'CS', 'showCS'], ['show-ps-row', 'chk-ps', 'PS', 'showPS']];
   let any = false;
   rows.forEach(([rowId, chkId, k, st]) => {
@@ -320,7 +329,7 @@ function syncShowSection() {
        (флаг снят — иначе включить обратно было бы нечем). Это функция состояния
        и картинки, а не пути: после отмены и после перезагрузки набор строк тот
        же (прибор session_probe). Память SHOW_SEEN хранит только цвет образца. */
-    const on = !monoOn && (!!colors[k] || STATE[st] === false);
+    const on = !monoOn && marketScene && (!!full[FULL[k]] || STATE[st] === false);
     row.hidden = !on;
     if (on) any = true;
     if (chk && document.activeElement !== chk) chk.checked = !!STATE[st];
@@ -333,4 +342,191 @@ function syncShowSection() {
   });
   const want = any ? '' : 'none';
   if (sec.style.display !== want) sec.style.display = want;
+}
+
+/* ═══ «НА ГРАФИКЕ» В ОКНЕ «ВИД ГРАФИКА» (тихие панели 14.10, этап Г; решение владельца «левая панель
+   только про условие, всё, что меняет одну картинку, — в «Вид»», Notion …8142…; ADR 0152) ═══
+   Галочки, которые меняют только картинку, переезжают сюда УЗЛАМИ: тот же id, тот же ключ STATE,
+   тот же обработчик (88-params.js) — история, ссылка, автосохранение и «Вид по умолчанию» видят их
+   как раньше. На старом месте остаётся заглушка .vg-home: строка в «Виде» видна ровно тогда, когда
+   логика сцены показала бы галочку на старом месте (hidden, display: none, scoped-off предков).
+   Условия (меняют числа «Ответа») остаются в «Условии»: chk-secant, chk-bundle-*, chk-elast-s,
+   chk-msb, chk-msc, ext-pigou, chk-lr, chk-labmin, ma-fx-fixed, ineq-redist, «Ставка на оси до». */
+// [id узла, группа, имена закрасок, которые прячет его СОБСТВЕННЫЙ признак]
+const VG_MOVE = [
+  ['chk-tp', 'curves'], ['chk-mp', 'curves'], ['chk-ap', 'curves'],
+  ['chk-mc', 'curves'], ['chk-atc', 'curves'], ['chk-avc', 'curves'], ['chk-afc', 'curves'],
+  ['chk-tc', 'curves'], ['chk-vc', 'curves'], ['chk-fc', 'curves'],
+  ['chk-convex', 'curves'], ['chk-inflect', 'curves'], ['chk-iso-fan', 'curves'], ['chk-cons-fan', 'curves'],
+  ['plv-tc', 'curves'], ['tanD', 'curves'], ['mm-name', 'curves'], ['inp-ppfsum-name', 'curves'],
+  ['chk-cs', 'areas', ['Излишек потребителя (CS)']], ['chk-ps', 'areas', ['Излишек производителя (PS)']],
+  ['chk-mono-cs', 'areas', ['Излишек потребителя (CS)']], ['chk-mono-ps', 'areas', ['Излишек производителя (TR - VC)']],
+  ['chk-mono-vc', 'areas', ['Переменные издержки (VC)']],
+  ['chk-nat-profit', 'areas'], ['chk-nat-loss', 'areas'],
+  ['chk-open-money', 'areas', ['Доход бюджета', 'Рента квоты']], ['chk-open-dwl', 'areas', ['Потери общества (DWL)']],
+  ['chk-ppf-in', 'areas', ['Достижимые наборы']], ['chk-ppf-out', 'areas', ['Недостижимые наборы']],
+  ['chk-lr-area', 'areas', ['Прибыль фирмы', 'Убыток фирмы']],
+  ['chk-ghost', 'more'], ['chk-lab-ghost', 'more'],
+];
+const _vgRows = [];
+let _vgDrawnKeys = [];
+function vgList(kind) { return document.querySelector('#wrench-pop .vg-list[data-vg="' + kind + '"]'); }
+/* Узел, который переезжает: строка галочки, тумблер с его сегментом, поле подписи, строка цвета. */
+function vgNodeOf(id) {
+  if (id === 'tanD') { const c = document.querySelector('#tools-panel input[data-col="tanD"], #tools-panel [data-col="tanD"]'); return c ? [c.closest('label') || c] : null; }
+  const el = document.getElementById(id);
+  if (!el) return null;
+  if (id === 'plv-tc') { const seg = el.closest('.seg'); return seg ? [seg._tgl, seg].filter(Boolean) : null; }
+  if (el.type === 'checkbox') return [el.closest('label') || el];
+  return [el.closest('.field') || el];
+}
+function vgSetup() {
+  const pop = document.getElementById('wrench-pop');
+  if (!pop || pop._vg) return;
+  pop._vg = true;
+  /* ⚠️ ТУМБЛЕРЫ БЕЗ id ФОРМА ПОМНИТ ПО ПОРЯДКУ (@toggles, 89-model-state.js). Переезд тумблера
+     заводов в «Вид» сдвинул бы номера соседей в старых ссылках и сохранениях: штампуем порядок
+     ДО переезда, форма читает и пишет тумблеры по этому штампу. */
+  [...document.querySelectorAll('.app .tgl-sw')].forEach((t, i) => { if (t._tgIdx == null) t._tgIdx = i; });
+  VG_MOVE.forEach(([id, kind, covers]) => {
+    const nodes = vgNodeOf(id);
+    const list = vgList(kind);
+    if (!nodes || !nodes.length || !list) return;
+    const home = document.createElement('span');
+    home.className = 'vg-home'; home.hidden = true;
+    nodes[0].before(home);
+    const row = document.createElement('div');
+    row.className = 'vg-row' + (kind === 'areas' ? ' vg-area' : '');
+    home._vgRow = row;   // заглушка знает свою строку: по ней приборы находят органы в прежнем порядке
+    nodes.forEach(n => row.appendChild(n));
+    list.appendChild(row);
+    const rec = { id, kind, row, home, node: nodes[0], covers: covers || [] };
+    // Образец закраски — кнопка цвета (STATE.areaColor): цвета закрасок уходят сюда из панели точек.
+    if (kind === 'areas' && covers && covers.length && typeof makeColorPicker === 'function') {
+      const chk = document.getElementById(id);
+      const pick = makeColorPicker('#888888', (hex) => { covers.forEach(k => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; }); redrawAll(); },
+        tipName('Цвет: ' + covers[0]));
+      pick.classList.add('vg-pick');
+      if (chk) chk.after(pick);
+      nodes[0].querySelectorAll('.show-sw, span.swatch').forEach(x => x.classList.add('vg-old-sw'));
+      rec.pick = pick;
+    }
+    _vgRows.push(rec);
+  });
+}
+// Видна ли заглушка на старом месте глазами логики сцены (не по раскладке).
+function vgHomeShown(home) {
+  const root = document.getElementById('tools-panel');
+  for (let n = home.parentElement; n && n !== root && n !== document.body; n = n.parentElement) {
+    if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return false;
+  }
+  return true;
+}
+const AREA_ID = (k) => 'vg-area-' + String(k).split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36);
+function syncOnChart() {
+  const pop = document.getElementById('wrench-pop');
+  const box = pop && pop.querySelector('.vg-onchart');
+  if (!box) return;
+  const covered = new Set();
+  _vgRows.forEach(r => {
+    const self = r.node && !(r.node.hidden || (r.node.style && r.node.style.display === 'none'));
+    const on = vgHomeShown(r.home) && self;
+    if (r.row.hidden === on) r.row.hidden = !on;
+    if (on) r.covers.forEach(k => covered.add(k));
+    if (on && r.pick && r.covers.length) {
+      const c = (STATE.areaColor || {})[r.covers[0]];
+      const drawn = document.querySelector('#chart [data-legend="' + CSS.escape(r.covers[0]) + '"]');
+      const col = c || (drawn && drawn.getAttribute('fill'));
+      const b = r.pick.querySelector('.cpick-btn');
+      if (b && col && b.style.background !== col) b.style.background = col;
+    }
+  });
+  // Кривые-производные «Сложения спросов» (рыночные D и S): их карточки собираются заново на каждой
+  // сборке списка кривых и сразу переезжают сюда (у них нет поля формулы — «считается по группам»).
+  const curves = vgList('curves');
+  const fresh = [...document.querySelectorAll('#curve-list > .fc-card')].filter(card => card.querySelector('.crow-auto'));
+  // Список кривых собран заново — прежние перенесённые карточки устарели: на их место встают свежие.
+  if (fresh.length) {
+    [...curves.querySelectorAll(':scope > .vg-deriv')].forEach(r => r.remove());
+    document.querySelectorAll('#curve-list > .vg-home').forEach(h => h.remove());
+  }
+  fresh.forEach(card => {
+    const row = document.createElement('div');
+    row.className = 'vg-row vg-deriv';
+    const home = document.createElement('span');
+    home.className = 'vg-home'; home.hidden = true; home._vgRow = row;
+    card.before(home);
+    row.appendChild(card);
+    curves.appendChild(row);
+  });
+  [...curves.querySelectorAll(':scope > .vg-deriv')].forEach(r => {
+    const card = r.firstElementChild;
+    const cid = card && card.dataset.cid;
+    const alive = cid && (STATE.curves || []).some(c => String(c.id) === cid);
+    if (!alive) r.remove();
+  });
+  // Закраски без своего признака — общий STATE.areaHidden (строка остаётся и у спрятанной).
+  const own = new Set((STATE.areaCalcList || []).map(r => areaKey(r.label)));
+  const keys = [];
+  [..._vgDrawnKeys, ...(STATE.areaHidden || [])].forEach(k => { if (k && !covered.has(k) && !own.has(k) && keys.indexOf(k) < 0) keys.push(k); });
+  const areas = vgList('areas');
+  const have = new Map([...areas.querySelectorAll(':scope > .vg-gen')].map(r => [r.dataset.key, r]));
+  have.forEach((r, k) => { if (keys.indexOf(k) < 0) r.remove(); });
+  keys.forEach(k => {
+    let r = have.get(k);
+    if (!r) {
+      r = document.createElement('div');
+      r.className = 'vg-row vg-area vg-gen';
+      r.dataset.key = k;
+      const lab = document.createElement('label'); lab.className = 'chk show-row';
+      const chk = document.createElement('input'); chk.type = 'checkbox'; chk.id = AREA_ID(k);
+      chk.addEventListener('change', () => {
+        const set = new Set(STATE.areaHidden || []);
+        if (chk.checked) set.delete(k); else set.add(k);
+        STATE.areaHidden = [...set];
+        redrawAll();
+      });
+      const pick = makeColorPicker('#888888', (hex) => { if (hex) STATE.areaColor[k] = hex; else delete STATE.areaColor[k]; redrawAll(); }, tipName('Цвет: ' + k));
+      pick.classList.add('vg-pick');
+      const nm = document.createElement('span'); nm.className = 'show-name'; nm.textContent = String(k).replace(/\s*\([^)]{1,12}\)\s*$/, '');
+      const nt = document.createElement('span'); nt.className = 'show-not';
+      const short = areaShort(k);
+      if (short !== k && typeof paintNotation === 'function') paintNotation(nt, short); else nt.textContent = '';
+      lab.append(chk, pick, nm, nt);
+      r.appendChild(lab);
+      r._chk = chk; r._pick = pick;
+    }
+    areas.appendChild(r);
+    const hidden = (STATE.areaHidden || []).indexOf(k) >= 0;
+    if (r._chk.checked === hidden) r._chk.checked = !hidden;
+    const drawn = document.querySelector('#chart [data-legend="' + CSS.escape(k) + '"]');
+    const col = (STATE.areaColor || {})[k] || (drawn && drawn.getAttribute('fill')) || r._lastCol;
+    if (col) { r._lastCol = col; const b = r._pick.querySelector('.cpick-btn'); if (b && b.style.background !== col) b.style.background = col; }
+  });
+  // Подзаголовки и сама группа — по видимым строкам.
+  const vis = (kind) => [...vgList(kind).children].some(x => !x.hidden);
+  const c = vis('curves'), a = vis('areas'), m = vis('more');
+  box.querySelectorAll('.vg-sub').forEach(h => { h.hidden = !(h.dataset.vg === 'curves' ? c && (a || m) : a && (c || m)); });
+  box.hidden = !(c || a || m);
+}
+/* Спрятанная человеком закраска (общий признак STATE.areaHidden) не рисуется: узел уходит из
+   холста до легенды, PNG и .tex (они собирают то, что нарисовано). Протяжки (клин налога) —
+   отдельные узлы без data-legend, они остаются. Зовётся из drawOverlays рядом с applyAreaColors. */
+function applyAreaHidden() {
+  const hid = new Set(STATE.areaHidden || []);
+  const own = new Set((STATE.areaCalcList || []).map(r => areaKey(r.label)));
+  const drawn = [];
+  if (typeof svg === 'undefined' || !svg) { _vgDrawnKeys = drawn; return; }
+  svg.selectAll('[data-legend]').each(function () {
+    const k = areaKey(this.getAttribute('data-legend'));
+    if (!k || own.has(k)) return;
+    if (drawn.indexOf(k) < 0) drawn.push(k);
+    if (hid.has(k)) this.remove();
+  });
+  _vgDrawnKeys = drawn;
+}
+/* id органов «На графике» — «Вид по умолчанию» возвращает их форму к старту модели. */
+function vgFormIds() {
+  const box = document.querySelector('#wrench-pop .vg-onchart');
+  return box ? [...box.querySelectorAll('[id]')].map(e => e.id) : [];
 }

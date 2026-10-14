@@ -1970,6 +1970,19 @@
     <div class="wrench" id="wrench-pop" role="dialog" aria-label="Вид графика">
       <div class="wrench-head">Вид графика</div>
 
+      <!-- «На графике» (тихие панели 14.10, этап Г; решение …8142…; ADR 0152): всё, что меняет только
+           картинку этой модели. Галочки переезжают сюда УЗЛАМИ из «Условия» (92-ui-kit.js, vgSetup), строки
+           закрасок без своего признака — общий STATE.areaHidden (syncOnChart). Узлы группы без id: её
+           видимость — вид, не форма модели. -->
+      <div class="wrench-group vg-onchart" hidden>
+        <div class="wrench-title">На графике</div>
+        <div class="vg-sub" data-vg="curves">Кривые</div>
+        <div class="vg-list" data-vg="curves"></div>
+        <div class="vg-sub" data-vg="areas">Закраски</div>
+        <div class="vg-list" data-vg="areas"></div>
+        <div class="vg-list" data-vg="more"></div>
+      </div>
+
       <div class="wrench-group">
         <div class="wrench-title">Сетка</div>
         <div class="seg" id="grid-seg">

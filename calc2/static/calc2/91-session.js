@@ -422,8 +422,13 @@ function restoreOnLoad() {
    текущей модели — к её старту, окно и масштаб — к вписанному; функции,
    ползунки и вмешательство остаются. Старт берётся тем же маршрутом, что у
    «Сбросить», только из него переносятся ключи вида. Один шаг истории. */
+/* С 14.10 (этап Г, ADR 0152) — и раздел «На графике»: признаки галочек картинки, общий признак
+   закрасок areaHidden и их цвета; форма этих органов — по vgFormIds() (92-ui-kit.js). */
 const VIEW_DEFAULT_KEYS = ['showGrid', 'gridDense', 'xStep', 'yStep', 'firstQuad', 'showLegend', 'labelSize',
-  'graphTitle', 'titleColor', 'axisXName', 'axisYName', 'graphTitlePos'];
+  'graphTitle', 'titleColor', 'axisXName', 'axisYName', 'graphTitlePos',
+  'areaHidden', 'areaColor', 'showCS', 'showPS', 'showMonoCS', 'showMonoPS', 'showMonoVC', 'showOpenMoney', 'showOpenDwl',
+  'ppfShowIn', 'ppfShowOut', 'lrArea', 'showNatProfit', 'showNatLoss', 'showGhost', 'showMC', 'showATC', 'showAVC',
+  'showAFC', 'showVC', 'showTC', 'showFC', 'showTP', 'showMP', 'showAP', 'isoFan', 'consFan', 'mathConvex', 'mathInflect', 'plView'];
 function viewDefaults() {
   const key = STATE.sceneKey;
   if (!key) return;
@@ -439,6 +444,7 @@ function viewDefaults() {
     start = collectModelState();
     const t = JSON.parse(JSON.stringify(before));
     VIEW_DEFAULT_KEYS.forEach(k => { if (k in start.state) t.state[k] = start.state[k]; else delete t.state[k]; });
+    if (t.form && start.form && typeof vgFormIds === 'function') vgFormIds().forEach(id => { if (id in start.form) t.form[id] = start.form[id]; else delete t.form[id]; });
     applyModelState(t);
     if (typeof resetZoom === 'function') resetZoom();
     if (typeof setGridMode === 'function') setGridMode(STATE.showGrid ? (STATE.gridDense ? 'dense' : 'plain') : 'off');

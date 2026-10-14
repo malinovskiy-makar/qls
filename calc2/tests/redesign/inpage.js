@@ -446,9 +446,28 @@
     const el = same[+(m[3] || 0)];
     return el && visible(el) ? el : null;
   }
+  /* «На графике» (тихие панели 14.10, ADR 0152): органы картинки переехали в «Вид графика», на старом
+     месте — заглушка .vg-home со ссылкой на строку (_vgRow). Прежний ключ «#контейнер>роль[i]» ищется в
+     прежнем порядке: органы контейнера на месте и органы строк его заглушек — там, где стояли. */
+  function findMovedVirtual(key, any) {
+    const m = /^#([\w-]+)>([^\[~]+)(?:\[(\d+)\])?$/.exec(key);
+    if (!m) return null;
+    const anc = document.getElementById(m[1]);
+    if (!anc || !anc.querySelector('.vg-home')) return null;
+    const all = [];
+    const w = document.createTreeWalker(anc, NodeFilter.SHOW_ELEMENT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (n.classList.contains('vg-home') && n._vgRow) { n._vgRow.querySelectorAll(CTRL_SEL).forEach(x => all.push(x)); continue; }
+      if (n.matches(CTRL_SEL)) { const a2 = n.parentElement ? n.parentElement.closest('[id]') : null; if (a2 === anc) all.push(n); }
+    }
+    const el = all.filter(x => roleOf(x) === m[2])[+(m[3] || 0)];
+    return el && (any || visible(el)) ? el : null;
+  }
   function findControl(key) {
     const v = /^#params-(curves|extra)>/.test(key) && document.querySelector('.crow-sliders .pchip[data-pult-box]') ? findPultVirtual(key) : null;
     if (v) return v;
+    const mv = findMovedVirtual(key);
+    if (mv) return mv;
     const list = [];
     const seen = new Set();
     roots().forEach(r => r && r.querySelectorAll(CTRL_SEL).forEach(el => {
@@ -475,7 +494,7 @@
         if (k === key) return el;
       }
     }
-    return null;
+    return findMovedVirtual(key, true);
   }
 
   /* ── Готовность экрана к слепку (CODE_NOTES 12.3) ── */

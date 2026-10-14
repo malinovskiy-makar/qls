@@ -91,6 +91,8 @@ function init() {
   upgradeSelect('math-trans', 'Что делаем с графиком');
   upgradeSelect('ineq-ngroups', 'Сколько групп населения');
   initSceneColorPickers();
+  // «На графике» в «Виде графика»: галочки картинки переезжают узлами (92-ui-kit.js, ADR 0152).
+  if (typeof vgSetup === 'function') vgSetup();
   renderCurveList();
   redrawAll();
   syncViewFields();

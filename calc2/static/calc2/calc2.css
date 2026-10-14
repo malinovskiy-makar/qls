@@ -3916,3 +3916,22 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #tools-panel .field > label, #tools-panel .grow > label { display: block; margin-bottom: 6px; }
 /* «Группа N» в таблице долей неравенства (подпись задана стилем узла 12 px, 56-scenes-inequality.js). */
 #tools-panel #ineq-groups-table span { font-size: 14px !important; font-weight: 500 !important; }
+
+/* ── Этап Г: «На графике» в «Виде графика» (решение …8142…; README 4, 7; ADR 0152) ──
+   Строка: галочка, образец (кнопка цвета у закраски), имя словами, обозначение справа 16 px.
+   Подзаголовки «Кривые» и «Закраски» 12 / 500 --text3. Секции «Показать на графике» в «Условии» нет. */
+#sec-show { display: none !important; }
+#wrench-pop .vg-onchart[hidden] { display: none; }
+#wrench-pop .vg-sub { margin: 10px 0 4px; font-size: 12px !important; font-weight: 500 !important; color: var(--text3); }
+#wrench-pop .vg-sub[hidden] { display: none; }
+#wrench-pop .vg-list { display: flex; flex-direction: column; gap: 2px; }
+#wrench-pop .vg-row[hidden] { display: none !important; }
+#wrench-pop .vg-row > label.chk, #wrench-pop .vg-row > label { display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0; }
+#wrench-pop .vg-row .show-name { flex: 1 1 auto; min-width: 0; color: var(--text); }
+#wrench-pop .vg-row .show-not { flex: 0 0 auto; margin-left: auto; color: var(--text2); }
+#wrench-pop .vg-row .show-not .katex { font-size: 16px; }
+#wrench-pop .vg-row .vg-old-sw { display: none !important; }
+#wrench-pop .vg-pick .cpick-btn { width: 14px; height: 14px; min-width: 14px; border-radius: 3px; padding: 0; }
+#wrench-pop .vg-row .field { margin: 6px 0 0; }
+#wrench-pop .vg-row .fc-card { margin: 4px 0; }
+#wrench-pop .vg-row .tgl { margin: 4px 0; }
