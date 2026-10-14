@@ -661,6 +661,8 @@ const SC_CARDS = [
   { m: 'adas', input: 'ma-lras', sym: '\\mathrm{LRAS}', name: 'Потенциальный выпуск', prefix: 'Y^{*} =', col: 'MC', number: true },
   { m: 'adas', input: 'ma-sras', sym: '\\mathrm{SRAS}', name: 'Краткосрочное предложение', prefix: 'P =', col: 'S' },
   { m: 'adas', input: 'ma-ad', sym: '\\mathrm{AD}', name: 'Совокупный спрос', prefix: 'P =', col: 'D' },
+  { m: 'islm', input: 'ma-is', sym: '\\mathrm{IS}', name: 'Равновесие рынка товаров', prefix: 'r =', col: 'D' },
+  { m: 'islm', input: 'ma-lm', sym: '\\mathrm{LM}', name: 'Равновесие денежного рынка', prefix: 'r =', col: 'S' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -696,7 +698,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
 /* Модели, переведённые на карточки и строки параметров (сессия 5: по одной модели, у каждой свой коммит — откат
    модели снимает её из списка). Ключ — семейство: 'mono-d3' включает и «Монополиста и внешний рынок» (те же поля),
    'labor' — все четыре модели рынка труда. */
-const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas']);
+const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {
