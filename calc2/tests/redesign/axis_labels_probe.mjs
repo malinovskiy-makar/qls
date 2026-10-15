@@ -5,9 +5,10 @@
      — первая: холст виден и на нём есть числа делений (иначе прибор зеленел бы вхолостую, README 11);
      — прямоугольники любых двух таких подписей не пересекаются (допуск 1 px по каждой оси);
      — каждая такая подпись целиком внутри области SVG (допуск 1 px): ничего не срезано краем.
-   Состояния: старт каждой из 42 моделей (1 440 × 900, «Ответ» закрыт — как на первом заходе) и три состояния
+   Состояния: старт каждой из 42 моделей (1 440 × 900, «Ответ» закрыт — как на первом заходе) и состояния
    карточки — «Конкурентный рынок труда» (labor, старт, МРОТ включён), «Внешние эффекты» (ext, старт),
-   «Двусторонняя монополия» (labor-bilat, старт) — при 1 440 и 1 280, с открытым «Ответом» (холст уже).
+   «Двусторонняя монополия» (labor-bilat, старт без МРОТ; с МРОТ 45 и 60 — сессия «рынок труда») — при 1 440 и 1 280,
+   с открытым «Ответом» (холст уже).
 
    ENGINES=chromium,webkit (по умолчанию chromium). KEYS="labor ext" — выборка моделей для стартов.
    CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/axis_labels_probe.mjs
@@ -81,14 +82,18 @@ async function run(engine) {
   console.log('\n=== Три состояния карточки (1 440 и 1 280, «Ответ» открыт) ===');
   for (const W of [1440, 1280]) {
     const ctx = await open(W, true);
-    for (const key of ['labor', 'ext', 'labor-bilat']) {
+    // labor-bilat@45 и @60 — «Двусторонняя монополия» с МРОТ (сессия «рынок труда», ADR 0156): полоса 45 … 50 с полкой
+    // MCLэфф и полосой безработицы; исход один 60 — «40 спрос», «100 предл».
+    for (const name of ['labor', 'ext', 'labor-bilat', 'labor-bilat@45', 'labor-bilat@60']) {
+      const [key, minW] = name.split('@');
       const page = await load(ctx, key);
-      if (key === 'labor') {
-        // МРОТ включён (на старте 65): если галочка выключена — включаем, как человек.
+      if (key === 'labor' || minW) {
+        // МРОТ включён (на старте labor 45): если галочка выключена — включаем, как человек.
         await page.evaluate(() => { const c = document.getElementById('chk-labmin'); if (c && !c.checked) c.click(); });
         await page.waitForTimeout(400);
       }
-      check(key + ' @' + W, await page.evaluate(measure));
+      if (minW) { await page.evaluate((v) => setLaborMin(v), +minW); await page.waitForTimeout(500); }
+      check(name + ' @' + W, await page.evaluate(measure));
       await page.close();
     }
     await ctx.close();

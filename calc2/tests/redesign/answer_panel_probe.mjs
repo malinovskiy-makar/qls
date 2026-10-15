@@ -29,7 +29,8 @@
          число без знака: taxes субсидия 20 — «Излишек потребителя» 1 250 → 1 800, «Излишек производителя»
          1 250 → 1 800, «Расходы бюджета» 0 → 1 200, «Общественное благосостояние» 2 500 → 2 400; тождество
          «SW после = до − DWL» и «SW после = CS + PS − расходы» при субсидии 10, 20, 35; mono субсидия 10 — 0 → 450.
-     Ж   (сессия 6, правка А5; Notion …8149…) «Ответ» при МРОТ: labor и labor-mono со включённым МРОТ, 1440 и 1280 —
+     Ж   (сессия 6, правка А5; Notion …8149…) «Ответ» при МРОТ: labor, labor-mono и labor-bilat (МРОТ 45, сессия
+         «рынок труда») со включённым МРОТ, 1440 и 1280 —
          в видимом тексте колонки нет «_»; есть раздел «С МРОТ»; строки с одной подписью стоят только в разных
          разделах (раздел — группа главных чисел, блок табло, подраздел .sb-subsec).
      З   (сессия 7, А1; Notion …8102…) запятые в формулах «Ответа» и «Разбора»: 42 старта и состояния с дробными
@@ -842,7 +843,8 @@ async function sectionZh() {
   head('Ж. «Ответ» при МРОТ: W_min индексом, раздел «С МРОТ»');
   for (const W of [1440, 1280]) {
     const { ctx, page, errors } = await openThemed(W, 'light');
-    for (const key of ['labor', 'labor-mono']) {
+    // labor-bilat — «Двусторонняя монополия» с МРОТ 45 (сессия «рынок труда», ADR 0156; на старте МРОТ выключен).
+    for (const key of ['labor', 'labor-mono', 'labor-bilat']) {
       await pick(page, key, "const c = document.getElementById('chk-labmin'); if (c && !c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }");
       const r = await page.evaluate(() => {
         const col = document.querySelector('#params-panel .side-inner');

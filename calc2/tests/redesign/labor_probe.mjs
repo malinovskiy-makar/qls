@@ -15,13 +15,28 @@
         МРОТ 45 (M (55; 45), «МРОТ увеличил занятость (парадокс монопсонии).»), профсоюз (как в А), двусторонняя без
         МРОТ (32,5 … 50, «Безработица на границах» 0 и 30; галочка МРОТ видна и снята, линии МРОТ нет, полоса торга
         от 32,5 до 50).
+     В  МРОТ в «Двусторонней монополии» (решение …8168…), новый пример со старта модели, цепочка шагов:
+        1 старт — галочка видна и снята, линии МРОТ нет, «Ответ» основного раздела;
+        2 галочка → МРОТ 45: «С МРОТ» (45 … 50, занятость 55 и 50, безработица 15 и 30), холст — M (55; 45), «MCLэфф»,
+          «Безработица = 15», полоса 45 … 50; один шаг истории;
+        3 МРОТ 36 (щелчок по значению, набор, Enter) → 36 … 50, 52 и 50, 0 и 30, полосы безработицы нет;
+        4 30 → «не связывает», основной раздел; 5 50 → исход один 50, занятость 50, безработица 30;
+        6 60 → исход один 60, 40, 60, надпись «Исход один: зарплата = МРОТ», полосы торга нет;
+        7 линия МРОТ мышью 45 → 60 → исход один по живому МРОТ (занятость 100 − W, безработица 3W − 120); один шаг;
+        8 снять галочку → как шаг 1; одно «Отменить» → МРОТ снова включён;
+        9 ссылка «Поделиться» и автосохранение с МРОТ 45 туда и обратно → те же числа;
+        10 «Второй пример» D = 120 − 2L, S = 20 + L: МРОТ 55 → 55 … 60, 32,5 и 30, 2,5 и 10; МРОТ 70 → исход один 70, 25, 25;
+        11 старые сохранения (claude/calc2_labor/fixtures/old_<ключ>.json, код bfb74cc3): ссылка и автосохранение тем же
+           путём, что autosaveModel, открываются без ошибок, числа «Старого примера» (двусторонняя: галочка видна и
+           включена, исход один 65, занятость 35, безработица 30).
    Первая проверка каждой страницы — «Ответ» открыт и виден (answerShown, README 11).
    Между действиями, которые пишут историю, пауза не меньше 1 с (склейка HIST_GLUE_MS = 900).
 
    ENGINES=chromium,webkit (по умолчанию оба), WIDTHS=1440,1280 (по умолчанию оба).
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/labor_probe.mjs [--only А,Б]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/labor_probe.mjs [--only А,Б,В]
    Код 0 — всё сошлось.                                                     */
 import * as pw from 'playwright';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { answerShown } from '../answer_open.mjs';
@@ -207,6 +222,164 @@ async function sectionB() {
   }
 }
 
+/* ── В ── */
+const BIL_MAIN = START_BILAT();
+function START_BILAT() {
+  return [[/^Нижняя граница/, 32.5], [/^Верхняя граница/, 50], [/^Диапазон зарплаты/, '32,5…50'],
+    [/^Конкурентный ориентир/, 40], [/^Занятость на границах/, '45 и 50'], [/^Безработица на границах/, '0 и 30']];
+}
+const bil = (page) => page.evaluate(() => { const b = STATE.laborBilateral; return { on: STATE.laborMinOn, w: STATE.laborMinW, min: b ? b.min || null : null, b }; });
+const undoLen = (page) => page.evaluate(() => histOf().undo.length);
+/* МРОТ как человек: щелчок по значению «W_min = …», набор, Enter (один шаг истории). */
+async function typeMin(page, v) {
+  await page.click('#labmin-field .pchip-label');
+  await settle(page, 300);
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type(String(v));
+  await page.keyboard.press('Enter');
+  await settle(page);
+}
+const between = (W, lo, hi, Llo, Lhi, Ulo, Uhi, wasR, wasL, wasU) => [[/^МРОТ/, W], [/^Диапазон зарплаты/, lo + ' … ' + hi + ' (было ' + wasR + ')'],
+  [/^Занятость на границах/, Llo + ' и ' + Lhi + ' (было ' + wasL + ')'], [/^Безработица на границах/, Ulo + ' и ' + Uhi + ' (было ' + wasU + ')']];
+const single = (W, L, U, wasR, wasL, wasU) => [[/^МРОТ/, W], [/^Исход один: зарплата/, W + ' (было ' + wasR + ')'],
+  [/^Занятость$/, L + ' (было ' + wasL + ')'], [/^Безработица$/, U + ' (было ' + wasU + ')']];
+const NEWWAS = ['32,5 … 50', '45 и 50', '0 и 30'];
+async function sectionV() {
+  head('В. МРОТ в «Двусторонней монополии»');
+  const { ctx, page, errors } = await openModel('labor-bilat');
+  ok('В1: предусловие «Ответ» открыт', await answerShown(page));
+  // 1. Старт.
+  let k = await chkState(page), c = await canvas(page), a = await answer(page);
+  ok('В1: галочка видна и снята', k.shown && !k.checked && !k.on, JSON.stringify(k));
+  ok('В1: линии МРОТ нет', !c.coords.some(t => /min/.test(t)), c.coords.join(', '));
+  checkRows('В1', a, BIL_MAIN);
+  // 2. Галочка → МРОТ 45.
+  let u0 = await undoLen(page);
+  await page.click('#chk-labmin');
+  await settle(page);
+  a = await answer(page); c = await canvas(page);
+  ok('В2: «С МРОТ»', a.subsec.includes('С МРОТ'), a.subsec.join(' | '));
+  checkRows('В2', a, BIL_MAIN.concat(between(45, 45, 50, 55, 50, 15, 30, ...NEWWAS)));
+  ok('В2: подсказка «МРОТ поднял нижнюю границу торга…»', a.hints.some(h => /^МРОТ поднял нижнюю границу торга/.test(h)), a.hints.join(' | '));
+  ok('В2: холст — точка M (55; 45)', dotAt(c, 55, 45), JSON.stringify(c.dots));
+  ok('В2: холст — полка «MCLэфф» и «Безработица = 15»', c.texts.includes('MCLэфф') && c.texts.includes('Безработица = 15'), c.texts.join(', '));
+  ok('В2: холст — полоса 45 … 50', !!c.band && near(c.band[0], 45, 0.2) && near(c.band[1], 50, 0.2), JSON.stringify(c.band));
+  ok('В2: у оси W внизу одно число — «45 min» линии МРОТ (не «32,5 м»)', c.coords.some(t => /^45min/.test(t)) && !c.coords.some(t => /^32,5м/.test(t)), c.coords.join(', '));
+  ok('В2: один шаг истории', (await undoLen(page)) === u0 + 1, u0 + ' → ' + (await undoLen(page)));
+  // 3. 36.
+  u0 = await undoLen(page);
+  await typeMin(page, 36);
+  a = await answer(page); c = await canvas(page);
+  checkRows('В3', a, BIL_MAIN.concat(between(36, 36, 50, 52, 50, 0, 30, ...NEWWAS)));
+  ok('В3: полосы безработицы нет', !c.texts.some(t => /^Безработица =/.test(t)), c.texts.join(', '));
+  ok('В3: один шаг истории', (await undoLen(page)) === u0 + 1);
+  // 4. 30.
+  await typeMin(page, 30);
+  a = await answer(page);
+  checkRows('В4', a, BIL_MAIN);
+  ok('В4: «не связывает»', a.hints.some(h => /не выше монопсонической зарплаты, поэтому не связывает/.test(h)), a.hints.join(' | '));
+  // 5. 50.
+  await typeMin(page, 50);
+  checkRows('В5', await answer(page), BIL_MAIN.concat(single(50, 50, 30, ...NEWWAS)));
+  // 6. 60.
+  await typeMin(page, 60);
+  a = await answer(page); c = await canvas(page);
+  checkRows('В6', a, BIL_MAIN.concat(single(60, 40, 60, ...NEWWAS)));
+  ok('В6: надпись «Исход один: зарплата = МРОТ»', c.texts.includes('Исход один: зарплата = МРОТ'), c.texts.join(', '));
+  ok('В6: полосы торга нет', !c.band, JSON.stringify(c.band));
+  ok('В6: подсказка «МРОТ не ниже ставки профсоюза…»', a.hints.some(h => /^МРОТ не ниже ставки профсоюза/.test(h)), a.hints.join(' | '));
+  ok('В6: на оси L «40 спрос» и «100 предл», «Безработица = 60»', c.coords.includes('40спрос') && c.coords.includes('100предл') && c.texts.includes('Безработица = 60'), c.coords.join(', '));
+  // 7. Линия МРОТ мышью 45 → 60.
+  await typeMin(page, 45);
+  u0 = await undoLen(page);
+  const [x0, y0] = await page.evaluate(() => { const { mx, my } = mainScales(null); const r = document.getElementById('chart').getBoundingClientRect(); return [r.left + mx(90), r.top + my(45)]; });
+  const y1 = await page.evaluate(() => { const { my } = mainScales(null); return document.getElementById('chart').getBoundingClientRect().top + my(60); });
+  await page.mouse.move(x0, y0); await page.mouse.down();
+  for (let i = 1; i <= 8; i++) { await page.mouse.move(x0, y0 + (y1 - y0) * i / 8); await page.waitForTimeout(30); }
+  await page.mouse.up();
+  await settle(page);
+  let v = await bil(page);
+  const W7 = v.w;
+  ok('В7: МРОТ протянут к 60 (±0,6)', near(W7, 60, 0.6), String(W7));
+  ok('В7: исход один по живому МРОТ', !!v.min && v.min.single && near(v.min.Llo, 100 - W7, 0.02) && near(v.min.Ulo, 3 * W7 - 120, 0.05), JSON.stringify(v.min));
+  a = await answer(page);
+  ok('В7: «Ответ» — исход один', a.stats.some(r => /^Исход один: зарплата/.test(r.lab) && near(num(r.val), W7, 0.006)), a.stats.map(r => r.lab + '=' + r.val).join(' | '));
+  ok('В7: один шаг истории', (await undoLen(page)) === u0 + 1, u0 + ' → ' + (await undoLen(page)));
+  // 8. Снять галочку, «Отменить».
+  await page.click('#chk-labmin');
+  await settle(page);
+  k = await chkState(page); c = await canvas(page); a = await answer(page);
+  ok('В8: галочка снята, линии МРОТ нет', !k.checked && !k.on && !c.coords.some(t => /min/.test(t)), JSON.stringify(k));
+  checkRows('В8', a, BIL_MAIN);
+  await page.evaluate(() => { const b = document.getElementById('btn-undo'); if (b) b.click(); else historyUndo(); });
+  await settle(page);
+  k = await chkState(page); v = await bil(page);
+  ok('В8: одно «Отменить» — МРОТ снова включён', k.checked && k.on && !!v.min, JSON.stringify(k));
+  // 9. Ссылка и автосохранение с МРОТ 45.
+  await typeMin(page, 45);
+  const want9 = JSON.stringify((await bil(page)).min);
+  const rows9 = (await answer(page)).stats.map(r => r.lab + '=' + r.val).join(' | ');
+  const link = await page.evaluate(() => shareLinkOf());
+  await settle(page, 1500);   // автосохранение пишется по затишью
+  const saved = await page.evaluate(() => localStorage.getItem('calc2.v1.model.labor-bilat'));
+  ok('В9: автосохранение записано', !!saved);
+  ok('В9: ошибок страницы нет', !errors.length, errors.join('; '));
+  await ctx.close();
+  for (const [how, init, url] of [['ссылка', null, link], ['автосохранение', { 'calc2.v1.model.labor-bilat': saved }, null]]) {
+    const o = await openModel('labor-bilat', init, url);
+    await settle(o.page);
+    const got = JSON.stringify((await bil(o.page)).min);
+    const rows = (await answer(o.page)).stats.map(r => r.lab + '=' + r.val).join(' | ');
+    ok('В9: ' + how + ' — те же числа', got === want9 && rows === rows9, got + ' ≠ ' + want9);
+    ok('В9: ' + how + ' — ошибок страницы нет', !o.errors.length, o.errors.join('; '));
+    await o.ctx.close();
+  }
+  // 10. «Второй пример».
+  {
+    const o = await openModel('labor-bilat');
+    await setCurves(o.page, SECOND);
+    await o.page.click('#chk-labmin'); await settle(o.page);
+    await typeMin(o.page, 55);
+    let m = (await bil(o.page)).min;
+    ok('В10: второй пример, МРОТ 55 → 55 … 60, занятость 32,5 и 30, безработица 2,5 и 10',
+      !!m && !m.single && near(m.Wlo, 55) && near(m.Whi, 60) && near(m.Llo, 32.5) && near(m.Lhi, 30) && near(m.Ulo, 2.5) && near(m.Uhi, 10), JSON.stringify(m));
+    await typeMin(o.page, 70);
+    m = (await bil(o.page)).min;
+    ok('В10: второй пример, МРОТ 70 → исход один 70, занятость 25, безработица 25',
+      !!m && m.single && near(m.W, 70) && near(m.Llo, 25) && near(m.Ulo, 25), JSON.stringify(m));
+    ok('В10: ошибок страницы нет', !o.errors.length, o.errors.join('; '));
+    await o.ctx.close();
+  }
+  // 11. Старые сохранения (код bfb74cc3).
+  for (const key of ['labor', 'labor-mono', 'labor-union', 'labor-bilat']) {
+    const fx = JSON.parse(fs.readFileSync(path.join(ROOT, 'claude', 'calc2_labor', 'fixtures', 'old_' + key + '.json'), 'utf8'));
+    // Автосохранение — тем же путём, что autosaveModel: страница без модели кладёт состояние в хранилище.
+    const z = await openModel('sd');
+    const saved11 = await z.page.evaluate((st) => { autosaveModel(st); return localStorage.getItem('calc2.v1.model.' + st.key); }, fx.state);
+    await z.ctx.close();
+    for (const [how, init, url] of [['ссылка', null, fx.link.replace(/^https?:\/\/[^/]+/, BASE)], ['автосохранение', { ['calc2.v1.model.' + key]: saved11 }, null]]) {
+      const o = await openModel(key, init, url);
+      await settle(o.page);
+      const r = await o.page.evaluate(() => ({ eq: STATE.laborEq, mono: STATE.laborMono, union: STATE.laborUnion, min: STATE.laborMin,
+        w: STATE.laborMinWelfare, bm: STATE.laborBilateral ? STATE.laborBilateral.min : null, on: STATE.laborMinOn, W: STATE.laborMinW }));
+      const tag = 'В11 ' + key + ' (' + how + ')';
+      if (key === 'labor') ok(tag + ': конкуренция 50 / 50, МРОТ 65 → 35, безработица 30, 1662,5 и 612,5, DWL 225',
+        near(r.eq.Q, 50) && r.on && near(r.W, 65) && near(r.min.employment, 35) && near(r.min.unemployment, 30) && near(r.w.workerCS, 1662.5, 0.05) && near(r.w.firmCS, 612.5, 0.05) && near(r.w.dwl, 225, 0.05), JSON.stringify(r));
+      if (key === 'labor-mono') ok(tag + ': монопсония 33,33 / 33,33, МРОТ 65 → 35, зарплата 65, безработица 30',
+        near(r.mono.Lm, 33.333, 0.01) && near(r.mono.Wm, 33.333, 0.01) && near(r.min.Lstar, 35) && near(r.min.wage, 65) && near(r.min.unemployment, 30), JSON.stringify(r));
+      if (key === 'labor-union') ok(tag + ': профсоюз — угол 50 / 50, фонд 2 500',
+        r.union && r.union.corner && near(r.union.Lu, 50) && near(r.union.Wu, 50) && near(r.union.fund, 2500, 0.1), JSON.stringify(r.union));
+      if (key === 'labor-bilat') {
+        const kk = await chkState(o.page);
+        ok(tag + ': галочка МРОТ видна и включена', kk.shown && kk.checked && kk.on, JSON.stringify(kk));
+        ok(tag + ': исход один 65, занятость 35, безработица 30', !!r.bm && r.bm.single && near(r.bm.W, 65) && near(r.bm.Llo, 35) && near(r.bm.Ulo, 30), JSON.stringify(r.bm));
+      }
+      ok(tag + ': ошибок страницы нет', !o.errors.length, o.errors.join('; '));
+      await o.ctx.close();
+    }
+  }
+}
+
 /* ── А ── */
 const UNION_NEW = [[/^Lп.*занятость/, 50], [/^Wп.*зарплата/, 50], [/^Фонд оплаты/, 2500], [/^Желающих работать/, 80],
   [/^Безработица/, 30], [/^Lk.*конкуренция/, 60], [/^Wk.*конкуренция/, 40], [/^DWL/, 75]];
@@ -260,6 +433,7 @@ for (engName of ENGINES) {
   for (W0 of WIDTHS) {
     if (want('А')) await sectionA();
     if (want('Б')) await sectionB();
+    if (want('В')) await sectionV();
   }
   await browser.close();
 }

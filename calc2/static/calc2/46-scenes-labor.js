@@ -132,6 +132,34 @@ function laborUnionWageFloor(W) {
   return { binding, W, Lu, Qs, employment: Lu, unemployment, Lk: eq.Q, Wk: eq.P };
 }
 
+/* Границы торга двусторонней монополии при МРОТ W_min (решение владельца 15.10, Notion …8168…, правило сверено с
+   Сафроновым и Бахаревым; ADR 0156). Нижняя граница — выбор монопсониста при МРОТ (laborMinMonopsony, уже в
+   STATE.laborMin): связывает (W_min > Wм) — зарплата W_min, занятость L*, безработица L̂ − L*; не связывает — Wм, Lм, 0.
+   Верхняя — max(Wп, W_min): занятость по спросу, безработица S⁻¹ − D⁻¹. W_min ≥ Wп — ИСХОД ОДИН: торга нет,
+   зарплата W_min, занятость min(D⁻¹, S⁻¹), безработица S⁻¹ − занятость. Объём при МРОТ за краем кривой — честный 0
+   (как в laborMinCompetition). */
+function laborBilateralMin(b, W) {
+  const D = STATE.laborD, S = STATE.laborS, mm = STATE.laborMin;
+  const qtyAt = (c, w) => {
+    let q = invCurve(c, w);
+    if (q == null) { const at0 = evalCurve(c, 0); if (isFinite(at0) && ((c === D && w > at0) || (c === S && w < at0))) q = 0; }
+    return q;
+  };
+  if (W >= b.Wu - 1e-9) {
+    const Ld = qtyAt(D, W), Ls = qtyAt(S, W);
+    const L = (Ld != null && Ls != null) ? Math.min(Ld, Ls) : Ld;
+    return { W, single: true, binding: true, Wlo: W, Whi: W, Llo: L, Lhi: L, Ld, Ls,
+             Ulo: (L != null && Ls != null) ? Math.max(0, Ls - L) : null, Uhi: (L != null && Ls != null) ? Math.max(0, Ls - L) : null };
+  }
+  const bind = !!(mm && mm.binding);
+  const Whi = Math.max(b.Wu, W);
+  const Lhi = (Whi > b.Wu + 1e-9) ? qtyAt(D, Whi) : b.Lu;
+  const Shi = (Whi > b.Wu + 1e-9) ? qtyAt(S, Whi) : null;
+  return { W, single: false, binding: bind,
+           Wlo: bind ? W : b.Wm, Llo: bind ? mm.Lstar : b.Lm, Ulo: bind ? mm.unemployment : 0,
+           Whi, Lhi, Uhi: (Shi != null && Lhi != null) ? Math.max(0, Shi - Lhi) : b.Uhi };
+}
+
 // Пересчёт рынка труда БЕЗ рисования — складываем результаты в STATE.
 function recomputeLabor() {
   STATE.laborD = curveByRole('demand');
@@ -173,26 +201,29 @@ function recomputeLabor() {
      монопсонист в одиночку, сверху — чего добился бы профсоюз-монополист.
      Обе границы берём из уже проверенных функций, ничего не пересчитывая. */
   STATE.laborBilateral = null;
+  if (STATE.laborStruct === 'bilateral') STATE.laborUnion = laborUnionMonopoly();
+  // Минимальная зарплата (МРОТ). В двусторонней монополии нижняя граница торга — выбор монопсониста при МРОТ
+  // (решение …8168…, ADR 0156): результат монопсонии с МРОТ, по нему рисуется и полка MCLэфф.
+  if (STATE.laborMinOn && STATE.laborMinW > 0 && eq) {
+    STATE.laborMin = (STATE.laborStruct === 'monopsony' || STATE.laborStruct === 'bilateral')
+      ? laborMinMonopsony(STATE.laborMinW)
+      : laborMinCompetition(STATE.laborMinW);
+  }
   if (STATE.laborStruct === 'bilateral') {
-    STATE.laborUnion = laborUnionMonopoly();
     const m = STATE.laborMono, u = STATE.laborUnion;
     if (m && u) {
       const lo = Math.min(m.Wm, u.Wu), hi = Math.max(m.Wm, u.Wu);
       STATE.laborBilateral = { Wlo: lo, Whi: hi, Wm: m.Wm, Lm: m.Lm, Wu: u.Wu, Lu: u.Lu,
                                Wk: eq ? eq.P : null, Lk: eq ? eq.Q : null,
                                Ulo: 0, Uhi: u.unemployment };
+      if (STATE.laborMinOn && STATE.laborMinW > 0) STATE.laborBilateral.min = laborBilateralMin(STATE.laborBilateral, STATE.laborMinW);
     }
-  }
-  // Минимальная зарплата (МРОТ).
-  if (STATE.laborMinOn && STATE.laborMinW > 0 && eq) {
-    STATE.laborMin = (STATE.laborStruct === 'monopsony')
-      ? laborMinMonopsony(STATE.laborMinW)
-      : laborMinCompetition(STATE.laborMinW);
   }
   // Благосостояние при связывающем МРОТ (Задача 3): перестраиваем под фактическое
   // состояние (занятость L*, фактическая зарплата W_факт) — единый источник чисел для
   // заливок и табло. L* и W_факт берём из уже найденного STATE.laborMin (не пересчитываем).
-  if (STATE.laborMin && STATE.laborMin.binding && eq) {
+  // В двусторонней монополии излишков при МРОТ не считаем: исход внутри полосы не определён.
+  if (STATE.laborMin && STATE.laborMin.binding && eq && STATE.laborStruct !== 'bilateral') {
     const min = STATE.laborMin;
     const Lstar = (STATE.laborStruct === 'monopsony') ? min.Lstar : min.employment;
     const Wfact = (STATE.laborStruct === 'monopsony') ? min.wage : min.Wmin;
@@ -310,7 +341,9 @@ function drawLaborMCL() {
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCL');
   // (2) Эффективная ломаная MCL_eff — поверх настоящей, при связывающем МРОТ.
   const min = STATE.laborMin;
-  if (min && min.binding && min.Lhat != null) {
+  // Двусторонняя, исход один (МРОТ не ниже ставки профсоюза): торга нет, полку не рисуем (эскиз, кадр 4).
+  const bm = (STATE.laborStruct === 'bilateral' && STATE.laborBilateral) ? STATE.laborBilateral.min : null;
+  if (min && min.binding && min.Lhat != null && !(bm && bm.single)) {
     const yW = sy(min.Wmin);
     // Полка W_min до L̂ (сплошная, тёмно-оранжевая, потолще).
     g.append('line').attr('x1', sx(0)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', yW)
@@ -592,30 +625,76 @@ function setUnionModel(model) {
 
 // Закрашенная горизонтальная полоса между Wм и Wп + обе граничные точки.
 // Одной «правильной» точки внутри полосы модель не даёт — так и подписываем.
+/* С МРОТ (решение …8168…, ADR 0156; эскиз владельца 15.10 из четырёх кадров): полоса — по границам с МРОТ; при
+   связывающем внизу — точка M (L*; W_min), как в монопсонии с МРОТ, призрак M₀, полка MCLэфф (drawLaborMCL по
+   STATE.laborMin), полоса безработицы на оси L от L* до L̂; у оси W — одно число на уровень: внизу только «… min»
+   линии МРОТ. Исход один (W_min ≥ Wп) — полосы нет, надпись «Исход один: зарплата = МРОТ», точка на спросе,
+   вертикали «спрос» и «предл», полоса безработицы, призраки E′₀ и M₀. */
 function drawLaborBilateral() {
   const b = STATE.laborBilateral; if (!b) return;
+  const mn = b.min || null, single = !!(mn && mn.single), bindLo = !!(mn && !single && mn.binding);
   const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax);
+  const gg = svg.append('g');
+  const ghost = (L, W, label) => {
+    if (!STATE.showGhost || L == null || W == null) return;
+    const [px, py] = toPx(L, W);
+    gg.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+    gg.append('text').attr('x', px + 7).attr('y', py - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
+  };
+  const unempBar = (La, Lb, U) => {
+    if (!(U > 1e-6) || La == null || Lb == null) return;
+    const xLo = sx(Math.min(La, Lb)), xHi = sx(Math.max(La, Lb));
+    gg.append('line').attr('x1', xLo).attr('y1', oy).attr('x2', xHi).attr('y2', oy).attr('stroke', COL.bad).attr('stroke-width', 5).attr('opacity', 0.5);
+    haloText(gg, (xLo + xHi) / 2, oy + 24, 'Безработица = ' + fmt(U), 'middle', 'hanging');
+  };
+  if (single) {
+    // Исход один: зарплата = МРОТ, занятость по спросу, остальные желающие без работы.
+    const yW = sy(mn.W);
+    gg.append('text').attr('x', (ox + xMax) / 2).attr('y', yW - 10)
+      .attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
+      .text('Исход один: зарплата = МРОТ');
+    const dash = (x) => gg.append('line').attr('x1', x).attr('y1', yW).attr('x2', x).attr('y2', oy)
+      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    if (mn.Ld != null) { dash(sx(mn.Ld)); axisValueX(gg, sx(mn.Ld), oy, fmt(mn.Ld), 'спрос'); }
+    if (mn.Ls != null && mn.Ld != null && Math.abs(mn.Ls - mn.Ld) > 1e-6) { dash(sx(mn.Ls)); axisValueX(gg, sx(mn.Ls), oy, fmt(mn.Ls), 'предл'); }
+    unempBar(mn.Ld, mn.Ls, mn.Ulo);
+    if (mn.Llo != null) gg.append('circle').attr('cx', sx(mn.Llo)).attr('cy', yW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    ghost(b.Lu, b.Wu, 'E′₀');
+    ghost(b.Lm, b.Wm, 'M₀');
+    return;
+  }
+  const Wlo = mn ? mn.Wlo : b.Wlo, Whi = mn ? mn.Whi : b.Whi;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const yLo = sy(b.Wlo), yHi = sy(b.Whi);
+  const yLo = sy(Wlo), yHi = sy(Whi);
   g.append('rect').attr('x', ox).attr('y', yHi).attr('width', xMax - ox).attr('height', Math.abs(yLo - yHi))
     .attr('fill', COL.reg).attr('opacity', 0.16).attr('data-legend', 'Диапазон возможных зарплат');
   g.append('line').attr('x1', ox).attr('y1', yLo).attr('x2', xMax).attr('y2', yLo)
     .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
   g.append('line').attr('x1', ox).attr('y1', yHi).attr('x2', xMax).attr('y2', yHi)
     .attr('stroke', COL.reg).attr('stroke-width', 1.8).attr('stroke-dasharray', '6 4');
-  const gg = svg.append('g');
-  axisValueY(gg, ox, yLo, fmt(b.Wm), 'м');
+  // Число самой границы, одно на уровень: при связывающем МРОТ внизу говорит линия МРОТ («45 min»).
+  if (!bindLo) axisValueY(gg, ox, yLo, fmt(b.Wm), 'м');
   axisValueY(gg, ox, yHi, fmt(b.Wu), 'п');
-  gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2)
-    .attr('text-anchor', 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
+  /* Узкая полоса (МРОТ близко к ставке профсоюза): две строки внутри не помещаются и ложатся на линию МРОТ и
+     «MCLэфф» — заголовок встаёт над полосой у правого края (слева стоят E′ и M), пояснение уходит (оно же — вопрос
+     «Разбора»). */
+  const narrow = Math.abs(yLo - yHi) < 36;
+  gg.append('text').attr('x', narrow ? xMax - 8 : (ox + xMax) / 2).attr('y', narrow ? yHi - 8 : (yLo + yHi) / 2)
+    .attr('text-anchor', narrow ? 'end' : 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Диапазон возможных исходов');
-  gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
+  if (!narrow) gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
     .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
-  // Две граничные точки: решение монопсониста и решение профсоюза.
-  laborPoint(gg, b.Lm, b.Wm, COL.S, 'M', { lIdx: 'м', wText: null });
+  // Две граничные точки: решение монопсониста (при МРОТ — с МРОТ) и решение профсоюза.
+  if (bindLo) {
+    laborPoint(gg, mn.Llo, mn.Wlo, COL.S, 'M', { lIdx: 'м', wText: null });
+    ghost(b.Lm, b.Wm, 'M₀');
+    unempBar(mn.Llo, STATE.laborMin ? STATE.laborMin.Lhat : null, mn.Ulo);
+  } else laborPoint(gg, b.Lm, b.Wm, COL.S, 'M', { lIdx: 'м', wText: null });
   laborPoint(gg, b.Lu, b.Wu, COL.MR, 'E′', { lIdx: 'п', wText: null });
 }
 
@@ -632,6 +711,28 @@ function updateLaborBilateralPanel() {
   /* Безработица на обеих границах (решение …813c…): внизу без МРОТ всегда 0 — монопсонист нанимает по предложению;
      вверху — желающие при ставке профсоюза минус нанятые по спросу. */
   if (b.Ulo != null && b.Uhi != null) html += `<div class="stat"><span>Безработица на границах</span><b>${fmt(b.Ulo)} и ${fmt(b.Uhi)}</b></div>`;
+  /* Раздел «С МРОТ» (решение …8168…, ADR 0156) — как у конкуренции и монопсонии: подзаголовок, W_min индексом. */
+  const mn = b.min;
+  if (mn) {
+    const wasRange = `${fmt(b.Wlo)} … ${fmt(b.Whi)}`, wasL = `${fmt(b.Lm)} и ${fmt(b.Lu)}`, wasU = `${fmt(b.Ulo)} и ${fmt(b.Uhi)}`;
+    if (mn.single) {
+      html += '<div class="sb-subsec">С МРОТ</div>';
+      html += `<div class="stat"><span>МРОТ $W_{\\min}$</span><b>${fmt(mn.W)}</b></div>`;
+      html += `<div class="stat"><span>Исход один: зарплата</span><b>${fmt(mn.W)} (было ${wasRange})</b></div>`;
+      if (mn.Llo != null) html += `<div class="stat"><span>Занятость</span><b>${fmt(mn.Llo)} (было ${wasL})</b></div>`;
+      if (mn.Ulo != null) html += `<div class="stat"><span>Безработица</span><b>${fmt(mn.Ulo)} (было ${wasU})</b></div>`;
+      html += '<div class="hint">МРОТ не ниже ставки профсоюза: торга нет, зарплата равна МРОТ, занятость по спросу.</div>';
+    } else if (mn.binding) {
+      html += '<div class="sb-subsec">С МРОТ</div>';
+      html += `<div class="stat"><span>МРОТ $W_{\\min}$</span><b>${fmt(mn.W)}</b></div>`;
+      html += `<div class="stat"><span>Диапазон зарплаты</span><b>${fmt(mn.Wlo)} … ${fmt(mn.Whi)} (было ${wasRange})</b></div>`;
+      html += `<div class="stat"><span>Занятость на границах</span><b>${fmt(mn.Llo)} и ${fmt(mn.Lhi)} (было ${wasL})</b></div>`;
+      html += `<div class="stat"><span>Безработица на границах</span><b>${fmt(mn.Ulo)} и ${fmt(mn.Uhi)} (было ${wasU})</b></div>`;
+      html += '<div class="hint">МРОТ поднял нижнюю границу торга: платить меньше МРОТ наниматель не может.</div>';
+    } else {
+      html += '<div class="hint" style="margin-top:6px;">МРОТ не выше монопсонической зарплаты, поэтому не связывает.</div>';
+    }
+  }
   /* «Один наниматель против одного профсоюза… нет единственного равновесия…» убрано (сессия 5, А4): та же мысль —
      вопросы «Разбора» «Что такое двусторонняя монополия?», «Почему модель не даёт одного числа?», «От чего зависит
      итог внутри диапазона?». */

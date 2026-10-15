@@ -622,6 +622,50 @@ const CASES = [
              ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 10, 0.3]],
   },
   {
+    /* МРОТ в двусторонней монополии (решение …8168…, ADR 0156): нижняя граница — монопсонист при МРОТ, верхняя —
+       max(Wп, W_min), МРОТ не ниже Wп — исход один. Числа — перебор (таблица задания сессии «рынок труда»). */
+    name: 'Двусторонняя монополия · новый пример с МРОТ 30 / 36 / 45 / 50 / 60 ⇒ не связывает; 36…50; 45…50; исход один 50 и 60',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('bilateral'); STATE.laborMinOn = true;
+          var r = {};
+          [30, 36, 45, 50, 60].forEach(function (w) { setLaborMin(w); var m = (STATE.laborBilateral || {}).min || {};
+            r['b' + w] = m.binding ? 1 : 0; r['s' + w] = m.single ? 1 : 0; r['lo' + w] = m.Wlo; r['hi' + w] = m.Whi;
+            r['Ll' + w] = m.Llo; r['Lh' + w] = m.Lhi; r['Ul' + w] = m.Ulo; r['Uh' + w] = m.Uhi; });
+          STATE.laborMinOn = false; redrawAll();
+          return r;`,
+    checks: [['30: не связывает', 'b30', 0, 0.1], ['30: нижняя Wм', 'lo30', 32.5, 0.15],
+             ['36: нижняя', 'lo36', 36, 0.05], ['36: верхняя', 'hi36', 50, 0.2], ['36: занятость внизу', 'Ll36', 52, 0.2],
+             ['36: занятость вверху', 'Lh36', 50, 0.2], ['36: безработица внизу', 'Ul36', 0, 0.05], ['36: безработица вверху', 'Uh36', 30, 0.3],
+             ['45: нижняя', 'lo45', 45, 0.05], ['45: верхняя', 'hi45', 50, 0.2], ['45: занятость внизу', 'Ll45', 55, 0.2],
+             ['45: занятость вверху', 'Lh45', 50, 0.2], ['45: безработица внизу', 'Ul45', 15, 0.2], ['45: безработица вверху', 'Uh45', 30, 0.3],
+             ['50: исход один', 's50', 1, 0.1], ['50: занятость', 'Ll50', 50, 0.2], ['50: безработица', 'Ul50', 30, 0.3],
+             ['60: исход один', 's60', 1, 0.1], ['60: занятость', 'Ll60', 40, 0.2], ['60: безработица', 'Ul60', 60, 0.3]],
+  },
+  {
+    name: 'Двусторонняя монополия · второй пример D=120−2L, S=20+L с МРОТ 55 и 70; старый пример с МРОТ 65 ⇒ исход один 65',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('bilateral'); STATE.laborMinOn = true;
+          setLaborMin(55); var a = (STATE.laborBilateral || {}).min || {};
+          setLaborMin(70); var c = (STATE.laborBilateral || {}).min || {};
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborMin(65); var o = (STATE.laborBilateral || {}).min || {};
+          STATE.laborMinOn = false; redrawAll();
+          return { lo: a.Wlo, hi: a.Whi, Ll: a.Llo, Lh: a.Lhi, Ul: a.Ulo, Uh: a.Uhi, s70: c.single ? 1 : 0, L70: c.Llo, U70: c.Ulo,
+                   s65: o.single ? 1 : 0, L65: o.Llo, U65: o.Ulo };`,
+    checks: [['55: нижняя', 'lo', 55, 0.05], ['55: верхняя', 'hi', 60, 0.2], ['55: занятость внизу', 'Ll', 32.5, 0.2],
+             ['55: занятость вверху', 'Lh', 30, 0.2], ['55: безработица внизу', 'Ul', 2.5, 0.2], ['55: безработица вверху', 'Uh', 10, 0.3],
+             ['70: исход один', 's70', 1, 0.1], ['70: занятость', 'L70', 25, 0.2], ['70: безработица', 'U70', 25, 0.3],
+             ['старый пример, 65: исход один', 's65', 1, 0.1], ['65: занятость', 'L65', 35, 0.2], ['65: безработица', 'U65', 30, 0.3]],
+  },
+  {
     name: 'Труд · конкуренция и монопсония, новый пример D=100−L, S=10+0,5L ⇒ 60 / 40 и 45 / 32,5; МРОТ 45 ⇒ занятость 55',
     run: `setMode('labor');
           STATE.curves = [];
