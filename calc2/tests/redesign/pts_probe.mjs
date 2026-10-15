@@ -592,7 +592,63 @@ async function sectionV9() {
   await ctx.close();
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5], ['В3', sectionV3], ['В6', sectionV6], ['В10', sectionV10], ['В9', sectionV9]];
+/* ── шаг 12: ссылка «Поделиться» и автосохранение со шагов 1–3 ── */
+async function openLink(link) {
+  const ctx = await newCtx({ viewport: { width: W0, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  await ctx.addInitScript(() => { try { if (sessionStorage.getItem('__i')) return; sessionStorage.setItem('__i', '1'); localStorage.clear(); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+  await page.goto(link, { waitUntil: 'load', timeout: 40000 });
+  await page.waitForFunction(() => typeof pickScene === 'function' && STATE.sceneKey, null, { timeout: 40000 });
+  await page.waitForTimeout(1500);
+  return { ctx, page, errors };
+}
+async function sectionV12() {
+  head('Шаг 12. Ссылка «Поделиться» и автосохранение со шагов 1–3');
+  if (!CH) { await chainStart(); }
+  const link = await CH.page.evaluate(async () => (await shareLinkOf()).replace(/^https?:\/\/[^/]+/, ''));
+  const save = await CH.page.evaluate(() => localStorage.getItem('calc2.v1.model.taxes'));
+  for (const [what, open] of [['ссылка', () => openLink(BASE + link)], ['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': save })]]) {
+    const { ctx, page, errors } = await open();
+    const m = await marks(page);
+    const a = await areasNow(page);
+    ok('12. ' + what + ': те же имена A, B, C и S₁ = 350', m.map(k => k.text).join('') === 'ABC' && a.st.length === 1 && a.st[0].label === 'S₁' && near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350', JSON.stringify({ m: m.map(k => k.text), st: a.st, ans: a.ans }));
+    ok('12. ' + what + ': открыта не в режиме набора, ошибок нет', (await page.evaluate(() => canvasMode())) !== 'vert' && !errors.length, errors.join(' | '));
+    await ctx.close();
+  }
+}
+/* ── шаг 13 (В7): старая фикстура ── */
+async function sectionV13() {
+  head('В7, шаг 13. Старые сохранения и ссылки');
+  const fx = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+  const old = fx.done;
+  for (const [what, open] of [['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': old.autosave })],
+                              ['ссылка', () => openLink(BASE + old.link.replace(/^https?:\/\/[^/]+/, ''))]]) {
+    const { ctx, page, errors } = await open();
+    ok('фикстура (' + what + '): панель режима видна', await enterPts(page));
+    const m = await marks(page);
+    const a = await areasNow(page);
+    const rows = await areaRows(page);
+    const ring = await page.evaluate(() => (STATE.areaCalcList[0] || {}).ring);
+    ok('13. ' + what + ': открывается, «Точка 1», «Точка 2», S₁ = 100 и контур прежние', m.map(k => k.text).join('|') === 'Точка 1|Точка 2' && a.st.length === 1 && near(a.st[0].value, old.areas[0].value, 1e-6) && JSON.stringify(ring) === JSON.stringify(old.areas[0].ring) && a.drawn.length === 1, JSON.stringify({ m, st: a.st, ring }));
+    ok('13. ' + what + ': в строке площади «по координатам»', rows[0] && rows[0].verts === 'по координатам' && rows[0].val === '100', JSON.stringify(rows));
+    ok('13. ' + what + ': ошибок нет', !errors.length, errors.join(' | '));
+    await ctx.close();
+  }
+  // Недонабранная площадь (непустой areaVerts): открывается без ошибки, не в режиме набора, набор отброшен.
+  for (const [what, open] of [['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': fx.pending.autosave })],
+                              ['ссылка', () => openLink(BASE + fx.pending.link.replace(/^https?:\/\/[^/]+/, ''))]]) {
+    const { ctx, page, errors } = await open();
+    await enterPts(page);
+    const st = await page.evaluate(() => ({ cm: canvasMode(), verts: (STATE.areaVerts || []).length, n: (STATE.areaCalcList || []).length, m: (STATE.marks || []).length }));
+    ok('13. недонабранная площадь (' + what + '): без ошибки, не в наборе, набор отброшен', !errors.length && st.cm === 'pts' && !st.verts && st.n === 1 && st.m === 2, JSON.stringify(st) + ' ' + errors.join(' | '));
+    await ctx.close();
+  }
+  if (CH) { await CH.ctx.close(); CH = null; }
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В12', sectionV12], ['В5', sectionV5], ['В3', sectionV3], ['В6', sectionV6], ['В10', sectionV10], ['В9', sectionV9], ['В13', sectionV13]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {
