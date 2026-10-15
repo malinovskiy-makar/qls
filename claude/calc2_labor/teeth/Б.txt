@@ -1,0 +1,27 @@
+## 1 вернуть S = L на старте — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] labor: кривые старта D = 100 − L, S = 10 + 0,5L  — demand:100 - L, supply:L
+    FAIL [chromium 1440] labor старт: строк 10  — Lk (занятость) = 50 | Wk (зарплата) = 50 | Излишек рабочих = 1 250 | Излишек фирм = 1 250
+    FAIL [chromium 1440] labor старт: строка 1 /^Lk.*занятость/ = 60  — Lk (занятость) = 50
+    FAIL [chromium 1440] labor старт: строка 1 видна в «Ответе»  — {"lab":"Lk (занятость)","val":"50","hero":true,"shown":false}
+    FAIL [chromium 1440] labor старт: строка 2 /^Wk.*зарплата/ = 40  — Wk (зарплата) = 50
+    FAIL [chromium 1440] labor старт: строка 2 видна в «Ответе»  — {"lab":"Wk (зарплата)","val":"50","hero":true,"shown":false}
+    FAIL [chromium 1440] labor старт: строка 3 /^Излишек рабочих/ = 900  — Излишек рабочих = 1 250
+    FAIL [chromium 1440] labor старт: строка 4 /^Излишек фирм/ = 1800  — Излишек фирм = 1 250
+## 2 МРОТ включён на старте «Двусторонней монополии» — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] labor-bilat: галочка МРОТ видна и снята, строки МРОТ нет  — {"shown":true,"checked":true,"field":true,"on":true,"w":45}
+    FAIL [chromium 1440] labor-bilat: линии МРОТ нет (подписи «… min» у оси нет)  — 32,5м, 50п, 45м, 50п, 45min
+    ИТОГ labor_probe: 97 / 99  — ПРОВАЛОВ 2
+## 3 снова спрятать галочку МРОТ в «Двусторонней монополии» — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] labor-bilat: галочка МРОТ видна и снята, строки МРОТ нет  — {"shown":false,"checked":false,"field":false,"on":false,"w":45}
+    ИТОГ labor_probe: 98 / 99  — ПРОВАЛОВ 1
+## 4 превью не пересобраны (previews.json кода до сессии) — КРАСНЫЙ (код 1)
+    ВЫГРУЗКА .tex: провалов 4 | стартов 44, своих точек и площадей 1, двух окон 5, превью сверено 42, 35.5 с
+## 5 паритет без «за галочкой» (органы МРОТ labor-bilat не ищутся за #chk-labmin) — КРАСНЫЙ (код 1)
+    ✗ labor-bilat: орган #labmin-field>span.pchip-label не найден
+    ✗ labor-bilat: орган #labmin-field>button.param-bound не найден
+    ✗ labor-bilat: орган #labmin-slider не найден
+    ✗ labor-bilat: орган #labmin-field>button.param-bound[1] не найден
+## 6 подпись «MRL = 0» на числах оси L (axis_labels_probe её видит) — ЗЕЛЁНЫЙ (зубов нет!) (код 0)
+    ИТОГ: 21 / 21 — всё сошлось
+
+git diff calc2/ после отката: пусто
