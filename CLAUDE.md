@@ -124,7 +124,7 @@ python manage.py migrate --noinput --settings=config.settings_test_pg
 python manage.py makemigrations --check --dry-run --settings=config.settings_test_pg
 
 # 4. tests — полный набор на PostgreSQL (см. ниже про два шага)
-python scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads vp \
+python scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads vp legal \
   --settings=config.settings_test_pg --verbosity 2
 
 # 5. deploy-check — боевые настройки глазами Django (переменные окружения — см. ci.yml, джоб deploy-check)
