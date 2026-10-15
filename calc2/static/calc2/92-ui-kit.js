@@ -1035,7 +1035,8 @@ function scGraphRows(box) {
     top.append(dot, sym, nm);
     const more = document.createElement('div');
     more.className = 'crow-more fc-menu'; more.setAttribute('role', 'dialog'); more.setAttribute('aria-label', 'Настройки функции');
-    if (name) { const l = document.createElement('div'); l.className = 'fc-menu-lab'; l.textContent = 'Имя на графике'; more.append(l, name); }
+    /* Подпись над полем — одна: подсказка внутри поля повторяла её слово в слово (сессия 7, А3.6; Notion …81fd…). */
+    if (name) { const l = document.createElement('div'); l.className = 'fc-menu-lab'; l.textContent = 'Имя на графике'; name.placeholder = ''; more.append(l, name); }
     if (del) { del.classList.add('fc-mi'); del.textContent = 'Убрать функцию'; more.appendChild(del); }
     const gear = document.createElement('button');
     gear.type = 'button'; gear.className = 'btn-icon crow-gear fc-ico';
