@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-15. HEAD: `1af9626f`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-15. HEAD: `90ce4f1e`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,20 +343,20 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2285 | 184.2 | шаблон |
+| `calc2/templates/calc2/calc2.html` | 2284 | 184.1 | шаблон |
 | `calc2/static/calc2/calc2.css` | 4295 | 324.9 | CSS |
-| `calc2/static/calc2/previews.json` | 44 | 30.7 | json |
+| `calc2/static/calc2/previews.json` | 44 | 30.8 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
 | `calc2/static/calc2/20-plane.js` | 1012 | 69.0 | JS |
-| `calc2/static/calc2/30-curves.js` | 1513 | 109.9 | JS |
+| `calc2/static/calc2/30-curves.js` | 1515 | 110.2 | JS |
 | `calc2/static/calc2/40-scenes-market.js` | 3778 | 271.0 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 1832 | 133.9 | JS |
 | `calc2/static/calc2/44-scenes-firm.js` | 1204 | 79.8 | JS |
-| `calc2/static/calc2/46-scenes-labor.js` | 759 | 55.1 | JS |
-| `calc2/static/calc2/48-scenes-consumer.js` | 269 | 17.0 | JS |
+| `calc2/static/calc2/46-scenes-labor.js` | 902 | 68.9 | JS |
+| `calc2/static/calc2/48-scenes-consumer.js` | 270 | 17.2 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 427 | 29.2 | JS |
-| `calc2/static/calc2/52-modes.js` | 956 | 65.6 | JS |
+| `calc2/static/calc2/52-modes.js` | 959 | 66.1 | JS |
 | `calc2/static/calc2/54-scenes-ppf.js` | 3275 | 211.8 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 555 | 36.3 | JS |
 | `calc2/static/calc2/60-overlays.js` | 4967 | 317.8 | JS |
@@ -364,11 +364,11 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/72-export-tex.js` | 1661 | 127.7 | JS |
 | `calc2/static/calc2/80-ui.js` | 696 | 43.1 | JS |
 | `calc2/static/calc2/82-input.js` | 2277 | 136.4 | JS |
-| `calc2/static/calc2/84-picker.js` | 580 | 43.9 | JS |
+| `calc2/static/calc2/84-picker.js` | 581 | 44.1 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2156 | 140.9 | JS |
-| `calc2/static/calc2/88-params.js` | 1995 | 136.6 | JS |
+| `calc2/static/calc2/88-params.js` | 1993 | 136.5 | JS |
 | `calc2/static/calc2/89-model-state.js` | 362 | 23.8 | JS |
-| `calc2/static/calc2/90-explain.js` | 381 | 62.9 | JS |
+| `calc2/static/calc2/90-explain.js` | 394 | 64.7 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 1316 | 90.4 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
@@ -377,7 +377,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 322 | 21.4 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 35 файлов, 45227 строк, 3175.4 КБ.**
+**Итого: 35 файлов, 45387 строк, 3192.1 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -527,30 +527,30 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 612 — `keepAxisNamesInside`
 - строка 640 — `yieldTicksToCoords`
 - строка 668 — `spreadLabels`
-- строка 824 — `redrawAfterFonts`
-- строка 863 — `parseColor`
-- строка 878 — `relLum`
-- строка 886 — `contrastOf`
-- строка 891 — `rgbToHsl`
-- строка 904 — `hslToRgb`
-- строка 931 — `labelInk`
-- строка 963 — `applyLabelInk`
-- строка 990 — `mixToBg`
-- строка 998 — `applyLabelSize`
-- строка 1032 — `smoothLabel`
-- строка 1062 — `requestLabelFrame`
-- строка 1067 — `resetLabelPositions`
-- строка 1077 — `curveLabelAnchor`
-- строка 1086 — `labelCurve`
-- строка 1172 — `curveWidth`
-- строка 1214 — `curveDash`
-- строка 1222 — `curveOpacity`
-- строка 1230 — `drawCurves`
-- строка 1391 — `sceneDrawsCurveList`
-- строка 1400 — `syncCurveListVisibility`
-- строка 1415 — `curveDragAllowed`
-- строка 1425 — `roundDrag`
-- строка 1467 — `setCurveFreeTerm`
+- строка 826 — `redrawAfterFonts`
+- строка 865 — `parseColor`
+- строка 880 — `relLum`
+- строка 888 — `contrastOf`
+- строка 893 — `rgbToHsl`
+- строка 906 — `hslToRgb`
+- строка 933 — `labelInk`
+- строка 965 — `applyLabelInk`
+- строка 992 — `mixToBg`
+- строка 1000 — `applyLabelSize`
+- строка 1034 — `smoothLabel`
+- строка 1064 — `requestLabelFrame`
+- строка 1069 — `resetLabelPositions`
+- строка 1079 — `curveLabelAnchor`
+- строка 1088 — `labelCurve`
+- строка 1174 — `curveWidth`
+- строка 1216 — `curveDash`
+- строка 1224 — `curveOpacity`
+- строка 1232 — `drawCurves`
+- строка 1393 — `sceneDrawsCurveList`
+- строка 1402 — `syncCurveListVisibility`
+- строка 1417 — `curveDragAllowed`
+- строка 1427 — `roundDrag`
+- строка 1469 — `setCurveFreeTerm`
 
 #### `calc2/static/calc2/40-scenes-market.js`
 
@@ -823,34 +823,36 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 14 — `laborMCL`
 - строка 26 — `laborMinMonopsony`
 - строка 64 — `laborMinCompetition`
-- строка 89 — `laborUnionMonopoly`
-- строка 103 — `laborUnionWageFloor`
-- строка 114 — `recomputeLabor`
-- строка 196 — `laborPoint`
-- строка 214 — `drawLaborGhost`
-- строка 224 — `drawLaborSurpluses`
-- строка 242 — `drawLaborMinWelfare`
-- строка 274 — `drawLaborMCL`
-- строка 308 — `drawLaborDWL`
-- строка 322 — `drawLaborMonopsonyPoints`
-- строка 378 — `drawLaborCompPoints`
-- строка 404 — `drawLaborMinLine`
-- строка 418 — `attachLaborMinDrag`
-- строка 426 — `setLaborMinFields`
-- строка 433 — `setLaborMin`
-- строка 445 — `drawLaborUnionMRL`
-- строка 457 — `drawLaborGapDWL`
-- строка 468 — `drawLaborUnionPoints`
-- строка 502 — `drawLaborUnionWageLine`
-- строка 516 — `attachUnionWageDrag`
-- строка 524 — `setUnionWageFields`
-- строка 531 — `setUnionWage`
-- строка 541 — `setUnionModel`
-- строка 558 — `drawLaborBilateral`
-- строка 586 — `updateLaborBilateralPanel`
-- строка 602 — `setLaborStruct`
-- строка 625 — `updateLaborPanel`
-- строка 720 — `redrawLabor`
+- строка 93 — `laborUnionMonopoly`
+- строка 125 — `laborUnionWageFloor`
+- строка 141 — `laborBilateralMin`
+- строка 164 — `recomputeLabor`
+- строка 250 — `laborPoint`
+- строка 268 — `drawLaborGhost`
+- строка 278 — `drawLaborSurpluses`
+- строка 296 — `drawLaborMinWelfare`
+- строка 328 — `drawLaborMCL`
+- строка 364 — `drawLaborDWL`
+- строка 378 — `drawLaborMonopsonyPoints`
+- строка 434 — `drawLaborCompPoints`
+- строка 460 — `drawLaborMinLine`
+- строка 474 — `attachLaborMinDrag`
+- строка 482 — `setLaborMinFields`
+- строка 490 — `setLaborMinOn`
+- строка 497 — `setLaborMin`
+- строка 509 — `drawLaborUnionMRL`
+- строка 521 — `drawLaborGapDWL`
+- строка 532 — `drawLaborUnionPoints`
+- строка 572 — `drawLaborUnionWageLine`
+- строка 586 — `attachUnionWageDrag`
+- строка 594 — `setUnionWageFields`
+- строка 601 — `setUnionWage`
+- строка 611 — `setUnionModel`
+- строка 633 — `drawLaborBilateral`
+- строка 702 — `updateLaborBilateralPanel`
+- строка 743 — `setLaborStruct`
+- строка 760 — `updateLaborPanel`
+- строка 863 — `redrawLabor`
 
 #### `calc2/static/calc2/48-scenes-consumer.js`
 
@@ -865,8 +867,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 145 — `setConsumerNum`
 - строка 154 — `redrawConsumer`
 - строка 188 — `updateConsumerPanel`
-- строка 243 — `applyConsumerTypeUI`
-- строка 257 — `setConsumerType`
+- строка 244 — `applyConsumerTypeUI`
+- строка 258 — `setConsumerType`
 
 #### `calc2/static/calc2/50-scenes-macro.js`
 
@@ -911,8 +913,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 821 — `makeThrottle`
 - строка 834 — `ineqRedraw`
 - строка 837 — `setMode`
-- строка 917 — `applyScenarioVisibility`
-- строка 943 — `setScenario`
+- строка 920 — `applyScenarioVisibility`
+- строка 946 — `setScenario`
 
 #### `calc2/static/calc2/54-scenes-ppf.js`
 
@@ -1495,12 +1497,12 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 8 — `loadScene`
 - строка 147 — `closePicker`
 - строка 169 — `openPicker`
-- строка 332 — `baseScene`
-- строка 341 — `applyCardScope`
-- строка 419 — `blockSpec`
-- строка 431 — `foldPickerGroups`
-- строка 518 — `plural`
-- строка 526 — `pickScene`
+- строка 333 — `baseScene`
+- строка 342 — `applyCardScope`
+- строка 420 — `blockSpec`
+- строка 432 — `foldPickerGroups`
+- строка 519 — `plural`
+- строка 527 — `pickScene`
 
 #### `calc2/static/calc2/86-workspace.js`
 
@@ -1646,7 +1648,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 #### `calc2/static/calc2/90-explain.js`
 
-- строка 375 — `sceneExplainHtml`
+- строка 388 — `sceneExplainHtml`
 
 #### `calc2/static/calc2/91-session.js`
 
@@ -1838,6 +1840,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1367.**
+**Итого функций в индексе: 1369.**
 
 <!-- AUTO:END -->
