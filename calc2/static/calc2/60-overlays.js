@@ -3587,7 +3587,13 @@ function onDocClosePick(e) {
   if (openCPick && (openCPick.contains(e.target) || (openCPick._owner && openCPick._owner.contains(e.target)))) return;
   closeColorMenu();
 }
-function onEscClosePick(e) { if (e.key === 'Escape') closeColorMenu(); }
+/* Esc закрывает только окно цвета: событие дальше не идёт (сессия 7, Б3). Раньше окно убиралось, а сторож режима
+   «Точки и площади» (88-params.js, тоже фаза захвата) следом выходил из режима — он видел уже закрытое окно. */
+function onEscClosePick(e) {
+  if (e.key !== 'Escape' || !openCPick) return;
+  e.preventDefault(); e.stopPropagation();
+  closeColorMenu();
+}
 
 /* Выбор цвета: ряд из шести образцов плюс «Свой цвет» (П34).
    Возвращает ОБЁРТКУ, а не сам input: меню уезжает в <body> с position:fixed,
@@ -3757,15 +3763,16 @@ function drawMarks() {
     const px = mx(mk.x), py = my(mk.y);
     const col = mk.color || COL.ink;
     // Пунктирные проекции на оси — как у равновесия: так точка читается по осям.
+    // data-mark-id — чей это узел (меню «⋯» находит подпись для «Переименовать», приборы — точку; сессия 7).
     if (mk.showDash !== false) {
       g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5).attr('data-mark-id', mk.id);
       g.append('line').attr('x1', px).attr('y1', my(0)).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5).attr('data-mark-id', mk.id);
     }
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('data-mark-id', mk.id)
       .attr('fill', col).attr('stroke', COL.halo).attr('stroke-width', 1.6)
       .style('cursor', 'move')
       /* Перетаскивание (П30) с сопротивлением при отрыве (П31).
@@ -3816,7 +3823,10 @@ function drawMarks() {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
         .text(s);
       // Первая строка — имя точки, его и правим двойным щелчком.
-      if (i === 0) makeRenamable(t, mk.text, px + 9, ty, (v) => { mk.text = v; renderMarkList(); });
+      if (i === 0 && mk.text) {
+        t.attr('data-mark-id', mk.id).attr('data-lx', px + 9).attr('data-ly', ty);
+        makeRenamable(t, mk.text, px + 9, ty, (v) => { mk.text = v; renderMarkList(); });
+      } else t.attr('data-mark-coords', mk.id);
     });
   });
 }
@@ -4690,6 +4700,7 @@ function ensureAddMarkButton() {
 function buildMarkRow(mk) {
   const row = document.createElement('div');
   row.className = 'mark-row';
+  row.dataset.mark = String(mk.id);
   if (mk.pending) row.classList.add('mark-draft');
 
   /* Тумблер «Ввести координаты | Указать на графике» (П28). Он живёт только
@@ -4790,7 +4801,14 @@ function buildMarkRow(mk) {
     STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
     renderMarkList(); redrawAll();
   });
-  top.append(pick, nameEl, del);
+  // «⋯» точки (сессия 7, Б3): меню всплывающим окном; кнопка без id и с aria-haspopup — вне формы модели.
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'btn-icon mark-more';
+  more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
+  more.setAttribute('aria-label', 'Действия с точкой ' + (mk.text || ''));
+  more.innerHTML = ICON_DOTS;
+  more.addEventListener('click', (e) => { e.stopPropagation(); openMarkMenu(more, mk.id); });
+  top.append(pick, nameEl, del, more);
   const onText = markOnText(mk);
 
   const toggle = (label, key, def) => {
@@ -4828,4 +4846,96 @@ function buildMarkRow(mk) {
      и только занимала место в списке. Отпустить точку по-прежнему можно:
      достаточно оттащить её от линии дальше порога отрыва. */
   return row;
+}
+
+/* ═══ Меню «⋯» своей точки (сессия 7 «тихих панелей», Б3; README пакета 9) ═══
+   Всплывающим окном в body (openPop, 92-ui-kit.js), а не внутри строки: список точек пересобирается на каждом шаге
+   перетаскивания, и меню в строке гибло бы вместе с ней. Окно — .pop: его органы не модель (formNodes), открыть и
+   закрыть — не шаг истории; изменение через меню — ровно один шаг (настоящее событие человека и перерисовка).
+   Точка ищется по id в момент действия: «Отменить» и применение снимка заменяют объекты STATE.marks. Пункты:
+   «Переименовать» (то же редактирование, что двойной щелчок по подписи на холсте), «Изменить координаты» (поля
+   строки), «Цвет» (makeColorPicker), «Пунктир к осям», «Координаты на графике», черта, «Убрать». Esc при открытом
+   меню закрывает только меню (onPopKey), при открытом окне цвета — только окно цвета (onEscClosePick). */
+let _markMenu = null;
+function markById(id) { return (STATE.marks || []).find(m => String(m.id) === String(id)) || null; }
+function openMarkMenu(anchor, id) {
+  if (!_markMenu) {
+    _markMenu = document.createElement('div');
+    _markMenu.className = 'pop pts-menu';
+    _markMenu.setAttribute('role', 'menu');
+    document.body.appendChild(_markMenu);
+  }
+  if (_markMenu.classList.contains('open') && _markMenu.dataset.mark === String(id)) { closePop(); return; }
+  _markMenu.dataset.mark = String(id);
+  fillMarkMenu();
+  openPop(anchor, _markMenu, { alignRight: true, noFocus: true });
+}
+function fillMarkMenu() {
+  const menu = _markMenu;
+  const id = menu.dataset.mark;
+  const mk = markById(id);
+  menu.innerHTML = '';
+  if (!mk) return;
+  menu.setAttribute('aria-label', 'Точка ' + (mk.text || ''));
+  const item = (text, fn, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pts-mi' + (cls ? ' ' + cls : ''); b.setAttribute('role', 'menuitem');
+    b.textContent = text;
+    b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    menu.appendChild(b);
+    return b;
+  };
+  item('Переименовать', () => { closePop(); renameMark(id); });
+  item('Изменить координаты', () => { closePop(); editMarkCoords(id); });
+  const crow = document.createElement('div');
+  crow.className = 'pts-mi pts-mi-color';
+  const cl = document.createElement('span'); cl.textContent = 'Цвет';
+  const pick = makeColorPicker(mk.color || COL.ink, (hex) => { const m = markById(id); if (m) { m.color = hex; redrawAll(); } }, 'Цвет точки');
+  crow.append(cl, pick);
+  menu.appendChild(crow);
+  const chk = (text, get, set) => {
+    const w = document.createElement('label');
+    w.className = 'pts-mi pts-mi-chk';
+    const c = document.createElement('input');
+    c.type = 'checkbox'; c.checked = get(mk);
+    c.addEventListener('change', () => { const m = markById(id); if (m) { set(m, c.checked); redrawAll(); } });
+    w.append(c, document.createTextNode(text));
+    menu.appendChild(w);
+  };
+  // Умолчания — те, что видит человек на холсте (drawMarks): пунктир есть, пока не выключен; координаты — только
+  // если включены (у точки без поля showCoords их на холсте нет).
+  chk('Пунктир к осям', (m) => m.showDash !== false, (m, v) => { m.showDash = v; });
+  chk('Координаты на графике', (m) => !!m.showCoords, (m, v) => { m.showCoords = v; });
+  const sep = document.createElement('div'); sep.className = 'pts-mi-sep'; sep.setAttribute('role', 'separator');
+  menu.appendChild(sep);
+  item('Убрать', () => { closePop(); removeMark(id); }, 'pts-mi-danger');
+}
+/* «Переименовать»: подпись точки на холсте правится на месте (editInlineLabel), как по двойному щелчку. Точки на
+   холсте не видно (она за окном) — правится имя в строке списка. */
+function renameMark(id) {
+  const mk = markById(id);
+  if (!mk) return;
+  const t = document.querySelector('#chart g.marks text[data-mark-id="' + String(id) + '"]');
+  if (t && typeof editInlineLabel === 'function') {
+    editInlineLabel(mk.text || '', +t.getAttribute('data-lx'), +t.getAttribute('data-ly'),
+      (v) => { const m = markById(id); if (m) m.text = v; renderMarkList(); }, t);
+    return;
+  }
+  CANVAS.markRename = id;
+  renderMarkList();
+  const ed = document.querySelector('#mark-list .mark-row[data-mark="' + String(id) + '"] .mark-name.edval');
+  if (ed) ed.focus();
+}
+/* «Изменить координаты»: строка точки показывает поля координат (как у черновика), «✓» — закончить. */
+function editMarkCoords(id) {
+  CANVAS.markEdit = id;
+  renderMarkList();
+  const ed = document.querySelector('#mark-list .mark-row[data-mark="' + String(id) + '"] .mark-xy .edval');
+  if (ed) ed.focus();
+}
+function removeMark(id) {
+  STATE.marks = (STATE.marks || []).filter(m => String(m.id) !== String(id));
+  if (CANVAS.ptsSel) CANVAS.ptsSel = CANVAS.ptsSel.filter(x => String(x) !== String(id));
+  renderMarkList();
+  redrawAll();
 }

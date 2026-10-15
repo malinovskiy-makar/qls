@@ -87,6 +87,8 @@ function setPtsMode(on) {
   }
   const was = CANVAS.pts;
   CANVAS.pts = on;
+  // Вход и выход снимают правку строки и выбор точек (вид, не модель; сессия 7).
+  if (was !== on) { CANVAS.markEdit = null; CANVAS.markRename = null; CANVAS.ptsSel = []; if (typeof renderMarkList === 'function') renderMarkList(); }
   document.body.classList.toggle('pts-on', on);
   const wrap = document.getElementById('graph-wrap');
   if (wrap && !STATE.markArm && !STATE.vertArm) wrap.style.cursor = on ? 'crosshair' : '';

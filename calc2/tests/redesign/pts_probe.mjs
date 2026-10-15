@@ -153,7 +153,162 @@ async function sectionB1() {
   await ctx.close();
 }
 
-const SECTIONS = [['Б1', sectionB1]];
+/* ── Б4: имена — буквы ── */
+async function sectionB4() {
+  head('Б4. Имена своих точек — буквы');
+  let { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50], [20, 80]]) await clickModel(page, x, y);
+  let m = await marks(page);
+  ok('taxes: три точки — A, B, C', m.length === 4 && m[0].text === 'A' && m[1].text === 'B' && m[2].text === 'C', JSON.stringify(m.map(x => x.text)));
+  ok('taxes: буква точки на спросе — не D, S, P, Q (' + (m[3] && m[3].text) + ')', !!m[3] && /^[A-Z]$/.test(m[3].text) && !/[DSPQ]/.test(m[3].text), JSON.stringify(m[3]));
+  const cv = await canvasMark(page, m[0].id);
+  ok('подпись на холсте — то же имя', cv.label === 'A', JSON.stringify(cv));
+  ok('Б4 taxes: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+  ({ ctx, page, errors } = await openModel('ineq'));
+  ok('ineq: панель режима видна', await enterPts(page));
+  await clickModel(page, 30, 10);
+  m = await marks(page);
+  const legend = await page.evaluate(() => [...document.querySelectorAll('#chart [data-legend]')].map(e => e.getAttribute('data-legend')));
+  ok('ineq: первая точка — не A и не B (области A и B: ' + legend.join(', ') + ')', m.length === 1 && /^[A-Z]$/.test(m[0].text) && !/[AB]/.test(m[0].text), JSON.stringify(m));
+  ok('Б4 ineq: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+  // Старая фикстура: автосохранение кода старта сессии (фаза −1).
+  const fx = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+  ({ ctx, page, errors } = await openModel('taxes', { 'calc2.v1.model.taxes': fx.done.autosave }));
+  ok('фикстура: панель режима видна', await enterPts(page));
+  m = await marks(page);
+  ok('фикстура: «Точка 1», «Точка 2» на месте', m.length === 2 && m[0].text === 'Точка 1' && m[1].text === 'Точка 2', JSON.stringify(m.map(x => x.text)));
+  await clickModel(page, 80, 70);
+  m = await marks(page);
+  ok('фикстура: новая точка — «A»', m.length === 3 && m[2].text === 'A', JSON.stringify(m.map(x => x.text)));
+  ok('Б4 фикстура: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── Б3: меню «⋯» точки ── */
+const menuOpen = (page) => page.evaluate(() => { const m = document.querySelector('.pts-menu'); return !!(m && m.classList.contains('open') && m.getClientRects().length); });
+/* Действия — настоящими щелчками мыши (Playwright): история пишет только события человека (isTrusted). */
+async function openMenuOf(page, id) {
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] [aria-haspopup]').click();
+  await settle(page, 400);
+}
+async function menuItem(page, text) {
+  await page.locator('.pts-menu.open .pts-mi', { hasText: text }).first().click();
+}
+async function menuCheck(page, re) {
+  await page.locator('.pts-menu.open label.pts-mi', { hasText: re }).locator('input').click();
+}
+async function sectionB3() {
+  head('Б3. Меню «⋯» точки');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  await clickModel(page, 40, 60);
+  let m = await marks(page);
+  const id = m[0] && m[0].id;
+  ok('точка A поставлена', m.length === 1 && m[0].text === 'A', JSON.stringify(m));
+  // Открыть и закрыть — не шаг.
+  let u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  const items = await page.evaluate(() => [...document.querySelectorAll('.pts-menu.open .pts-mi')].map(x => x.textContent.trim()));
+  ok('меню открылось: Переименовать, Изменить координаты, Цвет, Пунктир к осям, Координаты на графике, Убрать',
+    (await menuOpen(page)) && items.join('|') === 'Переименовать|Изменить координаты|Цвет|Пунктир к осям|Координаты на графике|Убрать', JSON.stringify(items));
+  await page.keyboard.press('Escape');
+  await settle(page);
+  ok('Esc при открытом меню закрывает только меню: меню закрыто, режим остаётся', !(await menuOpen(page)) && !(await exitedMode(page)));
+  ok('открыть и закрыть меню — не шаг истории', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  // Пунктир к осям: один шаг, «Отменить» возвращает.
+  let c0 = await canvasMark(page, id);
+  u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  await menuCheck(page, /Пунктир/);
+  await settle(page);
+  let c1 = await canvasMark(page, id);
+  ok('«Пунктир к осям» снят: пунктиров на холсте ' + c0.dash + ' → ' + c1.dash, c0.dash === 2 && c1.dash === 0, JSON.stringify({ c0, c1 }));
+  ok('«Пунктир к осям» — ровно один шаг истории', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  // Пересборка списка при открытом меню: меню живо и работает.
+  await page.evaluate(() => { renderMarkList(); redrawAll(); });
+  await settle(page, 400);
+  ok('меню пережило пересборку списка', await menuOpen(page));
+  await menuCheck(page, /Координаты/);
+  await settle(page);
+  c1 = await canvasMark(page, id);
+  ok('после пересборки пункт меню работает: «Координаты на графике» меняют холст (' + c0.coords + ' → ' + c1.coords + ')', c0.coords !== c1.coords, JSON.stringify({ c0, c1 }));
+  ok('«Координаты на графике» — ещё один шаг', (await undoLen(page)) === u0 + 2, (await undoLen(page)) + ' против ' + u0);
+  await page.keyboard.press('Escape'); await settle(page, 300);
+  await undo(page);
+  ok('одно «Отменить» вернуло координаты на холсте', (await canvasMark(page, id)).coords === c0.coords);
+  await undo(page);
+  ok('ещё одно — пунктир', (await canvasMark(page, id)).dash === 2);
+  // Цвет: окно цвета из меню; Esc закрывает только окно цвета.
+  await openMenuOf(page, id);
+  await page.locator('.pts-menu.open .pts-mi-color .cpick-btn').click();
+  await settle(page, 400);
+  const cp = await page.evaluate(() => !!document.querySelector('.cpick-menu'));
+  await page.keyboard.press('Escape');
+  await settle(page, 500);
+  const after = await page.evaluate(() => ({ cp: !!document.querySelector('.cpick-menu'), menu: !!document.querySelector('.pts-menu.open') }));
+  ok('Esc при открытом окне цвета закрывает только его: меню и режим остаются', cp && !after.cp && after.menu && !(await exitedMode(page)), JSON.stringify(after));
+  u0 = await undoLen(page);
+  const col0 = (await canvasMark(page, id)).fill;
+  await page.locator('.pts-menu.open .pts-mi-color .cpick-btn').click();
+  await settle(page, 400);
+  const k = await page.evaluate((c) => [...document.querySelectorAll('.cpick-menu .cpick-sw')].findIndex(x => normHex(x.style.background) !== normHex(c || '')), col0);
+  await page.locator('.cpick-menu .cpick-sw').nth(k).click();
+  await settle(page);
+  const col1 = (await canvasMark(page, id)).fill;
+  ok('«Цвет» перекрашивает точку на холсте (' + col0 + ' → ' + col1 + '), один шаг', col1 && col1 !== col0 && (await undoLen(page)) === u0 + 1, JSON.stringify({ col0, col1 }));
+  await page.keyboard.press('Escape'); await settle(page, 300);
+  await undo(page);
+  ok('«Отменить» вернула цвет', (await canvasMark(page, id)).fill === col0);
+  // Переименовать: правка на холсте, имя в строке, на холсте и в .tex.
+  u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  await menuItem(page, 'Переименовать');
+  await settle(page, 400);
+  const inp = await page.evaluate(() => !!document.getElementById('pt-rename'));
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Ж');
+  await page.keyboard.press('Enter');
+  await settle(page);
+  const rn = await page.evaluate((id) => {
+    const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.trim(); };
+    const r = document.querySelector('#mark-list .mark-row[data-mark="' + id + '"]');
+    return { row: tx(r && r.querySelector('.mark-name')), tex: /Ж/.test(buildTex('', '')) };
+  }, String(id));
+  const cvn = await canvasMark(page, id);
+  ok('«Переименовать» — правка на холсте; новое имя в строке, на холсте и в .tex', inp && rn.row === 'Ж' && cvn.label === 'Ж' && rn.tex, JSON.stringify({ inp, rn, cvn }));
+  ok('переименование — один шаг истории', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  await undo(page);
+  ok('«Отменить» вернула имя A', (await marks(page))[0].text === 'A');
+  // Изменить координаты (45; 55).
+  await openMenuOf(page, id);
+  await menuItem(page, 'Изменить координаты');
+  await settle(page, 400);
+  const eds = await page.evaluate((id) => [...document.querySelectorAll('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval')].length, String(id));
+  ok('«Изменить координаты»: в строке поля координат', eds === 2, String(eds));
+  for (const [i, v] of [[0, '45'], [1, '55']]) {
+    u0 = await undoLen(page);
+    await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval').nth(i).click();
+    await settle(page, 300);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(v);
+    await page.keyboard.press('Enter');
+    await settle(page);
+    ok('координата ' + (i ? 'P' : 'Q') + ' = ' + v + ' — один шаг', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  }
+  m = await marks(page);
+  ok('точка стоит в (45; 55)', near(m[0].x, 45) && near(m[0].y, 55), JSON.stringify(m[0]));
+  await undo(page);
+  m = await marks(page);
+  ok('«Отменить» вернула P = 60', near(m[0].x, 45) && near(m[0].y, 60), JSON.stringify(m[0]));
+  ok('режим «Точки и площади» всё время включён', !(await exitedMode(page)));
+  ok('Б3: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б3', sectionB3], ['Б4', sectionB4]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {

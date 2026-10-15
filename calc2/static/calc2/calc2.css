@@ -4202,3 +4202,22 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
    кегль даёт лесенка A выше) и «Готово» справа. «← Условие» и строка-подсказка ушли (закрытый список, 10.5). ── */
 #pts-panel .pts-head .pts-title { margin: 0; flex: 1 1 auto; line-height: 1.3; }
 #pts-panel .pts-body > .section:first-child { border-top: 0; padding-top: 4px; }
+/* Б3. Меню «⋯» точки — всплывающее окно в body (.pop: не модель). Пункты 14 / 500, разделитель --border-soft
+   (README 4, «Меню «⋯»»). */
+.pts-menu {
+  display: none; position: fixed; z-index: var(--z-pop); min-width: 240px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+  font-family: var(--font-ui);
+}
+.pts-menu.open { display: block; }
+.pts-menu .pts-mi {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 10px; text-align: left;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text); cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 500;
+}
+.pts-menu button.pts-mi:hover, .pts-menu label.pts-mi:hover { background: var(--chip-bg); }
+.pts-menu button.pts-mi:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.pts-menu .pts-mi-color { justify-content: space-between; cursor: default; }
+.pts-menu .pts-mi-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.pts-menu .pts-mi-sep { height: 1px; margin: 6px 4px; background: var(--border-soft); }
+.pts-menu .pts-mi-danger { color: var(--error-ink); }

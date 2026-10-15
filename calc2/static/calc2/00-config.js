@@ -551,7 +551,9 @@ function refreshColors() {
    и ссылку «Поделиться» не идёт. Включает и выключает его setPtsMode (93-shell.js).
    Внутри режима бывают взведены построение площади (vert) и заготовка точки (mark):
    они старше, поэтому проверяются раньше. */
-const CANVAS = { pts: false };
+/* Сессия 7 (README пакета 9): тоже вид — markEdit (id точки, у которой в строке открыты поля координат),
+   markRename (id точки, чьё имя правится в строке), ptsSel (id точек, отмеченных галочкой для площади). */
+const CANVAS = { pts: false, markEdit: null, markRename: null, ptsSel: [] };
 function canvasMode() {
   if (STATE.markArm) return 'mark';
   if (STATE.vertArm) return 'vert';
