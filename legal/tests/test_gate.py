@@ -2,9 +2,10 @@
 """Фаза 4: блокирующий экран согласия для уже зарегистрированных."""
 import asyncio
 
+from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.conf import settings
-from django.db import connection
+from django.db import connection, connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
@@ -186,6 +187,15 @@ class GateSwitchedOffTests(TestCase):
 
 class SocketGateTests(TransactionTestCase):
     """Сокеты дуэли: вошедший без записи не подключается."""
+
+    def tearDown(self):
+        # Проверка согласия в `legal/ws.py` идёт через `database_sync_to_async`, то есть
+        # в потоке-исполнителе asgiref, и подключение к базе остаётся открытым в нём после
+        # вызова (Channels закрывает его только перед следующим вызовом). На бою это штатно
+        # (CONN_MAX_AGE=600), а в тестах это лишнее подключение не давало удалить тестовую
+        # базу: 154/154 OK, но код выхода 1. Закрываем его в том же потоке.
+        asyncio.run(database_sync_to_async(connections.close_all)())
+        super().tearDown()
 
     @staticmethod
     async def _inner(scope, receive, send):
