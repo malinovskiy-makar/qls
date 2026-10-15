@@ -430,7 +430,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
 
   document.addEventListener('click', function (event) {
-    var button = event.target.closest('.fb-btn');
+    var button = event.target.closest('.fb-btn, [data-fb-open]');
     if (!button) return;
     event.preventDefault();
     var label = button.querySelector('.fb-btn-text');

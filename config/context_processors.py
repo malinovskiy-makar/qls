@@ -175,6 +175,18 @@ def metrika(request):
             'metrika_goal': partial(pop_goal, request)}
 
 
+def cookie_consent(request):
+    """Выбор в окне cookie: `cookie_choice` и `analytics_allowed` (часть Б, 09.10.2026).
+
+    ⚠️ Решение «выводить ли Метрику» принимает СЕРВЕР при сборке страницы по
+    куке `weco_consent` (`legal/cookie_consent.py`): без точного `all` в HTML
+    нет ни скрипта счётчика, ни картинки `mc.yandex.ru`.
+    """
+    from legal import cookie_consent as cc
+    chosen = cc.choice(request)
+    return {'cookie_choice': chosen, 'analytics_allowed': chosen == cc.ALL}
+
+
 def _problem_report_kinds():
     """Пары (значение, подпись) причин жалобы на задачу.
 

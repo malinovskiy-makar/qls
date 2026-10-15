@@ -323,7 +323,7 @@ class FiltersRowTests(Base):
         # Компонент показывает группу, только если поле размечено хоть у
         # одной задачи, — поэтому проверка сначала заводит такую задачу.
         # Без неё «пусто» и «фильтр потерян» были бы неотличимы.
-        topic = Topic.objects.create(name=CANONICAL[0])
+        topic = Topic.objects.create(name=CANONICAL[0], is_canonical=True)
         problem = Problem.objects.create(
             statement='Условие для проверки набора фильтров.',
             solution='Решение есть.', difficulty=3,

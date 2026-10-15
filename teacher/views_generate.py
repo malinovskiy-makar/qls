@@ -27,6 +27,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from legal.guards import AI_CONSENT_TEXT, ai_consent_missing
 from problems import hw_generator
 
 from . import picker, views_work
@@ -217,6 +218,14 @@ def assignment_generate(request):
     action = request.POST.get('step_action') or 'parse'
 
     if action == 'parse':
+        # ⚠️ Подбор по описанию отправляет текст репетитора модели за рубежом,
+        # поэтому ему нужно то же согласие `ai`, что и помощнику (Правовой
+        # контур, часть А). На бою функция выключена, защита стоит заранее.
+        if ai_consent_missing(request.user):
+            context['ai_error'] = {
+                'kind': 'ai_consent_required',
+                'text': AI_CONSENT_TEXT + ' Дать согласие можно в профиле, вкладка «Аккаунт».'}
+            return render(request, 'teacher/generate.html', context, status=403)
         try:
             plan = hw_generator.parse_request(form['text'], form, request.user)
         except hw_generator.GeneratorUnavailable as error:

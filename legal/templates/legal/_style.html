@@ -1,0 +1,70 @@
+{% comment %}
+Оформление страниц документов и списка /legal/. Только токены сайта
+(`_tokens.html`): обе темы работают без отдельных правил.
+Правила только внутри `.lg-*`, чтобы не задеть чужие страницы.
+{% endcomment %}
+.lg-wrap { max-width: var(--w-read, 860px); margin: 0 auto; }
+.lg-crumb { font-size: 13px; color: var(--text2); margin-bottom: 14px; }
+.lg-crumb a { color: var(--text2); }
+.lg-crumb a:hover { color: var(--text); }
+
+.lg-card {
+  background: var(--surface); border: .5px solid var(--border);
+  border-radius: var(--r-panel, 12px); padding: 28px 32px;
+}
+@media (max-width: 600px) { .lg-card { padding: 20px 16px; } }
+
+/* Текст документа */
+.lg-doc { color: var(--text); font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+.lg-doc h1 { font-size: 24px; line-height: 1.25; margin: 0 0 6px; font-weight: 700; }
+.lg-doc h2 { font-size: 18px; line-height: 1.3; margin: 28px 0 10px; font-weight: 700; }
+.lg-doc p { margin: 0 0 12px; }
+.lg-doc h1 + p { color: var(--text2); font-size: 14px; margin-bottom: 20px; }
+.lg-doc ul, .lg-doc ol { margin: 0 0 14px; padding-left: 22px; }
+.lg-doc li { margin: 0 0 6px; }
+.lg-doc a { color: var(--accent-ink, var(--accent)); text-decoration: underline; text-underline-offset: 2px; }
+.lg-doc a:hover { color: var(--text); }
+.lg-doc code {
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: .92em;
+  background: var(--surface-2); border-radius: 4px; padding: 1px 5px;
+}
+.lg-doc strong { font-weight: 700; }
+
+/* Таблицы документов: прокручиваются внутри себя на узком экране */
+.lg-table { overflow-x: auto; margin: 0 0 16px; border: .5px solid var(--border); border-radius: 8px; }
+.lg-table table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; line-height: 1.5; }
+.lg-table th, .lg-table td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: .5px solid var(--border); }
+.lg-table th { background: var(--surface-2); color: var(--text); font-weight: 700; white-space: nowrap; }
+.lg-table tr:last-child td { border-bottom: 0; }
+.lg-table td { color: var(--text); }
+/* Имена cookie в первой колонке не рвутся посреди слова */
+.lg-table td, .lg-table th { overflow-wrap: normal; }
+.lg-table code { white-space: nowrap; }
+
+/* Заглушка вместо ещё не заданного значения: заметна на любом фоне */
+.lg-missing {
+  background: var(--amber-tint); color: var(--amber-ink);
+  border: 1px solid var(--amber); border-radius: 4px; padding: 0 5px; font-weight: 600;
+}
+
+/* Страница /legal/ */
+.lg-h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+.lg-lead { color: var(--text2); font-size: 15px; margin: 0 0 22px; }
+.lg-h2 { font-size: 17px; font-weight: 700; margin: 0 0 12px; }
+.lg-req { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 20px; margin: 0 0 6px; font-size: 15px; }
+.lg-req dt { color: var(--text2); }
+.lg-req dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.lg-req a { color: var(--accent-ink, var(--accent)); }
+@media (max-width: 520px) { .lg-req { grid-template-columns: minmax(0, 1fr); gap: 2px; } .lg-req dd { margin-bottom: 10px; } }
+.lg-age {
+  display: inline-block; font-weight: 700; font-size: 13px; color: var(--text);
+  border: 1.5px solid var(--text); border-radius: 6px; padding: 0 6px; line-height: 1.5;
+}
+.lg-list { list-style: none; margin: 0; padding: 0; }
+.lg-list li { border-top: .5px solid var(--border); }
+.lg-list li:first-child { border-top: 0; }
+.lg-list a { display: block; padding: 12px 2px; color: var(--text); text-decoration: none; font-size: 15px; }
+.lg-list a:hover { color: var(--accent-ink, var(--accent)); text-decoration: underline; }
+.lg-list small { display: block; color: var(--text2); font-size: 13px; margin-top: 2px; }
+.lg-section + .lg-section { margin-top: 20px; }
+.lg-wrap a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }

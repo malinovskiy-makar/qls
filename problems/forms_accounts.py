@@ -49,9 +49,11 @@ class RegisterForm(UserCreationForm):
         widget=forms.RadioSelect,
     )
     consent = forms.BooleanField(
-        label='Согласен на обработку персональных данных',
+        # Текст с тремя ссылками рисует `legal/_agree_label.html`; здесь только
+        # подпись поля для служебных мест (админка, сообщения формы).
+        label='Принимаю Пользовательское соглашение и даю Согласие на обработку персональных данных',
         required=True,
-        error_messages={'required': 'Без согласия зарегистрировать нельзя.'},
+        error_messages={'required': 'Без согласия зарегистрироваться нельзя.'},
     )
 
     class Meta(UserCreationForm.Meta):
@@ -98,9 +100,8 @@ class KnownCodesField(forms.MultipleChoiceField):
 class ProfileForm(forms.ModelForm):
     """Данные профиля. Роль здесь не меняется — она про права.
 
-    ⚠️ ТЕЛЕФОНА В ФОРМЕ НЕТ С 22.09.2026 (решение владельца): поле модели
-    осталось, уже собранные номера лежат, но ни собрать, ни показать их эта
-    форма не может. Возвращать `'phone'` в `Meta.fields` нельзя.
+    ⚠️ ТЕЛЕФОНА НЕТ С 22.09.2026 (решение владельца), а с 09.10.2026 нет и поля
+    модели (миграция `problems/0081`). Заводить его обратно нельзя.
     """
 
     first_name = forms.CharField(label='Имя', max_length=150, required=False)

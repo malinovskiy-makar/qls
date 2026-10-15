@@ -672,7 +672,7 @@ class ExamCreationTests(TestCase):
         from problems.models import Topic
 
         fresh = make_problem('Не сохранённая задача каталога', difficulty=4)
-        fresh.topics.add(Topic.objects.create(name=CANONICAL[0]))
+        fresh.topics.add(Topic.objects.create(name=CANONICAL[0], is_canonical=True))
         body = self.client.get(self.pick_url).content.decode()
         self.assertIn('Не сохранённая задача каталога', body)
         # ⚠️ ФИЛЬТРЫ СТАЛИ ССЫЛКАМИ, А НЕ ПОЛЯМИ ФОРМЫ: отбор перешёл на

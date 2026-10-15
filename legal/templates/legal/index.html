@@ -1,0 +1,34 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}Документы{% endblock %}
+
+{% block extra_style %}{% include "legal/_style.html" %}{% endblock %}
+
+{% block content %}
+<div class="lg-wrap">
+  <h1 class="lg-h1">Документы и реквизиты</h1>
+  <p class="lg-lead">Кто владеет сайтом, как с ним связаться и по каким правилам он работает.</p>
+
+  <div class="lg-card lg-section">
+    <h2 class="lg-h2">Реквизиты</h2>
+    <dl class="lg-req">
+      <dt>Владелец и оператор</dt><dd>{{ req.name }}</dd>
+      <dt>Статус</dt><dd>{{ req.status }}</dd>
+      <dt>ИНН</dt><dd>{{ req.inn }}</dd>
+      <dt>Почта для обращений</dt><dd>{{ req.mail }}</dd>
+      <dt>Telegram</dt><dd><a href="https://t.me/{{ req.telegram }}" target="_blank" rel="noopener">@{{ req.telegram }}</a></dd>
+      <dt>Редакция документов</dt><dd>№ {{ req.version }} от {{ req.date }}</dd>
+      <dt>Возраст</dt><dd><span class="lg-age" title="Для аудитории 12+">12+</span></dd>
+    </dl>
+  </div>
+
+  <div class="lg-card lg-section">
+    <h2 class="lg-h2">Документы</h2>
+    <ul class="lg-list">
+      {% for doc in documents %}
+      <li><a href="{% url 'legal:document' doc.slug %}">{{ doc.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

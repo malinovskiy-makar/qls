@@ -276,7 +276,7 @@ class PageMetadataTests(TestCase):
 
     def test_calculator(self):
         html = self.client.get(reverse('calc2:calculator')).content.decode()
-        self.assertEqual(_title(html), 'Графический калькулятор по экономике — онлайн | Weconomics.ai')
+        self.assertEqual(_title(html), 'Графический калькулятор по экономике – онлайн | Weconomics.ai')
         self.assertEqual(_description(html), seo.CALC_DESCRIPTION)
 
     def test_game(self):

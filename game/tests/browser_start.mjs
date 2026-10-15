@@ -40,6 +40,10 @@ const host = new URL(BASE).hostname;
 
 async function openPage(width, height, withSession, path) {
   const context = await browser.newContext({ viewport: { width, height } });
+  // Выбор cookie сделан заранее: плашка законно появляется при первом визите и даёт
+  // странице нижний отступ на свою высоту, а здесь меряется раскладка после выбора
+  // (решение 10.10.2026, как в catalog/tests/test_stol_browser.py).
+  await context.addCookies([{ name: 'weco_consent', value: 'necessary', domain: host, path: '/' }]);
   if (withSession && SESSION) {
     await context.addCookies([{ name: 'sessionid', value: SESSION, domain: host, path: '/' }]);
   }

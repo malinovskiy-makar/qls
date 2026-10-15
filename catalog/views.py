@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
+from legal.guards import ai_consent_missing, ai_consent_required
 from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.templatetags.ru import plural_ru
@@ -694,6 +695,7 @@ def problem_list(request):
     context['search_log_id'] = (None if seo.is_crawler(request) or deferred
                                 else search_log.log_search(request, context, visitor))
     context.update(_seo_context(context))
+    context['nav_docs_link'] = True
     response = render(request, 'catalog/stol.html', context)
     if new_visitor and (context['search_log_id'] or deferred):
         search_log.remember_visitor(response, visitor)
@@ -1108,6 +1110,7 @@ def api_progress(request, problem_id):
 
 
 @require_POST
+@ai_consent_required
 def api_attempt_file(request):
     """Фото или файл к будущей попытке (этап 6.2). Только вход.
 
@@ -1135,6 +1138,7 @@ def api_attempt_file(request):
 
 
 @require_POST
+@ai_consent_required
 def api_attempt(request):
     """Отправить решение на проверку ИИ (этап 5, ADR 0079).
 
@@ -1201,6 +1205,7 @@ def api_attempt(request):
 
 
 @require_POST
+@ai_consent_required
 def api_chat(request):
     """Одна реплика помощника по задаче (ADR 0080, решение владельца 15.09.2026).
 
@@ -1288,6 +1293,7 @@ def api_chat(request):
 
 
 @require_POST
+@ai_consent_required
 def api_chat_upload(request):
     """Фото или PDF решения к реплике чата (решение владельца 15.09.2026). Только вход.
 
@@ -1528,6 +1534,9 @@ def _problem_context(request, problem):
         if request.user.is_authenticated:
             cfg['chatUploadUrl'] = reverse('catalog:api_chat_upload')
             cfg['chatHistoryUrl'] = reverse('catalog:api_chat_history', args=[problem.pk])
+    if request.user.is_authenticated:
+        # Согласие на помощника даётся в самой панели (Правовой контур, ч. А).
+        cfg['aiConsentUrl'] = reverse('legal:ai_grant')
 
     # Лента «Похожие» рисуется сервером — прямая ссылка работает без скрипта.
     similar_rows = list(_visible(problem.similar_problems.all())
@@ -1562,6 +1571,8 @@ def _problem_context(request, problem):
         'show_how':     show_how,
         'ai_available': ai_available,
         'chat_available': chat_available,
+        # Нет согласия на помощника → панель показывает его вместо поля ввода.
+        'ai_consent':   not ai_consent_missing(request.user),
         'hint_total':   hint_total,
         'test':         test,
         'remaining':    remaining,
@@ -1645,6 +1656,11 @@ def problem_detail(request, pk):
                      'is_test': bool(context['test'])},
         })
     context['view'] = 'stol'
+    # Экран задачи занят ровно в высоту окна: футер с документами там скрыт
+    # (stol.css), а ссылка «Документы» стоит в шапке (`_nav.html`). То же на
+    # входе и карте: вид «Стола» меняется без перезагрузки (`?pane=1`), шапка
+    # остаётся прежней, и ссылка должна быть в ней при любом виде.
+    context['nav_docs_link'] = True
     context.update(seo.problem_meta(problem, context['heading']))
     return render(request, 'catalog/stol.html', context)
 
@@ -2185,6 +2201,7 @@ def topic_map(request):
     # была единственным адресом поиска без запрета индекса.
     if context['query']:
         context['seo_noindex'] = True
+    context['nav_docs_link'] = True
     response = render(request, 'catalog/stol.html', context)
     visitor, new_visitor = search_log.visitor_for(request)
     if (new_visitor and context['smart_search_status'] == 'deferred'):

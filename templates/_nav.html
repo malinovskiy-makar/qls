@@ -148,6 +148,10 @@ nav.site-nav {
   flex-shrink: 0;
 }
 .nav-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+a.nav-icon-btn { text-decoration: none; }
+.nav-docs-btn .qi { width: 16px; height: 16px; }
+/* Ниже порога бургера «Документы» живёт в панели ☰, значок не нужен. */
+@media (max-width: 1023px) { .nav-docs-btn { display: none; } }
 
 /* Плашка профиля: круг с инициалами (или аватар) и имя — одна ссылка. */
 .nav-user {
@@ -350,6 +354,14 @@ nav.site-nav {
       </svg>
       <span class="fb-btn-text">Проблема или предложение</span>
     </button>
+    {% comment %}
+    «Документы» значком, и ТОЛЬКО там, где футеру некуда встать: игра,
+    калькулятор и «Стол» каталога заняты ровно в высоту окна (Правовой
+    контур, часть А). Остальные страницы несут ссылки в футере
+    (`_legal_footer.html`). Это не пункт ряда `.nav-links`: состав ряда
+    (6/7/7) решает владелец, и его сторожит `config/tests/test_nav.py`.
+    {% endcomment %}
+    {% if nav_docs_link %}<a class="nav-icon-btn nav-docs-btn" href="{% url 'legal:index' %}" aria-label="Документы" title="Документы">{% include '_icon.html' with name='info' %}</a>{% endif %}
     {% include '_theme_toggle.html' %}
     {% if user.is_authenticated %}
       {% comment %}
@@ -396,6 +408,7 @@ nav.site-nav {
       </svg>
       <span class="fb-btn-text">Проблема или предложение</span>
     </button>
+    {% if nav_docs_link %}<a class="nav-link nav-docs-panel" href="{% url 'legal:index' %}">Документы</a>{% endif %}
   </div>
 </nav>
 <script>

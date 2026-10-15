@@ -26,6 +26,7 @@ from channels.security.websocket import (                # noqa: E402
     AllowedHostsOriginValidator)
 
 from game import routing as game_routing                 # noqa: E402
+from legal.ws import ConsentSocketMiddleware             # noqa: E402
 
 application = ProtocolTypeRouter({
     'http': game_routing.http_application(django_asgi_app),
@@ -33,6 +34,9 @@ application = ProtocolTypeRouter({
     # чужого сайта с куками игрока — это CSRF, только на сокете, и обычная
     # защита Django его не покрывает. `AllowedHostsOriginValidator` берёт
     # список из ALLOWED_HOSTS, то есть настраивать второй список не нужно.
+    # Экран согласия действует и на сокетах: вошедший без записи `pd` текущей
+    # редакции не подключается (legal/ws.py).
     'websocket': AllowedHostsOriginValidator(
-        AuthMiddlewareStack(URLRouter(game_routing.websocket_urlpatterns))),
+        AuthMiddlewareStack(ConsentSocketMiddleware(
+            URLRouter(game_routing.websocket_urlpatterns)))),
 })

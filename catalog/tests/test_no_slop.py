@@ -65,6 +65,9 @@ def visible_text(html):
     # Метка версии сайта (Beta 1.0) — осознанное число из настроек, а не
     # данные банка: правило нуля её не касается (17.09.2026).
     text = re.sub(r'<div class="site-version">.*?</div>', ' ', html)
+    # Футер с документами («© 2026», «12+») — обязательный знак, а не данные
+    # банка: правило нуля его не касается (Правовой контур, часть А).
+    text = re.sub(r'<p class="legal-foot">.*?</p>', ' ', text, flags=re.S)
     text = _RX_SCRIPT.sub(' ', text)
     text = _RX_STYLE.sub(' ', text)
     text = _RX_HTML_COMMENT.sub(' ', text)

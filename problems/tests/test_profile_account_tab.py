@@ -95,13 +95,18 @@ class PageTests(TestCase):
         self.assertLess(html.index('<aside class="pf-aside"'),
                         html.index('<div class="card pf-card pf-card--form'))
 
-    def test_06_both_cards_link_out_safely(self):
+    def test_06_the_telegram_card_links_out_safely_and_feedback_is_our_own_button(self):
+        """Внешней Google Формы нет (решение владельца 08.10.2026): обратная связь идёт
+        через свою кнопку «Проблема или предложение», внешняя ссылка осталась одна."""
         html = self.page()
         aside = html.split('class="pf-aside"', 1)[1].split('</aside>', 1)[0]
         self.assertIn('https://t.me/weconomics_ru"', aside)
         self.assertNotIn('?direct', aside)
-        self.assertIn('docs.google.com/forms/', aside)
-        self.assertEqual(aside.count('target="_blank" rel="noopener"'), 2)
+        self.assertNotIn('docs.google.com', aside)
+        self.assertNotIn('forms.gle', aside)
+        self.assertEqual(aside.count('target="_blank" rel="noopener"'), 1)
+        self.assertIn('data-fb-open', aside)
+        self.assertIn('Проблема или предложение', aside)
 
     def test_07_email_hint_is_a_tooltip_and_not_a_line_under_the_field(self):
         html = self.page()
@@ -215,15 +220,20 @@ class TelegramTests(TestCase):
                 self.assertEqual(self.user.profile.telegram, 'masha_orl')
 
 
-class PhoneIsNotCollectedTests(TestCase):
-    def test_an_old_number_survives_a_save_that_tries_to_change_it(self):
-        """Инвариант: до = после. Форма телефон не принимает и не стирает."""
-        user = _person('acc_phone', phone='+70000000000', **FULL)
+class PhoneIsGoneTests(TestCase):
+    """Телефона нет: не собирается с 22.09.2026, колонка удалена 09.10.2026 (problems/0081)."""
+
+    def test_the_profile_model_has_no_phone_column(self):
+        from problems.models_platform import UserProfile
+        self.assertNotIn('phone', {f.name for f in UserProfile._meta.get_fields()})
+
+    def test_a_save_that_sends_a_phone_stores_nothing(self):
+        user = _person('acc_phone', **FULL)
         _client(user).post('/profile/?tab=data', dict(
             FULL, action='data', username='acc_phone', first_name='', last_name='',
             email='', phone='+79999999999'))
         user.profile.refresh_from_db()
-        self.assertEqual(user.profile.phone, '+70000000000')
+        self.assertFalse(hasattr(user.profile, 'phone'))
 
     def test_the_form_has_no_phone_field_at_all(self):
         self.assertNotIn('phone', ProfileForm.Meta.fields)

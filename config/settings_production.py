@@ -186,6 +186,8 @@ TEMPLATES = [
                 # Номер счётчика Метрики и отложенная цель регистрации
                 # (ADR 0133). Без этой строки на бою счётчика не было бы.
                 'config.context_processors.metrika',
+                # Выбор в окне cookie: от него зависит Метрика (часть Б).
+                'config.context_processors.cookie_consent',
             ],
             'loaders': [
                 ('django.template.loaders.cached.Loader', [

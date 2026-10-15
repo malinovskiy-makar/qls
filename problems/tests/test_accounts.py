@@ -543,7 +543,7 @@ class BetaProfileFieldsTests(TestCase):
                 'city': 'Казань', 'level': 'basic', 'goal': 'Регион',
                 'prep_mode': ['self', 'club'], 'hours_week': '3_6',
                 'source_channel': 'telegram',
-                'olympiad_history': ['vsosh_school', 'listed'], 'phone': ''}
+                'olympiad_history': ['vsosh_school', 'listed']}
         data.update(over)
         return self.client.post('/profile/', data)
 

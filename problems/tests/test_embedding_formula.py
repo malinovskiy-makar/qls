@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """`problems/embedding_formula.py` — спецификация формулы отпечатка данными.
 
-Главный тест файла — `V1ByteForByteTests`: спецификация `v1` обязана
-воспроизводить `problem_to_text` СИМВОЛ В СИМВОЛ на реальных задачах банка.
-Не «похоже» и не «эквивалентно». Это единственная гарантия, что сравнение
-v1 против v2 честное, а не сравнение v2 с новой опечаткой.
+`ActiveSpecWrapperTests` сверяет `problem_to_text` с `build_text` по
+АКТИВНОЙ формуле. Сверка `v1` с прежней реализацией символ в символ снята
+10.10.2026: прежней реализации нет, активна `v2_focus_repeat` (решение 09.09).
 """
 import re
 
 from django.test import TestCase, tag
 
+from problems.embedding_config import ACTIVE_SPEC
 from problems.embedding_formula import (
     BLOCKS, CONCEPT_DROP_REASONS, PREFETCH, SPECS, build_text, clean_concepts,
 )
@@ -179,11 +179,13 @@ def _make_problem(**kwargs):
     return Problem.objects.create(**поля)
 
 
-class V1ByteForByteTests(TestCase):
-    """⚠️ Главный тест модуля. Выборка синтетическая, но покрывает ровно те
-    случаи, на которых склейка v1 расходится незаметно: задачи с
-    подпунктами, без темы, без blurb, с пустым `title`, с пустым условием
-    (в v1 условие добавляется ДАЖЕ ПУСТЫМ и даёт двойной пробел).
+class ActiveSpecWrapperTests(TestCase):
+    """Обёртка `problem_to_text` собирает отпечаток по АКТИВНОЙ формуле.
+    Сверка `v1` символ в символ снята: решение 09.09 перевело отпечаток на
+    `v2_focus_repeat`, и прежней реализации, с которой сверялась `v1`, нет.
+
+    Выборка синтетическая: задачи с подпунктами, без темы, без blurb,
+    с пустым `title`, с пустым условием.
 
     Прогон по 2 000+ реальных задач банка — отдельной командой
     `embeddings_export_texts --self-check`: в тестовой базе задач банка нет.
@@ -236,12 +238,12 @@ class V1ByteForByteTests(TestCase):
         только_новые.tags.add(новый, мусор)
         cls.случаи.append(только_новые)
 
-    def test_v1_совпадает_с_problem_to_text_символ_в_символ(self):
+    def test_problem_to_text_собирает_по_активной_формуле(self):
         for задача in self.случаи:
             задача.refresh_from_db()
             with self.subTest(problem=задача.pk):
-                self.assertEqual(build_text(задача, SPECS['v1']),
-                                 problem_to_text(задача))
+                self.assertEqual(problem_to_text(задача),
+                                 build_text(задача, ACTIVE_SPEC))
 
     def test_v2_берёт_только_канонические_темы(self):
         """Тем в банке 865, канонических 29; остальные — импортные названия

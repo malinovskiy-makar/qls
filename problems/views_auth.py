@@ -29,10 +29,13 @@ Django, а не наша: `ModelBackend` при несуществующем и�
 """
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView  # noqa: F401
+from django.db import transaction
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.edit import FormView
 
+from legal import consent
+from problems.models_legal import ConsentRecord
 from problems import ratelimit, signup_source
 from problems.forms_accounts import RegisterForm
 from problems.models_platform import SignupSource, UserProfile
@@ -198,13 +201,19 @@ class RegisterView(FormView):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
-        user = form.save()
+        # ⚠️ ПОЛЬЗОВАТЕЛЬ, ПРОФИЛЬ И ЗАПИСЬ СОГЛАСИЯ — ОДНОЙ ТРАНЗАКЦИЕЙ
+        # (Правовой контур, часть А). Иначе сбой между шагами оставил бы
+        # человека с аккаунтом, но без доказательства, что он принял
+        # документы, — и экран согласия потом встретил бы его на первом входе.
+        with transaction.atomic():
+            user = form.save()
 
-        # Профиль с выбранной ролью. `UserProfile.save()` сам подтянет
-        # старое поле `User.role` через существующее соответствие.
-        profile_role = form.cleaned_data['role']
-        UserProfile.objects.update_or_create(
-            user=user, defaults={'role': profile_role})
+            # Профиль с выбранной ролью. `UserProfile.save()` сам подтянет
+            # старое поле `User.role` через существующее соответствие.
+            profile_role = form.cleaned_data['role']
+            UserProfile.objects.update_or_create(
+                user=user, defaults={'role': profile_role})
+            consent.grant(user, ConsentRecord.Kind.PD, ConsentRecord.Source.REGISTER)
 
         # Считаем УДАЧНУЮ регистрацию: см. комментарий у REGISTER_SCOPE.
         ratelimit.note_failure(REGISTER_SCOPE + ':ip',
@@ -212,6 +221,7 @@ class RegisterView(FormView):
                                multiplier=1)
 
         login(self.request, user)   # cycle_key Django делает сам
+        consent.remember_in_session(self.request)
 
         # Источник регистрации и цель Метрики (ADR 0133) — ПОСЛЕ входа: цель
         # ложится в сессию. Вид — по выбранной роли. ⚠️ `invited` отсюда не

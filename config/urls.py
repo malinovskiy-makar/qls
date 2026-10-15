@@ -114,6 +114,8 @@ urlpatterns = [
     path('calendar/', include('calendar_stub.urls')),
     # Игра Econ Rush (публичная, без логина).
     path('game/', include('game.urls')),
+    # Правовые документы, реквизиты оператора и экран согласия (08.10.2026).
+    path('legal/', include('legal.urls')),
     # Справочник олимпиад: даты туров, льготы вузов, комплекты заданий.
     path('olympiads/', include('olympiads.urls')),
     # Тренажёр 1 тура «Высшей пробы»: таймер и автопроверка.

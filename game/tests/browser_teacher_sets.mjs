@@ -50,6 +50,10 @@ async function block(names, fn) {
 
 async function open(path, { width = 1440, height = 940 } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
+  // Выбор cookie сделан заранее: плашка законно появляется при первом визите и даёт
+  // странице нижний отступ на свою высоту, а здесь меряется раскладка после выбора
+  // (решение 10.10.2026, как в catalog/tests/test_stol_browser.py).
+  await context.addCookies([{ name: 'weco_consent', value: 'necessary', domain: host, path: '/' }]);
   contexts.push(context);
   await context.addCookies([{ name: 'sessionid', value: SESSION, domain: host, path: '/' }]);
   const page = await context.newPage();
@@ -139,6 +143,7 @@ try {
     const seen = {};
     for (const [path, withSession] of [['/teacher/game-sets/', true], ['/login/', false]]) {
       const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await context.addCookies([{ name: 'weco_consent', value: 'necessary', domain: host, path: '/' }]);
       contexts.push(context);
       if (withSession) await context.addCookies([{ name: 'sessionid', value: SESSION, domain: host, path: '/' }]);
       const page = await context.newPage();

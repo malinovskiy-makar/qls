@@ -39,6 +39,8 @@ body {
   margin-block: auto;
 }
 body > .site-version { align-self: stretch; margin-top: 0; }   /* сильнее правила партиала: оно ниже в документе */
+/* Подвал на узком экране — вровень с карточкой: поле 24 px у `body` уже есть (`_legal_footer.html`). */
+body { --legal-foot-left: 0px; }
 .login-logo {
   display: flex;
   align-items: center;
@@ -129,6 +131,10 @@ a:focus-visible, button:focus-visible {
   margin-top: 8px;
 }
 .btn-login:hover { background: var(--btn-bg-hover); }
+.btn-login:disabled {
+  background: var(--surface-2); color: var(--text3);
+  border: 1px solid var(--border); cursor: not-allowed;
+}
 .back-link {
   display: block;
   text-align: center;
@@ -217,5 +223,7 @@ a:focus-visible, button:focus-visible {
 }
 .consent input { margin-top: 2px; flex-shrink: 0; }
 .consent span { font-weight: 400; }
+.consent a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.consent a:hover { color: var(--text); }
 {% include '_fb_btn_style.html' %}
 </style>

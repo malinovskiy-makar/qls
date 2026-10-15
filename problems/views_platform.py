@@ -136,6 +136,19 @@ def avatar(request, user_id):
     return response
 
 
+def _ai_consent_record(user):
+    """Действующее согласие на помощника ТЕКУЩЕЙ редакции или None.
+
+    Запись старой редакции не считается: помощник попросит согласие заново
+    (`legal.consent.has_current`), и профиль обязан говорить то же самое.
+    """
+    from legal import consent
+    from problems.models_legal import ConsentRecord
+
+    record = consent.active_record(user, ConsentRecord.Kind.AI)
+    return record if record and record.version == consent.current_version() else None
+
+
 @login_required(login_url='/login/')
 def profile(request):
     profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
@@ -212,6 +225,7 @@ def profile(request):
         'saved_ok': request.GET.get('saved') == '1',
         'password_changed': request.GET.get('changed') == '1',
         'facts': _profile_facts(request.user, profile_obj),
+        'ai_consent': _ai_consent_record(request.user),
     }
     if profile_obj.is_tutor:
         from .models import User as UserModel

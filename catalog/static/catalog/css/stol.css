@@ -13,12 +13,15 @@
 /* Высота шапки сайта — 48 (templates/_nav.html). `100dvh` — для iPad и
    iPhone, где `100vh` уходит под панель браузера; старые браузеры берут
    строку с `100vh` (24.09.2026). */
-.stol-app { position: relative; min-height: calc(100vh - 48px); min-height: calc(100dvh - 48px); }
+/* `--ck-h` – высота окна cookie, пока оно открыто (`static/cookie_bar.js`); иначе 0:
+   экран не уезжает под закреплённую полосу (часть Б, 09.10.2026). */
+.stol-app { position: relative; min-height: calc(100vh - 48px - var(--ck-h, 0px)); min-height: calc(100dvh - 48px - var(--ck-h, 0px)); }
 /* ⚠️ «Beta 1.0» на странице задачи не показывается (решение владельца
    24.09.2026): обычной строкой после <main> она давала пустую полосу под
    панелями. Правило следует за видом «Стола» (`data-view`), а не за
    адресом: задача открывается и без перезагрузки (`?pane=1`). */
-body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
+body:has(.stol-app[data-view="stol"]) .site-version,
+body:has(.stol-app[data-view="stol"]) .legal-foot { display: none; }
 
 /* ── Вход ───────────────────────────────────────────────────────────── */
 .stol-entry { position: relative; overflow: hidden; padding: 0 16px 80px; }
@@ -673,10 +676,10 @@ span.pp--src:active { transform: none; }
 .stol-app[data-view="stol"] .stol-entry { display: none; }
 .desk { --rail-col: 52px; --help-col: 392px; --top: 48px;
         display: grid; grid-template-columns: var(--rail-col) minmax(0, 1fr) var(--help-col);
-        align-items: start; min-height: calc(100vh - var(--top)); min-height: calc(100dvh - var(--top)); }
+        align-items: start; min-height: calc(100vh - var(--top) - var(--ck-h, 0px)); min-height: calc(100dvh - var(--top) - var(--ck-h, 0px)); }
 .desk[data-rail="open"] { --rail-col: 316px; }
 .desk[data-help="closed"] { --help-col: 52px; }
-.desk-side { position: sticky; top: var(--top); height: calc(100vh - var(--top)); height: calc(100dvh - var(--top)); min-width: 0; }
+.desk-side { position: sticky; top: var(--top); height: calc(100vh - var(--top) - var(--ck-h, 0px)); height: calc(100dvh - var(--top) - var(--ck-h, 0px)); min-width: 0; }
 .desk-side--rail { grid-column: 1; box-shadow: 1px 0 0 var(--border); background: var(--surface); z-index: 1; }
 .desk-side--help { grid-column: 3; box-shadow: -1px 0 0 var(--border); background: var(--surface); z-index: 1; }
 .desk-center { grid-column: 2; min-width: 0; padding: 18px 20px 80px; display: flex; justify-content: center; }
@@ -961,6 +964,23 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .help-foot .ai-in { background: var(--surface-2); border-radius: 14px; }
 .help-foot .ai-send { background: var(--brand-amber); color: var(--brand-amber-ink); }
 .help-foot .sv-limit { margin: 0; }
+.help-foot .ai-live { display: flex; flex-direction: column; gap: 8px; }
+.help-foot .ai-live[hidden], .help-foot .ai-consent[hidden] { display: none; }
+/* Запрос согласия на помощника (Правовой контур, часть А) */
+.help-foot .ai-consent { display: flex; flex-direction: column; gap: 8px; background: var(--surface-2);
+  border: .5px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.help-foot .ai-consent p { margin: 0; }
+.help-foot .ai-consent-h { font-size: 14px; font-weight: 700; color: var(--text); }
+.help-foot .ai-consent-t { font-size: 13px; line-height: 1.5; color: var(--text2); }
+.help-foot .ai-consent-err { font-size: 13px; color: var(--error); }
+.help-foot .ai-consent-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.help-foot .ai-consent-link { font-size: 13px; color: var(--accent-ink); }
+.help-foot .ai-consent-link:hover { color: var(--text); }
+/* Блок согласия: полный и свёрнутый в строку после «Нет, не согласен» (09.10.2026). */
+.help-foot .ai-consent-full { display: flex; flex-direction: column; gap: 8px; }
+.help-foot .ai-consent-full[hidden], .help-foot .ai-consent-off[hidden] { display: none; }
+.help-foot .ai-consent-off { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 13px; line-height: 1.4; color: var(--text2); }
 
 /* «Спросить ИИ про этот пункт» и «Спросить об этом» по выделению (README §3). */
 .stm .part { position: relative; padding-right: 38px; }

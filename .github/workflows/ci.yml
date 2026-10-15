@@ -125,7 +125,15 @@ jobs:
       # ⚠️ Проверяем БОЕВОЙ лок, а не dev: уязвимость в линтере на сервер
       # не поедет, а уязвимость в Django поедет.
       - name: pip-audit
-        run: pip-audit -r requirements/base.txt
+        # ⚠️ ВРЕМЕННЫЙ ИГНОР ОДНОГО CVE (решение 15.10.2026). CVE-2026-106454
+        # (GHSA-8pqf-f4m5-798g) — ReDoS в twisted/mail/imap4.py (wildcardToRegexp),
+        # twisted 26.4.0, исправленной версии нет. Нас не касается: эксплуатируется
+        # только через запущенный IMAP-сервер на Twisted, а у нас twisted приходит
+        # лишь как основа Daphne (`# via daphne` в requirements/base.txt), twisted.mail
+        # и IMAP в коде не используются. Остальные проверки pip-audit не ослаблены.
+        # Снять, когда выйдет исправленная версия twisted:
+        # https://app.notion.com/p/3fab11c92bc1818a84b7f118f6b67edd
+        run: pip-audit -r requirements/base.txt --ignore-vuln CVE-2026-106454
 
   # ---------------------------------------------------------------------
   migrations:
@@ -304,7 +312,7 @@ jobs:
       - name: Прогон (два шага)
         run: |
           python scripts/run_tests.py \
-            problems catalog teacher student calc2 game calendar_stub config olympiads vp \
+            problems catalog teacher student calc2 game calendar_stub config olympiads vp legal \
             --settings=config.settings_test_pg --verbosity 2
 
   # ---------------------------------------------------------------------
@@ -327,6 +335,10 @@ jobs:
       # не подключается — Redis-бэкенд Django соединение не открывает,
       # пока у него не попросят ключ.
       REDIS_URL: redis://127.0.0.1:6379
+      # Реквизиты правовых документов обязательны (legal.E001): подставные,
+      # джоб только читает настройки.
+      LEGAL_CONTACT_EMAIL: ${{ format('ci{0}example.org', '@') }}
+      LEGAL_DOCS_DATE: 15 октября 2026 г.
 
     steps:
       - uses: actions/checkout@v4
