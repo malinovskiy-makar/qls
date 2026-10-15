@@ -1542,7 +1542,7 @@ function snapVertexAt(px, py) {
   // Своя точка — кандидат только в СВОЕЙ панели: в соседней её нет на экране.
   (STATE.marks || []).filter(mk => markPanelId(mk) === pid).forEach(mk => {
     const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d, panel: pid, mark: mk.id };
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.text || 'своя точка', key: true, d, panel: pid, mark: mk.id };   // имя точки — mk.text (у точки нет .name; сессия 7)
   });
   if (best) return best;
   const hit = snapPointAt(px, py);
@@ -4594,10 +4594,43 @@ function nextMarkColor() {
   return pal[(STATE.marks || []).length % pal.length];
 }
 
+/* ИМЯ СВОЕЙ ТОЧКИ — БУКВА (сессия 7 «тихих панелей», Б4; README пакета 9; ADR 0155).
+   Новая точка получает первую свободную букву A … Z, потом A₁ … Z₁, A₂ … Свободная — не занята ни своей точкой,
+   ни обозначением на холсте модели: буквой кривой (D, S), подписью ключевой точки и области (E, M; в «Неравенстве
+   доходов» области A и B), буквой оси (P, Q, L, W …). Буква, занятая на холсте, пропускается на всех уровнях
+   (D₁ рядом с кривой D читалась бы её копией). Не счётчиком: markCounter съедает номера черновиков и откатывается
+   «Отменить» — были бы пропуски и повторы. Точки старых ссылок и сохранений («Точка 1») сохраняют свои имена. */
+const NOTATION_LETTER_RE = /^([A-Z])(?:[′'*]|\^\{?[′'*]\}?|_\{?[^{}]*\}?|[₀-₉]+)?$/;
+function canvasNameLetters() {
+  const out = new Set();
+  const take = (v) => { const m = NOTATION_LETTER_RE.exec(String(v == null ? '' : v).replace(/\u200b/g, '').trim()); if (m) out.add(m[1]); };
+  const node = (typeof svg !== 'undefined' && svg && svg.node) ? svg.node() : null;
+  if (node) {
+    node.querySelectorAll('text').forEach(t => { if (!t.closest('g.marks')) take(t.getAttribute('data-raw') || t.textContent); });
+    node.querySelectorAll('[data-legend]').forEach(e => take(e.getAttribute('data-legend')));
+  }
+  (typeof snapTargets === 'function' ? snapTargets() : []).forEach(t => take(t.name));
+  take(axisLetter('x')); take(axisLetter('y'));
+  return out;
+}
+function nextMarkName() {
+  const taken = canvasNameLetters();
+  const own = new Set((STATE.marks || []).map(m => String(m.text || '').trim()));
+  for (let k = 0; k < 100; k++) {
+    for (let i = 0; i < 26; i++) {
+      const L = String.fromCharCode(65 + i);
+      const name = k ? L + subDigits(k) : L;
+      if (!taken.has(L) && !own.has(name)) return name;
+    }
+  }
+  return 'Точка ' + ((STATE.marks || []).length + 1);
+}
 function newMark(x, y, snapTo, mode, panel) {
-  markCounter++;
+  /* id — больше любого id в списке: старое сохранение могло принести точки с id выше счётчика, а площади держат
+     вершины по id (этап В). */
+  markCounter = Math.max(markCounter, (STATE.marks || []).reduce((m, k) => Math.max(m, +k.id || 0), 0)) + 1;
   return {
-    id: markCounter, x, y, text: 'Точка ' + markCounter,
+    id: markCounter, x, y, text: nextMarkName(),
     // Хозяйская панель: в ней точку поставили, по её шкалам и рисуем.
     panel: panel || (activePanel() ? activePanel().id : null),
     showCoords: true, showDash: true, color: nextMarkColor(),
