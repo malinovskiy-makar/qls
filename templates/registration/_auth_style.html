@@ -39,6 +39,8 @@ body {
   margin-block: auto;
 }
 body > .site-version { align-self: stretch; margin-top: 0; }   /* сильнее правила партиала: оно ниже в документе */
+/* Подвал на узком экране — вровень с карточкой: поле 24 px у `body` уже есть (`_legal_footer.html`). */
+body { --legal-foot-left: 0px; }
 .login-logo {
   display: flex;
   align-items: center;

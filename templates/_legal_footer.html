@@ -3,7 +3,8 @@
 
 Одна строка: «© 2026 Weconomics · Документы · Политика · Соглашение ·
 Рекомендации · Настройки cookie · 12+» (кнопка «Настройки cookie» открывает окно
-выбора заново, `_cookie_bar.html`; часть Б, 09.10.2026). Подключается в каждый корневой шаблон-документ сразу
+выбора заново, `_cookie_bar.html`; часть Б, 09.10.2026). На узком экране (до 760 px,
+15.10.2026) — ссылки списком в колонку и служебная строка «© … · 12+ · версия». Подключается в каждый корневой шаблон-документ сразу
 ПОСЛЕ `_site_version.html`: метка версии остаётся последним блоком страницы
 (её сторожит `config/tests/test_nav.py`), а здесь `<p>`, а не блок.
 
@@ -35,10 +36,23 @@ body > .site-version ~ .legal-foot {
    отступом, и строка не становится выше. Между перенесёнными рядами — 18 px, чтобы
    области соседних рядов не накладывались (15,6 + 18 = 33,6 px шага). */
 body > .legal-foot a, body > .legal-foot .legal-foot-link { padding: 9px 0; margin: -9px 0; }
-/* Узкий экран: справа поле под кружок Telegram (`_feedback.html`: 16 + 53 px от края),
-   иначе ссылки последнего ряда уходят под него. */
+/* Служебная строка (копирайт · 12+ · метка версии) — только на узком экране (ниже). */
+.legal-foot-meta { display: none; }
+/* Узкий экран (решение 15.10.2026): ссылки списком в одну колонку, каждая — своя строка
+   в 32 px, она же область нажатия; разделителей нет; блок по левому краю с содержимым,
+   без места под метку версии (у страницы со своим полем у `body` — `--legal-foot-left`). Метка переезжает в служебную строку под списком, своя
+   строка версии над подвалом прячется. Справа поле под кружок Telegram (`_feedback.html`:
+   16 + 53 px от края). Калькулятор не задет: его подвал не прямо в `body`. */
 @media (max-width: 760px) {
-  body > .legal-foot, body > .site-version ~ .legal-foot { padding-right: 72px; }
+  body > .legal-foot, body > .site-version ~ .legal-foot {
+    flex-direction: column; align-items: flex-start; gap: 0;
+    margin-top: auto; padding: 4px 72px 14px var(--legal-foot-left, 16px);
+  }
+  body > .legal-foot a, body > .legal-foot .legal-foot-link { padding: 0; margin: 0; line-height: 32px; }
+  body > .legal-foot .legal-foot-sep, body > .legal-foot .legal-foot-copy,
+  body > .legal-foot .legal-foot-age { display: none; }
+  body > .legal-foot .legal-foot-meta { display: block; margin-top: 4px; font-size: 11px; line-height: 1.4; color: var(--text3); }
+  body:has(> .legal-foot) > .site-version { display: none; }
 }
 .legal-foot a { color: var(--text2); text-decoration: none; }
 .legal-foot a:hover { color: var(--text); text-decoration: underline; }
@@ -55,11 +69,12 @@ body > .legal-foot a, body > .legal-foot .legal-foot-link { padding: 9px 0; marg
 бросить исключение — 500 рисуется с пустым контекстом и при любой схеме адресов.{% endcomment %}
 {% url 'legal:index' as legal_index_url %}{% url 'legal:document' 'privacy' as legal_privacy_url %}{% url 'legal:document' 'terms' as legal_terms_url %}{% url 'legal:document' 'recommendations' as legal_reco_url %}
 <p class="legal-foot">
-  <span>© 2026 Weconomics</span><span class="legal-foot-sep" aria-hidden="true">·</span>
+  <span class="legal-foot-copy">© 2026 Weconomics</span><span class="legal-foot-sep" aria-hidden="true">·</span>
   <a href="{{ legal_index_url|default:'/legal/' }}">Документы</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <a href="{{ legal_privacy_url|default:'/legal/privacy/' }}">Политика</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <a href="{{ legal_terms_url|default:'/legal/terms/' }}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <a href="{{ legal_reco_url|default:'/legal/recommendations/' }}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <button type="button" class="legal-foot-link" data-cookie-settings>Настройки cookie</button><span class="legal-foot-sep" aria-hidden="true">·</span>
   <span class="legal-foot-age" title="Для аудитории 12+">12+</span>
+  <span class="legal-foot-meta">© 2026 Weconomics · 12+{% if site_version %} · {{ site_version }}{% endif %}</span>
 </p>
