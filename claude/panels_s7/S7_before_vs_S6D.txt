@@ -1,0 +1,46 @@
+✓ m-graph
+✓ m-transform
+✓ m-optimum
+✓ m-tangent
+✓ m-minmax
+✓ m-constraint
+✓ ppf
+✓ ppfsum
+✓ trade
+✓ tradeprice
+✓ sd
+✓ sdsum
+✓ taxes
+✓ ceil
+✓ quota
+✓ elast
+✓ ext
+✓ prod
+✓ costs
+✓ plants
+✓ isoquant
+✓ mono
+✓ mono-nat
+✓ mono-d1
+✓ mono-d3
+✓ mono-kink
+✓ labor
+✓ labor-mono
+✓ labor-union
+✓ labor-bilat
+✓ smallopen
+✓ monoexport
+✓ consumer
+✓ cons-slutsky
+✓ adas
+✓ islm
+✓ phillips
+✓ money
+✓ loanable
+✓ fx
+✓ ineq
+✓ laffer
+
+подсказок data-tip на экране: 1199 → 1199; поясняющих строк: Условие 0 → 0, Ответ 5 → 5, Вид 0 → 0
+
+расхождений нет

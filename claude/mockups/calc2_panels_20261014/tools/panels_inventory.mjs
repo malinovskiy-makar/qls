@@ -9,6 +9,8 @@
 //            до и после (поле answerChanged) и возвращает галочку назад. Долго: ~6 минут.
 // Окружение: сервер на 8099 (--settings=config.settings_check), BASE=… переопределяет адрес,
 // KEYS="sd taxes" — только эти модели.
+// Сессия 7: опись видит и панель режима «Точки и площади» (поле pts): во всех моделях — органы пустого режима;
+// в PTS_FILL ещё и с двумя своими точками и площадью под кривой (строки и их «⋯», открытые по очереди).
 import { chromium } from 'playwright';
 import fs from 'fs';
 
@@ -17,6 +19,52 @@ const ALL = 'm-graph m-transform m-optimum m-tangent m-minmax m-constraint ppf p
 const KEYS = (process.env.KEYS || ALL).split(/\s+/).filter(Boolean);
 const OUT = process.argv[2] || 'panels_inventory.json';
 const TOGGLES = process.argv.includes('--toggles');
+const PTS_FILL = ['taxes', 'm-graph', 'ineq'];
+
+/* Органы панели «Точки и площади» (сессия 7). Ключ органа без id — тег, первый класс и подпись без цифр
+   (имена точек и числа меняются, сам орган — нет). */
+function ptsControls() {
+  const vis = (el) => !!(el && el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+  const clean = (el) => {
+    if (!el) return '';
+    const c = el.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation, script, style, select, option').forEach(n => n.remove());
+    return c.textContent.replace(/[\s   ​]+/g, ' ').trim();
+  };
+  const keyOf = (el, label) => {
+    const cls = String(el.className || '').split(/\s+/).filter(c => c && !/^(active|open|on|editing|sc-)/.test(c))[0] || '';
+    return el.tagName.toLowerCase() + (el.type && el.tagName === 'INPUT' ? ':' + el.type : '') + (cls ? '.' + cls : '') +
+      '|' + String(label || '').replace(/[0-9₀-₉.,;:()\[\]−\-=\s]+/g, ' ').replace(/(^|\s)(Точка|[A-Z])(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+  const P = document.getElementById('pts-panel');
+  if (!P || !vis(P)) return { open: false, controls: [] };
+  const out = [];
+  P.querySelectorAll('input, select, math-field, textarea, button, .edval, [role=button], [role=checkbox]').forEach(el => {
+    const box = el.type === 'checkbox' ? (el.closest('label') || el.parentElement) : el;
+    if (!vis(el) && !vis(box)) return;
+    let label = el.getAttribute('aria-label') || el.getAttribute('data-tip') || '';
+    if (el.type === 'checkbox') { const l = el.closest('label'); label = label || (l ? clean(l) : ''); }
+    if (!label) label = clean(el);
+    out.push({ side: 'P', tag: el.tagName.toLowerCase(), id: el.id || '', key: el.id ? '#' + el.id : keyOf(el, label),
+      label: label.slice(0, 60), popup: el.getAttribute('aria-haspopup') || '' });
+  });
+  const rows = {
+    marks: [...P.querySelectorAll('#mark-list .mark-row, #mark-list [data-mark]')].filter(vis).length,
+    areas: [...P.querySelectorAll('#info-areacalc .area-row:not(.area-head), #info-areacalc [data-area-id]')].filter(vis).length,
+    text: clean(P).slice(0, 600),
+  };
+  return { open: true, controls: out, rows };
+}
+/* Пункты открытого всплывающего окна (меню «⋯» строки точки или площади). */
+function popItems() {
+  const vis = (el) => !!(el && el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+  const pop = [...document.querySelectorAll('.pop.open, .pop[open], [role=menu]')].filter(vis).pop();
+  if (!pop) return [];
+  return [...pop.querySelectorAll('button, input, [role=menuitem], [role=menuitemcheckbox], .edval')].filter(vis).map(el => {
+    const t = (el.getAttribute('aria-label') || (el.closest('label') ? el.closest('label').textContent : el.textContent) || '').replace(/\s+/g, ' ').trim();
+    return { side: 'PM', tag: el.tagName.toLowerCase(), id: el.id || '', key: 'menu|' + t.replace(/[0-9]+/g, '').trim(), label: t.slice(0, 60) };
+  });
+}
 
 /* Всё, что считается в странице, — одной функцией: её же зовут и до, и после щелчка. */
 function pageInventory() {
@@ -155,6 +203,45 @@ for (const key of KEYS) {
       inv.toggles[id] = after !== base ? 'answer-changed' : 'picture-only';
       await page.evaluate((i) => document.getElementById(i).click(), id);
       await page.waitForTimeout(500);
+    }
+  }
+  /* Панель «Точки и площади» (сессия 7): вход кнопкой холста, как у человека. */
+  {
+    await page.evaluate(() => { const b = document.getElementById('tool-pts'); if (b) b.click(); });
+    await page.waitForTimeout(500);
+    const empty = await page.evaluate(ptsControls);
+    inv.pts = { empty, filled: null, menus: [] };
+    if (PTS_FILL.includes(key)) {
+      // Две точки щелчками по первой кривой (30 % и 60 % окна по x) и площадь под первой кривой.
+      const spots = await page.evaluate(() => {
+        const t = (typeof snapTargets === 'function' ? snapTargets() : []).filter(t => typeof t.f === 'function')[0];
+        const { mx, my } = mainScales(null);
+        const [x0, x1] = mx.domain();
+        const svgEl = document.getElementById('chart');
+        const r = svgEl.getBoundingClientRect();
+        return [0.3, 0.6].map(k => {
+          const x = x0 + (x1 - x0) * k;
+          const y = t ? t.f(x) : (my.domain()[0] + my.domain()[1]) / 2;
+          return [r.left + mx(x), r.top + my(isFinite(y) ? y : my.domain()[1] / 2)];
+        });
+      });
+      for (const [cx, cy] of spots) { await page.mouse.click(cx, cy); await page.waitForTimeout(1100); }
+      await page.evaluate(() => { const b = document.getElementById('ac-curve'); if (b) b.click(); });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => { const b = document.querySelector('#ac-pick-btns .ac-cbtn'); if (b) b.click(); });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => { const b = document.getElementById('ac-calc'); if (b && !b.disabled && b.getClientRects().length) b.click(); });
+      await page.waitForTimeout(800);
+      inv.pts.filled = await page.evaluate(ptsControls);
+      // Меню «⋯» строк — по очереди: открыть, переписать пункты, закрыть Esc (Esc при меню закрывает только меню).
+      const n = await page.evaluate(() => [...document.querySelectorAll('#pts-panel [aria-haspopup]')].filter(e => e.getClientRects().length).length);
+      for (let i = 0; i < n; i++) {
+        await page.evaluate((i) => { const b = [...document.querySelectorAll('#pts-panel [aria-haspopup]')].filter(e => e.getClientRects().length)[i]; if (b) b.click(); }, i);
+        await page.waitForTimeout(300);
+        inv.pts.menus.push(...await page.evaluate(popItems));
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+      }
     }
   }
   inv.errors = errors;

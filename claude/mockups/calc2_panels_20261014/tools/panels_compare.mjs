@@ -13,7 +13,11 @@
 //   ОРГАНЫ  — каждый орган «Условия» с id до есть после в «Условии», в окне «Вид графика» или в закрытом «⋯»
 //             карточки «Условия» (сессия 5, README 1: «переехал в «⋯»»);
 //   ЗАКРАСКИ — набор закрасок на холсте на старте тот же;
-//   ОШИБКИ  — новых ошибок страницы нет.
+//   ОШИБКИ  — новых ошибок страницы нет;
+//   ТОЧКИ   — (сессия 7, если в обеих описях есть поле pts) каждый орган панели «Точки и площади» до (пустой режим и
+//             режим с точками и площадью) есть после в панели или в «⋯» её строк. allow «pts»:
+//             [{ "key": "ключ органа", "to": "новый ключ" | null, "why": "причина" }] — переехал (to обязан быть) или
+//             убран по закрытому списку (to: null). Без причины запись не действует.
 // allow.json — закрытый список сознательно убранного: { "<модель>": { "numbers": ["-450"], "notes": ["…"],
 //   "rows": ["Налог t"], "ids": ["btn-howto"], "legend": [], "questions": [{ "q": "…", "to": "…" | null, "why": "…" }] },
 //   "*": {…} } — «*» действует на все модели.
@@ -129,6 +133,23 @@ for (const k of Object.keys(B)) {
   const la = new Set(a.legend), lb = new Set(b.legend);
   b.legend.filter(x => !la.has(x) && !allowL.has(x)).forEach(x => miss.push('ЗАКРАСКА пропала: ' + x));
   a.legend.filter(x => !lb.has(x) && !allowL.has(x)).forEach(x => miss.push('ЗАКРАСКА появилась: ' + x));
+  // ПАНЕЛЬ ТОЧЕК (сессия 7)
+  if (b.pts && a.pts) {
+    const keysOf = (p, withMenus) => new Set([...(p.empty ? p.empty.controls : []), ...(p.filled ? p.filled.controls : []),
+      ...(withMenus ? (p.menus || []) : [])].map(c => c.key));
+    const ka = keysOf(a.pts, true);
+    const allowP = [...((ALLOW['*'] || {}).pts || []), ...((ALLOW[k] || {}).pts || [])].filter(x => x && x.key && x.why);
+    [...keysOf(b.pts, true)].forEach(key => {
+      if (ka.has(key)) return;
+      const r = allowP.find(x => x.key === key);
+      if (!r) { miss.push('ПАНЕЛЬ ТОЧЕК: орган «' + key + '»'); return; }
+      if (r.to && !ka.has(r.to)) miss.push('ПАНЕЛЬ ТОЧЕК: «' + key + '» переехал в «' + r.to + '», но его нет');
+    });
+    if (b.pts.filled && a.pts.filled) {
+      if (b.pts.filled.rows.marks !== a.pts.filled.rows.marks) miss.push('ПАНЕЛЬ ТОЧЕК: строк точек ' + b.pts.filled.rows.marks + ' → ' + a.pts.filled.rows.marks);
+      if (b.pts.filled.rows.areas !== a.pts.filled.rows.areas) miss.push('ПАНЕЛЬ ТОЧЕК: строк площадей ' + b.pts.filled.rows.areas + ' → ' + a.pts.filled.rows.areas);
+    }
+  }
   // ОШИБКИ
   (a.errors || []).filter(e => !(b.errors || []).includes(e)).forEach(e => miss.push('ОШИБКА ' + e.slice(0, 100)));
   if (miss.length) { problems += miss.length; lines.push(`✗ ${k}: ${miss.length}`); miss.forEach(x => lines.push('    ' + x)); }
