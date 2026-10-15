@@ -2480,6 +2480,37 @@ function calcAreaPolygon() {
 let areaCalcCounter = 0;
 const AREA_PALETTE = () => [COL.MR, COL.D, COL.S, COL.tax, COL.reg, COL.MC];
 
+/* ЖИВАЯ ПЛОЩАДЬ (сессия 7 «тихих панелей», В1 и В4; README пакета 9; решения …81e0…, …81be… (П43); ADR 0155).
+   Площадь по точкам хранит вершины ССЫЛКАМИ — id точек STATE.marks (r.ids), а не копиями координат: двинули
+   точку — площадь пересчиталась. Обход и число считаются заново по правилу П43 (bestAreaRing: наибольшая фигура
+   без самопересечений через все вершины, порядок отметки не важен) ОДНОЙ функцией перед каждым чтением — отрисовкой,
+   строкой панели, «Ответом», подписью «Ответа», границами нарисованного; r.ring, r.value, r.order (id в порядке
+   обхода) обновляются на месте, и все прежние читатели видят живое. Площадь под кривой: число = заливка — по
+   текущей кривой на её отрезке [a; b] из записи (до сессии 7 заливка шла по живой кривой, а число замерзало).
+   Запись без ids (старые ссылки и сохранения: только ring) — как была: замороженный контур и число. */
+function areaLive(r) {
+  if (!r) return r;
+  if (r.kind === 'poly' && Array.isArray(r.ids) && r.ids.length) {
+    const pts = r.ids.map(id => markById(id)).filter(m => m && !m.pending && isFinite(m.x) && isFinite(m.y));
+    if (pts.length >= 3) {
+      const best = bestAreaRing(pts.map(m => ({ x: m.x, y: m.y, id: m.id })));
+      r.ring = best.ring.map(p => [p.x, p.y]);
+      r.order = best.ring.map(p => p.id);
+      r.value = ringArea(best.ring);
+      r.exact = best.exact;
+      r.crosses = !best.exact && ringSelfCrosses(best.ring);
+    }
+  } else if (r.kind === 'curve' && isFinite(r.a) && isFinite(r.b)) {
+    const t = areaTargets(markPanelId(r)).filter(x => x.name === r.name)[0];
+    if (t) {
+      const v = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, r.a, r.b);
+      if (isFinite(v)) r.value = v;
+    }
+  }
+  return r;
+}
+function areasLive() { (STATE.areaCalcList || []).forEach(areaLive); return STATE.areaCalcList || []; }
+
 function runAreaCalc() {
   const err = document.getElementById('ac-error');
   const res = (STATE.areaCalcMode === 'poly') ? calcAreaPolygon() : calcAreaUnderCurve();
@@ -2509,7 +2540,7 @@ function clearAreaCalc() {
 }
 
 function drawAreaCalc() {
-  const list = STATE.areaCalcList || [];
+  const list = areasLive();
   if (!list.length) { updateAreaCalcPanel(); return; }
   const g = svg.append('g').attr('class', 'areacalc').attr('clip-path', 'url(#plot-clip)');
   list.forEach(r => {
@@ -2547,7 +2578,7 @@ function drawAreaCalc() {
 function updateAreaCalcPanel() {
   const box = document.getElementById('info-areacalc');
   if (!box) return;
-  const list = STATE.areaCalcList || [];
+  const list = areasLive();
   /* Свх-5, Н59. Таблица это единый список ВСЕГО закрашенного на графике: и
      посчитанного пользователем, и нарисованного самой сценой (излишки, сбор
      бюджета, потери общества). Раньше сценовые области жили только в отдельном

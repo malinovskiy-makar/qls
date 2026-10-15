@@ -246,7 +246,7 @@ function boundsOfDrawn(baseQ, baseP) {
   };
   (STATE.marks || []).forEach(m => { if (!m.pending) eat(m.x, m.y); });
   (STATE.areaVerts || []).forEach(v => eat(v.x, v.y));
-  (STATE.areaCalcList || []).forEach(r => {
+  (typeof areasLive === 'function' ? areasLive() : (STATE.areaCalcList || [])).forEach(r => {   // живой обход (сессия 7)
     if (r.ring) r.ring.forEach(p => eat(p[0], p[1]));
     else if (isFinite(r.b)) eat(r.b, 0);
   });

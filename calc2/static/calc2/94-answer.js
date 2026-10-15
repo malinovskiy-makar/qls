@@ -176,7 +176,7 @@ function answerSignature() {
     // Отрезок ответа: ручной отрезок с теми же числами ответа меняет строку под шапкой.
     + '|' + (typeof _ansSeg !== 'undefined' && _ansSeg ? _ansSeg.a + ':' + _ansSeg.b : '')
     // Свои площади (ADR 0148): посчитали, убрали, переименовали — группа заново.
-    + '|' + (STATE.areaCalcList || []).map(r => r.id + ':' + r.label + ':' + r.value).join(',');
+    + '|' + (typeof areasLive === 'function' ? areasLive() : (STATE.areaCalcList || [])).map(r => r.id + ':' + r.label + ':' + r.value).join(',');
 }
 /* ⚠️ «ОТВЕТ» НЕ ЖДЁТ КАДРА, КОТОРОГО НЕ БУДЕТ (13.10). Пересборка отложена на
    кадр, чтобы протяжка не собирала колонку трижды за кадр. Но в фоновой
@@ -508,7 +508,8 @@ function buildAnswer() {
      «Сначала сам» прячет их число, как остальные (selfCell), но главными
      числами модели они не считаются — ни для «всё сошлось», ни для подписей
      холста, ни для строки чисел «Скачать». Свои точки в «Ответ» не идут. */
-  const own = (STATE.areaCalcList || []).filter(r => r && isFinite(r.value));
+  // Числа живые (areaLive, сессия 7): площадь по точкам и под кривой — по текущим точкам и кривой.
+  const own = (typeof areasLive === 'function' ? areasLive() : (STATE.areaCalcList || [])).filter(r => r && isFinite(r.value));
   if (own.length) {
     const box = document.createElement('div');
     box.className = 'ans-group ans-own';
