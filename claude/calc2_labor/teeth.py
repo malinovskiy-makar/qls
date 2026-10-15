@@ -46,6 +46,20 @@ STAGES = {
         "const t = haloText(g, sx(60), oy + 8, 'MRL = 0', 'middle', 'hanging');\n      if (t) t.attr('fill', COL.MR).attr('class', 'labor-mrl0').attr('data-no-spread', '1');")],
    'ENGINES=chromium KEYS="labor-union" node calc2/tests/redesign/axis_labels_probe.mjs'),
  ],
+ 'В': [
+  ('1 нижняя граница без МРОТ (связывающий МРОТ не поднимает низ)',
+   [(L, "  const bind = !!(mm && mm.binding);", "  const bind = false;")],
+   PROBE + 'В'),
+  ('2 нет «исхода одного» (верх ниже низа)',
+   [(L, "  if (W >= b.Wu - 1e-9) {\n    const Ld = qtyAt(D, W), Ls = qtyAt(S, W);", "  if (false) {\n    const Ld = qtyAt(D, W), Ls = qtyAt(S, W);")],
+   PROBE + 'В'),
+  ('3 МРОТ в двусторонней по-старому, как в конкуренции',
+   [(L, "    STATE.laborMin = (STATE.laborStruct === 'monopsony' || STATE.laborStruct === 'bilateral')", "    STATE.laborMin = (STATE.laborStruct === 'monopsony')")],
+   PROBE + 'В'),
+  ('4 поднять версию состояния',
+   [(S + '89-model-state.js', "const MODEL_STATE_VERSION = 1;", "const MODEL_STATE_VERSION = 2;")],
+   PROBE + 'В'),
+ ],
 }
 stage = sys.argv[1]
 only = sys.argv[2:]   # номера зубов (первое слово названия); без них — все
