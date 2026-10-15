@@ -1830,7 +1830,7 @@ await t('у числовых полей калькулятора нет крут
   return look === 'textfield' || 'appearance: ' + look;
 }));
 
-await t('режим «Между точками» взводит набор вершин', async () => {
+await t('режим «По точкам» (бывший «Между точками») взводит набор вершин', async () => {
   await page.evaluate(() => { openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
@@ -1848,7 +1848,8 @@ await t('щелчок по графику ставит вершину', async ()
   await page.waitForTimeout(380);
   await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.62);
   await page.waitForTimeout(380);
-  const n = await page.evaluate(() => (STATE.areaVerts || []).length);
+  // С сессии 7 вершина — точка списка (README пакета calc2_panels_20261014, 9): набор — CANVAS.buildIds.
+  const n = await page.evaluate(() => (CANVAS.buildIds || []).length);
   return n === 2 || 'вершин набрано: ' + n;
 });
 

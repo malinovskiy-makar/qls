@@ -1542,7 +1542,7 @@ function snapVertexAt(px, py) {
   // Своя точка — кандидат только в СВОЕЙ панели: в соседней её нет на экране.
   (STATE.marks || []).filter(mk => markPanelId(mk) === pid).forEach(mk => {
     const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.text || 'своя точка', key: true, d, panel: pid, mark: mk.id };   // имя точки — mk.text (у точки нет .name; сессия 7)
+    if (d <= KEY_SNAP_PX && (!best || d <= best.d)) best = { x: mk.x, y: mk.y, name: mk.text || 'своя точка', key: true, d, panel: pid, mark: mk.id };   // своя точка в ключевой — сильнее ключевой (сессия 7: её берут вершиной, а не ставят копию)   // имя точки — mk.text (у точки нет .name; сессия 7)
   });
   if (best) return best;
   const hit = snapPointAt(px, py);
@@ -2004,6 +2004,7 @@ function axisLetter(which) {
 function armVerts(on) {
   const was = STATE.vertArm;
   STATE.vertArm = !!on;
+  if (was !== STATE.vertArm) CANVAS.buildIds = [];
   const wrap = document.getElementById('graph-wrap');
   if (wrap) wrap.style.cursor = (STATE.vertArm || CANVAS.pts) ? 'crosshair' : '';
   if (!STATE.vertArm) showSnapHint(null);
@@ -2028,7 +2029,7 @@ const CANVAS_MODE_TEXT = {
      здесь же. Считает площадь по-прежнему одна кнопка — та, под которой
      появляется результат. */
   vert: () => {
-    const n = (STATE.areaVerts || []).length;
+    const n = (CANVAS.buildIds || []).length;
     const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ', щелчок по первой замкнёт'))
                    : '· каждый щелчок ставит вершину';
     return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
@@ -2112,76 +2113,12 @@ function vertsMixed() { return vertPanels().length > 1; }
 
 function clearAreaVerts() { STATE.areaVerts = []; renderVertList(); redrawAll(); }
 
-/* Список набранных вершин (П42). Пока не выбрана ни одна точка, вместо списка
-   стоит надпись «Выберите точки на графике»; с первой же вершиной вместо неё
-   появляется кнопка «Убрать все вершины», а под ней сам список: у каждой
-   строки крестик, а по двойному щелчку координата правится прямо в строке. */
+/* Списка набранных вершин больше нет (сессия 7, В3; README пакета 9): вершина площади — точка списка «Точки», набор
+   «+ По точкам» держит их id в CANVAS.buildIds (вид). STATE.areaVerts остаётся пустым массивом ради старых ссылок:
+   сохранение с недонабранной площадью (непустой areaVerts) открывается без ошибки, набор отбрасывается. */
 function renderVertList() {
-  const box = document.getElementById('ac-verts');
-  if (!box) return;
-  const list = STATE.areaVerts || [];
-  const empty = document.getElementById('ac-verts-empty');
-  const btns = document.getElementById('ac-vert-btns');
-  if (empty) empty.style.display = list.length ? 'none' : '';
-  if (btns) btns.style.display = list.length ? '' : 'none';
-  syncCanvasMode();   // подпись кнопки «Отмечать вершины» идёт за состоянием
-  box.innerHTML = '';
-  if (vertsMixed()) {
-    const warn = document.createElement('div');
-    warn.className = 'vert-mixed warn';
-    warn.textContent = 'Вершины стоят на разных графиках: площадь считается внутри одного.';
-    box.appendChild(warn);
-  }
-  list.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'vert-row';
-    const n = document.createElement('b'); n.textContent = (i + 1) + '.';
-
-    const t = document.createElement('span');
-    t.className = 'vert-co';
-    t.setAttribute('data-tip', 'Двойной щелчок поправит координаты');
-    const paint = () => {
-      t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
-    };
-    paint();
-    t.addEventListener('dblclick', () => {
-      const ed = document.createElement('span');
-      ed.className = 'vert-edit';
-      const mk = (key) => {
-        const inp = document.createElement('input');
-        inp.type = 'number'; inp.step = 'any'; inp.value = Math.round(p[key] * 1000) / 1000;
-        inp.addEventListener('input', () => {
-          const v = parseFloat(inp.value);
-          if (isFinite(v)) { p[key] = v; p.name = ''; redrawAll(); }
-        });
-        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
-        return inp;
-      };
-      const ix = mk('x'), iy = mk('y');
-      ed.append(ix, document.createTextNode(';'), iy);
-      t.replaceWith(ed);
-      ix.focus(); ix.select();
-      const done = () => {
-        // Уходим из строки, только когда фокус ушёл из обоих полей.
-        setTimeout(() => {
-          if (document.activeElement === ix || document.activeElement === iy) return;
-          paint(); ed.replaceWith(t); redrawAll();
-        }, 0);
-      };
-      ix.addEventListener('blur', done); iy.addEventListener('blur', done);
-    });
-
-    const del = document.createElement('button');
-    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-    del.setAttribute('data-tip', 'Убрать эту вершину');
-    del.addEventListener('click', () => {
-      STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
-      renderVertList(); syncAreaCalcButton(); redrawAll();
-    });
-
-    row.append(n, t, del);
-    box.appendChild(row);
-  });
+  if ((STATE.areaVerts || []).length) STATE.areaVerts = [];
+  syncCanvasMode();
   syncAreaCalcButton();
 }
 
@@ -2295,77 +2232,35 @@ function freshenVertNames() {
   return changed;
 }
 
-// Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
+/* Набор «+ По точкам» на графике (сессия 7, В3): вершины — точки списка (их рисует drawMarks), здесь — номер у
+   каждой и бледный контур будущей фигуры РОВНО того обхода, что будет посчитан (П43). Точки на разных графиках
+   контура не дают. Щелчки — в обработчике холста (88-params.js). */
 function drawAreaVerts() {
-  const list = STATE.areaVerts || [];
-  if (!list.length) return;
-  // Список перекладываем ПОСЛЕ проверки имён и только если что-то изменилось:
-  // renderVertList не перерисовывает холст, поэтому петли здесь нет.
-  if (freshenVertNames()) renderVertList();
-  /* Контур собирается ТОЛЬКО из вершин одной панели: у смешанного набора
-     фигуры нет, и рисовать её было бы враньём (см. vertsMixed). Кружки при
-     этом рисуются у всех вершин — каждый по шкалам своей панели. */
+  if ((STATE.areaVerts || []).length) STATE.areaVerts = [];   // старая недонабранная площадь — отброшена
+  // На месте, а не новым массивом: обработчик щелчка держит ссылку на набор, пока ставит точку.
+  const ids = CANVAS.buildIds || (CANVAS.buildIds = []);
+  for (let i = ids.length - 1; i >= 0; i--) if (!markById(ids[i]) || markById(ids[i]).pending) ids.splice(i, 1);
+  if (!STATE.vertArm || !ids.length) return;
+  const list = ids.map(id => markById(id));
+  const mixed = new Set(list.map(markPanelId)).size > 1;
   const { mx, my } = mainScales(markPanelId(list[0]));
-  const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
-  if (vertsMixed()) {
-    // нечего соединять
-  } else if (list.length >= 3) {
-    /* П43: контур показывает РОВНО ту фигуру, которая будет посчитана.
-       Раньше пунктир соединял вершины в порядке щелчков, а площадь считалась
-       по другому обходу — картинка и число расходились. */
-    const ring = bestAreaRing(list).ring;
-    markPoly(g.append('path')
+  const g = svg.append('g').attr('class', 'area-verts').attr('data-service', '1').style('pointer-events', 'none');
+  if (!mixed && list.length >= 3) {
+    const ring = bestAreaRing(list.map(m => ({ x: m.x, y: m.y }))).ring;
+    g.append('path')
       .attr('d', 'M' + ring.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
       .attr('fill', COL.reg).attr('fill-opacity', 0.1)
-      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4'),
-    'контур площади: многоугольник по вершинам, поставленным человеком', 'контур площади');
-  } else if (list.length === 2) {
+      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
+  } else if (!mixed && list.length === 2) {
     g.append('line').attr('x1', mx(list[0].x)).attr('y1', my(list[0].y))
       .attr('x2', mx(list[1].x)).attr('y2', my(list[1].y))
       .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
   }
-  /* Вершины на графике (П42): при наведении явно выделяются, щелчок по уже
-     выбранной снимает её, а зажатую можно перетащить — координата в списке
-     меняется сама. Рядом с кривой вершина катится по ней, как и при постановке. */
-  list.forEach((p, i) => {
-    const ps = mainScales(markPanelId(p));
-    const pmx = ps.mx, pmy = ps.my;
-    const [xLo, xHi] = pmx.domain(), [yLo, yHi] = pmy.domain();
-    const dot = g.append('circle').attr('cx', pmx(p.x)).attr('cy', pmy(p.y)).attr('r', 4.5)
-      .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
-      .style('pointer-events', 'all').style('cursor', 'grab');
-    // Номер вершины стоит вплотную к своей точке: на 8 px вправо и вверх,
-    // то есть в углу её же кружка радиусом 4,5.
-    haloText(g, pmx(p.x) + 8, pmy(p.y) - 8, String(i + 1), 'start', 'auto');
-
-    dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
-       .on('pointerleave', () => dot.attr('r', 4.5).attr('stroke-width', 2));
-
-    let moved = false;
-    dot.call(d3.drag().container(() => svg.node())
-      .on('start', () => { moved = false; })
-      .on('drag', (ev) => {
-        moved = true;
-        const hit = snapVertexAt(ev.x, ev.y);
-        // Вершина не переезжает в чужую панель протяжкой: хозяин у неё один.
-        const inOwn = hit && markPanelId(hit) === markPanelId(p);
-        p.x = inOwn ? hit.x : Math.max(xLo, Math.min(xHi, pmx.invert(ev.x)));
-        p.y = inOwn ? hit.y : Math.max(yLo, Math.min(yHi, pmy.invert(ev.y)));
-        p.name = (inOwn && hit.key) ? hit.name : '';
-        renderVertList(); redrawAll();
-      })
-      .on('end', () => {
-        if (moved) return;
-        // Щелчок без движения по уже выбранной вершине снимает её. Щелчок по
-        // холсту, который придёт следом, надо погасить: иначе на том же месте
-        // тут же появится новая вершина.
-        STATE._vertClickEaten = true;
-        // Режим «Точки и площади»: щелчок по ПЕРВОЙ вершине при трёх и больше
-        // замыкает фигуру — то же, что «Готово» (ADR 0148).
-        if (i === 0 && list.length >= 3 && CANVAS.pts) { finishPolyBuild(); return; }
-        STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
-        renderVertList(); redrawAll();
-      }));
+  list.forEach((m, i) => {
+    const ps = mainScales(markPanelId(m));
+    g.append('circle').attr('cx', ps.mx(m.x)).attr('cy', ps.my(m.y)).attr('r', 7.5)
+      .attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2);
+    haloText(g, ps.mx(m.x) - 10, ps.my(m.y) + 14, String(i + 1), 'end', 'auto');
   });
 }
 
@@ -2855,6 +2750,7 @@ function closeAreaBuild() {
 // Esc посреди набора вершин: набранное забывается, режим холста остаётся.
 function cancelAreaBuild() {
   STATE.areaVerts = [];
+  CANVAS.buildIds = [];   // поставленные при наборе точки остаются обычными точками (В3)
   const err = document.getElementById('ac-error');
   if (err) { err.textContent = ''; err.style.display = 'none'; }
   renderVertList();
@@ -2865,10 +2761,8 @@ function cancelAreaBuild() {
    набор очищается и построение закрывается. Ошибка расчёта (вершины на разных
    графиках) оставляет построение открытым: поправить есть что. */
 function finishPolyBuild() {
-  if ((STATE.areaVerts || []).length >= 3) {
-    STATE.areaCalcMode = 'poly';
-    if (!runAreaCalc()) return;
-  }
+  const ids = (CANVAS.buildIds || []).slice();
+  if (ids.length >= 3 && !addPolyArea(ids)) return;
   cancelAreaBuild();
 }
 
@@ -2920,10 +2814,6 @@ function wireAreaCalc() {
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
   if (pick) pick.addEventListener('change', () => { syncAreaCurveButtons(); syncAreaRangeLabel(); syncAreaCalcButton(); });
-  const vClear = document.getElementById('ac-vert-clear');
-  if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
-  const vArm = document.getElementById('ac-vert-arm');
-  if (vArm) vArm.addEventListener('click', () => armVerts(!STATE.vertArm));
   setAreaCalcMode('curve');
   closeAreaBuild();   // на старте построение закрыто: видны только две кнопки
 }
@@ -4640,6 +4530,7 @@ function addMarkAt(x, y, snapTo, panel, on) {
   STATE.marks.push(mk);
   renderMarkList();
   redrawAll();
+  return mk;
 }
 
 /* Заготовка точки: строка списка уже есть, а на плоскости точки ещё нет.

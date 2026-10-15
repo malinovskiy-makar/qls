@@ -1799,22 +1799,33 @@ function wireControls() {
     // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
     addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid, keyOnText(hit));
   });
-  // Набор вершин площади: щелчок ставит вершину и режим не снимается —
-  // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
+  /* Набор «+ По точкам» (сессия 7, В3; README пакета 9): вершина площади — ТОЧКА списка. Щелчок по свободному месту
+     ставит новую точку (прилипание — как у обычной, имя — следующая буква) и берёт её вершиной; щелчок по точке
+     списка берёт её, повторный — снимает (найденный баг: прежний обработчик не смотрел hit.mark и ставил вершину
+     поверх своей точки копией координат); щелчок по ПЕРВОЙ вершине при трёх и больше — площадь готова. Набор —
+     CANVAS.buildIds (вид). Каждая новая точка — шаг истории, площадь — ещё один («Готово»). */
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.vertArm || STATE.markArm) return;
-    // Только что сняли вершину щелчком по ней — этот щелчок уже отработан (П42).
-    if (STATE._vertClickEaten) { STATE._vertClickEaten = false; return; }
     const [px, py] = d3.pointer(ev, chartEl);
     const pan = panelAt(px, py);
     const pid = pan ? pan.id : null;
     const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     const hit = snapVertexAt(px, py);
+    const ids = CANVAS.buildIds || (CANVAS.buildIds = []);
+    if (hit && hit.mark != null) {
+      const i = ids.findIndex(x => String(x) === String(hit.mark));
+      if (i === 0 && ids.length >= 3) { finishPolyBuild(); return; }
+      if (i >= 0) ids.splice(i, 1); else ids.push(hit.mark);
+      syncCanvasMode(); redrawAll();
+      return;
+    }
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    addAreaVert(x, y, hit && hit.key ? hit.name : '', pid);
+    const mk = addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid, keyOnText(hit));
+    if (mk) (CANVAS.buildIds || (CANVAS.buildIds = [])).push(mk.id);
+    syncCanvasMode(); redrawAll();
   });
   // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
   // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.

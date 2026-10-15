@@ -754,15 +754,17 @@ const CASES = [
   {
     name: 'Площадь по точкам · треугольник (0;0) (10;0) (0;10) ⇒ 50',
     // Вершины набираются щелчками по графику (Фаза 7); здесь ставим их через
-    // ту же функцию, что и щелчок, — галочек в списке больше нет.
+    // ту же функцию, что и щелчок. С сессии 7 «тихих панелей» вершина — ТОЧКА списка (README пакета
+    // calc2_panels_20261014, раздел 9): набор — id точек (CANVAS.buildIds), «Готово» — finishPolyBuild.
     run: `loadScene('sd'); redrawAll();
-          clearAreaCalc(); setAreaCalcMode('poly'); clearAreaVerts();
-          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(0, 10, '');
+          clearAreaCalc(); STATE.marks = []; setAreaCalcMode('poly');
+          var ids = [[0, 0], [10, 0], [0, 10]].map(function (p) { return addMarkAt(p[0], p[1], null, null, '').id; });
+          CANVAS.buildIds = ids.slice();
           var armed = STATE.vertArm ? 1 : 0;
-          runAreaCalc();
+          finishPolyBuild();
           var r0 = STATE.areaCalcList[0];
           var v = r0 ? r0.value : NaN;
-          clearAreaVerts(); clearAreaCalc(); setAreaCalcMode('curve');
+          clearAreaCalc(); STATE.marks = []; renderMarkList(); setAreaCalcMode('curve'); closeAreaBuild();
           return { S: v, armed: armed };`,
     checks: [['площадь', 'S', 50, 0.01], ['режим набора взведён', 'armed', 1, 0]],
   },
@@ -1234,14 +1236,19 @@ const CASES = [
           var head = [].map.call(document.querySelectorAll('.area-head span'),
                                  function (s) { return s.textContent; }).join('|');
           var areaVal = STATE.areaCalcList[0].value;
-          setAreaCalcMode('poly');
-          var lockedPoly = btn.disabled ? 1 : 0;
-          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(10, 10, '');
-          var openPoly = btn.disabled ? 0 : 1;
-          var crosses = document.querySelectorAll('.vert-row .btn-icon').length;
-          // Возвращаем секцию в исходное состояние: следующие случаи считают
-          // площадь под кривой, а оставленный режим «между точками» их сломал бы.
-          clearAreaVerts(); setAreaCalcMode('curve'); clearAreaCalc();
+          /* С сессии 7 площадь по точкам — по ОТМЕЧЕННЫМ точкам списка (README пакета 9, решение …81e0…): «заперта» —
+             плашки «Площадь по точкам» нет, пока отмечено меньше трёх; «у каждой вершины крестик» — у каждой
+             отмеченной точки «⋯», где «Убрать». */
+          STATE.marks = []; CANVAS.ptsSel = [];
+          var mids = [[0, 0], [10, 0], [10, 10]].map(function (p) { return addMarkAt(p[0], p[1], null, null, '').id; });
+          var bar = document.querySelector('#sec-view .pts-selbar');
+          CANVAS.ptsSel = mids.slice(0, 2); syncPtsSelBar();
+          var lockedPoly = bar.hidden ? 1 : 0;
+          CANVAS.ptsSel = mids.slice(); syncPtsSelBar();
+          var openPoly = !bar.hidden && bar.querySelector('.pts-selbar-go') ? 1 : 0;
+          var crosses = mids.filter(function (id) { return document.querySelector('#mark-list .mark-row[data-mark="' + id + '"] .mark-more'); }).length;
+          // Возвращаем секцию в исходное состояние: следующие случаи считают площадь под кривой.
+          CANVAS.ptsSel = []; STATE.marks = []; renderMarkList(); setAreaCalcMode('curve'); clearAreaCalc();
           return { lockedCurve: lockedCurve, openCurve: openCurve, lockedPoly: lockedPoly,
                    openPoly: openPoly, area: areaVal,
                    rangeOk: range === '[0; 100]' ? 1 : 0,
@@ -1254,9 +1261,9 @@ const CASES = [
              ['и обе границы правятся (Н52)', 'rangeEd', 2, 0],
              ['площадь под D = 5000', 'area', 5000, 1],
              ['заголовки «Название» и «Площадь» (Н53)', 'headOk', 1, 0],
-             ['без вершин кнопка заперта', 'lockedPoly', 1, 0],
-             ['три вершины — открылась', 'openPoly', 1, 0],
-             ['у каждой вершины крестик', 'verts', 3, 0]],
+             ['без вершин кнопка заперта (две отмечены — плашки нет)', 'lockedPoly', 1, 0],
+             ['три вершины — открылась («Площадь по точкам»)', 'openPoly', 1, 0],
+             ['у каждой вершины крестик («⋯» с «Убрать»)', 'verts', 3, 0]],
   },
   {
     /* П40. Разбор построен как вопрос с ответом, и кусочная кривая его не

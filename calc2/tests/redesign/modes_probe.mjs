@@ -126,22 +126,24 @@ if (want('А')) {
   const n3 = await page.evaluate(() => (STATE.marks || []).length);
   ok('в «Курсоре» щелчок по графику точку не ставит', n3 === 1, 'точек ' + n3);
 
-  // Налоги: «+ Между точками», три вершины, «Готово».
+  /* Налоги: «+ По точкам» (бывшее «+ Между точками»), три вершины, «Готово». С сессии 7 вершина площади — точка списка
+     (README пакета calc2_panels_20261014, раздел 9; решение …81e0…): набор — id точек в CANVAS.buildIds, а не копии
+     координат в STATE.areaVerts (тот остаётся пустым). */
   await openKey(page, 'taxes');
   await page.click('#tool-pts');
   await settle(page);
   await page.click('#ac-poly');
   await settle(page);
   const armed = await page.evaluate(() => canvasMode());
-  ok('«+ Между точками» взводит набор вершин', armed === 'vert', armed);
+  ok('«+ По точкам» взводит набор вершин', armed === 'vert', armed);
   for (const [x, y] of [[40, 60], [40, 40], [50, 50]]) await clickModel(page, x, y);
-  const nv = await page.evaluate(() => (STATE.areaVerts || []).length);
-  ok('три щелчка — три вершины', nv === 3, String(nv));
+  const nv = await page.evaluate(() => ({ b: (CANVAS.buildIds || []).length, m: (STATE.marks || []).length, v: (STATE.areaVerts || []).length }));
+  ok('три щелчка — три вершины (три точки списка)', nv.b === 3 && nv.m === 3 && !nv.v, JSON.stringify(nv));
   await page.click('#cv-mode-stop');
   await settle(page);
-  const a1 = await page.evaluate(() => ({ list: (STATE.areaCalcList || []).map(r => r.value), cm: canvasMode(), verts: (STATE.areaVerts || []).length }));
+  const a1 = await page.evaluate(() => ({ list: (STATE.areaCalcList || []).map(r => r.value), cm: canvasMode(), verts: (CANVAS.buildIds || []).length }));
   ok('«Готово» → площадь 100; набор закрыт, режим остался', a1.list.length === 1 && Math.abs(a1.list[0] - 100) < 0.01 && a1.cm === 'pts' && !a1.verts, JSON.stringify(a1));
-  // Замыкание щелчком по первой вершине.
+  // Замыкание щелчком по первой вершине (вершины — те же три точки: щелчок по своей точке берёт её).
   await page.click('#ac-poly');
   await settle(page);
   for (const [x, y] of [[40, 60], [40, 40], [50, 50], [40, 60]]) await clickModel(page, x, y);
@@ -154,8 +156,8 @@ if (want('А')) {
   await clickModel(page, 40, 60);
   await page.keyboard.press('Escape');
   await settle(page);
-  const a3 = await page.evaluate(() => ({ cm: canvasMode(), verts: (STATE.areaVerts || []).length, n: (STATE.areaCalcList || []).length }));
-  ok('Esc посреди набора: вершин нет, площадь не добавлена, режим остался', a3.cm === 'pts' && !a3.verts && a3.n === 2, JSON.stringify(a3));
+  const a3 = await page.evaluate(() => ({ cm: canvasMode(), verts: (CANVAS.buildIds || []).length, n: (STATE.areaCalcList || []).length, m: (STATE.marks || []).length }));
+  ok('Esc посреди набора: набор пуст, площадь не добавлена, точка осталась, режим остался', a3.cm === 'pts' && !a3.verts && a3.n === 2 && a3.m === 3, JSON.stringify(a3));
 
   // Спрос и предложение: «+ Под кривой», D, [0; 40].
   await openKey(page, 'sd');

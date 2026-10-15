@@ -450,7 +450,57 @@ async function sectionV5() {
   ok('6. «Отменить» → три точки и S₁ = 200', (await marks(page)).length === 3 && a.st.length === 1 && near(a.st[0].value, 200, 0.01), JSON.stringify(a.st));
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5]];
+const shoelace = (pts) => { let s2 = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; s2 += p.x * q.y - q.x * p.y; } return Math.abs(s2) / 2; };
+/* Пустые места холста «Налогов» для набора: не ближе 30 px к кривым D, S, S + t, осям, пунктирам точек A, B, C и
+   ключевым точкам (подобраны и проверены прибором: новые точки ни к чему не прилипают). */
+const EMPTY = [[80, 92], [95, 78], [88, 68]];
+const EMPTY2 = [[70, 15], [85, 25]];
+async function sectionV3() {
+  head('В3. «+ По точкам»: набор вершин — точки списка');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  const lab = await page.evaluate(() => document.getElementById('ac-poly').textContent.trim());
+  ok('кнопка раздела — «+ По точкам»', lab === '+ По точкам', lab);
+  const n0 = (await marks(page)).length, a0 = (await areasNow(page)).st.length;
+  let u0 = await undoLen(page);
+  await page.locator('#ac-poly').click();
+  await settle(page);
+  const mode = await page.evaluate(() => ({ cm: canvasMode(), banner: (document.getElementById('cv-mode-what') || {}).textContent || '' }));
+  ok('11. вход в набор — не шаг истории; полоса «Отмечаете вершины»', (await undoLen(page)) === u0 && mode.cm === 'vert' && /Отмечаете вершины/.test(mode.banner), JSON.stringify(mode) + ' шагов ' + (await undoLen(page)) + '/' + u0);
+  for (const [x, y] of EMPTY) await clickModel(page, x, y);
+  let m = await marks(page);
+  const fresh = m.slice(n0);
+  const free = await page.evaluate(() => (STATE.marks || []).slice(-3).every(k => !k.snapTo && !k.on));
+  ok('7. три щелчка в пустые места → три новые точки списка с буквами, ни к чему не прилипли (' + fresh.map(k => k.text).join(', ') + ')',
+    fresh.length === 3 && fresh.every(k => /^[A-Z]$/.test(k.text)) && free, JSON.stringify(fresh));
+  ok('7. каждая вершина — один шаг (3)', (await undoLen(page)) === u0 + 3, (await undoLen(page)) + ' против ' + u0);
+  await page.locator('#cv-mode-stop').click();
+  await settle(page);
+  let a = await areasNow(page);
+  const r = a.st[a.st.length - 1] || {};
+  const want = shoelace(fresh);
+  ok('7. «Готово» → площадь = треугольник по координатам точек (шнурки ' + want.toFixed(3) + ', ±0,5 %), вершины — эти точки',
+    a.st.length === a0 + 1 && Math.abs(r.value - want) <= want * 0.005 && JSON.stringify(r.ids) === JSON.stringify(fresh.map(k => k.id)), JSON.stringify(r));
+  ok('7. имя — первый свободный индекс (' + r.label + ')', r.label === 'S₂', r.label);
+  ok('7. набор закрыт, режим «Точки и площади» остался', (await page.evaluate(() => canvasMode())) === 'pts');
+  CH.v7 = { ids: fresh.map(k => k.id), area: r.id };
+  // 8. Esc посреди набора.
+  await page.locator('#ac-poly').click();
+  await settle(page);
+  const n1 = (await marks(page)).length, a1 = (await areasNow(page)).st.length;
+  for (const [x, y] of EMPTY2) await clickModel(page, x, y);
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+  await page.keyboard.press('Escape');
+  await settle(page);
+  a = await areasNow(page);
+  m = await marks(page);
+  ok('8. два щелчка и Esc → площади нет, две новые точки в списке, режим остался', a.st.length === a1 && m.length === n1 + 2 && (await page.evaluate(() => canvasMode())) === 'pts', JSON.stringify({ n: m.length, n1, a: a.st.length }));
+  await undo(page);
+  ok('8. одно «Отменить» убирает последнюю точку', (await marks(page)).length === n1 + 1);
+  await undo(page);
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5], ['В3', sectionV3]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {

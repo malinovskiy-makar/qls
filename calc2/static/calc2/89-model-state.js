@@ -30,8 +30,10 @@
 /* markArm, vertArm — взведённая заготовка точки и набор вершин: состояние
    режима холста «Точки и площади», а не модели (ADR 0148). В истории их
    переключение давало бы шаг «Отменить», в ссылке — взведённый режим. */
+/* areaCalcMode — открытое построение площади («Под кривой» / «По точкам») — тоже вид (сессия 7, В3): вход в набор
+   «+ По точкам» был шагом истории. */
 const MODEL_STATE_SKIP = new Set(['panels', 'pointerPx', 'pointerPy', 'roller', 'hoverCross', 'armedCurve',
-  'sceneKey', 'resizeRedraws', 'markArm', 'vertArm']);
+  'sceneKey', 'resizeRedraws', 'markArm', 'vertArm', 'areaCalcMode']);
 
 /* Глубокая копия ПРОСТЫХ данных. Скомпилированные формулы, функции сцен и
    объекты с прототипом не копируются: это кэши расчёта, их пересобирает
@@ -71,7 +73,9 @@ function plainCopy(v, depth) {
    истории и несла бы режим в ссылку. */
 // Стрелка «Ответа» и полоска — тоже вид (ADR 0148, 0150): ни истории, ни ссылки.
 // Полоса «Разбор» (#ex-bar) — вид (ADR 0150): свёрнутость не шаг истории.
-const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc', 'ans-hide', 'ans-rail', 'ex-bar']);
+// Кнопки «+ Под кривой» / «+ По точкам» и их панели (инлайновый display) — вид построения площади (сессия 7, В3).
+const FORM_SKIP_IDS = new Set(['btn-self', 'tool-cursor', 'tool-pts', 'pts-back', 'pts-done', 'cv-esc', 'ans-hide', 'ans-rail', 'ex-bar',
+  'ac-curve', 'ac-poly', 'ac-pane-curve', 'ac-pane-poly']);
 /* Тумблеры — в порядке разметки на загрузке (штамп _tgIdx ставит vgSetup до переезда тумблера заводов
    в «Вид графика», ADR 0152): старые ссылки и сохранения применяются к тем же тумблерам. */
 function togglesInOrder() {
@@ -338,7 +342,8 @@ function applyModelState(s) {
   if (typeof pultShiftHalf === 'function') pultShiftHalf();
   applyForm(s.form);
   Object.keys(s.state).forEach(k => {
-    if (k === 'curves') return;
+    // Вид в старой ссылке (areaCalcMode до сессии 7) не применяется: ссылка открывается не в режиме набора.
+    if (k === 'curves' || MODEL_STATE_SKIP.has(k)) return;
     STATE[k] = plainCopy(s.state[k], 0);
   });
   STATE.curves = rebuildCurves(s.state.curves);

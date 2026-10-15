@@ -1798,7 +1798,7 @@
                .ac-open, 60-overlays.js). Источник правды — по-прежнему STATE.areaCalcMode. -->
           <div class="seg ac-mode" id="ac-mode" role="radiogroup" aria-label="Как считаем площадь">
             <button class="seg-btn active" id="ac-curve" type="button" role="radio" aria-checked="true">+ Под кривой</button>
-            <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">+ Между точками</button>
+            <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">+ По точкам</button>
           </div>
 
           <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
@@ -1823,22 +1823,10 @@
                ставит человека перед выключенной кнопкой. п. 28: «Убрать все
                вершины» стоит ПОД списком — разрушающее действие не может
                опережать то, что оно разрушает. -->
-          <div id="ac-pane-poly" style="display:none;">
-            <div class="k-empty" id="ac-verts-empty">
-              <b>Ещё ни одной вершины</b>
-              <p>Нажимайте на график: каждый щелчок ставит вершину, а рядом с
-                 особой точкой она садится точно в неё. Нужно хотя бы три.</p>
-            </div>
-            <div id="ac-verts"></div>
-            <!-- п. 25. Набор вершин можно начать заново: без этой кнопки выход из
-                 режима был бы дорогой в один конец. Пока вершины отмечаются, её
-                 здесь нет: закончить набор предлагает полоса режима над холстом,
-                 и двух одинаковых кнопок в двух местах не нужно. -->
-            <button class="btn btn-quiet" id="ac-vert-arm" type="button" style="margin-top:6px;width:100%;">Отмечать вершины</button>
-            <div class="vert-btns" id="ac-vert-btns" style="display:none;">
-              <button class="btn btn-quiet" id="ac-vert-clear" type="button" style="margin-top:6px;width:100%;">Убрать все вершины</button>
-            </div>
-          </div>
+          <!-- «+ По точкам» (сессия 7, В3): набор вершин на холсте, вершины — точки списка «Точки» (полоса режима
+               над холстом: «Отмечаете вершины», «Готово»). Отдельного списка вершин и его кнопок больше нет: их
+               судьба — «переехал в список точек». Узел оставлен пустым: на нём держится вид построения. -->
+          <div id="ac-pane-poly" style="display:none;"></div>
 
           <button class="btn btn-quiet" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
           <div class="error" id="ac-error"></div>
