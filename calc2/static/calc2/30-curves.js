@@ -786,7 +786,8 @@ function spreadLabels() {
        лечь на соседку, и в ту сторону, где её число: большее выше (правее), меньшее ниже (левее). Порядок чисел
        сохраняется, сдвиг — меньше высоты строки, пунктир к оси остаётся у своего числа. Одно и то же число с разными
        индексами сюда не доходит: такие подписи сливаются в одну (coordAlreadyAt, 20-plane.js). */
-    if (it.only && !dx && !dy) {
+    // И после сдвига наружу: разведение по порогу 2 px оставляло касание 1–2 px (WebKit, «66,67_п» и «65_min»).
+    if (it.only) {
       const mates = placed.filter(p => p.el && p.only === it.only);
       const touch = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 0.5
                            && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 0.5;
@@ -794,8 +795,9 @@ function spreadLabels() {
         const p = mates.find(q => touch(it, q));
         if (!p) break;
         if (it.only === 'left') {
+          // Зазор 3 px: в WebKit рамка подписи после набора на 1–2 px выше, чем при разведении.
           const up = (it.y + it.h / 2) < (p.y + p.h / 2);
-          const ny = up ? p.y - it.h - 1 : p.y + p.h + 1;
+          const ny = up ? p.y - it.h - 3 : p.y + p.h + 3;
           dy += ny - it.y; it.y = ny;
         } else {
           const lft = (it.x + it.w / 2) < (p.x + p.w / 2);

@@ -156,7 +156,9 @@ const answerNums = (page) => page.evaluate(() => {
   const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent; };
   const hero = [...document.querySelectorAll('#ans-hero .ans-cell .ans-val')].map(tx).join('|');
   const sb = [...document.querySelectorAll('#sb-body .stat > b')].map(tx).join('|');
-  return (hero + '#' + sb).replace(/[\s   ​]+/g, '');
+  /* Запись точки — без скобок и разделителя: с сессии 7 (А3.1, карточка …81fd…) точки Слуцкого «(50; 25)», на коде
+     до сессии — «50 / 25»; сравнивается само число. */
+  return (hero + '#' + sb).replace(/[\s   ​]+/g, '').replace(/[()]/g, '').replace(/[;\/]/g, '|');
 });
 const formulaIds = (page) => page.evaluate(() => [...document.querySelectorAll('#tools-panel math-field, #tools-panel .f-slot > input[type=text]')]
   .filter(e => e.getClientRects().length).map(e => { const i = e.tagName === 'MATH-FIELD' ? e.parentElement.querySelector('input[id]') : e; return i ? i.id : '?'; })
