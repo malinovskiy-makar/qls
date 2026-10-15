@@ -9,6 +9,7 @@
   "piecewise": "var i=document.getElementById('curve-expr-2'); i.value='(Q >= 0 and Q < 40) ? 0.5*Q + 10 : (Q >= 40 ? 2*Q - 50 : NaN)'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true}));",
   "self": "document.getElementById('btn-self').click();",
   "marks": "var m=newMark(30,70,null,'coords'); STATE.marks.push(m); if(typeof renderMarkList==='function') renderMarkList();",
+  "pts-areas": "var ids = [[30, 70], [40, 40], [60, 50]].map(function (p) { var m = newMark(p[0], p[1], null, 'coords'); STATE.marks.push(m); return m.id; }); renderMarkList(); addPolyArea(ids);",
   "title": "STATE.graphTitle='Рынок хлеба: налог 20 & субсидия 5%';",
   "allquad": "STATE.firstQuad=false; CONFIG.Qmin=-20; CONFIG.Pmin=-20;"
  },

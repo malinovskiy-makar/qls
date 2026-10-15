@@ -895,6 +895,7 @@
  {"id":"taxes@piecewise","key":"taxes","src":"recipe","recipe":"taxes@piecewise","file":"10-market-etc.json"},
  {"id":"taxes@self","key":"taxes","src":"recipe","recipe":"taxes@self","file":"10-market-etc.json"},
  {"id":"taxes@marks","key":"taxes","src":"recipe","recipe":"taxes@marks","file":"10-market-etc.json"},
+ {"id":"taxes@pts-areas","key":"taxes","src":"recipe","recipe":"taxes@pts-areas","file":"10-market-etc.json"},
  {"id":"taxes@title","key":"taxes","src":"recipe","recipe":"taxes@title","file":"10-market-etc.json"},
  {"id":"taxes@allquad","key":"taxes","src":"recipe","recipe":"taxes@allquad","file":"10-market-etc.json"},
  {"id":"sd@param","key":"sd","src":"recipe","recipe":"sd@param","file":"10-market-etc.json"},

@@ -10,7 +10,7 @@
  "prod": { "self": "setSelfMode(true);" },
  "sd": {
   "marks-area": "STATE.marks.push(newMark(30, 70, null, 'coords')); STATE.marks.push(newMark(60, 20, null, 'coords')); if (typeof renderMarkList === 'function') renderMarkList(); syncAreaCalcUI(); var sel = document.getElementById('ac-pick'); sel.value = areaTargets()[0].name; STATE.acFrom = 10; STATE.acTo = 40; runAreaCalc();",
-  "area-poly": "STATE.areaVerts = [{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 60 }, { x: 15, y: 45 }]; STATE.areaCalcMode = 'poly'; runAreaCalc();",
+  "area-poly": "var ids = [[10, 10], [40, 10], [40, 60], [15, 45]].map(function (p) { var m = newMark(p[0], p[1], null, 'coords'); STATE.marks.push(m); return m.id; }); renderMarkList(); addPolyArea(ids);",
   "pw-window": "openPiecewise(document.getElementById('curve-expr-1'), 'Q', { split: true }); document.getElementById('pw-apply').click();",
   "qp-nl": "SETF('curve-expr-1', '1000/(P + 10)');",
   "title-pct": { "code": "", "title": "50% & выше" },
