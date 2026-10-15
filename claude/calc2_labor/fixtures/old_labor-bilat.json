@@ -1,0 +1,2814 @@
+{
+ "base": "http://127.0.0.1:8098",
+ "code": "bfb74cc3",
+ "made": "2026-10-15T17:17:18.400Z",
+ "state": {
+  "v": 1,
+  "key": "labor-bilat",
+  "route": "labor-bilat",
+  "state": {
+   "showGrid": true,
+   "gridDense": false,
+   "xStep": null,
+   "yStep": null,
+   "firstQuad": true,
+   "viewDirty": false,
+   "titleColor": null,
+   "labelSize": 14,
+   "areaCalcList": [],
+   "areaColor": {},
+   "params": {},
+   "areaPicked": [],
+   "crosses": [
+    {
+     "x": 49.999999999667125,
+     "y": 50.000000000332875,
+     "a": "D",
+     "b": "S"
+    },
+    {
+     "x": 99.99999999995445,
+     "y": 0,
+     "a": "D",
+     "b": "ось Q"
+    },
+    {
+     "x": 0,
+     "y": 100,
+     "a": "D",
+     "b": "ось P"
+    },
+    {
+     "x": 0,
+     "y": 0,
+     "a": "S",
+     "b": "ось P"
+    }
+   ],
+   "pRegSet": false,
+   "quotaSet": false,
+   "openPwSet": false,
+   "panelWin": {},
+   "graphTitle": "",
+   "axisXName": "",
+   "axisYName": "",
+   "axisXDefault": "L",
+   "axisYDefault": "W",
+   "marks": [],
+   "areaVerts": [],
+   "colorOverride": {},
+   "zoomLock": false,
+   "showLegend": true,
+   "pointNames": {},
+   "mathSub": "tangent",
+   "mathFormula": "x^2",
+   "mathXmin": -6,
+   "mathXmax": 6,
+   "mathYmin": -4,
+   "mathYmax": 20,
+   "ansA": null,
+   "ansB": null,
+   "ansHand": false,
+   "mathX0": 1,
+   "mathDx": 1,
+   "mathSecant": false,
+   "mathConvex": true,
+   "mathInflect": true,
+   "mathTrans": "up",
+   "mmCount": 2,
+   "mmName": "Z",
+   "mathGmore": [],
+   "mathG2": "4 - x",
+   "mathG3": "",
+   "mathG4": "",
+   "mathMinMax": "min",
+   "mathFC": "x^0.5 * y^0.5",
+   "mathGC": "x + y = 10",
+   "mathConsWantMax": true,
+   "mathRes": null,
+   "showCS": true,
+   "showPS": true,
+   "tax": 0,
+   "taxKind": "unit",
+   "taxForm": "unit",
+   "subKind": "unit",
+   "taxSide": "seller",
+   "intervType": "tax",
+   "pReg": 0,
+   "quota": 0,
+   "quotaPos": 0.5,
+   "qt": null,
+   "showGhost": false,
+   "market": "comp",
+   "scenario": "none",
+   "openPw": 30,
+   "openTool": "none",
+   "openTariff": 10,
+   "openQuota": 20,
+   "open": null,
+   "showOpenMoney": true,
+   "showOpenDwl": true,
+   "elastQ": null,
+   "elast": null,
+   "elastQS": null,
+   "elastS": null,
+   "showElastS": true,
+   "msbOn": false,
+   "msbExpr": "",
+   "msbCompiled": null,
+   "mscOn": false,
+   "mscExpr": "",
+   "mscCompiled": null,
+   "applyPigou": false,
+   "ext": null,
+   "extSign": "neg",
+   "showMonoCS": true,
+   "showMonoVC": false,
+   "showMonoPS": true,
+   "monoCeil": null,
+   "monoTax": null,
+   "monoFloor": null,
+   "monoMode": "simple",
+   "natFC": 800,
+   "natural": null,
+   "showNatProfit": true,
+   "showNatLoss": true,
+   "discr1": null,
+   "d3D1": "100 - Q",
+   "d3D2": "80 - 2*Q",
+   "d3MC": "20",
+   "discr3": null,
+   "d3World": false,
+   "kinkInput": "individual",
+   "kiD1": "100 - Q",
+   "kiD2": "60 - Q",
+   "kiD3": "",
+   "kpD1": "100 - Q",
+   "kpD2": "120 - 1.5*Q",
+   "kinkMC": "20",
+   "kinked": null,
+   "mode": "labor",
+   "consPx": 1,
+   "consPy": 2,
+   "consI": 100,
+   "consType": "cobb",
+   "consA": 0.5,
+   "consB": 0.5,
+   "consK": 2,
+   "consCustom": "x^0.5 * y^0.5",
+   "consFan": true,
+   "consSlutskyOn": false,
+   "consPx1": 4,
+   "cons": null,
+   "consErr": null,
+   "macroModel": "adas",
+   "macro": {
+    "adas": {
+     "lras": 100,
+     "sras": "10 + 0.5*Y",
+     "ad": "120 - 0.6*Y"
+    },
+    "phillips": {
+     "pe": 5,
+     "ustar": 5,
+     "beta": 0.5
+    },
+    "money": {
+     "md": "200 - 4*i",
+     "ms": 120
+    },
+    "loanable": {
+     "s": "50 + 2*r",
+     "d": "150 - 3*r",
+     "dg": 0
+    },
+    "fx": {
+     "d": "100 - 2*e",
+     "s": "20 + 3*e",
+     "fixedOn": false,
+     "fixed": 20
+    },
+    "laffer": {
+     "d": "100 - Q",
+     "s": "Q",
+     "tmax": 100
+    },
+    "islm": {
+     "is": "20 - 0.1*Y",
+     "lm": "0.05*Y - 5"
+    }
+   },
+   "macroRes": null,
+   "macroErr": null,
+   "laborStruct": "bilateral",
+   "laborBilateral": {
+    "Wlo": 33.33333333318434,
+    "Whi": 66.66666666681566,
+    "Wm": 33.33333333318434,
+    "Lm": 33.33333333318434,
+    "Wu": 66.66666666681566,
+    "Lu": 33.33333333318434,
+    "Wk": 50,
+    "Lk": 50
+   },
+   "unionModel": "monopoly",
+   "unionWage": 0,
+   "unionWageVisited": false,
+   "laborUnion": {
+    "Lu": 33.33333333318434,
+    "Wu": 66.66666666681566,
+    "Lk": 50,
+    "Wk": 50,
+    "dwl": 277.777777782744
+   },
+   "laborMinOn": true,
+   "laborMinW": 65,
+   "laborVisited": true,
+   "laborEq": {
+    "Q": 50,
+    "P": 50
+   },
+   "laborMono": {
+    "Lm": 33.33333333318434,
+    "Wm": 33.33333333318434,
+    "Lk": 50,
+    "Wk": 50,
+    "dwl": 277.777777782744
+   },
+   "laborMin": {
+    "binding": true,
+    "Wmin": 65,
+    "Qd": 34.99999999973183,
+    "Qs": 65.00000000026817,
+    "employment": 34.99999999973183,
+    "unemployment": 30.000000000536346
+   },
+   "costsMode": "tc",
+   "costsTC": "Q^3 - 6*Q^2 + 15*Q + 18",
+   "costsMCx": "3*Q^2 - 12*Q + 15",
+   "costsATCx": "Q^2 - 6*Q + 15 + 18/Q",
+   "costsAVCx": "Q^2 - 6*Q + 15",
+   "costsFCInfo": null,
+   "costsWarn": null,
+   "costsCompiled": null,
+   "costsReady": false,
+   "showMC": true,
+   "showATC": true,
+   "showAVC": true,
+   "showAFC": true,
+   "showTC": false,
+   "showVC": false,
+   "showFC": false,
+   "costsSub": "costs",
+   "lrOn": true,
+   "lrPrice": 15,
+   "lrArea": true,
+   "lr": null,
+   "prodExpr": "30*L^2 - L^3",
+   "prodCompiled": null,
+   "prod": null,
+   "showTP": true,
+   "showMP": true,
+   "showAP": true,
+   "isoExpr": "L^0.5 * K^0.5",
+   "isoW": 1,
+   "isoR": 2,
+   "isoC": 100,
+   "isoFan": true,
+   "iso": null,
+   "isoErr": null,
+   "pl1": "Q^2",
+   "pl2": "2*Q^2",
+   "plView": "tc",
+   "plQ": 30,
+   "plants": null,
+   "plErr": null,
+   "ppfFormula": "100 - X",
+   "ppfCompiled": null,
+   "ppfReady": false,
+   "ppfX": null,
+   "ppfSub": "single",
+   "ppf1": "100 - X",
+   "ppf2": "60 - 3*X",
+   "ppfSumData": null,
+   "ppfSumKinks": null,
+   "ppfSumView": "scale",
+   "ppfSumCount": 2,
+   "ppfSumMore": [],
+   "ppfSumNames": [],
+   "ppfSumColors": [],
+   "ppfSumName": "Сумма",
+   "ppfSumColor": "",
+   "ppftFormula": "100 - X",
+   "ppftPrice": 2,
+   "ppfTradeData": null,
+   "tradeScenario": "A",
+   "tbF1": "100 - X",
+   "tbF2": "100 - 2*X",
+   "tbManualPrice": null,
+   "tradeBData": null,
+   "tbNames": [],
+   "ineqInput": "groups",
+   "ineqGroupN": 5,
+   "ineqGroups": [
+    8,
+    12,
+    16,
+    24,
+    40
+   ],
+   "ineqIncomes": "10, 20, 30, 40, 100",
+   "ineqFormula": "p^2",
+   "ineqAlpha": 2,
+   "ineqVisited": false,
+   "ineqLorenz": null,
+   "ineqShares": null,
+   "ineqShareN": 0,
+   "ineqStats": null,
+   "ineqWarn": null,
+   "ineqSortNote": false,
+   "ineqRedistOn": false,
+   "ineqRedistTool": "tax",
+   "ineqTau": 0,
+   "ineqTransfer": 0,
+   "ineqRedist": null,
+   "ineqMasterBase": null,
+   "ineqMasterDetached": false,
+   "ineqMasterS": 1,
+   "_paramsSig": "",
+   "_sumSig": null,
+   "D": null,
+   "S": null,
+   "eq": null,
+   "sw": null,
+   "ps": null,
+   "cs": null,
+   "offEq": null,
+   "taxActive": false,
+   "taxEq": null,
+   "taxAfterS": null,
+   "taxAfterD": null,
+   "taxCurveOn": false,
+   "taxNoBase": false,
+   "shift": 0,
+   "advTau": 0,
+   "tx": null,
+   "budget": null,
+   "dwl": null,
+   "csTax": null,
+   "psTax": null,
+   "incBuyer": null,
+   "incSeller": null,
+   "pcMode": false,
+   "pcActive": false,
+   "pc": null,
+   "quotaMode": false,
+   "quotaActive": false,
+   "mono": null,
+   "monoQuota": null,
+   "crossesPanel": "main",
+   "acFrom": null,
+   "acTo": null,
+   "areaHidden": [],
+   "titlePos": null,
+   "quadSaved": null,
+   "legendSpot": 0,
+   "bundleOn": false,
+   "bundleX": null,
+   "bundleY": null,
+   "laborFirmCS": 1250,
+   "laborWorkerCS": 1250,
+   "laborMinWelfare": {
+    "Lstar": 34.99999999973183,
+    "Wfact": 65,
+    "workerCS": 1662.4999999919544,
+    "firmCS": 612.4999999999994,
+    "dwl": 225.0000000080451
+   },
+   "curves": [
+    {
+     "_code": [
+      "compiled"
+     ],
+     "id": 1,
+     "expr": "100 - L",
+     "color": "#2F6FED",
+     "role": "demand",
+     "visible": true,
+     "linear": {
+      "a": -1,
+      "b": 100
+     },
+     "srcForm": "PQ",
+     "_auto": "f",
+     "shiftBase": 100,
+     "_pNamesFor": "100 - L|w",
+     "_pNames": []
+    },
+    {
+     "_code": [
+      "compiled"
+     ],
+     "id": 2,
+     "expr": "L",
+     "color": "#E0563B",
+     "role": "supply",
+     "visible": true,
+     "linear": {
+      "a": 1,
+      "b": 0
+     },
+     "srcForm": "PQ",
+     "_auto": "f",
+     "shiftBase": 0,
+     "_pNamesFor": "L|w",
+     "_pNames": []
+    }
+   ]
+  },
+  "form": {
+   "model-head": {
+    "d": ""
+   },
+   "scene-back": {
+    "d": "",
+    "cls": "mh-btn mh-quiet"
+   },
+   "model-block": {
+    "d": ""
+   },
+   "scene-name": {
+    "d": ""
+   },
+   "save-status": {
+    "d": ""
+   },
+   "save-status-text": {
+    "d": ""
+   },
+   "btn-undo": {
+    "d": "",
+    "cls": "mh-icon"
+   },
+   "btn-redo": {
+    "d": "",
+    "cls": "mh-icon"
+   },
+   "btn-model-reset": {
+    "d": "",
+    "cls": "mh-btn mh-quiet"
+   },
+   "dock-export": {
+    "d": "",
+    "cls": "mh-btn mh-outline"
+   },
+   "tools-panel": {
+    "d": ""
+   },
+   "sec-input": {
+    "d": ""
+   },
+   "sec-input-fold": {
+    "d": ""
+   },
+   "sec-curves": {
+    "d": ""
+   },
+   "sum-counts": {
+    "d": "none"
+   },
+   "sum-nd": {
+    "d": "",
+    "v": "2",
+    "min": "1",
+    "max": "8",
+    "step": "1",
+    "bbh": ""
+   },
+   "sum-ns": {
+    "d": "",
+    "v": "2",
+    "min": "1",
+    "max": "8",
+    "step": "1",
+    "bbh": ""
+   },
+   "curve-error": {
+    "d": "none"
+   },
+   "curve-list": {
+    "d": ""
+   },
+   "curve-expr-1": {
+    "d": "",
+    "v": "100 - L"
+   },
+   "fp-auto-curve-expr-1": {
+    "d": ""
+   },
+   "curve-expr-2": {
+    "d": "",
+    "v": "L"
+   },
+   "fp-auto-curve-expr-2": {
+    "d": ""
+   },
+   "social-curves": {
+    "d": "none"
+   },
+   "chk-msb": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "inp-msb": {
+    "d": "",
+    "v": ""
+   },
+   "fp-auto-inp-msb": {
+    "d": ""
+   },
+   "chk-msc": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "inp-msc": {
+    "d": "",
+    "v": ""
+   },
+   "fp-auto-inp-msc": {
+    "d": ""
+   },
+   "social-error": {
+    "d": "none"
+   },
+   "btn-add-curve": {
+    "d": "",
+    "cls": "fc-add"
+   },
+   "sec-graph": {
+    "d": "none"
+   },
+   "hp-graph": {
+    "d": ""
+   },
+   "graph-rows": {
+    "d": ""
+   },
+   "graph-error": {
+    "d": ""
+   },
+   "scn-pane-elast": {
+    "d": "none"
+   },
+   "chk-elast-s": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "scn-pane-ext": {
+    "d": "none"
+   },
+   "ext-pigou": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "ext-pigou-label": {
+    "d": ""
+   },
+   "ext-hint": {
+    "d": ""
+   },
+   "scn-pane-open": {
+    "d": "none"
+   },
+   "open-pw-field": {
+    "d": ""
+   },
+   "open-pw-val": {
+    "d": ""
+   },
+   "open-pw-slider": {
+    "d": "",
+    "v": "30",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "open-pw-input": {
+    "d": "",
+    "v": "30",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "oi-none": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "oi-tariff": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "oi-quota": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "open-tariff-field": {
+    "d": "none"
+   },
+   "open-tariff-val": {
+    "d": ""
+   },
+   "open-tariff-slider": {
+    "d": "",
+    "v": "10",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "open-tariff-input": {
+    "d": "",
+    "v": "10",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "open-quota-field": {
+    "d": "none"
+   },
+   "open-quota-name": {
+    "d": ""
+   },
+   "open-quota-val": {
+    "d": ""
+   },
+   "open-quota-slider": {
+    "d": "",
+    "v": "20",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "open-quota-input": {
+    "d": "",
+    "v": "20",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "sec-mono": {
+    "d": "none"
+   },
+   "mono-hint": {
+    "d": "none"
+   },
+   "mono-submode": {
+    "d": "none"
+   },
+   "mm-simple": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "mm-d1": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-d3": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-kink": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-nat": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mono-d1-pane": {
+    "d": "none"
+   },
+   "mono-d3-pane": {
+    "d": "none"
+   },
+   "inp-d3-1": {
+    "d": "",
+    "v": "100 - Q"
+   },
+   "fp-auto-inp-d3-1": {
+    "d": ""
+   },
+   "inp-d3-2": {
+    "d": "",
+    "v": "80 - 2*Q"
+   },
+   "fp-auto-inp-d3-2": {
+    "d": ""
+   },
+   "inp-d3-mc": {
+    "d": "",
+    "v": "20"
+   },
+   "fp-auto-inp-d3-mc": {
+    "d": ""
+   },
+   "d3-error": {
+    "d": "none"
+   },
+   "mono-kink-pane": {
+    "d": "none"
+   },
+   "ki-indiv": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "ki-piece": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "kink-indiv": {
+    "d": ""
+   },
+   "inp-ki-1": {
+    "d": "",
+    "v": "100 - Q"
+   },
+   "fp-auto-inp-ki-1": {
+    "d": ""
+   },
+   "inp-ki-2": {
+    "d": "",
+    "v": "60 - Q"
+   },
+   "fp-auto-inp-ki-2": {
+    "d": ""
+   },
+   "inp-ki-3": {
+    "d": "",
+    "v": ""
+   },
+   "fp-auto-inp-ki-3": {
+    "d": ""
+   },
+   "kink-piece": {
+    "d": "none"
+   },
+   "inp-kp-1": {
+    "d": "",
+    "v": "100 - Q"
+   },
+   "fp-auto-inp-kp-1": {
+    "d": ""
+   },
+   "inp-kp-2": {
+    "d": "",
+    "v": "120 - 1.5*Q"
+   },
+   "fp-auto-inp-kp-2": {
+    "d": ""
+   },
+   "inp-kink-mc": {
+    "d": "",
+    "v": "20"
+   },
+   "fp-auto-inp-kink-mc": {
+    "d": ""
+   },
+   "kink-error": {
+    "d": "none"
+   },
+   "mono-nat-pane": {
+    "d": "none"
+   },
+   "inp-nat-fc": {
+    "d": "",
+    "v": "800",
+    "min": null,
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "mono-interv-hint": {
+    "d": "none"
+   },
+   "sec-costs": {
+    "d": "none"
+   },
+   "costs-seg": {
+    "d": ""
+   },
+   "cs-costs": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "cs-prod": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "cs-iso": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "cs-plants": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "costs-pane-costs": {
+    "d": ""
+   },
+   "costs-mode-seg": {
+    "d": "none"
+   },
+   "cm-tc": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "cm-curves": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "costs-input-tc": {
+    "d": ""
+   },
+   "inp-tc": {
+    "d": "",
+    "v": "Q^3 - 6*Q^2 + 15*Q + 18"
+   },
+   "btn-costs-preset": {
+    "d": "",
+    "cls": "btn-sm fc-mi"
+   },
+   "fp-tc": {
+    "d": ""
+   },
+   "costs-input-curves": {
+    "d": "none"
+   },
+   "inp-cmc": {
+    "d": "",
+    "v": "3*Q^2 - 12*Q + 15"
+   },
+   "fp-auto-inp-cmc": {
+    "d": ""
+   },
+   "inp-catc": {
+    "d": "",
+    "v": "Q^2 - 6*Q + 15 + 18/Q"
+   },
+   "fp-auto-inp-catc": {
+    "d": ""
+   },
+   "inp-cavc": {
+    "d": "",
+    "v": "Q^2 - 6*Q + 15"
+   },
+   "fp-auto-inp-cavc": {
+    "d": ""
+   },
+   "costs-error": {
+    "d": ""
+   },
+   "chk-lr": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "lr-price-field": {
+    "d": ""
+   },
+   "lr-price-val": {
+    "d": ""
+   },
+   "lr-price-slider": {
+    "d": "",
+    "v": "15",
+    "min": "0",
+    "max": "50",
+    "step": "0.5",
+    "bbh": ""
+   },
+   "lr-price-input": {
+    "d": "",
+    "v": "15",
+    "min": "0",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "costs-pane-prod": {
+    "d": "none"
+   },
+   "inp-prod": {
+    "d": "",
+    "v": "30*L^2 - L^3"
+   },
+   "fp-prod": {
+    "d": ""
+   },
+   "prod-error": {
+    "d": "none"
+   },
+   "costs-pane-iso": {
+    "d": "none"
+   },
+   "inp-iso": {
+    "d": "",
+    "v": "L^0.5 * K^0.5"
+   },
+   "fp-iso": {
+    "d": ""
+   },
+   "iso-w": {
+    "d": "",
+    "v": "1",
+    "min": "0.01",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "iso-r": {
+    "d": "",
+    "v": "2",
+    "min": "0.01",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "iso-c": {
+    "d": "",
+    "v": "100",
+    "min": "1",
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "iso-error": {
+    "d": "none"
+   },
+   "costs-pane-plants": {
+    "d": "none"
+   },
+   "inp-pl1": {
+    "d": "",
+    "v": "Q^2"
+   },
+   "fp-auto-inp-pl1": {
+    "d": ""
+   },
+   "inp-pl2": {
+    "d": "",
+    "v": "2*Q^2"
+   },
+   "fp-auto-inp-pl2": {
+    "d": ""
+   },
+   "pl-q-field": {
+    "d": ""
+   },
+   "pl-q-val": {
+    "d": ""
+   },
+   "pl-q-slider": {
+    "d": "",
+    "v": "30",
+    "min": "0",
+    "max": "60",
+    "step": "1",
+    "bbh": ""
+   },
+   "pl-q-input": {
+    "d": "",
+    "v": "30",
+    "min": "0",
+    "max": null,
+    "step": "0.5",
+    "bbh": ""
+   },
+   "pl-error": {
+    "d": "none"
+   },
+   "sec-labor": {
+    "d": ""
+   },
+   "hp-labor": {
+    "d": ""
+   },
+   "labor-seg": {
+    "d": ""
+   },
+   "lab-comp": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "lab-mono": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "lab-union": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "lab-bilat": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "union-pane": {
+    "d": "none"
+   },
+   "un-monopoly": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "un-wagefloor": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "un-hint-mono": {
+    "d": ""
+   },
+   "union-wage-field": {
+    "d": "none"
+   },
+   "union-wage-val": {
+    "d": ""
+   },
+   "union-wage-slider": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "union-wage-input": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "labmin-block": {
+    "d": ""
+   },
+   "chk-labmin": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "labmin-field": {
+    "d": ""
+   },
+   "labmin-val": {
+    "d": ""
+   },
+   "labmin-slider": {
+    "d": "",
+    "v": "65",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "labmin-input": {
+    "d": "",
+    "v": "65",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "sec-inequality": {
+    "d": "none"
+   },
+   "ineq-in-groups": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "ineq-in-incomes": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ineq-in-formula": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ineq-pane-groups": {
+    "d": ""
+   },
+   "ineq-ngroups": {
+    "d": "",
+    "v": "5"
+   },
+   "ineq-groups-table": {
+    "d": ""
+   },
+   "ineq-note-groups": {
+    "d": "none"
+   },
+   "ineq-pane-incomes": {
+    "d": "none"
+   },
+   "ineq-incomes": {
+    "d": "",
+    "v": "10, 20, 30, 40, 100"
+   },
+   "ineq-note-incomes": {
+    "d": "none"
+   },
+   "ineq-pane-formula": {
+    "d": "none"
+   },
+   "ineq-formula": {
+    "d": "",
+    "v": "p^2"
+   },
+   "fp-auto-ineq-formula": {
+    "d": ""
+   },
+   "ineq-alpha-field": {
+    "d": ""
+   },
+   "ineq-alpha-val": {
+    "d": ""
+   },
+   "ineq-alpha": {
+    "d": "",
+    "v": "2",
+    "min": "1",
+    "max": "6",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ineq-redist": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "ineq-redist-pane": {
+    "d": "none"
+   },
+   "ineq-rd-tax": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "ineq-rd-transfer": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ineq-tau-field": {
+    "d": ""
+   },
+   "ineq-tau-val": {
+    "d": ""
+   },
+   "ineq-tau": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "1",
+    "step": "0.05",
+    "bbh": ""
+   },
+   "ineq-transfer-field": {
+    "d": "none"
+   },
+   "ineq-transfer-val": {
+    "d": ""
+   },
+   "ineq-transfer": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "50",
+    "step": "1",
+    "bbh": ""
+   },
+   "sec-consumer": {
+    "d": "none"
+   },
+   "cons-type": {
+    "d": "",
+    "v": "cobb"
+   },
+   "cons-ab-row": {
+    "d": ""
+   },
+   "cons-a-lbl": {
+    "d": ""
+   },
+   "cons-a": {
+    "d": "",
+    "v": "0.5",
+    "min": null,
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-b-lbl": {
+    "d": ""
+   },
+   "cons-b": {
+    "d": "",
+    "v": "0.5",
+    "min": null,
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-k-row": {
+    "d": "none"
+   },
+   "cons-k": {
+    "d": "",
+    "v": "2",
+    "min": null,
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-custom-row": {
+    "d": "none"
+   },
+   "cons-custom": {
+    "d": "",
+    "v": "x^0.5 * y^0.5"
+   },
+   "fp-cons": {
+    "d": ""
+   },
+   "cons-px": {
+    "d": "",
+    "v": "1",
+    "min": "0.01",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-py": {
+    "d": "",
+    "v": "2",
+    "min": "0.01",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-i": {
+    "d": "",
+    "v": "100",
+    "min": "1",
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "cons-slutsky-row": {
+    "d": ""
+   },
+   "chk-cons-slutsky": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "cons-px1-row": {
+    "d": "none"
+   },
+   "cons-px1-val": {
+    "d": ""
+   },
+   "cons-px1-slider": {
+    "d": "",
+    "v": "4",
+    "min": "0.1",
+    "max": "10",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-px1-input": {
+    "d": "",
+    "v": "4",
+    "min": "0.01",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "cons-error": {
+    "d": "none"
+   },
+   "sec-ppf": {
+    "d": "none"
+   },
+   "ppf-seg": {
+    "d": ""
+   },
+   "ppfsub-single": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "ppfsub-sum": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ppfsub-trade": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ppf-pane-single": {
+    "d": ""
+   },
+   "ppf-color1": {
+    "d": ""
+   },
+   "inp-ppf": {
+    "d": "",
+    "v": "y = 100 - x"
+   },
+   "ppf-name1-row": {
+    "d": ""
+   },
+   "inp-ppf-name1": {
+    "d": "",
+    "v": ""
+   },
+   "fp-ppf": {
+    "d": ""
+   },
+   "ppf-second": {
+    "d": "none"
+   },
+   "ppf-color2": {
+    "d": ""
+   },
+   "inp-ppf2b": {
+    "d": "",
+    "v": "y = 80 - 0.8*x"
+   },
+   "inp-ppf-name2": {
+    "d": "",
+    "v": ""
+   },
+   "fp-auto-inp-ppf2b": {
+    "d": ""
+   },
+   "btn-ppf-compare": {
+    "d": "",
+    "cls": "btn-sm"
+   },
+   "ppf-error": {
+    "d": ""
+   },
+   "chk-bundle-1": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "bundle-error": {
+    "d": "none"
+   },
+   "bundle-row": {
+    "d": "none"
+   },
+   "inp-bundle-x": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "inp-bundle-y": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ppf-pane-sum": {
+    "d": "none"
+   },
+   "inp-ppfsum-n": {
+    "d": "",
+    "v": "2",
+    "min": "2",
+    "max": "5",
+    "step": "1",
+    "bbh": ""
+   },
+   "ppfsum-rows": {
+    "d": ""
+   },
+   "inp-ppfsum-0": {
+    "d": "",
+    "v": "100 - X"
+   },
+   "fp-auto-inp-ppfsum-0": {
+    "d": ""
+   },
+   "inp-ppfsum-1": {
+    "d": "",
+    "v": "60 - 3*X"
+   },
+   "fp-auto-inp-ppfsum-1": {
+    "d": ""
+   },
+   "ppfsum-error": {
+    "d": ""
+   },
+   "chk-bundle-2": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "bundle-row2": {
+    "d": "none"
+   },
+   "inp-bundle-x2": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "inp-bundle-y2": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ppf-pane-trade": {
+    "d": "none"
+   },
+   "trade-pane-a": {
+    "d": ""
+   },
+   "inp-ppft": {
+    "d": "",
+    "v": "100 - X"
+   },
+   "fp-auto-inp-ppft": {
+    "d": ""
+   },
+   "ppft-price-field": {
+    "d": ""
+   },
+   "ppft-price-val": {
+    "d": ""
+   },
+   "ppft-price-slider": {
+    "d": "",
+    "v": "2",
+    "min": "0.1",
+    "max": "4",
+    "step": "0.01",
+    "bbh": ""
+   },
+   "inp-ppft-price": {
+    "d": "",
+    "v": "2",
+    "min": "0.1",
+    "max": null,
+    "step": "0.05",
+    "bbh": ""
+   },
+   "chk-bundle-t": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "bundle-rowt": {
+    "d": "none"
+   },
+   "inp-bundle-xt": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "inp-bundle-yt": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ppft-error": {
+    "d": ""
+   },
+   "trade-pane-b": {
+    "d": "none"
+   },
+   "inp-tb1": {
+    "d": "",
+    "v": "100 - X"
+   },
+   "fp-auto-inp-tb1": {
+    "d": ""
+   },
+   "inp-tb2": {
+    "d": "",
+    "v": "100 - 2*X"
+   },
+   "fp-auto-inp-tb2": {
+    "d": ""
+   },
+   "tb-price-field": {
+    "d": ""
+   },
+   "tb-price-val": {
+    "d": ""
+   },
+   "tb-price-slider": {
+    "d": "",
+    "v": "1.41",
+    "min": "0.1",
+    "max": "4",
+    "step": "0.01",
+    "bbh": ""
+   },
+   "inp-tb-price": {
+    "d": "",
+    "v": "",
+    "min": "0.1",
+    "max": null,
+    "step": "0.05",
+    "bbh": ""
+   },
+   "btn-tb-reset": {
+    "d": "",
+    "cls": "btn-sm"
+   },
+   "tb-error": {
+    "d": "none"
+   },
+   "sec-macro": {
+    "d": "none"
+   },
+   "macro-seg": {
+    "d": ""
+   },
+   "mm-adas": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "mm-phillips": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-money": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-loanable": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-fx": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-laffer": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-islm": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "macro-pane-adas": {
+    "d": ""
+   },
+   "ma-lras": {
+    "d": "",
+    "v": "100",
+    "min": null,
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "ma-sras": {
+    "d": "",
+    "v": "10 + 0.5*Y"
+   },
+   "fp-auto-ma-sras": {
+    "d": ""
+   },
+   "ma-ad": {
+    "d": "",
+    "v": "120 - 0.6*Y"
+   },
+   "fp-auto-ma-ad": {
+    "d": ""
+   },
+   "macro-pane-phillips": {
+    "d": "none"
+   },
+   "ma-pe": {
+    "d": "",
+    "v": "5",
+    "min": null,
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ma-ustar": {
+    "d": "",
+    "v": "5",
+    "min": null,
+    "max": null,
+    "step": "0.1",
+    "bbh": ""
+   },
+   "ma-beta": {
+    "d": "",
+    "v": "0.5",
+    "min": null,
+    "max": null,
+    "step": "0.05",
+    "bbh": ""
+   },
+   "macro-pane-money": {
+    "d": "none"
+   },
+   "ma-md": {
+    "d": "",
+    "v": "200 - 4*i"
+   },
+   "fp-auto-ma-md": {
+    "d": ""
+   },
+   "ma-ms": {
+    "d": "",
+    "v": "120",
+    "min": null,
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "macro-pane-loanable": {
+    "d": "none"
+   },
+   "ma-ls": {
+    "d": "",
+    "v": "50 + 2*r"
+   },
+   "fp-auto-ma-ls": {
+    "d": ""
+   },
+   "ma-ld": {
+    "d": "",
+    "v": "150 - 3*r"
+   },
+   "fp-auto-ma-ld": {
+    "d": ""
+   },
+   "ma-dg-field": {
+    "d": ""
+   },
+   "ma-dg-val": {
+    "d": ""
+   },
+   "ma-dg-slider": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "100",
+    "step": "1",
+    "bbh": ""
+   },
+   "ma-dg-input": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": null,
+    "step": "1",
+    "bbh": ""
+   },
+   "macro-pane-fx": {
+    "d": "none"
+   },
+   "ma-fxd": {
+    "d": "",
+    "v": "100 - 2*e"
+   },
+   "fp-auto-ma-fxd": {
+    "d": ""
+   },
+   "ma-fxs": {
+    "d": "",
+    "v": "20 + 3*e"
+   },
+   "fp-auto-ma-fxs": {
+    "d": ""
+   },
+   "ma-fx-fixed": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "ma-fx-fixed-field": {
+    "d": "none"
+   },
+   "ma-fxe-val": {
+    "d": ""
+   },
+   "ma-fxe-slider": {
+    "d": "",
+    "v": "20",
+    "min": "0",
+    "max": "60",
+    "step": "0.5",
+    "bbh": ""
+   },
+   "ma-fxe-input": {
+    "d": "",
+    "v": "20",
+    "min": "0",
+    "max": null,
+    "step": "0.5",
+    "bbh": ""
+   },
+   "macro-pane-laffer": {
+    "d": "none"
+   },
+   "ma-lafd": {
+    "d": "",
+    "v": "100 - Q"
+   },
+   "fp-auto-ma-lafd": {
+    "d": ""
+   },
+   "ma-lafs": {
+    "d": "",
+    "v": "Q"
+   },
+   "fp-auto-ma-lafs": {
+    "d": ""
+   },
+   "ma-lafmax": {
+    "d": "",
+    "v": "100",
+    "min": null,
+    "max": null,
+    "step": "5",
+    "bbh": ""
+   },
+   "macro-pane-islm": {
+    "d": "none"
+   },
+   "ma-is": {
+    "d": "",
+    "v": "20 - 0.1*Y"
+   },
+   "fp-auto-ma-is": {
+    "d": ""
+   },
+   "ma-lm": {
+    "d": "",
+    "v": "0.05*Y - 5"
+   },
+   "fp-auto-ma-lm": {
+    "d": ""
+   },
+   "macro-error": {
+    "d": "none"
+   },
+   "sec-math": {
+    "d": "none"
+   },
+   "math-seg": {
+    "d": ""
+   },
+   "ms-tangent": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "ms-optimum": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ms-transform": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ms-minmax": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "ms-constraint": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "math-row-f": {
+    "d": ""
+   },
+   "math-f-label": {
+    "d": ""
+   },
+   "inp-mathf": {
+    "d": "",
+    "v": "x^2"
+   },
+   "fp-mathf": {
+    "d": ""
+   },
+   "math-error": {
+    "d": "none"
+   },
+   "ans-seg-row": {
+    "d": ""
+   },
+   "hp-ans-seg": {
+    "d": ""
+   },
+   "ans-a": {
+    "d": "",
+    "v": ""
+   },
+   "ans-b": {
+    "d": "",
+    "v": ""
+   },
+   "ans-seg-auto": {
+    "d": "",
+    "cls": "ans-seg-auto"
+   },
+   "math-pane-tangent": {
+    "d": ""
+   },
+   "mathx0-field": {
+    "d": ""
+   },
+   "mathx0-slider": {
+    "d": "",
+    "v": "1",
+    "min": "-10",
+    "max": "10",
+    "step": "0.01",
+    "bbh": ""
+   },
+   "mathx0-input": {
+    "d": "",
+    "v": "1",
+    "min": null,
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "math-secant-row": {
+    "d": ""
+   },
+   "chk-secant": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "mathdx-field": {
+    "d": "none"
+   },
+   "mathdx-val": {
+    "d": ""
+   },
+   "mathdx-slider": {
+    "d": "",
+    "v": "1",
+    "min": "0.001",
+    "max": "5",
+    "step": "0.001",
+    "bbh": ""
+   },
+   "hp-tangent": {
+    "d": ""
+   },
+   "math-pane-optimum": {
+    "d": "none"
+   },
+   "hp-optimum": {
+    "d": ""
+   },
+   "math-pane-transform": {
+    "d": "none"
+   },
+   "math-trans": {
+    "d": "",
+    "v": "up"
+   },
+   "math-trans-hint": {
+    "d": ""
+   },
+   "math-pane-minmax": {
+    "d": "none"
+   },
+   "mm-mode": {
+    "d": "none"
+   },
+   "mm-min": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "mm-max": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-count": {
+    "d": "",
+    "v": "2",
+    "min": "2",
+    "max": "8",
+    "step": "1",
+    "bbh": ""
+   },
+   "mm-rows": {
+    "d": ""
+   },
+   "mm-f0": {
+    "d": "",
+    "v": "x^2"
+   },
+   "fp-auto-mm-f0": {
+    "d": ""
+   },
+   "mm-f1": {
+    "d": "",
+    "v": "4 - x"
+   },
+   "fp-auto-mm-f1": {
+    "d": ""
+   },
+   "hp-minmax": {
+    "d": ""
+   },
+   "math-pane-constraint": {
+    "d": "none"
+   },
+   "mc-max": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "mc-min": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "inp-mathfc": {
+    "d": "",
+    "v": "x^0.5 * y^0.5"
+   },
+   "fp-mathfc": {
+    "d": ""
+   },
+   "inp-mathgc": {
+    "d": "",
+    "v": "x + y = 10"
+   },
+   "fp-mathgc": {
+    "d": ""
+   },
+   "hp-constraint": {
+    "d": ""
+   },
+   "sec-params": {
+    "d": ""
+   },
+   "sec-params-fold": {
+    "d": ""
+   },
+   "params-body": {
+    "d": ""
+   },
+   "params-curves": {
+    "d": ""
+   },
+   "params-extra": {
+    "d": ""
+   },
+   "sec-tax": {
+    "d": "none"
+   },
+   "sec-tax-fold": {
+    "d": ""
+   },
+   "seg-tax": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "seg-sub": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "seg-ceil": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "seg-floor": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "seg-quota": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "taxkind-row": {
+    "d": ""
+   },
+   "taxkind-label": {
+    "d": "block"
+   },
+   "tk-unit": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "tk-vat": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "tk-exc": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "taxside-row": {
+    "d": ""
+   },
+   "taxside-label": {
+    "d": "block"
+   },
+   "tsb-seller": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "tsb-buyer": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "tax-field": {
+    "d": ""
+   },
+   "rate-letter": {
+    "d": ""
+   },
+   "tax-val": {
+    "d": ""
+   },
+   "rate-unit": {
+    "d": ""
+   },
+   "tax-slider": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "tax-input": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "pc-field": {
+    "d": "none"
+   },
+   "pc-letter": {
+    "d": ""
+   },
+   "pc-val": {
+    "d": ""
+   },
+   "pc-slider": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "pc-input": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "quota-field": {
+    "d": "none"
+   },
+   "quota-val": {
+    "d": ""
+   },
+   "quota-slider": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "1",
+    "bbh": ""
+   },
+   "quota-input": {
+    "d": "",
+    "v": "0",
+    "min": "0",
+    "max": "120",
+    "step": "0.1",
+    "bbh": ""
+   },
+   "quota-price-field": {
+    "d": "none"
+   },
+   "quota-price-val": {
+    "d": ""
+   },
+   "quota-price-slider": {
+    "d": "",
+    "v": "50",
+    "min": "0",
+    "max": "100",
+    "step": "1",
+    "bbh": ""
+   },
+   "quota-price-range": {
+    "d": ""
+   },
+   "quota-hint": {
+    "d": ""
+   },
+   "tax-hint": {
+    "d": ""
+   },
+   "pc-hint": {
+    "d": ""
+   },
+   "sec-show": {
+    "d": "none"
+   },
+   "sec-show-fold": {
+    "d": ""
+   },
+   "show-list": {
+    "d": ""
+   },
+   "mono-areas-chk": {
+    "d": "none"
+   },
+   "pts-panel": {
+    "d": ""
+   },
+   "sec-view": {
+    "d": ""
+   },
+   "marks-body": {
+    "d": ""
+   },
+   "hp-marks": {
+    "d": ""
+   },
+   "mark-list": {
+    "d": ""
+   },
+   "sec-areascalc": {
+    "d": ""
+   },
+   "areascalc-body": {
+    "d": ""
+   },
+   "hp-areascalc": {
+    "d": ""
+   },
+   "ac-mode": {
+    "d": ""
+   },
+   "ac-pick-btns": {
+    "d": ""
+   },
+   "ac-pick": {
+    "d": "",
+    "v": ""
+   },
+   "ac-range": {
+    "d": ""
+   },
+   "ac-calc": {
+    "d": "",
+    "cls": "btn btn-quiet"
+   },
+   "ac-error": {
+    "d": ""
+   },
+   "info-areacalc": {
+    "d": ""
+   },
+   "ac-clear": {
+    "d": "",
+    "cls": "btn btn-quiet pts-clear"
+   },
+   "canvas-col": {
+    "d": ""
+   },
+   "cv-back": {
+    "d": ""
+   },
+   "canvas-bar": {
+    "d": ""
+   },
+   "zoom-level": {
+    "d": ""
+   },
+   "btn-zoomout": {
+    "d": "",
+    "cls": "gt-btn"
+   },
+   "btn-zoomin": {
+    "d": "",
+    "cls": "gt-btn"
+   },
+   "btn-resetview": {
+    "d": "",
+    "cls": "gt-btn cv-text"
+   },
+   "btn-focus": {
+    "d": "",
+    "cls": "gt-btn",
+    "aria": {
+     "aria-pressed": "false"
+    }
+   },
+   "ans-strip": {
+    "d": ""
+   },
+   "graph-wrap": {
+    "d": ""
+   },
+   "print-title": {
+    "d": ""
+   },
+   "print-stats": {
+    "d": ""
+   },
+   "cv-mode": {
+    "d": ""
+   },
+   "cv-mode-what": {
+    "d": ""
+   },
+   "cv-mode-stop": {
+    "d": "",
+    "cls": "cv-mode__stop"
+   },
+   "wrench-pop": {
+    "d": ""
+   },
+   "chk-tp": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-mp": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-ap": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-mc": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-atc": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-avc": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-afc": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-tc": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "chk-vc": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "chk-fc": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "chk-convex": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-inflect": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-iso-fan": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-cons-fan": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "plv-tc": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "plv-mc": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "mm-name": {
+    "d": "",
+    "v": "Z"
+   },
+   "ppfsum-color": {
+    "d": ""
+   },
+   "inp-ppfsum-name": {
+    "d": "",
+    "v": ""
+   },
+   "show-cs-row": {
+    "d": ""
+   },
+   "chk-cs": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "show-ps-row": {
+    "d": ""
+   },
+   "chk-ps": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-mono-cs": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-mono-ps": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-mono-vc": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-nat-profit": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-nat-loss": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-open-money": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-open-dwl": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-ppf-in": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-ppf-out": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "chk-lr-area": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "vg-area-bkmkg3": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-ghost": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "chk-lab-ghost": {
+    "d": "",
+    "v": "on",
+    "c": false
+   },
+   "grid-seg": {
+    "d": ""
+   },
+   "grid-dense": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "grid-plain": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "grid-off": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "lblsize-seg": {
+    "d": ""
+   },
+   "lbl-s": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "lbl-m": {
+    "d": "",
+    "cls": "seg-btn active"
+   },
+   "lbl-l": {
+    "d": "",
+    "cls": "seg-btn"
+   },
+   "chk-legend": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "chk-quad": {
+    "d": "",
+    "v": "on",
+    "c": true
+   },
+   "inp-qmax": {
+    "d": "",
+    "v": "120",
+    "min": null,
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "inp-pmax": {
+    "d": "",
+    "v": "120",
+    "min": null,
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "inp-xname": {
+    "d": "",
+    "v": ""
+   },
+   "inp-yname": {
+    "d": "",
+    "v": ""
+   },
+   "inp-gtitle": {
+    "d": "",
+    "v": ""
+   },
+   "gtitle-color-slot": {
+    "d": ""
+   },
+   "inp-qmin": {
+    "d": "",
+    "v": "0",
+    "min": null,
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "inp-pmin": {
+    "d": "",
+    "v": "0",
+    "min": null,
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "inp-xstep": {
+    "d": "",
+    "v": "",
+    "min": "0",
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "inp-ystep": {
+    "d": "",
+    "v": "",
+    "min": "0",
+    "max": null,
+    "step": "any",
+    "bbh": ""
+   },
+   "view-defaults": {
+    "d": "",
+    "cls": "btn btn-quiet wrench-defaults"
+   },
+   "tools-advanced": {
+    "d": ""
+   },
+   "ph-tabs": {
+    "d": ""
+   },
+   "params-panel": {
+    "d": ""
+   },
+   "self-showall": {
+    "d": "",
+    "cls": ""
+   },
+   "ans-x": {
+    "d": "",
+    "cls": "btn-icon ans-x"
+   },
+   "scoreboard": {
+    "d": ""
+   },
+   "sb-fold": {
+    "d": ""
+   },
+   "self-note": {
+    "d": ""
+   },
+   "ans-seg-note": {
+    "d": ""
+   },
+   "ans-status": {
+    "d": ""
+   },
+   "ans-hero": {
+    "d": ""
+   },
+   "self-gate": {
+    "d": "",
+    "cls": "self-gate"
+   },
+   "ans-burden": {
+    "d": ""
+   },
+   "sb-body": {
+    "d": ""
+   },
+   "info-final": {
+    "d": ""
+   },
+   "sec-eq": {
+    "d": "none"
+   },
+   "info-eq": {
+    "d": ""
+   },
+   "info-graph": {
+    "d": ""
+   },
+   "info-areas": {
+    "d": ""
+   },
+   "info-sum": {
+    "d": ""
+   },
+   "info-tax": {
+    "d": ""
+   },
+   "info-mono": {
+    "d": ""
+   },
+   "info-nat": {
+    "d": ""
+   },
+   "info-costs": {
+    "d": ""
+   },
+   "info-prod": {
+    "d": ""
+   },
+   "info-iso": {
+    "d": ""
+   },
+   "info-plants": {
+    "d": ""
+   },
+   "info-labor": {
+    "d": ""
+   },
+   "info-inequality": {
+    "d": ""
+   },
+   "info-consumer": {
+    "d": ""
+   },
+   "info-macro": {
+    "d": ""
+   },
+   "info-math": {
+    "d": ""
+   },
+   "info-elast": {
+    "d": ""
+   },
+   "info-ext": {
+    "d": ""
+   },
+   "info-open": {
+    "d": ""
+   },
+   "info-d3": {
+    "d": ""
+   },
+   "info-kink": {
+    "d": ""
+   },
+   "info-ppf": {
+    "d": ""
+   },
+   "info-ppfsum": {
+    "d": ""
+   },
+   "info-ppft": {
+    "d": ""
+   },
+   "info-tb": {
+    "d": ""
+   },
+   "explain": {
+    "d": ""
+   },
+   "ex-title": {
+    "d": ""
+   },
+   "ex-fold": {
+    "d": ""
+   },
+   "ex-body": {
+    "d": ""
+   },
+   "@toggles": [
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ],
+    [
+     "tgl-sw",
+     "false"
+    ]
+   ]
+  },
+  "view": {
+   "Qmin": 0,
+   "Qmax": 120,
+   "Pmin": 0,
+   "Pmax": 120
+  },
+  "margin": {
+   "top": 35,
+   "right": 32,
+   "bottom": 44,
+   "left": 56
+  },
+  "counters": {
+   "curve": 2,
+   "mark": 0,
+   "area": 0
+  }
+ },
+ "link": "http://127.0.0.1:8098/calc2/?m=labor-bilat#s=1zrTvZcuQ2kr9SgXmTSS3JOlpmxDyopZbHYamt6tK2usdhd6BIsIQoXiJAqcpaPWzs6_7E_sF-wMR8g_1HE4mLIIssXVMvIvJiIpFAHoQe0B0KfQetyRaFKMXLonKXNMUcOagqak52oIxjgD4gdlPc_1DRGIW8qomDVhWNT0nOCAoTnDLioM2CkxKFeZ2mDtrag4RWjM9rbJjvKLk_pRXfGmZOeUpOirSoNFOKlyRd0N8JCv2Jg3BF8AlOo3PKOAp_-VVBJMfDo4NKXOGMyWdAXdJoTWJJGlUFY4Sh8JcHtEHh5PvD7_VvNnvnB1MHbVE49Q49_RuPg6N3UwdhFKJT5KAlCtECPTqC_3uL__vpZCLZvTb1H__887___N_RXDN5gsj3-sku22SKaLFD9KuDyk9ktSDcmO62Lji2AUVJ8st7G1LinKTXNJfWWVW4vLkCg6MQIQfhDWVfPuLMGn5tD7-ckgTXKUchOtcUDegaOSjD1Zo16_KZVFwNI1iin-9IVdGYSAV-L4rsvIjWRj9wrnOyIrnxkLKgOQcl1IpmmN8sarAFx_mK5BxJ2FlRZXUKttr8FijYlwxm6s70CG9QqAZfJWqiR4AKwNg5O9aOh3P23nr-GwatlKJCoCf2EDyebszjgkQ45y3CkyK_Ixs9I4D8mCcpibgNuqpwzlCI6hK0z06KGqQE8KzW4O9qWj9kRUWkTcUwQCGajNzRRuPHcsHE86R5vqD5BcwTwdyV1U6EwbzD6ehgtIW_mk8gRt-NtqO_jnwPmYmwa5xzIaZR_RMsjrQTLODJQiNhdGlGHEu35njzEwVbojqnsH4cb2D5GgCrlzsUC-E1iJE0JRVyEM05qe6utiURvgCThw0h3iB2QvN0WTAUeodTB91yW9Efbgpmr1S1hq2CoiKDNWARyXFFCxSivMgJ0vsJhWNPPl8VRdrGXuGKJgnsbjmeS0UCNbRf_nNJ8osihwO4MRYAT-9TDSIpZnyuucSoNZgvWsOFLf-DgqhlYsuf82aqbPlhU1bKNdjypMhKmsIhKfkzFrWoI5s66lLjsky3l3RV1IaFbBpFN3xBVznYiayQ1O2iyIu2lwDk80nrHABQ4zwZsBCaGhWLvLgCh2qGZ2nRRA0AXBTSZWhWprBCOebg8Edw9OaY1xVObYt9xPyyKhLKbcU-Yn5eMKZBMWVR5WuueHzqoxD5njdyR3MkALAbj2AcHEjIBWylALaQYB43zNdFlTZHyprm6x_zsgYXpHlM72hc4xQBovOWNRVvmVljteXXZZe0FKR-AAD_cHog6fN1oxWMrKWXNhPBH8GhnbNLebiJx604kuDxRxXD4FntwqhYLhXPsdpw8Pzeev7J8J_UjBdZz_EDyDOca4vDcJHWnK23lk9KvXwUTuSzVh-eP1SNF-CoEm4A-xTHmCEFg0xGjMMHlFbwV0yGiUfke6PvRt7h9OArBLnYGNA7nB18RZBj3NA0paVgh6lPHVQzjivxtCTi8DmcPgo3hB3-gLJY2BukTA6o2Ego9APv0UFpgXO8TGV2hUI0hbcHB2B-8eopMI3lGM63RwclGyCOzVIHB-DfTLxi9N1oLIYJ3ZDYspkYw2EE78RJQqq2kLkSAX-5iIi-B7SUpRlQUiUf7OAL0wAceYfe9ODryB1N0eOjMq8VEcTYWhLhWQte1RD-kEgvSSX8XGDeG0D4gK7TAoXj8eFY__yjyXjioOsbisLZ7HCmf0f-dDZz0HXWS37eD76ue4Wc1_3Ua0gMHXQu_j46EJqKXPsWHDdlkW6Rgl_jFREByIw-U0Y5aba7mO1_AhZmOvTSARWVLlqnGEJG8O7d4Tv5OwreTSaP6h0XNP_Z7CYNuUbhbKqGRjOL5MMtaDWX4i_VjCVzkYvdM2TUgSV4ocbwhiWcgvlK63UtUjbQeh6jcDxpUu93Y_9o7KA5A3STugezI_-dg0hWpsU2g1Sxj6vOWwRW6j8dz8aT2SMcKowzFUx4hBTgCk7Q-W_jkTuaHcx_C0bfjfzpwRz-HGmaixPIt8YC7Y78QKKnGn18JfASO1NIIeA_5obmcw-NRp6d_JgnRXP4Mc6ucZW3AN1wLYCfCI637XB7Yoe946v28HN7eNYaXrUDdyeOn51YpzbjTGbv4hE2fWU5Z3VZ0QjqPHDN6rgiuEFp9cuqiFU6MvYOzoVZzn8bI4npThZgdoy_umxlHa3RsRlRVqhXnKvg9JMKTpQV1yIaUlZ8ErGMsuJERQ_KCitwUWYWBuQ1J2CZ-nJBQecUwnNwoEefKbnXXlamc5lrlinOOWvYbVll0lQ-8hj_ggR4xxJl0l70sky-WEi5LIzmK5ErlWXid0WapGN8oCCLOjvFEO0sMdlPNF-zNkhNi0VYC1_UVokjxxemrJFjVfU1AFHksy4JlMX_9-f__PGPP_7xx_-jFq1Misoy4QNG4srhpA5XFY6JPR8OgEVTBxxDZFyetQ3Dl2eBFYgl6ALnNU6VdEvY-5b4pTVFmpNbnf6tqqIuGZLAH2DwUWQWZgg8R44fOP7MCSbOxDMCokJIRL7njALPGY09ZzTxnJHveUpeY4pSOB3AjtPyBkt3zsltN1QB7LyoSP67ceic3C5ucNWEeQP5KMKeGHLMW3j7aBIERcU_Fpy0XvSJxJRxK21pgKreksUegK9wbd4m6meR03g2j_2-C8w4qd5jRnahp4Tj6KYzaYlaiA3_TfaVFnQlveobqzMxkJJO9UNTkt2ag-fe7IYmUTVPRZJ8MKQcb44jTu8am3C8aaMTqVIbcGoBTurqjlgG5HjzsZCzNscyTbhsLsV32ojcFFPLOl4RYzkRqrXSVslV2gOaR-_rLams8UJW6po6kgFUHz5RZ5plpClFyd4iFpAOfSbSkKbWU5W20lO2-S6h2wXJGRYNDxydVVBxqKo1ujICoFP1NxrHUKHDXhRNSNE10CrheIHvmsM0FT2qRVlIKy7rPE5tk0vAl8agMPzaSoHPaJVBDewHkA8J0HVRrUnVAUKyRtIEV6I-OJdVRk8ec51gyKghP7pv5MxmweFEEfrQohRNWPHimd-g4DfRWVnQ5FBH3mTqQwYELiXbpt8isTS_iDaJCDBw9sRijxAZNOVReI5Uzw-F6C_B2ezsw6noLotuY0wyaKdBB5hRUfuoOE9zgkVdglHo-qLrKasQVkWqSXQJudE3XHM4khOk3Fk6uIjD30pxrp4VljL_dY8MAhYZuqyDUwnMVFqT-OBNZ-P3zSRYDZ2PJyYh5_D8GXT139X8VygAhaAHxOrMhUbZAzT0kWh8QpaMfFHoQuJ4JJr30IMXwOXyBs4vUAdY2atYhTu4pKoKU0KKJliD2pSV62vZjT_ESkBSujB7t0sdt18A8EBLeYI_aPHfrN2MLTVrAds_UrsTKtq8tNENR7SfI-pyiLaby7pc4AaPovXllrIv1i8VeoJuee-ylMayGr8Taa1ZC8-shS96Nb2roaVQmT08V4h32COGiwZmRyH_NQopSS2lnhbUq5Q4_zs6Ba_RSQpqqfS0nK5KjERupopg2_PBReJx1-vnFsq4sukPNrgssjRS4DUdlLamjbRZFzO23VTAymFBZSPI7hIaafm6V7ccczeJmgkZM-quj0kNepcDRHDDPlRFK8KoUWC3lNY02BbXV08bwrsBQr2p02pgP6eVW0JG390e0x4XmrY8aNqavJHT3hw9YloW7DoizEbWt3rLW-WwwosiVJ2frVJW9PUK9968vXn5oec_7_2scJv9-Dr-yHLL3Qj0hAOJQtqsZAM1Di3raujXpu7tc07Z2eD5ISQ8ecJ25jvdOThkX92KVCleuuKDU_iAopSJL1wrd8lzjZQf4LvYEZbpsO5Duvd41fXLF56QlpzWPF98QIo9hJeZ7OL17SOBdBNK0rhjC4C3ZzHr2117pqGEtKbwtIzdvUVu3VzV4UrK1CCoLrO17-7W2po00dW2JC21n5JbF8uiezj_mj2hX6Uq3KGUhdy6HNd719F-gzfdfQU3VfWwkOngWsDXGJeLj0OSXXwh0ggzd_XZeV_02PExELB8q4D1jvVfxB6pT1hSRvs7lqYpN284YaWE7RvOWCGBvvaQhZ0sJDD5AW7I1dRM_c7WnVj6Nl7t7zs6tKDW9p28fN4iEJSJliBvMXjikkSDdXOcERNCLESwtBmP5Cevo4Md3sDmBWPJQr9JtvrKCEVj_KLPSE_OTQnZvklIWSaiCNz1r6DZ3EN72xLgtXPLLx20sYbpHbetFTzHWsG_xVxvkwIN456pArg3MQx6_X_SOnP73yLF7ZXT0bZzeFvm3RMgGvPyf4t53yaFL_0BR-LLoI0JpBPxZX9CfjjxX2V6Le8F0-jYPcOuvE6wc-A-ry7KsMta_OYigkRik-13biRk2G3C7IujYYZddX_h9QLktYcXBORd02VNJ8vclFAYZs37xSZNmxxO361QiMac5paFxMSr52TT3mDqI0U8lUjvVzvZxF23JwbVdO70jQ-NcdVFj_5dL0h2TqqniqFuLaOkPNlK2VsQwQLgpDPHeYMxU7RgQuqzN9fO-6htNn2RRQnPGu9tbrSo1h_mNyaZ2MgcHtsprAa0eorAtfG6h5MxkuvbnrTnaFJy2t2Cp6aO8-1ORGDqbuqQZ_CbeDOoLtyMaI7SaUvfHoVl6aDF1KWAZ24kP_oOJxyDTecscxPPXoPddrAhiS0eE1T0Hdk-rlb32ax41Lyuk9trklVD0lyWVbU-x-aWlu4Rcty17wuLdBDwtuq8jN6mQRm9UYG-bu4Ldejp475Sjb70YfrCox5Hbkmjtb3zYbPxcqD9IT417EPivZw73yhsTr4Xe7cXm-zD7go2xd_N2t0VbGN3BdvYSN2OH3w11ZflhylY4SZ4qN1kqthhkiwT9ZzG_r1bIVk4UxcPffUBZLkPCR8P9rMLiqdl7F1OaNCX6jrzXqJUXG8eJBEfTsw11n1E4uvxsElK-Bj0BEFRD0Yn2Zl3sbgU1ivkbiWw7nKdrVfjPiKn9YFwJa__73kdXj6DSP27yuC8bms8hAYXu7Uzmqdz225YF176dhGbrosDcNsHXHH5D0Nt6K3V7X3lHN4oYCNx3cKtNxHt49--gR-iPbltB_tH-d9tAJwLWZ6D5vJWNfw7yKWGXWqYyJuqlTQDL0oUjqcOqujqBu6lBg5aFly0G-ESR0qgFTGVt1Nr-FcYsYfF93D5X0O4WssbPmLDeI-P_wI",
+ "answer": [
+  "Нижняя граница Wм (монопсония)=33,3333{,}3333,33",
+  "Верхняя граница Wп (профсоюз)=66,6766{,}6766,67",
+  "Диапазон зарплаты=33,33…66,6733{,}33 … 66{,}6733,33…66,67",
+  "Конкурентный ориентир Wk=505050",
+  "Занятость на границах=33,33 и 33,3333{,}33\\text{ и }33{,}3333,33 и 33,33"
+ ],
+ "nums": {
+  "laborEq": {
+   "Q": 50,
+   "P": 50
+  },
+  "laborMono": {
+   "Lm": 33.33333333318434,
+   "Wm": 33.33333333318434,
+   "Lk": 50,
+   "Wk": 50,
+   "dwl": 277.777777782744
+  },
+  "laborUnion": {
+   "Lu": 33.33333333318434,
+   "Wu": 66.66666666681566,
+   "Lk": 50,
+   "Wk": 50,
+   "dwl": 277.777777782744
+  },
+  "laborBilateral": {
+   "Wlo": 33.33333333318434,
+   "Whi": 66.66666666681566,
+   "Wm": 33.33333333318434,
+   "Lm": 33.33333333318434,
+   "Wu": 66.66666666681566,
+   "Lu": 33.33333333318434,
+   "Wk": 50,
+   "Lk": 50
+  },
+  "laborMin": {
+   "binding": true,
+   "Wmin": 65,
+   "Qd": 34.99999999973183,
+   "Qs": 65.00000000026817,
+   "employment": 34.99999999973183,
+   "unemployment": 30.000000000536346
+  },
+  "laborMinWelfare": {
+   "Lstar": 34.99999999973183,
+   "Wfact": 65,
+   "workerCS": 1662.4999999919544,
+   "firmCS": 612.4999999999994,
+   "dwl": 225.0000000080451
+  },
+  "laborMinOn": true,
+  "laborMinW": 65,
+  "laborStruct": "bilateral",
+  "curves": [
+   {
+    "role": "demand",
+    "text": "100 - L"
+   },
+   {
+    "role": "supply",
+    "text": "L"
+   }
+  ]
+ },
+ "chkLabminShown": false,
+ "minLineDrawn": true,
+ "labminFieldShown": true,
+ "errors": []
+}
