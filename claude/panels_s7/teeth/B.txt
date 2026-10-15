@@ -1,0 +1,19 @@
+## 1 вернуть «← Условие» в шапку — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] в шапке слева «Точки и площади» 18 / 600, справа «Готово»  — {"title":"Точки и площади","fs":"18px","fw":"600","done":true,"back":true,"backText":true,"hint":0,"titles":1,"order":"BUTTON#pts-back,H2,BUTTON#pts-done"}
+    FAIL [chromium 1440] «← Условие» нет, строки-подсказки нет, заголовок колонки один  — {"title":"Точки и площади","fs":"18px","fw":"600","done":true,"back":true,"backText":true,"hint":0,"titles":1,"order":"BUTTON#pts-back,H2,BUTTON#pts-done"}
+    ИТОГ pts_probe: 4 из 6, провалов 2
+## 2 вернуть имена «Точка N» — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] taxes: три точки — A, B, C  — ["Точка 1","Точка 2","Точка 3","Точка 4"]
+    FAIL [chromium 1440] taxes: буква точки на спросе — не D, S, P, Q (Точка 4)  — {"id":4,"text":"Точка 4","x":20,"y":80,"color":"#ffa94d","showDash":true,"showCoords":true}
+    FAIL [chromium 1440] подпись на холсте — то же имя  — {"label":"Точка 1","fill":"#ff6b66","dash":2,"coords":"(40; 60)"}
+    FAIL [chromium 1440] ineq: первая точка — не A и не B (области A и B: )  — [{"id":1,"text":"Точка 1","x":29.88691437802908,"y":10.016155088852985,"color":"#ff6b66","showDash":true,"showCoords":true}]
+    FAIL [chromium 1440] фикстура: новая точка — «A»  — ["Точка 1","Точка 2","Точка 3"]
+    ИТОГ pts_probe: 7 из 12, провалов 5
+## 3 меню внутри строки (гибнет при пересборке списка) — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] меню пережило пересборку списка
+    name: 'TimeoutError'
+## 4 Esc при открытом меню выходит из режима — КРАСНЫЙ (код 1)
+    FAIL [chromium 1440] Esc при открытом меню закрывает только меню: меню закрыто, режим остаётся
+    name: 'TimeoutError'
+
+git diff calc2/ после отката: пусто
