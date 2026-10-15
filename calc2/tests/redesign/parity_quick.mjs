@@ -67,6 +67,11 @@ const REDEFINED = {
   'm-optimum': ['Наибольшее на отрезке', 'Наименьшее на отрезке', 'Локальный максимум', 'Локальный минимум', 'Перегиб'],
   'm-tangent': ['Угол наклона'],
 };
+/* Строки, у которых решением сменилась ЗАПИСЬ, а не числа: сверяются числа строки по порядку (сессия 7 «тихих
+   панелей», А3.1; Notion …81fd…): точки Слуцкого «50 / 25» → «(50; 25)». Новую запись стережёт
+   redesign/answer_panel_probe.mjs, раздел И. */
+const REFORMATTED = { 'cons-slutsky': /^[ABC]:/ };
+const numsOf = (v) => (norm(v).match(/-?\d+(?:,\d+)?/g) || []).join('|');
 let bad = 0, checks = 0;
 const issues = [];
 // Предусловие: колонка «Ответ» открыта (иначе проверки видимого зеленеют вхолостую).
@@ -151,6 +156,10 @@ for (const key of keys) {
       if ((REDEFINED[key] || []).includes(String(r.label).trim())) return;   // ADR 0143, см. выше
       const q = c && c.rows.find(x => String(x.i) === String(r.i));
       if (!q) { bad++; issues.push(key + ': ' + b.id + ' строка «' + r.label + '» не показана'); return; }
+      if (REFORMATTED[key] && REFORMATTED[key].test(String(r.label).trim())) {
+        if (numsOf(q.value) !== numsOf(r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» числа ' + r.value + ' → ' + q.value); }
+        return;
+      }
       if (norm(q.value) !== norm(r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» ' + r.value + ' → ' + q.value); }
     });
     (b.final || []).forEach((f, i) => {

@@ -36,6 +36,11 @@
          значениями (m-tangent x₀ = 0,5; ineq τ = 0,5), 1440, «Ответ» открыт, «Разбор» раскрыт со всеми вопросами
          (первая проверка — колонка и «Разбор» видны): в TeX-исходнике каждого видимого узла KaTeX
          (annotation[encoding="application/x-tex"]) нет «цифра,цифра» без {,} и нет «,,».
+     И   (сессия 7, А3.1–А3.4; Notion …81fd…) мелкая типографика «Ответа» (1440, «Ответ» открыт, «Разбор» раскрыт):
+         cons-slutsky — точки A, B, C в виде «(x; y)», ни одна строка колонки не кончается «(» (скобка и формула за
+         ней на одной строке); phillips — каждое обозначение ожидаемой инфляции в TeX-исходниках колонки и «Условия» —
+         \pi^{e}, в обычном тексте нет «πe»; consumer — строка отношения цен подписана словами «Отношение цен» и
+         формулой P_x/P_y; money — предложение денег M_s с индексом (TeX M_s / M_{s}), в обычном тексте нет «Ms».
 
    ENGINES=chromium,webkit (по умолчанию оба). Нет движка — громкий пропуск.
    CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А,Д,Е,Ж]
@@ -761,6 +766,78 @@ async function sectionZ() {
   await ctx.close();
 }
 
+/* И (сессия 7, А3.1–А3.4): мелкая типографика «Ответа». */
+async function sectionI() {
+  head('И. Мелкая типографика «Ответа» (сессия 7, А3.1–А3.4)');
+  const { ctx, page, errors } = await openThemed(1440, 'light');
+  const read = () => page.evaluate(() => {
+    const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+    const tx = (e) => { const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+    const col = document.querySelector('#params-panel .side-inner');
+    const stats = [...document.querySelectorAll('#params-panel .stat, #params-panel .ans-cell')].filter(vis).map(r => {
+      const lab = r.querySelector(':scope > span, .ans-lab'), val = r.querySelector(':scope > b, .ans-val');
+      return { lab: lab ? tx(lab) : '', labTex: lab ? [...lab.querySelectorAll('annotation')].map(a => a.textContent).join(' ') : '', val: val ? tx(val) : '' };
+    });
+    // Строка, которая кончается «(»: текстовый узел на «(» и формула сразу за ним — на разных строках.
+    const breaks = [];
+    const w = document.createTreeWalker(col, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      const v = t.nodeValue; const e = t.parentElement;
+      if (!e || e.closest('.katex') || !vis(e)) continue;
+      const i = v.replace(/\s+$/, '').length - 1;
+      if (i < 0 || v[i] !== '(') continue;
+      const rg = document.createRange(); rg.setStart(t, i); rg.setEnd(t, i + 1);
+      const a = rg.getClientRects()[0];
+      let nx = t.nextSibling; while (nx && nx.nodeType === 3 && !nx.nodeValue.trim()) nx = nx.nextSibling;
+      const b = nx && (nx.nodeType === 1 ? nx.getClientRects()[0] : null);
+      if (a && b && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) > 6) breaks.push(tx(e).slice(0, 60));
+    }
+    const texes = [...document.querySelectorAll('#params-panel annotation, #tools-panel annotation')].filter(a => vis(a.closest('.katex'))).map(a => a.textContent);
+    const plain = [];
+    [document.querySelector('#params-panel .side-inner'), document.getElementById('tools-panel')].forEach(root => {
+      const w2 = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let t = w2.nextNode(); t; t = w2.nextNode()) { const e = t.parentElement; if (e && !e.closest('.katex, script, style') && vis(e)) plain.push(t.nodeValue); }
+    });
+    return { col: vis(col), stats, breaks, texes, plain: plain.join(' ') };
+  });
+  const open = async () => {
+    await page.evaluate(() => { if (!document.body.classList.contains('ex-shown')) { const b = document.getElementById('ex-bar'); if (b && b.getClientRects().length) b.click(); } });
+    await settle(page, 250);
+    await page.evaluate(() => { document.querySelectorAll('#ex-body p.ex-q:not(.ex-open) > b').forEach(b => b.click()); });
+    await settle(page, 250);
+  };
+  // 1. Слуцкий.
+  await pick(page, 'cons-slutsky'); await open();
+  let r = await read();
+  ok('cons-slutsky: «Ответ» открыт', r.col);
+  const pts = r.stats.filter(x => /^[ABC]:/.test(x.lab));
+  ok('cons-slutsky: точки A, B, C — «(x; y)» (' + pts.map(x => x.val).join(' · ') + ')', pts.length === 3 && pts.every(x => /^\(\s?[−-]?[\d\s,]+;\s?[−-]?[\d\s,]+\s?\)$/.test(x.val)), JSON.stringify(pts));
+  ok('cons-slutsky: ни одна строка колонки не кончается «(»', !r.breaks.length, r.breaks.join(' | '));
+  // 2. Филлипс.
+  await pick(page, 'phillips'); await open();
+  r = await read();
+  ok('phillips: «Ответ» открыт', r.col);
+  const pe = r.texes.filter(t => /\\pi\s*[_^]\s*\{?\s*e/.test(t));
+  const peBad = pe.filter(t => /\\pi\s*_\s*\{?\s*e|\\pi\s*\^\s*e/.test(t));
+  ok('phillips: ожидаемая инфляция в TeX — только \\pi^{e} (' + pe.length + ' узлов)', pe.length >= 2 && !peBad.length, JSON.stringify(peBad.slice(0, 4)));
+  ok('phillips: в обычном тексте нет «πe» и «π_e»', !/πe|π_e/.test(r.plain), (r.plain.match(/.{0,20}(πe|π_e).{0,10}/) || [''])[0]);
+  // 3. Кривые безразличия.
+  await pick(page, 'consumer'); await open();
+  r = await read();
+  ok('consumer: «Ответ» открыт', r.col);
+  const pr = r.stats.find(x => /P_\{?x\}?\s*\/\s*P_\{?y|frac\s*\{\s*P_\{?x/.test(x.labTex));
+  ok('consumer: строка отношения цен — словами «Отношение цен» и формулой P_x/P_y', !!pr && /Отношение цен/.test(pr.lab) && /P_\{?x\}?\s*\/\s*P_\{?y/.test(pr.labTex), JSON.stringify(pr));
+  // 4. Денежный рынок.
+  await pick(page, 'money'); await open();
+  r = await read();
+  ok('money: «Ответ» открыт', r.col);
+  const ms = r.stats.find(x => /Предложение денег/.test(x.lab));
+  ok('money: «Предложение денег» — M_s с индексом', !!ms && /M_\{?s\}?/.test(ms.labTex), JSON.stringify(ms));
+  ok('money: в обычном тексте «Ответа» нет «Ms»', !/(^|[^A-Za-z])Ms([^A-Za-z]|$)/.test(r.plain), (r.plain.match(/.{0,20}Ms.{0,10}/) || [''])[0]);
+  ok('И: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 async function sectionZh() {
   head('Ж. «Ответ» при МРОТ: W_min индексом, раздел «С МРОТ»');
   for (const W of [1440, 1280]) {
@@ -821,6 +898,7 @@ for (const name of ENGINES) {
   if (want('Е')) await sectionE();
   if (want('Ж')) await sectionZh();
   if (want('З')) await sectionZ();
+  if (want('И')) await sectionI();
   await browser.close();
 }
 console.log('\nИТОГ answer_panel_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));
