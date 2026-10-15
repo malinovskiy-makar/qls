@@ -351,7 +351,71 @@ async function sectionB2() {
   await ctx.close();
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4]];
+/* ── В: площади — цепочка в «Налогах» со старта ── */
+const areasNow = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const st = (STATE.areaCalcList || []).map(r => ({ id: r.id, label: r.label, kind: r.kind, value: r.value, ids: r.ids || null, order: r.order || null }));
+  const rows = [...document.querySelectorAll('#info-areacalc [data-area], #info-areacalc .area-row:not(.area-head)')].filter(e => e.getClientRects().length)
+    .map(e => ({ text: tx(e), tex: [...e.querySelectorAll('annotation')].map(a => a.textContent).join(' ') }));
+  const drawn = [...document.querySelectorAll('#chart g.areacalc path')].map(x => x.getAttribute('data-legend'));
+  const legend = [...document.querySelectorAll('#chart [data-legend-item], #chart .legend text, #chart g.legend text')].map(t => t.textContent.trim());
+  const g = [...document.querySelectorAll('#ans-hero .ans-group')].find(x => /Свои площади/.test((x.querySelector('.ans-ghead') || {}).textContent || ''));
+  const ans = g ? [...g.querySelectorAll('.ans-cell')].map(c => ({ lab: tx(c.querySelector('.ans-lab')), val: tx(c.querySelector('.ans-val')).replace(/\s+/g, '') })) : [];
+  const dwl = [...document.querySelectorAll('#ans-hero .ans-cell')].find(c => /DWL|Потери/.test(c.textContent || ''));
+  return { st, rows, drawn, legend, ans, dwl: dwl ? tx(dwl.querySelector('.ans-val')).replace(/\s+/g, '') : null, open: !!document.querySelector('#params-panel .side-inner') && document.querySelector('#params-panel .side-inner').getClientRects().length > 0 };
+});
+async function setCoords(page, id, x, y) {
+  await openMenuOf(page, id);
+  await menuItem(page, 'Изменить координаты');
+  await settle(page, 400);
+  for (const [i, v] of [[0, x], [1, y]]) {
+    await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval').nth(i).click();
+    await settle(page, 300);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(String(v));
+    await page.keyboard.press('Enter');
+    await settle(page);
+  }
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-ok').click();
+  await settle(page);
+}
+const fmtN = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+let CH = null;   // общая страница цепочки В (шаги 1–6, 9–12 идут подряд)
+async function chainStart() {
+  CH = await openModel('taxes');
+  const page = CH.page;
+  ok('В: панель режима видна', await enterPts(page));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50]]) await clickModel(page, x, y);
+  CH.ids = (await marks(page)).map(m => m.id);
+}
+async function sectionV1() {
+  head('В1–В2. Площадь по отмеченным точкам, живое число');
+  await chainStart();
+  const page = CH.page;
+  const u0 = await undoLen(page);
+  for (const id of CH.ids) { await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-pick input').click(); await settle(page, 400); }
+  const bar = await page.evaluate(() => { const b = document.querySelector('#sec-view .pts-selbar'); return b && !b.hidden ? b.textContent.replace(/\s+/g, ' ').trim() : ''; });
+  ok('отмечены три точки → плашка «Выбрано 3 · Площадь по точкам»', /^Выбрано 3\s*Площадь по точкам$/.test(bar), bar);
+  ok('выбор галочками — не шаги истории', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  await page.locator('#sec-view .pts-selbar-go').click();
+  await settle(page);
+  let a = await areasNow(page);
+  const s1 = a.st[0] || {};
+  ok('1. S₁ = 100 по точкам A, B, C (ids — точки списка)', a.st.length === 1 && near(s1.value, 100, 0.01) && JSON.stringify(s1.ids) === JSON.stringify(CH.ids), JSON.stringify(a.st));
+  ok('1. «Площадь по точкам» — ровно один шаг; выбор снят', (await undoLen(page)) === u0 + 1 && (await page.evaluate(() => CANVAS.ptsSel.length)) === 0, String(await undoLen(page)));
+  ok('1. S₁ на холсте и в «Ответе» (Свои площади: S₁ 100); это DWL модели (' + a.dwl + ')', a.open && a.drawn.includes(s1.label) && a.ans.length === 1 && a.ans[0].val === '100' && a.dwl === '100', JSON.stringify(a));
+  await setCoords(page, CH.ids[2], 60, 50);
+  a = await areasNow(page);
+  ok('2. C → (60; 50): S₁ = 200 в списке, «Ответе»', near(a.st[0].value, 200, 0.01) && a.ans[0] && a.ans[0].val === '200', JSON.stringify(a));
+  const fill = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d') : ''; });
+  await setCoords(page, CH.ids[0], 30, 70);
+  a = await areasNow(page);
+  const fill2 = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d') : ''; });
+  ok('3. A → (30; 70): S₁ = 350, заливка на холсте сменилась', near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350' && fill && fill2 && fill !== fill2, JSON.stringify(a.st));
+  CH.after3 = a;
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {

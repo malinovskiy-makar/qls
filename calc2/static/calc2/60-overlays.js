@@ -2519,9 +2519,15 @@ function runAreaCalc() {
     return false;
   }
   if (err) { err.textContent = ''; err.style.display = 'none'; }
+  pushArea(res);
+  return true;
+}
+/* Новая площадь в список: id, цвет, имя. Одна дверь для «Под кривой», «Площади по точкам» и набора «+ По точкам». */
+function pushArea(res) {
   STATE.areaCalcList = STATE.areaCalcList || [];
   const pal = AREA_PALETTE();
-  res.id = ++areaCalcCounter;
+  areaCalcCounter = Math.max(areaCalcCounter, STATE.areaCalcList.reduce((m, r) => Math.max(m, +r.id || 0), 0)) + 1;
+  res.id = areaCalcCounter;
   res.color = pal[(STATE.areaCalcList.length) % pal.length];
   /* Н27: короткое имя с настоящим индексом — S₁, S₂, S₃. Прежние «Площадь под
      D» и «Площадь по точкам» не помещались в легенду и вытесняли из неё сами
@@ -2529,7 +2535,43 @@ function runAreaCalc() {
   res.label = 'S' + subDigits(STATE.areaCalcList.length + 1);
   STATE.areaCalcList.push(res);
   redrawAll();
-  return true;
+  return res;
+}
+/* «Площадь по точкам» (сессия 7, В2): вершины — отмеченные точки списка (по id), обход — П43 (areaLive). Точки на
+   разных графиках (панелях) площади не дают — как и прежний набор вершин. */
+function addPolyArea(ids) {
+  const pts = (ids || []).map(id => markById(id)).filter(m => m && !m.pending);
+  const err = document.getElementById('ac-error');
+  const say = (t) => { if (err) { err.textContent = t; err.style.display = t ? 'block' : 'none'; } };
+  if (pts.length < 3) { say('Нужно хотя бы три точки.'); return null; }
+  if (new Set(pts.map(markPanelId)).size > 1) { say('Точки стоят на разных графиках: площадь считается внутри одного.'); return null; }
+  say('');
+  const r = { kind: 'poly', ids: pts.map(m => m.id), panel: markPanelId(pts[0]) };
+  areaLive(r);
+  return pushArea(r);
+}
+/* Плашка выбора (В2; макет 04_screen_points): отмечено ≥ 3 точек — «Выбрано N» и «Площадь по точкам». Выбор — вид
+   (CANVAS.ptsSel), нажатие — один шаг истории (появилась площадь), выбор снимается. */
+function syncPtsSelBar() {
+  const bar = document.querySelector('#sec-view .pts-selbar');
+  if (!bar) return;
+  const ids = (CANVAS.ptsSel || []).filter(id => markById(id) && !markById(id).pending);
+  CANVAS.ptsSel = ids;
+  bar.hidden = ids.length < 3;
+  if (bar.hidden) { bar.innerHTML = ''; return; }
+  const sig = ids.length;
+  if (bar._n === sig && bar.firstChild) return;
+  bar._n = sig;
+  bar.innerHTML = '';
+  const n = document.createElement('span'); n.className = 'pts-selbar-n'; n.textContent = 'Выбрано ' + ids.length;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pts-selbar-go'; b.textContent = 'Площадь по точкам';
+  b.addEventListener('click', () => {
+    const made = addPolyArea(CANVAS.ptsSel);
+    if (!made) return;
+    CANVAS.ptsSel = [];
+    renderMarkList();
+  });
+  bar.append(n, b);
 }
 
 function clearAreaCalc() {
@@ -4737,6 +4779,7 @@ function renderMarkList() {
   (STATE.marks || []).forEach(mk => box.appendChild(buildMarkRow(mk)));
   if (!pendingMark()) ensureAddMarkButton();
   else { const add = document.querySelector('#sec-view .btn-mark-add'); if (add) add.remove(); }
+  syncPtsSelBar();
 }
 
 /* «+ По координатам» — тихая кнопка в строке заголовка раздела «Точки» (рядом с h3, не внутри: его текст сверяют

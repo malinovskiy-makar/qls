@@ -4249,3 +4249,14 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #pts-panel .mark-row:has(.mark-xy-edit) { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
 #pts-panel .mark-row:has(.mark-xy-edit) > .mark-name { font-size: 19px; }
 #pts-panel .mark-xy-edit { margin: 0; align-items: center; }
+/* В2. Плашка выбора: «Выбрано N» и «Площадь по точкам» (макет 04_screen_points). */
+#pts-panel .pts-selbar:not([hidden]) {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 2px; padding: 8px 8px 8px 14px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card);
+}
+#pts-panel .pts-selbar-n { font-size: 14px; font-weight: 600; color: var(--text); }
+#pts-panel .pts-selbar-go {
+  height: 36px; padding: 0 14px; border: 0; border-radius: var(--r); cursor: pointer;
+  background: var(--btn-bg); color: var(--on-btn); font: inherit; font-size: 13px; font-weight: 600;
+}
+#pts-panel .pts-selbar-go:hover { filter: brightness(1.08); }
