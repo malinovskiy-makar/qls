@@ -15,17 +15,25 @@ function texFallback(expr) {
     .replace(/\*/g, '\\cdot ')
     .replace(/<=/g, '\\le ').replace(/>=/g, '\\ge ');
 }
+/* ⚠️ ОДНОБУКВЕННАЯ ПЕРЕМЕННАЯ — КУРСИВОМ, ДАЖЕ ЕСЛИ MATH.JS ЗНАЕТ ЕЁ КАК ЕДИНИЦУ (сессия 7 «тихих панелей», А3.5;
+   Notion …81fd…). Math.js печатает символ, совпавший с единицей измерения, прямым шрифтом: L (литр), K (кельвин),
+   W (ватт), m, s, g, h, A, N … → \mathrm{L}. В поле «W = 100 − L» и «Q = L^0.5·K^0.5» буквы L и K стояли прямо, а
+   прочие переменные — курсивом. Правим только ЗАПИСЬ: разбор и счёт формулы идут мимо этой функции. Имя функции
+   («\mathrm{f}\left(») не трогаем. */
+function texVarsItalic(tex) {
+  return String(tex).replace(/\\mathrm\{([A-Za-z])\}(?!\\left)/g, ' $1');
+}
 function mathToTex(expr) {
   const s = String(expr || '').trim();
   if (!s) return '';
-  try { return math.parse(s).toTex({ parenthesis: 'auto' }); }
+  try { return texVarsItalic(math.parse(s).toTex({ parenthesis: 'auto' })); }
   catch (e) {
     /* Предпросмотр показывает то, что считает движок. Запись, которую Math.js
        не берёт как есть («100-ax», вставленный из буфера LaTeX), он берёт
        после общей подготовки — той же, что стоит перед разбором. Сначала
        пробуем исходный текст: подготовка раскрывает неявное умножение, и
        показывать «a*x» там, где человек набрал «ax», незачем. */
-    try { const t = prepExpr(s); if (t !== s) return math.parse(t).toTex({ parenthesis: 'auto' }); }
+    try { const t = prepExpr(s); if (t !== s) return texVarsItalic(math.parse(t).toTex({ parenthesis: 'auto' })); }
     catch (e2) {}
     return texFallback(s);
   }

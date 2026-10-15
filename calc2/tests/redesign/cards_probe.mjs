@@ -51,6 +51,10 @@
       (tradeprice — «P_w = 1,41»; m-tangent x₀ = 0,5; ineq τ = 0,5), 1 440: в TeX-исходнике каждого видимого узла KaTeX
       «Условия» (annotation[encoding="application/x-tex"]) нет «цифра,цифра» без {,} и нет «,,». Первая проверка —
       «Условие» видно.
+   Л  (сессия 7, А3.5–А3.6; Notion …81fd…) — в полях формул «Рынка труда» (labor: D, S) и «Изокванты» (isoquant: Q)
+      буквы L и K набраны переменными: запись поля MathLive без \mathrm{L} и \mathrm{K}, а узлы букв L и K в теневом
+      дереве поля — курсивом; ввод «100 - L» в поле D рынка труда даёт тот же «Ответ», что на коде BEFORE; в меню «⋯»
+      карточки «Построения графиков» подпись «Имя на графике» одна: у поля под ней нет подсказки с тем же текстом.
 
    CALC2_BASE_URL=http://127.0.0.1:8099 BEFORE=http://127.0.0.1:8098 node calc2/tests/redesign/cards_probe.mjs
    ENGINES=chromium,webkit (по умолчанию оба), KEYS="ppf costs" — выборка. Код 0 — всё сошлось.            */
@@ -789,6 +793,58 @@ async function iRun() {
   await ctx.close();
 }
 
+// Л (сессия 7, А3.5–А3.6): буквы L, K в полях — переменные; одна подпись «Имя на графике».
+async function lFields(page) {
+  return page.evaluate(() => [...document.querySelectorAll('#tools-panel math-field')].filter(m => m.getClientRects().length).map(m => {
+    const inp = m.parentElement.querySelector('input[id]');
+    const letters = [];
+    const root = m.shadowRoot;
+    if (root) root.querySelectorAll('span').forEach(sp => {
+      if (sp.children.length || !/^[LK]$/.test(sp.textContent)) return;
+      letters.push(sp.textContent + ':' + getComputedStyle(sp).fontStyle);
+    });
+    return { id: inp ? inp.id : '?', tex: m.value, letters };
+  }));
+}
+async function lRun(beforeAns) {
+  const { ctx, page, errors } = await openAt(BASE);
+  for (const key of ['labor', 'isoquant']) {
+    if (KEYS && !KEYS.includes(key)) continue;
+    await pick(page, key);
+    await page.evaluate(() => { if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon(); });
+    await page.waitForTimeout(700);
+    const f = await lFields(page);
+    const withLK = f.filter(x => x.letters.length);
+    ok('Л ' + key + ': в полях есть буквы L/K (' + withLK.map(x => x.id).join(', ') + ')', withLK.length >= 1, JSON.stringify(f));
+    const bad = f.filter(x => /\\mathrm\{[LK]\}/.test(x.tex) || x.letters.some(l => !/italic/.test(l)));
+    ok('Л ' + key + ': L и K — переменные (курсив, без \\mathrm)', !bad.length, JSON.stringify(bad));
+  }
+  if (!KEYS || KEYS.includes('labor')) {
+    await pick(page, 'labor');
+    const t = await typeAndRead(page, 'curve-expr-1', '100 - L');
+    ok('Л labor: ввод «100 - L» в D даёт тот же «Ответ», что на коде BEFORE', !t.missing && (!beforeAns || t.after === beforeAns.after), JSON.stringify({ now: t.after && t.after.slice(0, 80), was: beforeAns ? beforeAns.after.slice(0, 80) : 'BEFORE недоступен' }));
+  }
+  if (!KEYS || KEYS.includes('m-graph')) {
+    await pick(page, 'm-graph');
+    const r = await page.evaluate(async () => {
+      const g = [...document.querySelectorAll('#graph-rows .crow-gear')].find(b => b.getClientRects().length);
+      if (!g) return { gear: false };
+      g.click(); await new Promise(res => setTimeout(res, 250));
+      const menu = [...document.querySelectorAll('.fc-menu.open, .crow-more.open')].find(m => m.getClientRects().length);
+      if (!menu) return { gear: true, menu: false };
+      const labs = [...menu.querySelectorAll('.fc-menu-lab')].map(l => l.textContent.trim());
+      const inp = menu.querySelector('input.grow-name');
+      const out = { gear: true, menu: true, labs, ph: inp ? inp.placeholder : null };
+      if (typeof closeFcMenu === 'function') closeFcMenu();
+      return out;
+    });
+    ok('Л m-graph: меню «⋯» карточки открылось', r.gear && r.menu, JSON.stringify(r));
+    ok('Л m-graph: «Имя на графике» одной подписью, у поля нет подсказки с тем же текстом', r.menu && r.labs.filter(x => /Имя на графике/.test(x)).length === 1 && !/Имя на графике/.test(r.ph || ''), JSON.stringify(r));
+  }
+  ok('Л: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 async function zExt(viaEye, base) {
   const { ctx, page } = await openAt(base);
   await pick(page, 'ext');
@@ -827,6 +883,13 @@ try {
       await ctx.close();
     }
     if (want('З') && (!KEYS || KEYS.includes('ext'))) beforeMap.ext = await zExt(false, BEFORE);
+    if (want('Л') && (!KEYS || KEYS.includes('labor'))) {
+      const { ctx, page } = await openAt(BEFORE);
+      await pick(page, 'labor');
+      const t = await typeAndRead(page, 'curve-expr-1', '100 - L');
+      if (!t.missing) beforeMap.labor100L = t;
+      await ctx.close();
+    }
     if (want('Д')) {
       beforeMap.cons = {};
       for (const key of ['consumer', 'cons-slutsky']) {
@@ -869,6 +932,7 @@ for (const name of ENGINES) {
   if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); await zhMinmax(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
   if (want('И')) { head('И. Запятые в формулах «Условия» (сессия 7, А1)'); await iRun(); }
+  if (want('Л')) { head('Л. Буквы L и K в полях, «Имя на графике» (сессия 7, А3.5–А3.6)'); await lRun(beforeMap.labor100L); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;
