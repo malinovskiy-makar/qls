@@ -1,7 +1,7 @@
 /* ПОДПИСИ ЗНАЧЕНИЙ НА ОСЯХ НЕ НАЛЕЗАЮТ (тихие панели, сессия 7, этап А2; карточка Notion …81b8…).
 
-   Что смотрит: на холсте (#chart) подписи значений точек на осях (text.coord-num: «35_спрос», «65_min», «50_опт»)
-   и числа делений шкалы (text.axis-num). Проверки:
+   Что смотрит: на холсте (#chart) подписи значений точек на осях (text.coord-num: «35_спрос», «65_min», «50_опт»),
+   подпись «MRL = 0» у профсоюза (text.labor-mrl0, сессия «рынок труда») и числа делений шкалы (text.axis-num). Проверки:
      — первая: холст виден и на нём есть числа делений (иначе прибор зеленел бы вхолостую, README 11);
      — прямоугольники любых двух таких подписей не пересекаются (допуск 1 px по каждой оси);
      — каждая такая подпись целиком внутри области SVG (допуск 1 px): ничего не срезано краем.
@@ -31,11 +31,13 @@ function measure() {
   if (!svg || !svg.getClientRects().length) return null;
   const b = svg.getBoundingClientRect();
   const out = [];
-  svg.querySelectorAll('text.coord-num, text.axis-num').forEach(t => {
+  // text.labor-mrl0 — подпись точки «MRL = 0» на оси L у профсоюза (сессия «рынок труда», ADR 0156): стоит у оси
+  // рядом с числами, и наложение на них проверяется так же, как у подписи значения.
+  svg.querySelectorAll('text.coord-num, text.axis-num, text.labor-mrl0').forEach(t => {
     if (getComputedStyle(t).display === 'none' || getComputedStyle(t).visibility === 'hidden') return;
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
-    out.push({ cls: t.classList.contains('coord-num') ? 'coord' : 'tick', text: t.textContent.trim(),
+    out.push({ cls: t.classList.contains('axis-num') ? 'tick' : 'coord', text: t.textContent.trim(),
       l: r.left, r: r.right, t: r.top, b: r.bottom });
   });
   return { svg: { l: b.left, r: b.right, t: b.top, b: b.bottom }, labels: out };

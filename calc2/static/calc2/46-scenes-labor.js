@@ -452,6 +452,14 @@ function setLaborMinFields(p) {
   const l = document.getElementById('labmin-val'); if (l) l.textContent = fmt(p);
   const i = document.getElementById('labmin-input'); if (i) i.value = fmtInput(p);
 }
+// Включить / выключить МРОТ: состояние, галочка, строка регулятора, пульт (без перерисовки). Один путь для галочки
+// (88-params.js) и для маршрута «Двусторонней монополии», где на старте МРОТ выключен (решение …8168…).
+function setLaborMinOn(on) {
+  STATE.laborMinOn = !!on;
+  const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = !!on;
+  const f = document.getElementById('labmin-field'); if (f) f.style.display = on ? '' : 'none';
+  if (typeof updatePult === 'function') updatePult();   // ползунок МРОТ в пульт / домой
+}
 // Единый путь смены МРОТ (ползунок, поле, перетаскивание).
 function setLaborMin(p) {
   const s = document.getElementById('labmin-slider');
@@ -635,19 +643,13 @@ function setLaborStruct(mode) {
   STATE.laborStruct = mode;
   [['lab-comp', 'competition'], ['lab-mono', 'monopsony'], ['lab-union', 'union'], ['lab-bilat', 'bilateral']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === mode); });
-  // Панель профсоюза видна только при структуре «Профсоюз»; МРОТ — только там, где он осмыслен
-  // (в двусторонней монополии показывается диапазон, поверх него МРОТ только запутал бы).
+  // Панель профсоюза видна только при структуре «Профсоюз»; МРОТ — во всех структурах, кроме профсоюза.
+  /* «Двусторонняя монополия»: МРОТ учитывается в расчёте, его галочка видна (решение владельца 15.10, Notion
+     …8168…, ADR 0156); прежде галочка здесь пряталась, а включённый пресетом МРОТ рисовался, но не считался. На
+     старте модели МРОТ выключен — это делает маршрут labor-bilat (setLaborMinOn). */
   const up = document.getElementById('union-pane'); if (up) up.style.display = (mode === 'union') ? '' : 'none';
   const lb = document.getElementById('labmin-block');
-  if (lb) {
-    lb.style.display = (mode === 'union') ? 'none' : '';
-    /* Редизайн 10.2026: регулятор больше не уезжает в пульт, а стоит на месте
-       (пункт (з)). В двусторонней монополии галочки МРОТ нет, как и было, но
-       включённый пресетом МРОТ виден своим регулятором — раньше его
-       показывал пульт (прибор паритета, labor-bilat). */
-    const lc = lb.querySelector(':scope > label.chk');
-    if (lc) lc.style.display = (mode === 'bilateral') ? 'none' : '';
-  }
+  if (lb) lb.style.display = (mode === 'union') ? 'none' : '';
   if (mode === 'union') setUnionModel(STATE.unionModel);   // синхронизировать под-модель/поля
   if (typeof updatePult === 'function') updatePult();   // зарплата профсоюза / МРОТ в пульт
   redrawAll();

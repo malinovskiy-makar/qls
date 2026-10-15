@@ -905,6 +905,16 @@ try {
   } else console.log('\n!!! сервер BEFORE (' + BEFORE + ') недоступен — сравнение ввода с кодом до обёртки НЕ ПРОВЕРЕНО');
   await b0.close();
 } catch (e) { console.log('!!! замер «до» не удался: ' + String(e).slice(0, 160)); }
+/* Рынок труда (сессия 15.10, ADR 0156): числа труда сменились решениями владельца (профсоюз по фонду оплаты …81ac…,
+   безработица при его ставке …813c…, стартовый пример и МРОТ 45 …81df…, МРОТ в двусторонней выключен …8168…), и код
+   до сессии (BEFORE) им больше не эталон. Для четырёх ключей труда «Ответ» после контрольного ввода сверяется с
+   расчётом перебором (claude/calc2_labor/expected_cards.py → labor_cards_expected.json); id полей формул (ОРГАН)
+   — по-прежнему с BEFORE. Остальные модели — с BEFORE, как раньше. */
+{
+  const LX = JSON.parse(fs.readFileSync(path.join(HERE, 'labor_cards_expected.json'), 'utf8'));
+  Object.entries(LX.cases).forEach(([k, v]) => { beforeMap[k] = Object.assign({ ids: null }, beforeMap[k] || {}, { after: v }); });
+  beforeMap.labor100L = Object.assign({}, beforeMap.labor100L || {}, { after: LX.labor100L });
+}
 
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;

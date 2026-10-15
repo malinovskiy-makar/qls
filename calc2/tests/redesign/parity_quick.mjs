@@ -71,6 +71,10 @@ const REDEFINED = {
    панелей», А3.1; Notion …81fd…): точки Слуцкого «50 / 25» → «(50; 25)». Новую запись стережёт
    redesign/answer_panel_probe.mjs, раздел И. */
 const REFORMATTED = { 'cons-slutsky': /^[ABC]:/ };
+/* Органы «на месте, за галочкой»: на старте модели они спрятаны галочкой, которую человек видит и включает
+   (сессия «рынок труда», 15.10, ADR 0156; решение …8168…: в «Двусторонней монополии» МРОТ на старте выключен).
+   Прибор включает галочку, как человек, ищет оставшиеся органы и возвращает галочку. Судьба — PARITY.md. */
+const BEHIND_CHECKBOX = { 'labor-bilat': 'chk-labmin' };
 const numsOf = (v) => (norm(v).match(/-?\d+(?:,\d+)?/g) || []).join('|');
 let bad = 0, checks = 0;
 const issues = [];
@@ -85,7 +89,7 @@ for (const key of keys) {
   await page.waitForTimeout(120);
   // 1. Органы старта.
   const want = (rec.controls || rec.start.controls || []).filter(c => !c.picker).map(c => c.key);
-  const res = await page.evaluate(async (list) => {
+  const res = await page.evaluate(async ({ list, behind }) => {
     // Выезд панели и смена вкладки видны не в тот же миг: видимость у
     // потомков панели меняется переходом (до 0,2 с).
     const pause = () => new Promise(r => setTimeout(r, 260));
@@ -116,6 +120,14 @@ for (const key of keys) {
        Режим открывается ОДИН раз на модель, а не на орган: иначе быстрый паритет
        шёл 287 с вместо 16 (предел Django-теста — 120). */
     let left = out;
+    if (left.length && behind) {
+      const chk = document.getElementById(behind);
+      if (chk && !chk.checked && chk.getClientRects().length) {
+        chk.click(); await new Promise(r => setTimeout(r, 60));
+        left = left.filter(k => !window.__RD.findControl(k.mapped));
+        chk.click(); await new Promise(r => setTimeout(r, 60));
+      }
+    }
     /* «На графике» в «Виде графика» (ADR 0152): галочки картинки переехали туда узлами — орган достижим
        открытием окна «Вид графика». Окно открывается один раз на модель. */
     if (left.length) {
@@ -139,11 +151,11 @@ for (const key of keys) {
       setPtsMode(false);
     }
     return left.map(k => k.orig);
-  }, want.filter(k => {
+  }, { list: want.filter(k => {
     const f = fateOf(k, key);   // судьбы по модели (сессия 6: мёртвый ползунок r у loanable — «т»)
     // «р» (ADR 0152): образец цвета закраски переехал строкой «На графике» — его стережёт view_probe.
     return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдкр]$/.test(f.letter)));
-  }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })));
+  }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })), behind: BEHIND_CHECKBOX[key] || null });
   checks += want.length;
   res.forEach(k => { bad++; issues.push(key + ': орган ' + k + ' не найден'); });
   // 2. Числа старта.

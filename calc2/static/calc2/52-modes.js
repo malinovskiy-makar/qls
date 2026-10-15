@@ -877,8 +877,11 @@ function setMode(mode) {
     // Роль, а не видимость: погашенная кривая роль всё равно занимает.
     if (!curveByRoleAny('demand') || !curveByRoleAny('supply')) {
       STATE.curves = []; curveCounter = 0;
-      addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
-      addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
+      // Стартовый пример во всех четырёх моделях труда (решение владельца 15.10, Notion …81df…, ADR 0156):
+      // D = 100 − L, S = 10 + 0,5L — конкуренция 60 / 40, монопсония 45 / 32,5, профсоюз по фонду оплаты 50 / 50.
+      // Прежний S = L профсоюзу с целью «фонд оплаты» ничего не давал: MRL = 0 ровно в конкурентной точке.
+      addCurve('100 - L');    if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
+      addCurve('10 + 0.5*L'); if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
     }
     if (!STATE.laborVisited) {
       STATE.laborVisited = true;
@@ -887,7 +890,7 @@ function setMode(mode) {
       STATE.laborMinOn = true;
       const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = true;
       const lf = document.getElementById('labmin-field'); if (lf) lf.style.display = '';
-      if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(65);  // выше равновесия (≈50) → связывающий
+      if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(45);  // выше равновесия 40 → связывающий
     }
   }
   // Режим неравенства: пометить первый вход и заполнить таблицу групп.

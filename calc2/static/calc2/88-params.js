@@ -1310,15 +1310,13 @@ function wireControls() {
   if (unWageInput) unWageInput.addEventListener('change', () => { const v = parseFloat(unWageInput.value); if (!isNaN(v)) setUnionWage(v); });
   const labMinChk = document.getElementById('chk-labmin');
   if (labMinChk) labMinChk.addEventListener('change', () => {
-    STATE.laborMinOn = labMinChk.checked;
-    const f = document.getElementById('labmin-field'); if (f) f.style.display = labMinChk.checked ? '' : 'none';
     // При включении ставим линию на уровень текущей зарплаты (пока не связывает) — точка отсчёта.
     if (labMinChk.checked && !(STATE.laborMinW > 0)) {
       const base = (STATE.laborStruct === 'monopsony' && STATE.laborMono) ? STATE.laborMono.Wm
                  : (STATE.laborEq ? STATE.laborEq.P : 0);
       if (base > 0) setLaborMinFields(Math.round(base));
     }
-    if (typeof updatePult === 'function') updatePult();   // ползунок МРОТ в пульт / домой
+    setLaborMinOn(labMinChk.checked);   // состояние, строка регулятора, пульт — один помощник (46-scenes-labor.js)
     redrawAll();
   });
   const labMinSlider = document.getElementById('labmin-slider');

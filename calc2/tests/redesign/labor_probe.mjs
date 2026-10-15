@@ -10,11 +10,16 @@
         желающих и безработицу; «Разбор» содержит «единичной эластичности»;
         угол — «Угол» D = 100 − L, S = 2L (33,33 / 66,67, фонд 2 222,22) и «Старый пример» D = 100 − L, S = L
         (50 / 50, фонд 2 500): подсказка про конкурентную ставку, строк «Желающих работать», «Безработица», DWL нет.
+     Б  старт каждой модели труда (новый пример D = 100 − L, S = 10 + 0,5L, решение …81df…): «Ответ» из таблицы задания —
+        конкуренция с МРОТ 45 (занятость 55, было 60; безработица 15; на оси L «55 спрос» и «70 предл»), монопсония с
+        МРОТ 45 (M (55; 45), «МРОТ увеличил занятость (парадокс монопсонии).»), профсоюз (как в А), двусторонняя без
+        МРОТ (32,5 … 50, «Безработица на границах» 0 и 30; галочка МРОТ видна и снята, линии МРОТ нет, полоса торга
+        от 32,5 до 50).
    Первая проверка каждой страницы — «Ответ» открыт и виден (answerShown, README 11).
    Между действиями, которые пишут историю, пауза не меньше 1 с (склейка HIST_GLUE_MS = 900).
 
    ENGINES=chromium,webkit (по умолчанию оба), WIDTHS=1440,1280 (по умолчанию оба).
-   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/labor_probe.mjs [--only А]
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/labor_probe.mjs [--only А,Б]
    Код 0 — всё сошлось.                                                     */
 import * as pw from 'playwright';
 import path from 'path';
@@ -107,10 +112,13 @@ const answer = (page) => page.evaluate(() => {
 function checkRows(name, a, want) {
   const got = a.stats.map(s => s.lab + ' = ' + s.val).join(' | ');
   ok(name + ': строк ' + want.length, a.stats.length === want.length, got);
+  // Ожидание — число (сверка числом) или строка (сверка записью без пробелов: «55 (было 60)», «32,5…50», «45 и 50»).
+  const flat = (x) => String(x).replace(/[\s\u00a0\u202f\u2009]+/g, '');
   want.forEach(([re, v], i) => {
     const s = a.stats[i];
-    ok(name + ': строка ' + (i + 1) + ' ' + re, !!s && re.test(s.lab) && near(num(s.val), v, Math.max(0.011, Math.abs(v) * 0.0005)), s ? s.lab + ' = ' + s.val : 'нет строки');
-    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => near(num(h.val), v, 0.011))), JSON.stringify(s));
+    const valOk = !!s && (typeof v === 'string' ? flat(s.val) === flat(v) : near(num(s.val), v, Math.max(0.011, Math.abs(v) * 0.0005)));
+    ok(name + ': строка ' + (i + 1) + ' ' + re + ' = ' + v, !!s && re.test(s.lab) && valOk, s ? s.lab + ' = ' + s.val : 'нет строки');
+    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => typeof v === 'string' ? flat(h.val) === flat(v) : near(num(h.val), v, 0.011))), JSON.stringify(s));
   });
 }
 const canvasMRL = (page) => page.evaluate(() => {
@@ -130,6 +138,73 @@ async function explainText(page) {
   // Ответы вопросов «Разбора» свёрнуты: текст берём у разметки (без невидимой копии KaTeX), «Разбор» раскрыт.
   return page.evaluate(() => { const e = document.getElementById('explain'); if (!e || !e.getClientRects().length) return '';
     const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' '); });
+}
+
+/* Холст: подписи значений на осях (text.coord-num) текстом без невидимых знаков; точки (кружки) в координатах модели;
+   полоса торга двусторонней монополии; линия МРОТ (подпись «… min» у оси W). */
+const canvas = (page) => page.evaluate(() => {
+  const { mx, my } = mainScales(null);
+  const clean = (t) => t.replace(/[\u200b\s]+/g, '');
+  const band = document.querySelector('#chart rect[data-legend="Диапазон возможных зарплат"]');
+  return {
+    coords: [...document.querySelectorAll('#chart text.coord-num')].map(t => clean(t.textContent)),
+    texts: [...document.querySelectorAll('#chart text')].map(t => t.textContent.trim()),
+    dots: [...document.querySelectorAll('#chart circle')].filter(c => +c.getAttribute('r') >= 4)
+      .map(c => [mx.invert(+c.getAttribute('cx')), my.invert(+c.getAttribute('cy'))]),
+    band: band ? [my.invert(+band.getAttribute('y') + +band.getAttribute('height')), my.invert(+band.getAttribute('y'))] : null,
+  };
+});
+const dotAt = (c, x, y, t) => c.dots.some(([a, b]) => Math.abs(a - x) <= (t || 0.3) && Math.abs(b - y) <= (t || 0.3));
+const chkState = (page) => page.evaluate(() => {
+  const c = document.getElementById('chk-labmin'), lab = c && c.closest('label');
+  const vis = (e) => !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none');
+  return { shown: vis(lab), checked: !!(c && c.checked), field: vis(document.getElementById('labmin-field')), on: STATE.laborMinOn, w: STATE.laborMinW };
+});
+
+/* ── Б ── */
+const START = {
+  labor: [[/^Lk.*занятость/, 60], [/^Wk.*зарплата/, 40], [/^Излишек рабочих/, 900], [/^Излишек фирм/, 1800],
+    [/^МРОТ/, 45], [/^Занятость$/, '55 (было 60)'], [/^Безработица/, 15], [/^Излишек рабочих/, 1168.75],
+    [/^Излишек фирм/, 1512.5], [/^DWL/, 18.75]],
+  'labor-mono': [[/^Lм.*занятость/, 45], [/^Wм.*зарплата/, 32.5], [/^Lk.*конкуренция/, 60], [/^Wk.*конкуренция/, 40],
+    [/^DWL/, 168.75], [/^МРОТ/, 45], [/^Занятость с МРОТ/, '55 (было 45)'], [/^Зарплата/, 45], [/^Безработица/, 15],
+    [/^Излишек рабочих/, 1168.75], [/^Излишек фирм/, 1512.5], [/^DWL/, 18.75]],
+  'labor-bilat': [[/^Нижняя граница/, 32.5], [/^Верхняя граница/, 50], [/^Диапазон зарплаты/, '32,5…50'],
+    [/^Конкурентный ориентир/, 40], [/^Занятость на границах/, '45 и 50'], [/^Безработица на границах/, '0 и 30']],
+};
+async function sectionB() {
+  head('Б. Старт моделей труда: новый пример');
+  for (const key of ['labor', 'labor-mono', 'labor-union', 'labor-bilat']) {
+    const { ctx, page, errors } = await openModel(key);
+    ok(key + ': предусловие «Ответ» открыт', await answerShown(page));
+    const st = await page.evaluate(() => STATE.curves.map(c => c.role + ':' + c.expr).join(', '));
+    ok(key + ': кривые старта D = 100 − L, S = 10 + 0,5L', st === 'demand:100 - L, supply:10 + 0.5*L', st);
+    const a = await answer(page);
+    checkRows(key + ' старт', a, key === 'labor-union' ? UNION_NEW : START[key]);
+    const c = await canvas(page);
+    const k = await chkState(page);
+    if (key === 'labor') {
+      ok('labor: раздел «С МРОТ»', a.subsec.includes('С МРОТ'), a.subsec.join(' | '));
+      ok('labor: на оси L «55 спрос» и «70 предл»', c.coords.includes('55спрос') && c.coords.includes('70предл'), c.coords.join(', '));
+      ok('labor: МРОТ на старте 45 и включён', k.on && k.w === 45 && k.checked && k.shown, JSON.stringify(k));
+    }
+    if (key === 'labor-mono') {
+      ok('labor-mono: «МРОТ увеличил занятость (парадокс монопсонии).»', a.hints.includes('МРОТ увеличил занятость (парадокс монопсонии).'), a.hints.join(' | '));
+      ok('labor-mono: точка M (55; 45)', dotAt(c, 55, 45), JSON.stringify(c.dots));
+      ok('labor-mono: МРОТ на старте 45 и включён', k.on && k.w === 45 && k.checked && k.shown, JSON.stringify(k));
+    }
+    if (key === 'labor-union') {
+      ok('labor-union: точка «MRL = 0» подписана', c.texts.includes('MRL = 0'), c.texts.join(', '));
+    }
+    if (key === 'labor-bilat') {
+      ok('labor-bilat: галочка МРОТ видна и снята, строки МРОТ нет', k.shown && !k.checked && !k.field && !k.on, JSON.stringify(k));
+      ok('labor-bilat: линии МРОТ нет (подписи «… min» у оси нет)', !c.coords.some(t => /min/.test(t)), c.coords.join(', '));
+      ok('labor-bilat: полоса торга от 32,5 до 50', !!c.band && near(c.band[0], 32.5, 0.2) && near(c.band[1], 50, 0.2), JSON.stringify(c.band));
+      ok('labor-bilat: раздела «С МРОТ» нет', !a.subsec.length, a.subsec.join(' | '));
+    }
+    ok(key + ': ошибок страницы нет', !errors.length, errors.join('; '));
+    await ctx.close();
+  }
 }
 
 /* ── А ── */
@@ -184,6 +259,7 @@ for (engName of ENGINES) {
   browser = await pw[engName].launch(); ctxCount = 0;
   for (W0 of WIDTHS) {
     if (want('А')) await sectionA();
+    if (want('Б')) await sectionB();
   }
   await browser.close();
 }

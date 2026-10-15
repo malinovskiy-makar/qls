@@ -300,7 +300,8 @@ const SCENE_ROUTE = {
   labor:         { run: () => { setMode('labor'); setLaborStruct('competition'); }, lock: ['labor-seg'] },
   'labor-mono':  { base: 'labor', run: () => { setMode('labor'); setLaborStruct('monopsony'); }, lock: ['labor-seg'] },
   'labor-union': { base: 'labor', run: () => { setMode('labor'); setLaborStruct('union'); },     lock: ['labor-seg'] },
-  'labor-bilat': { base: 'labor', run: () => { setMode('labor'); setLaborStruct('bilateral'); }, lock: ['labor-seg'] },
+  // МРОТ на старте выключен (галочка видна; решение …8168…): классический диапазон торга без МРОТ.
+  'labor-bilat': { base: 'labor', run: () => { setMode('labor'); setLaborMinOn(false); setLaborStruct('bilateral'); }, lock: ['labor-seg'] },
 
   /* --- Блок 7 · Международная торговля -------------------------------- */
   smallopen:  { run: () => loadScene('smallopen'),  lock: [L_INTERV] },
