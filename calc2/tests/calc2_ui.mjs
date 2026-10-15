@@ -1583,7 +1583,8 @@ await t('буква из формулы даёт ползунок', async () => 
 
 await t('удаление строки убирает кривую', async () => {
   const before = await page.evaluate(() => STATE.curves.length);
-  await page.evaluate(() => document.querySelector('#graph-rows .grow .btn-icon').click());
+  // С сессии 6 «тихих панелей» (Г2, ADR 0154) «Убрать функцию» — пункт «⋯» карточки; первая кнопка-значок строки — сама «⋯».
+  await page.evaluate(() => document.querySelector('#graph-rows .grow .btn-icon:not(.crow-gear)').click());
   await page.waitForTimeout(260);
   const after = await page.evaluate(() => STATE.curves.length);
   return after === before - 1 || `${before} → ${after}`;

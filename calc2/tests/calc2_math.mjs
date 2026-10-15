@@ -5037,6 +5037,11 @@ const CASES = [
             cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
             var t = cl.textContent.replace(/\s+/g, ' ').trim();
             if (/…/.test(t)) cut++;
+            /* С сессии 6 «тихих панелей» (README пакета 4, ADR 0154) строка сдвига — «Сдвиг» и число, кривую называет
+               карточка, под которой стоит ползунок: различимость — по обозначению карточки вместе со строкой. */
+            var card = ch.closest('.fc-card');
+            var nt = card && card.querySelector('.fc-notation');
+            if (nt) { var cn = nt.cloneNode(true); cn.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); }); t = cn.textContent.replace(/\s+/g, '') + ' ' + t; }
             if (seen[t]) dupText++; else seen[t] = 1;
             /* Светлый акцент заставляет Chromium рисовать незалитую дорожку
                тёмной, и на панели оказываются рядом ползунки двух видов.
