@@ -236,7 +236,11 @@ if (want('Р') || want('К') || want('П')) {
              формулой («−2,562;1,562») или текстом («−2,562; 1,562»), по ширине
              подписи (restatWide). Строгую сверку строки с её источником в табло
              держит answer_probe.mjs. */
-          if (norm(c.val) !== norm(b.val)) par.push(key + ': «' + b.cap + '» ' + b.val + ' → ' + c.val);
+          /* Точки Слуцкого A, B, C — запись «(50; 25)» вместо «50 / 25» по карточке …81fd… (тихие панели, сессия 7,
+             А3.1): у них сверяются числа по порядку, как REFORMATTED в parity_quick.mjs. */
+          const numsOf = (v) => (norm(v).match(/-?\d+(?:,\d+)?/g) || []).join('|');
+          if (key === 'cons-slutsky' && /^[ABC]:/.test(String(b.cap).trim())) { if (numsOf(c.val) !== numsOf(b.val)) par.push(key + ': «' + b.cap + '» числа ' + b.val + ' → ' + c.val); }
+          else if (norm(c.val) !== norm(b.val)) par.push(key + ': «' + b.cap + '» ' + b.val + ' → ' + c.val);
           if (norm(c.was) !== norm(wasNew(b.was))) par.push(key + ': «' + b.cap + '» было ' + b.was + ' → ' + c.was);
         });
         (await page.evaluate(() => __ar.dups())).forEach(d => dups.push(key + ': ' + d));

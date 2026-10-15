@@ -221,10 +221,11 @@ function updateConsumerPanel() {
   if (s) {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
     /* Точки A, B, C — «(x; y)», как строка «Оптимум» (сессия 7 «тихих панелей», А3.1; Notion …81fd…): «50 / 25»
-       читалось делением. Скобка с ценой не отрывается от формулы переносом («B: компенсированный (» в конце строки). */
+       читалось делением. Скобка с ценой не отрывается от формулы переносом («B: компенсированный (» в конце строки);
+       «компенсация», а не «компенсированный»: при значении «(31,25; 62,5)» длинное слово ставило подпись в 3 строки. */
     const nb = (t) => '<span style="white-space:nowrap">' + t + '</span>';
     html += `<div class="stat"><span>A: старый выбор ${nb(`(Px=${fmt(b.px)})`)}</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
-    html += `<div class="stat"><span>B: компенсированный ${nb(`($I'$=${fmt(s.Icomp)})`)}</span><b>(${fmt(s.comp.x)}; ${fmt(s.comp.y)})</b></div>`;
+    html += `<div class="stat"><span>B: компенсация ${nb(`($I'$=${fmt(s.Icomp)})`)}</span><b>(${fmt(s.comp.x)}; ${fmt(s.comp.y)})</b></div>`;
     html += `<div class="stat"><span>C: новый выбор ${nb(`(Px=${fmt(s.px1)})`)}</span><b>(${fmt(s.fin.x)}; ${fmt(s.fin.y)})</b></div>`;
     const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
     html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>замещ.</th><th>доход</th><th>итог</th></tr>';
