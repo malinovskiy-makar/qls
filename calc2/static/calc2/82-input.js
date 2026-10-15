@@ -1213,8 +1213,12 @@ function flushMathfields() {
    и внутри них ничего не трогаем — там кириллица уже на своём месте. */
 const TEX_TEXT_CMD = /\\(?:text|textrm|textbf|textit|mathrm|operatorname)\s*\{/g;
 
+/* Десятичная запятая между цифрами — {,} (сессия 7 «тихих панелей», А1; Notion …8102…): без скобок KaTeX
+   считает запятую знаком препинания и ставит после неё пробел, и «1,41» читалось «1, 41». Правка — здесь, на
+   общем входе набора (katexInto), а не в fmt и не в шаблонах сцен: так же уже делают statToTex (60-overlays.js)
+   и answerValueInto (94-answer.js). Пара «2, 3» с пробелом и \, не трогаются. */
 function katexSafe(src) {
-  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,');
+  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,').replace(/(\d),(?=\d)/g, '$1{,}');
   if (!/[А-Яа-яЁё]/.test(s)) return s;
   // Где начинаются текстовые группы: внутрь них не заглядываем.
   const spans = [];

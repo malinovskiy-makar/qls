@@ -47,6 +47,11 @@
    М  (сессия 6, А3; Notion …812b…) — «КТВ. Две страны-партнёра»: строка «Мировая цена» в «Условии» и «Мировая цена
       Pw» в «Ответе» — одно число на старте (1,41), после «Сбросить к равновесной» и после сдвига дорожки.
 
+   И  (сессия 7, А1; Notion …8102…) — запятые в формулах «Условия»: 42 старта и состояния с дробными значениями
+      (tradeprice — «P_w = 1,41»; m-tangent x₀ = 0,5; ineq τ = 0,5), 1 440: в TeX-исходнике каждого видимого узла KaTeX
+      «Условия» (annotation[encoding="application/x-tex"]) нет «цифра,цифра» без {,} и нет «,,». Первая проверка —
+      «Условие» видно.
+
    CALC2_BASE_URL=http://127.0.0.1:8099 BEFORE=http://127.0.0.1:8098 node calc2/tests/redesign/cards_probe.mjs
    ENGINES=chromium,webkit (по умолчанию оба), KEYS="ppf costs" — выборка. Код 0 — всё сошлось.            */
 import * as pw from 'playwright';
@@ -749,6 +754,41 @@ async function zRun() {
   await ctx.close();
 }
 // ext: глаз MSB меняет картинку и «Ответ» так же, как галочка на коде до правки.
+// И (сессия 7, А1): запятые в TeX-исходниках «Условия».
+const I_STATES = [
+  ['m-tangent', 'x₀ = 0,5', "setMathX0(0.5);"],
+  ['ineq', 'τ = 0,5', "const c = document.getElementById('ineq-redist'); if (c && !c.checked) c.click(); const t = document.getElementById('ineq-tau'); t.value = 0.5; t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new Event('change', { bubbles: true }));"],
+];
+async function iRun() {
+  const { ctx, page, errors } = await openAt(BASE);
+  const list = ALL42.filter(k => !KEYS || KEYS.includes(k)).map(k => [k, 'старт', '']).concat(I_STATES.filter(x => !KEYS || KEYS.includes(x[0])));
+  let finds = 0;
+  for (const [key, label, extra] of list) {
+    await pick(page, key, extra);
+    const r = await page.evaluate(() => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const L = document.getElementById('tools-panel');
+      const bad = [];
+      let n = 0;
+      L.querySelectorAll('.katex').forEach(k => {
+        if (!vis(k)) return;
+        const a = k.querySelector('annotation[encoding="application/x-tex"]');
+        if (!a) return;
+        n++;
+        const t = a.textContent;
+        if (/\d,\d/.test(t) || /,,/.test(t)) bad.push(t.slice(0, 80));
+      });
+      return { shown: vis(L), n, bad };
+    });
+    ok('И ' + key + ' (' + label + '): «Условие» видно', r.shown);
+    ok('И ' + key + ' (' + label + '): ' + r.n + ' узлов KaTeX — нет «цифра,цифра» без {,} и нет «,,»', !r.bad.length, r.bad.slice(0, 4).join(' | '));
+    finds += r.bad.length;
+  }
+  console.log('  находок всего: ' + finds);
+  ok('И: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 async function zExt(viaEye, base) {
   const { ctx, page } = await openAt(base);
   await pick(page, 'ext');
@@ -828,6 +868,7 @@ for (const name of ENGINES) {
   }
   if (want('Ж')) { head('Ж. Неравенство и математика'); await zhIneq(beforeMap.ineq); await zhGraph(); await zhMinmax(); }
   if (want('М') && (!KEYS || KEYS.includes('tradeprice'))) { head('М. Мировая цена КТВ: строка и «Ответ»'); await mRun(); }
+  if (want('И')) { head('И. Запятые в формулах «Условия» (сессия 7, А1)'); await iRun(); }
   let last = '';
   for (const [sec, key, label, extra, ctl] of CASES) {
     if (!want(sec) || (KEYS && !KEYS.includes(key))) continue;

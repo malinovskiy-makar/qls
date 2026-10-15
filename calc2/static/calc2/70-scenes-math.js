@@ -1528,7 +1528,7 @@ function updateMathPanel() {
       const cg = ' data-ans-group="Условный оптимум"';
       html += `<div class="stat ans-main"${cg}><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
       html += `<div class="stat ans-main"${cg}><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat ans-main"${cg}><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
+      html += `<div class="stat ans-main"${cg}><span>$f(x^*,\\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
       /* Строки «Ищем = максимум» здесь больше нет (решение владельца 01.09):
          переключатель «Какую функцию ищем» стоит в левой панели, и повторять
          его выбор среди ПОСЧИТАННЫХ величин незачем. Слово осталось в разборе

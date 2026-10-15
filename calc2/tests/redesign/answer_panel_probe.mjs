@@ -32,6 +32,10 @@
      Ж   (сессия 6, правка А5; Notion …8149…) «Ответ» при МРОТ: labor и labor-mono со включённым МРОТ, 1440 и 1280 —
          в видимом тексте колонки нет «_»; есть раздел «С МРОТ»; строки с одной подписью стоят только в разных
          разделах (раздел — группа главных чисел, блок табло, подраздел .sb-subsec).
+     З   (сессия 7, А1; Notion …8102…) запятые в формулах «Ответа» и «Разбора»: 42 старта и состояния с дробными
+         значениями (m-tangent x₀ = 0,5; ineq τ = 0,5), 1440, «Ответ» открыт, «Разбор» раскрыт со всеми вопросами
+         (первая проверка — колонка и «Разбор» видны): в TeX-исходнике каждого видимого узла KaTeX
+         (annotation[encoding="application/x-tex"]) нет «цифра,цифра» без {,} и нет «,,».
 
    ENGINES=chromium,webkit (по умолчанию оба). Нет движка — громкий пропуск.
    CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/answer_panel_probe.mjs [--only А,Д,Е,Ж]
@@ -716,6 +720,47 @@ async function sectionE() {
   await ctx.close();
 }
 
+/* З (сессия 7, А1): TeX-исходники видимых узлов KaTeX под корнем — нарушения правила запятых. */
+const TEX_COMMA_STATES = [
+  ['m-tangent', 'x₀ = 0,5', "setMathX0(0.5);"],
+  ['ineq', 'τ = 0,5', "const c = document.getElementById('ineq-redist'); if (c && !c.checked) c.click(); const t = document.getElementById('ineq-tau'); t.value = 0.5; t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new Event('change', { bubbles: true }));"],
+];
+async function sectionZ() {
+  head('З. Запятые в формулах «Ответа» и «Разбора» (сессия 7, А1)');
+  const { ctx, page, errors } = await openThemed(1440, 'light');
+  const list = KEYS.map(k => [k, 'старт', '']).concat(TEX_COMMA_STATES.filter(x => KEYS.includes(x[0])));
+  let finds = 0;
+  for (const [key, label, extra] of list) {
+    await pick(page, key, extra);
+    await page.evaluate(() => { if (!document.body.classList.contains('ex-shown')) { const b = document.getElementById('ex-bar'); if (b && b.getClientRects().length) b.click(); } });
+    await settle(page, 250);
+    await page.evaluate(() => { document.querySelectorAll('#ex-body p.ex-q:not(.ex-open) > b').forEach(b => b.click()); });
+    await settle(page, 250);
+    const r = await page.evaluate(() => {
+      const vis = (e) => !!(e && e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+      const col = document.querySelector('#params-panel .side-inner');
+      const ex = document.getElementById('ex-body');
+      const bad = [];
+      let n = 0;
+      document.querySelectorAll('#params-panel .katex').forEach(k => {
+        if (!vis(k)) return;
+        const a = k.querySelector('annotation[encoding="application/x-tex"]');
+        if (!a) return;
+        n++;
+        const t = a.textContent;
+        if (/\d,\d/.test(t) || /,,/.test(t)) bad.push(t.slice(0, 80));
+      });
+      return { col: vis(col), ex: !ex || !ex.textContent.trim() || vis(ex), n, bad };
+    });
+    ok(key + ' (' + label + '): «Ответ» открыт и «Разбор» раскрыт', r.col && r.ex, JSON.stringify({ col: r.col, ex: r.ex }));
+    ok(key + ' (' + label + '): ' + r.n + ' узлов KaTeX — нет «цифра,цифра» без {,} и нет «,,»', !r.bad.length, r.bad.slice(0, 4).join(' | '));
+    finds += r.bad.length;
+  }
+  console.log('  находок всего: ' + finds);
+  ok('З: ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 async function sectionZh() {
   head('Ж. «Ответ» при МРОТ: W_min индексом, раздел «С МРОТ»');
   for (const W of [1440, 1280]) {
@@ -775,6 +820,7 @@ for (const name of ENGINES) {
   if (want('Д')) await sectionD();
   if (want('Е')) await sectionE();
   if (want('Ж')) await sectionZh();
+  if (want('З')) await sectionZ();
   await browser.close();
 }
 console.log('\nИТОГ answer_panel_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));
