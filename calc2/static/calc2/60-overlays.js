@@ -4817,14 +4817,21 @@ function buildMarkRow(mk) {
   if (editing) {
     const xy = document.createElement('div');
     xy.className = 'mark-xy mark-xy-edit';
+    /* «Изменить координаты» готовой точки — ОДНО действие (сессия 7, В; README 9): поля правят черновик
+       (CANVAS.markDraft), «✓» кладёт обе координаты в точку разом — один шаг истории, площадь на ней пересчитается
+       один раз. У заготовки новой точки — как раньше: точка появляется и едет на каждый символ. */
+    const own = !mk.pending;
+    if (own && (!CANVAS.markDraft || String(CANVAS.markDraft.id) !== String(mk.id))) CANVAS.markDraft = { id: mk.id, x: mk.x, y: mk.y };
+    const src = own ? CANVAS.markDraft : mk;
     const mkNum = (key) => {
       // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
       const letter = axisLetter(key);
       const n = makeEditableValue({
-        get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
+        get: () => (isFinite(src[key]) ? Math.round(src[key] * 1000) / 1000 : ''),
         tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
         title: 'Координата ' + letter,
         set: (v) => {
+          if (own) { src[key] = isFinite(v) ? v : NaN; return; }
           mk[key] = isFinite(v) ? v : NaN;
           mk.on = '';   // координаты правят руками: с ключевой точки она ушла
           // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
@@ -4858,6 +4865,16 @@ function buildMarkRow(mk) {
     ok.textContent = '✓';
     ok.setAttribute('aria-label', mk.pending ? 'Поставить точку' : 'Готово');
     ok.addEventListener('click', () => {
+      if (own) {
+        const d = CANVAS.markDraft || {};
+        if (!isFinite(d.x) || !isFinite(d.y)) return;
+        const m = markById(mk.id) || mk;
+        // Правка руками уводит с ключевой точки; с кривой — если новая точка на ней не лежит.
+        const f = markSnapFn(m);
+        if (f && Math.abs(f(d.x) - d.y) > 1e-9 * (1 + Math.abs(d.y))) m.snapTo = null;
+        m.x = d.x; m.y = d.y; m.on = '';
+        CANVAS.markDraft = null;
+      }
       if (!isFinite(mk.x) || !isFinite(mk.y)) return;
       mk.pending = false;
       CANVAS.markEdit = null;
@@ -5004,12 +5021,16 @@ function renameMark(id) {
 /* «Изменить координаты»: строка точки показывает поля координат (как у черновика), «✓» — закончить. */
 function editMarkCoords(id) {
   CANVAS.markEdit = id;
+  CANVAS.markDraft = null;
   renderMarkList();
   const ed = document.querySelector('#mark-list .mark-row[data-mark="' + String(id) + '"] .mark-xy .edval');
   if (ed) ed.focus();
 }
+/* Убрали точку — уходят и площади, у которых она вершина (как в GeoGebra; сессия 7, В5): одно действие, один шаг
+   истории, одно «Отменить» возвращает и точку, и площади. Убрали площадь — точки остаются. */
 function removeMark(id) {
   STATE.marks = (STATE.marks || []).filter(m => String(m.id) !== String(id));
+  STATE.areaCalcList = (STATE.areaCalcList || []).filter(r => !(Array.isArray(r.ids) && r.ids.some(x => String(x) === String(id))));
   if (CANVAS.ptsSel) CANVAS.ptsSel = CANVAS.ptsSel.filter(x => String(x) !== String(id));
   renderMarkList();
   redrawAll();

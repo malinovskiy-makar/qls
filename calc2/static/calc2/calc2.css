@@ -4260,3 +4260,9 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
   background: var(--btn-bg); color: var(--on-btn); font: inherit; font-size: 13px; font-weight: 600;
 }
 #pts-panel .pts-selbar-go:hover { filter: brightness(1.08); }
+/* В5. «Убрать все точки и площади» — тихая кнопка-строка внизу панели (макет: без рамки, по левому краю). */
+#pts-panel .pts-clear {
+  width: auto; margin: 14px 0 0; padding: 0 2px; min-height: 32px; border: 0; background: transparent;
+  color: var(--text2); text-align: left; font-size: 13px; font-weight: 600;
+}
+#pts-panel .pts-clear:hover { color: var(--text); background: transparent; text-decoration: underline; }

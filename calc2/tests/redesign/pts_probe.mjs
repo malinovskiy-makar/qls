@@ -288,21 +288,25 @@ async function sectionB3() {
   await settle(page, 400);
   const eds = await page.evaluate((id) => [...document.querySelectorAll('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval')].length, String(id));
   ok('«Изменить координаты»: в строке поля координат', eds === 2, String(eds));
+  /* «Изменить координаты» — одно действие: поля правят черновик, «✓» кладёт обе координаты разом (README 9;
+     цепочка В: «A → (30; 70)» и одно «Отменить» возвращает (40; 60)). */
+  u0 = await undoLen(page);
   for (const [i, v] of [[0, '45'], [1, '55']]) {
-    u0 = await undoLen(page);
     await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval').nth(i).click();
     await settle(page, 300);
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type(v);
     await page.keyboard.press('Enter');
     await settle(page);
-    ok('координата ' + (i ? 'P' : 'Q') + ' = ' + v + ' — один шаг', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
   }
+  ok('набор в полях — ещё не шаг', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-ok').click();
+  await settle(page);
   m = await marks(page);
-  ok('точка стоит в (45; 55)', near(m[0].x, 45) && near(m[0].y, 55), JSON.stringify(m[0]));
+  ok('«✓» → точка стоит в (45; 55); один шаг', near(m[0].x, 45) && near(m[0].y, 55) && (await undoLen(page)) === u0 + 1, JSON.stringify(m[0]) + ' шагов ' + (await undoLen(page)));
   await undo(page);
   m = await marks(page);
-  ok('«Отменить» вернула P = 60', near(m[0].x, 45) && near(m[0].y, 60), JSON.stringify(m[0]));
+  ok('одно «Отменить» вернула (40; 60)', near(m[0].x, 40) && near(m[0].y, 60), JSON.stringify(m[0]));
   ok('режим «Точки и площади» всё время включён', !(await exitedMode(page)));
   ok('Б3: ошибок страницы нет', !errors.length, errors.join(' | '));
   await ctx.close();
@@ -415,7 +419,38 @@ async function sectionV1() {
   CH.after3 = a;
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1]];
+async function sectionV5() {
+  head('В5. Каскад: убрали точку — ушла площадь; «Отменить»; «Убрать все»');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  const B = CH.ids[1];
+  let u0 = await undoLen(page);
+  await openMenuOf(page, B);
+  await menuItem(page, 'Убрать');
+  await settle(page);
+  let a = await areasNow(page);
+  const mk = await marks(page);
+  ok('4. B «Убрать» → S₁ нет в списке, на холсте, в легенде и в «Ответе»; точек две', !a.st.length && !a.rows.length && !a.drawn.length && !a.legend.some(t => /S₁/.test(t)) && !a.ans.length && mk.length === 2, JSON.stringify({ a, n: mk.length }));
+  ok('4. убрать точку с площадью — один шаг', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  await undo(page);
+  a = await areasNow(page);
+  ok('5. «Отменить» → B и S₁ = 350 вернулись', (await marks(page)).length === 3 && a.st.length === 1 && near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350', JSON.stringify(a.st));
+  await undo(page);
+  a = await areasNow(page);
+  const A = (await marks(page)).find(m => m.id === CH.ids[0]);
+  ok('5. ещё «Отменить» → A (40; 60), S₁ = 200', A && near(A.x, 40) && near(A.y, 60) && near(a.st[0].value, 200, 0.01), JSON.stringify({ A, st: a.st }));
+  u0 = await undoLen(page);
+  await page.locator('#ac-clear').click();
+  await settle(page);
+  a = await areasNow(page);
+  const lab = await page.evaluate(() => document.getElementById('ac-clear').textContent.trim());
+  ok('6. «' + lab + '» → пусто; один шаг', lab === 'Убрать все точки и площади' && !(await marks(page)).length && !a.st.length && (await undoLen(page)) === u0 + 1, JSON.stringify({ lab, n: (await marks(page)).length, a: a.st }));
+  await undo(page);
+  a = await areasNow(page);
+  ok('6. «Отменить» → три точки и S₁ = 200', (await marks(page)).length === 3 && a.st.length === 1 && near(a.st[0].value, 200, 0.01), JSON.stringify(a.st));
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {
