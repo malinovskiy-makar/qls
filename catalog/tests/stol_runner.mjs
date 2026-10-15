@@ -194,6 +194,10 @@ try {
     for (const [width, height] of [[1440, 900], [900, 1200]]) {
       const { ctx, page, errors } = await fresh(width, { path: process.env.STOL_PROBLEM, height,
                                                          panels: { rail: true, help: true } });
+      /* Плашка cookie, пока видна, даёт странице нижний отступ на свою высоту, и низ
+         панелей уезжает выше окна: меряем раскладку после выбора, как человек. */
+      await page.click('#cookie-bar [data-cookie-choice="necessary"]');
+      await page.waitForSelector('#cookie-bar', { state: 'hidden' });
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       await page.waitForTimeout(250);
       const box = await page.evaluate(() => {
@@ -440,6 +444,10 @@ try {
       const box = { entryOver: await wide(), errors,
         entryFab: await page.evaluate(() => [...document.querySelectorAll('.tg-fab')].filter(x => getComputedStyle(x).display !== 'none').length) };
       const boot = await page.evaluate(() => window.__stolBoot);
+      /* Плашка cookie законно появляется при первом визите и на телефоне накрывает
+         шторку тем: закрываем её, как человек, кнопкой «Только необходимые». */
+      await page.click('#cookie-bar [data-cookie-choice="necessary"]');
+      await page.waitForSelector('#cookie-bar', { state: 'hidden' });
       await page.click('[data-dd="topic"]');
       box.sheet = await page.evaluate(() => {
         const r = document.getElementById('se-dd-topic').getBoundingClientRect();
