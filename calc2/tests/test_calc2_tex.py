@@ -91,7 +91,8 @@ class Calc2TexExportTest(StaticLiveServerTestCase):
         self.assertEqual(result.returncode, 0, msg="Выгрузка .tex нарушена (см. вывод выше).")
 
         files = sorted(f for f in os.listdir(out_dir) if f.endswith(".tex"))
-        self.assertEqual(len(files), 44, msg="раннер записал не 44 файла")
+        # 44 старта и состояние своих точек и площадей taxes@pts-areas (тихие панели, сессия 7, Г1): его pdflatex тоже собирает.
+        self.assertEqual(len(files), 45, msg="раннер записал не 45 файлов (44 старта и taxes@pts-areas)")
         if not pdflatex_available():
             self._loud_skip("А проверка сборки PDF", "pdflatex не установлен на этой машине")
 
