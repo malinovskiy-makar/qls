@@ -626,6 +626,45 @@ function keepAxisNamesInside() {
   });
 }
 
+/* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
+   Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
+   размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
+   («35_спрос» вдвое шире «40»), и пара, разошедшаяся якорями на девять
+   пикселей, всё равно налезала друг на друга. Раньше это скрывало разведение
+   подписей: оно двигало деление в сторону. Теперь деления прибиты, и порог
+   обязан считаться по тому же, что видит глаз, — по рамкам.
+   Сессия 7 «тихих панелей» (А2; Notion …81b8…): деление уходит и тогда, когда рамки не пересекаются, но стоят
+   ближе 4 px (вплотную «35спрос40» читалось одним числом); проход идёт ДВАЖДЫ — до разведения и после него
+   (подпись, разведённая вдоль оси, могла встать на деление); подпись под осью Q не выходит за боковой край. */
+const TICK_GAP = 4;
+function yieldTicksToCoords(node) {
+  const box0 = node.getBoundingClientRect();
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    if (t.getAttribute('text-anchor') !== 'middle') return;
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    let dx = 0;
+    if (r.left < box0.left + 2) dx = box0.left + 2 - r.left;
+    else if (r.right > box0.right - 2) dx = box0.right - 2 - r.right;
+    const cur = parseFloat(t.getAttribute('x'));
+    if (dx && isFinite(cur)) t.setAttribute('x', cur + dx);
+  });
+  const coordBoxes = [];
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if (r.width > 0.5 && r.height > 0.5) coordBoxes.push(r);
+  });
+  if (!coordBoxes.length) return;
+  node.querySelectorAll('text.axis-num').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    const over = coordBoxes.some(c =>
+      (Math.min(r.right, c.right) - Math.max(r.left, c.left)) > -TICK_GAP &&
+      (Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) > -TICK_GAP);
+    if (over) t.remove();
+  });
+}
+
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
@@ -646,28 +685,7 @@ function spreadLabels() {
     t.setAttribute('x', cur + (box0.left + 2 - r.left));
   });
 
-  /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
-     Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
-     размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
-     («35_спрос» вдвое шире «40»), и пара, разошедшаяся якорями на девять
-     пикселей, всё равно налезала друг на друга. Раньше это скрывало разведение
-     подписей: оно двигало деление в сторону. Теперь деления прибиты, и порог
-     обязан считаться по тому же, что видит глаз, — по рамкам. */
-  const coordBoxes = [];
-  node.querySelectorAll('text.coord-num').forEach(t => {
-    const r = t.getBoundingClientRect();
-    if (r.width > 0.5 && r.height > 0.5) coordBoxes.push(r);
-  });
-  if (coordBoxes.length) {
-    node.querySelectorAll('text.axis-num').forEach(t => {
-      const r = t.getBoundingClientRect();
-      if (r.width < 0.5) return;
-      const over = coordBoxes.some(c =>
-        (Math.min(r.right, c.right) - Math.max(r.left, c.left)) > 1 &&
-        (Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) > 1);
-      if (over) t.remove();
-    });
-  }
+  yieldTicksToCoords(node);
 
   const items = [], anchored = [];
   node.querySelectorAll('text').forEach(t => {
@@ -762,6 +780,30 @@ function spreadLabels() {
       const probe = { x: it.x + wx, y: top, w: it.w, h: it.h };
       if (!against.some(p => hit(probe, p))) { dy = wy; dx = wx; it.y = top; it.x = probe.x; break; }
     }
+    /* ⚠️ ДВЕ ПОДПИСИ КООРДИНАТ ОДНОЙ ОСИ, КОТОРЫМ НЕКУДА УЙТИ НАРУЖУ (сессия 7, А2; Notion …81b8…).
+       У оси P поле узкое: «66,67_п» и «65_min» в «Двусторонней монополии» стоят на 9 px друг от друга, и левее
+       оси второй подписи места нет. Тогда — последняя мера — подпись отходит ВДОЛЬ оси ровно настолько, чтобы не
+       лечь на соседку, и в ту сторону, где её число: большее выше (правее), меньшее ниже (левее). Порядок чисел
+       сохраняется, сдвиг — меньше высоты строки, пунктир к оси остаётся у своего числа. Одно и то же число с разными
+       индексами сюда не доходит: такие подписи сливаются в одну (coordAlreadyAt, 20-plane.js). */
+    if (it.only && !dx && !dy) {
+      const mates = placed.filter(p => p.el && p.only === it.only);
+      const touch = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 0.5
+                           && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 0.5;
+      for (let n = 0; n < 4; n++) {
+        const p = mates.find(q => touch(it, q));
+        if (!p) break;
+        if (it.only === 'left') {
+          const up = (it.y + it.h / 2) < (p.y + p.h / 2);
+          const ny = up ? p.y - it.h - 1 : p.y + p.h + 1;
+          dy += ny - it.y; it.y = ny;
+        } else {
+          const lft = (it.x + it.w / 2) < (p.x + p.w / 2);
+          const nx = lft ? p.x - it.w - 2 : p.x + p.w + 2;
+          dx += nx - it.x; it.x = nx;
+        }
+      }
+    }
     if (dy) {
       const cur = parseFloat(it.el.getAttribute('y'));
       if (isFinite(cur)) it.el.setAttribute('y', cur + dy);
@@ -772,6 +814,25 @@ function spreadLabels() {
     }
     placed.push(it);
   });
+  yieldTicksToCoords(node);   // второй проход: подпись, разведённая вдоль оси, могла встать на деление
+}
+
+/* Рамки подписей зависят от шрифта: холст, нарисованный до того, как догрузился шрифт подписей, разводил их по
+   узким рамкам, и потом «35_спрос» вставала на деление «40» (сессия 7, А2). Догрузился шрифт — одна перерисовка
+   (не в бумажном прогоне выгрузки и не до первой модели). */
+let _fontsRedraw = 0;
+function redrawAfterFonts() {
+  if (_fontsRedraw) return;
+  _fontsRedraw = requestAnimationFrame(() => {
+    _fontsRedraw = 0;
+    if (typeof texPaperActive === 'function' && texPaperActive()) return;
+    if (!STATE.sceneKey || typeof redrawAll !== 'function' || !svg || !svg.node()) return;
+    redrawAll();
+  });
+}
+if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(redrawAfterFonts);
+  if (typeof document.fonts.addEventListener === 'function') document.fonts.addEventListener('loadingdone', redrawAfterFonts);
 }
 
 /* ───────────────────────────────────────────────────────────────────────

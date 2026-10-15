@@ -678,13 +678,32 @@ function coordValue(value) {
 
    Проверка живёт ЗДЕСЬ, в общей точке печати координат, а не в сценах: сцены
    не знают друг о друге, а второй такой же проверки рядом быть не должно. */
+/* ⚠️ ОДНО МЕСТО — ОДНО ЧИСЛО И С РАЗНЫМИ ИНДЕКСАМИ (сессия 7 «тихих панелей», А2; Notion …81b8…). Две величины с
+   одним числом в одной точке оси («50_рын» и «50_опт» во «Внешних эффектах» на старте) печатались друг на друге,
+   и левую срезал край холста. Теперь подпись ОДНА, с обоими индексами: «50_{рын, опт}» — число одно, и оно
+   действительно общее; различители остаются оба. Вторая подпись не рисуется, у первой дописывается индекс. */
+function coordSplit(raw) {
+  const m = /^(.*?)_(?:\{(.*)\}|(.))$/.exec(String(raw || '').trim());
+  return m ? { num: m[1], idx: (m[2] != null ? m[2] : m[3]).split(/,\s*/) } : { num: String(raw || '').trim(), idx: [] };
+}
 function coordAlreadyAt(px, horiz, text) {
   let found = false;
+  const want = coordSplit(text);
   svg.selectAll('text.coord-num').each(function () {
     if (found) return;
-    if ((this.getAttribute('data-raw') || this.textContent || '').trim() !== String(text).trim()) return;
+    const raw = (this.getAttribute('data-raw') || this.textContent || '').trim();
     const at = horiz ? +this.getAttribute('x') : +this.getAttribute('y');
-    if (isFinite(at) && Math.abs(at - px) < 6) found = true;
+    if (!isFinite(at) || Math.abs(at - px) >= 6) return;
+    // Подпись той же оси: под осью Q — по центру, у оси P — по правому краю.
+    if ((this.getAttribute('text-anchor') === 'middle') !== !!horiz) return;
+    if (raw === String(text).trim()) { found = true; return; }
+    const have = coordSplit(raw);
+    if (have.num !== want.num || !have.idx.length || !want.idx.length) return;
+    const idx = have.idx.concat(want.idx.filter(i => have.idx.indexOf(i) < 0));
+    const sel = d3.select(this);
+    sel.text(null);
+    renderLabelText(sel, have.num + '_{' + idx.join(', ') + '}');
+    found = true;
   });
   return found;
 }
