@@ -1741,16 +1741,17 @@
        fieldActive считает мёртвым); при возврате — afterColumnShown(). -->
   <aside class="side side-left col-cond col-pts" id="pts-panel" aria-label="Точки и площади">
     <div class="side-inner">
+      <!-- Сессия 7 «тихих панелей» (README пакета 9, 10.5): шапка — заголовок колонки и «Готово» (единственный
+           выход; Esc работает, надписи о нём нет). «← Условие» и строка-подсказка ушли по закрытому списку. -->
       <div class="side-head col-head pts-head">
-        <button class="col-quiet pts-back" id="pts-back" type="button">← Условие</button>
+        <h2 class="pts-title">Точки и площади</h2>
         <button class="pts-done" id="pts-done" type="button">Готово</button>
       </div>
       <div class="side-scroll">
         <section class="side-part pts-body">
-          <h2 class="pts-title">Точки и площади</h2>
-          <p class="pts-hint">Щёлкните по графику: точка встанет на ближайшую кривую, пересечение или ключевую точку.</p>
       <div class="section" id="sec-view">
-        <h3 class="sec-head pts-sec-head">Точки</h3>
+        <!-- Заголовок раздела и справа тихая «+ По координатам» (её ставит ensureAddMarkButton в .pts-sec-row). -->
+        <div class="pts-sec-row"><h3 class="sec-head pts-sec-head">Точки</h3></div>
         <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
              renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
         <div class="fold-body open" id="marks-body">

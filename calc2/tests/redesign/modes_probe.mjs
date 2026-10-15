@@ -247,13 +247,16 @@ if (want('Б')) {
   ok('и на холсте', own.drawn.length === 1, JSON.stringify(own.drawn));
   const expr = await typeD(page, '100-2Q');
   ok('после возврата поле D живое: набор 100-2Q меняет кривую', /^100-2\*?Q$/.test(expr), expr);
-  // «← Условие» — тот же выход.
+  /* С сессии 7 «← Условие» нет (закрытый список README пакета calc2_panels_20261014, 10.5: выход один — «Готово»,
+     Esc работает без надписи): тот же выход клавишей Esc, кнопки «← Условие» в шапке нет. */
   await page.click('#tool-pts');
   await settle(page);
-  await page.click('#pts-back');
+  const noBack = await page.evaluate(() => !document.getElementById('pts-back') && ![...document.querySelectorAll('#pts-panel button')].some(b => /Условие/.test(b.textContent)));
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+  await page.keyboard.press('Escape');
   await settle(page);
   const p3 = await panels(page);
-  ok('«← Условие» → «Условие»', p3.cond && !p3.pts, JSON.stringify(p3));
+  ok('кнопки «← Условие» нет; Esc → «Условие»', noBack && p3.cond && !p3.pts, JSON.stringify(Object.assign({ noBack }, p3)));
   const expr2 = await typeD(page, '100-Q');
   ok('и снова живое поле D (100-Q)', /^100-Q$/.test(expr2), expr2);
   // В «Курсоре» группа собирается и с нуля: перезагрузка поднимает автосохранение модели.

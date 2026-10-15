@@ -150,7 +150,7 @@ function wireShell() {
   const tc = document.getElementById('tool-cursor'), tp = document.getElementById('tool-pts');
   if (tc) tc.addEventListener('click', () => setPtsMode(false));
   if (tp) tp.addEventListener('click', () => setPtsMode(true));
-  // Панель режима: «← Условие» и «Готово» обе возвращают «Курсор».
+  // Панель режима: «Готово» возвращает «Курсор» («← Условие» ушла в сессии 7 — закрытый список README пакета, 10.5).
   ['pts-back', 'pts-done'].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.addEventListener('click', (e) => {

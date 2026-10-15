@@ -54,8 +54,8 @@
 | Ключ | Вид | Подпись | Где | Судьба на старте сессии 7 |
 |---|---|---|---|---|
 | `#tool-cursor`, `#tool-pts` | button | Курсор, Точки и площади | панель холста | на месте |
-| `#pts-back` | button | ← Условие | шапка `#pts-panel` | на месте |
-| `#pts-done` | button | Готово | шапка `#pts-panel` | на месте |
+| `#pts-back` | button | ← Условие | шапка `#pts-panel` | **убран** — закрытый список README пакета 10.5 (выход один: «Готово»; Esc без надписи). Сессия 7, Б1; сторож — `pts_probe` Б1, `modes_probe` Б |
+| `#pts-done` | button | Готово | шапка `#pts-panel` | на месте; рядом с ним в шапке — заголовок `h2.pts-title` (переехал в шапку, Б1) |
 | `#ac-curve`, `#ac-poly` | button (radio) | + Под кривой, + Между точками | `#ac-mode` | на месте |
 | `#ac-pick-btns>button.ac-cbtn` | button (radio) | имя кривой | `#ac-pane-curve` | на месте |
 | `#ac-vert-arm`, `#ac-vert-clear` | button | Отмечать вершины, Убрать все вершины | `#ac-pane-poly` | на месте |

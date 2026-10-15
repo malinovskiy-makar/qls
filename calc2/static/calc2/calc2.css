@@ -4196,3 +4196,9 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #wrench-pop .seg.sc-seg { display: flex !important; }
 #wrench-pop .tgl.sc-tgl-off { display: none; }
 
+
+/* ── Тихие панели, сессия 7: «Точки и площади» (README пакета 9; макет 04_screen_points) ──
+   Б1. Шапка панели режима — заголовок колонки «Точки и площади» 18 / 600 слева (h2.pts-title переехал в шапку,
+   кегль даёт лесенка A выше) и «Готово» справа. «← Условие» и строка-подсказка ушли (закрытый список, 10.5). ── */
+#pts-panel .pts-head .pts-title { margin: 0; flex: 1 1 auto; line-height: 1.3; }
+#pts-panel .pts-body > .section:first-child { border-top: 0; padding-top: 4px; }
