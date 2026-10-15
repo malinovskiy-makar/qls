@@ -4266,3 +4266,22 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
   color: var(--text2); text-align: left; font-size: 13px; font-weight: 600;
 }
 #pts-panel .pts-clear:hover { color: var(--text); background: transparent; text-decoration: underline; }
+/* В6. Строки своих площадей: образец 14 px, имя S₁ KaTeX, вершины «ABC» (--text2), число справа, «⋯». */
+#pts-panel .area-list { display: flex; flex-direction: column; }
+#pts-panel .area-line {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: 10px; min-height: 44px; padding: 4px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+#pts-panel .area-line .area-sw .cpick-btn { width: 14px; height: 14px; min-width: 14px; border-radius: 3px; padding: 0; }
+#pts-panel .area-line > .area-name { flex: 0 0 auto; font-size: 19px; color: var(--text); }
+#pts-panel .area-line > .area-name .katex { font-size: 1em; }
+#pts-panel .area-line > .area-verts { flex: 1 1 auto; font-size: 16px !important; font-weight: 400 !important; color: var(--text2); }
+#pts-panel .area-line > .area-verts .katex { font-size: 1em; }
+#pts-panel .area-line > .area-val { flex: 0 0 auto; margin-left: auto; font-size: 16px !important; font-weight: 400 !important; color: var(--text); font-variant-numeric: tabular-nums; }
+#pts-panel .area-line > .area-more { flex: 0 0 auto; width: 28px; height: 28px; color: var(--text3); }
+#pts-panel .area-line > .area-more svg { width: 18px; height: 18px; }
+#pts-panel .area-line > .area-note { flex: 1 0 100%; font-size: 12px; color: var(--text3); }
+/* Кнопки раздела «Площади» — две тихие кнопки в рамке рядом (макет), нажатая — открытое построение. */
+#pts-panel .seg.ac-mode { background: transparent; border: 0; padding: 0; gap: 8px; }
+#pts-panel .seg.ac-mode .seg-btn { border: 1px solid var(--border); border-radius: var(--r); background: transparent; min-height: 36px; }
+#pts-panel #sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { border-color: var(--border); }

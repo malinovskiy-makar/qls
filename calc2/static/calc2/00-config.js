@@ -553,7 +553,7 @@ function refreshColors() {
    они старше, поэтому проверяются раньше. */
 /* Сессия 7 (README пакета 9): тоже вид — markEdit (id точки, у которой в строке открыты поля координат),
    markRename (id точки, чьё имя правится в строке), ptsSel (id точек, отмеченных галочкой для площади). */
-const CANVAS = { pts: false, markEdit: null, markDraft: null, markRename: null, ptsSel: [], buildIds: [] };
+const CANVAS = { pts: false, markEdit: null, markDraft: null, markRename: null, ptsSel: [], buildIds: [], areaRename: null };
 function canvasMode() {
   if (STATE.markArm) return 'mark';
   if (STATE.vertArm) return 'vert';

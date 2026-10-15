@@ -2423,11 +2423,16 @@ function pushArea(res) {
   const pal = AREA_PALETTE();
   areaCalcCounter = Math.max(areaCalcCounter, STATE.areaCalcList.reduce((m, r) => Math.max(m, +r.id || 0), 0)) + 1;
   res.id = areaCalcCounter;
-  res.color = pal[(STATE.areaCalcList.length) % pal.length];
   /* Н27: короткое имя с настоящим индексом — S₁, S₂, S₃. Прежние «Площадь под
      D» и «Площадь по точкам» не помещались в легенду и вытесняли из неё сами
-     области. Что именно посчитано, видно рядом в строке таблицы. */
-  res.label = 'S' + subDigits(STATE.areaCalcList.length + 1);
+     области. Что именно посчитано, видно рядом в строке таблицы.
+     Сессия 7 (В6): индекс — ПЕРВЫЙ СВОБОДНЫЙ, а не длина списка (убрали S₁, добавили — снова S₁, а не второй S₂);
+     цвет — первый не занятый другой площадью цвет палитры. */
+  const labels = new Set(STATE.areaCalcList.map(r => String(r.label || '')));
+  let k = 1; while (labels.has('S' + subDigits(k))) k++;
+  res.label = 'S' + subDigits(k);
+  const used = new Set(STATE.areaCalcList.map(r => String(r.color || '').toLowerCase()));
+  res.color = pal.find(c => !used.has(String(c).toLowerCase())) || pal[(STATE.areaCalcList.length) % pal.length];
   STATE.areaCalcList.push(res);
   redrawAll();
   return res;
@@ -2510,92 +2515,79 @@ function drawAreaCalc() {
   updateAreaCalcPanel();
 }
 
-/* Таблица результатов: что посчитано, на каком отрезке, сколько вышло и каким
-   цветом закрашено. Название и цвет правятся прямо здесь. */
+/* СТРОКИ СВОИХ ПЛОЩАДЕЙ (сессия 7, В6; README пакета 9; макет 04_screen_points). Строка: образец цвета 14 px
+   (щелчок — выбор цвета), имя S₁ (KaTeX), вершины «ABC» — имена точек в порядке обхода П43 (у площади под кривой —
+   кривая и отрезок «D, [0; 100]»; у записи старой ссылки без ids — «по координатам»), число справа (fmt), «⋯»
+   (Переименовать, Цвет, Убрать) — всплывающим окном в body: строки пересобираются на каждой перерисовке. Числа
+   живые (areaLive). Строк закрасок модели здесь нет с 14.10 (их цвет — в «Виде», числа — в «Ответе»); мёртвый цикл
+   их строк и шапка «Название | Площадь» убраны. */
+/* Конец правки имени на месте (Enter, Esc, уход фокуса) — один раз, после того как makeEditableValue отдал итог. */
+function renameCommit(el, fn) {
+  let done = false;
+  const go = () => setTimeout(() => { if (done || el.classList.contains('editing')) return; done = true; fn(); }, 0);
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') go(); });
+  el.addEventListener('blur', go);
+}
+function areaById(id) { return (STATE.areaCalcList || []).find(r => String(r.id) === String(id)) || null; }
+function areaVertsLabel(r) {
+  if (r.kind === 'curve') return { tex: null, text: null, curve: r.name, range: '[' + fmt(r.a) + '; ' + fmt(r.b) + ']' };
+  if (!Array.isArray(r.ids) || !r.ids.length) return { text: 'по координатам' };
+  const names = (r.order || r.ids).map(id => { const m = markById(id); return m ? String(m.text || '') : '?'; });
+  if (names.every(n => /^[A-Z][₀-₉]*$/.test(n))) return { tex: names.map(markNameTex).join('') };
+  return { text: names.join(', ') };
+}
 function updateAreaCalcPanel() {
   const box = document.getElementById('info-areacalc');
   if (!box) return;
   const list = areasLive();
-  /* Свх-5, Н59. Таблица это единый список ВСЕГО закрашенного на графике: и
-     посчитанного пользователем, и нарисованного самой сценой (излишки, сбор
-     бюджета, потери общества). Раньше сценовые области жили только в отдельном
-     разделе «Цвета областей», и там у них не было ни числа, ни соседства с
-     посчитанными площадями. Раздел удалён, ничего не потеряно. */
-  /* Области, которые нарисовала САМА МОДЕЛЬ. Посчитанные человеком площади
-     тоже помечены `data-legend` — иначе они не попали бы в легенду на холсте,
-     а там они нужны. Но в ТАБЛИЦЕ им не место: они уже идут своими строками
-     ниже, со своим именем, цветом и крестиком. Без этой отсечки одна и та же
-     площадь стояла дважды: S₁ без крестика и S₁ с крестиком, с одним числом. */
-  const mine = {};
-  (list || []).forEach(r => { mine[areaKey(r.label)] = 1; });
-  /* С 14.10 (тихие панели, этап Г, ADR 0152) строки закрасок модели здесь не стоят: их цвет и видимость —
-     в «Виде графика» («На графике»), числа — в «Ответе» (закрытый список README пакета, 10.6). Остаются
-     свои площади. */
-  const scene = [];
   box.innerHTML = '';
-  if (!list.length && !scene.length) return;
-
+  if (!list.length) return;
   const table = document.createElement('div');
-  table.className = 'area-table';
-  // П44: столбцы «Название» и «Площадь». «Отрезок» убран — он и так виден
-  // рядом с выбором кривой, а в таблице только занимал место.
-  const head = document.createElement('div');
-  head.className = 'area-row area-head';
-  ['Название', 'Площадь', ''].forEach(t => {
-    const c = document.createElement('span'); c.textContent = t; head.appendChild(c);
-  });
-  table.appendChild(head);
-
-  // Сначала области сцены: их не удаляют (их рисует сама модель), поэтому
-  // вместо крестика пустая клетка, а цвет правится тем же пикером.
-  scene.forEach(e => {
-    const row = document.createElement('div');
-    row.className = 'area-row';
-    const c1 = document.createElement('span');
-    c1.className = 'area-what';
-    const pick = makeColorPicker(e.color, (hex) => { STATE.areaColor[e.key] = hex; redrawAll(); },
-                                 tipName('Цвет области: ' + e.key));
-    pick.setAttribute('data-area', e.key);
-    const lab = document.createElement('span');
-    lab.className = 'area-name-fixed';
-    paintNotation(lab, areaShort(e.key));   // «CS», «PS», «DWL» — формулой
-    lab.setAttribute('data-tip', tipName(e.key));
-    c1.append(pick, lab);
-    const c2 = document.createElement('b');
-    c2.textContent = (e.value == null) ? '' : fmt(e.value);
-    const c3 = document.createElement('span');
-    row.append(c1, c2, c3);
-    table.appendChild(row);
-  });
-
+  table.className = 'area-list';
   list.forEach(r => {
     const row = document.createElement('div');
-    row.className = 'area-row';
-
-    const c1 = document.createElement('span');
-    c1.className = 'area-what';
-    // Шесть образцов, как и у всех остальных мест выбора цвета (П34).
-    const pick = makeColorPicker(r.color, (hex) => { r.color = hex; redrawAll(); }, 'Цвет площади');
-    const nameInp = document.createElement('input');
-    nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
-    nameInp.setAttribute('data-tip', 'Название площади');
-    nameInp.addEventListener('input', () => { r.label = nameInp.value; });
-    nameInp.addEventListener('change', () => redrawAll());
-    c1.append(pick, nameInp);
-
-    const c3 = document.createElement('b');
-    c3.textContent = fmt(r.value);
-    if (r.kind === 'poly' && r.exact === false) c3.classList.add('area-approx');
-
-    const del = document.createElement('button');
-    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
-    del.setAttribute('data-tip', 'Убрать эту площадь');
-    del.addEventListener('click', () => {
-      STATE.areaCalcList = STATE.areaCalcList.filter(x => x !== r);
-      redrawAll();
-    });
-
-    row.append(c1, c3, del);
+    row.className = 'area-line';
+    row.dataset.area = String(r.id);
+    const pick = makeColorPicker(r.color, (hex) => { const a = areaById(r.id); if (a) { a.color = hex; redrawAll(); } }, 'Цвет площади');
+    pick.classList.add('area-sw');
+    let name;
+    if (String(CANVAS.areaRename) === String(r.id)) {
+      /* Правка на месте зовёт set на каждый символ, а строки пересобираются на каждой перерисовке: имя кладётся в
+         площадь, когда правка кончилась (Enter, Esc, уход фокуса) — renameCommit. */
+      let pend = r.label || '';
+      name = makeEditableValue({
+        kind: 'text',
+        get: () => pend,
+        set: (v) => { pend = String(v); },
+        tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
+        title: 'Название площади',
+      });
+      name.classList.add('area-name');
+      renameCommit(name, () => { const a = areaById(r.id); const t = String(pend).trim(); if (a && t) a.label = t; CANVAS.areaRename = null; redrawAll(); });
+    } else {
+      name = document.createElement('span');
+      name.className = 'area-name';
+      katexInto(name, markNameTex(String(r.label || '').replace(/^S([₀-₉]+)$/, 'S$1')));
+    }
+    const verts = document.createElement('span');
+    verts.className = 'area-verts';
+    const vl = areaVertsLabel(r);
+    if (vl.curve != null) {
+      const c = document.createElement('span'); curveNameInto(c, vl.curve);
+      verts.append(c, document.createTextNode(', ' + vl.range));
+    } else if (vl.tex) katexInto(verts, vl.tex);
+    else verts.textContent = vl.text;
+    const val = document.createElement('b');
+    val.className = 'area-val';
+    val.textContent = fmt(r.value);
+    if (r.kind === 'poly' && r.exact === false) val.classList.add('area-approx');
+    const more = document.createElement('button');
+    more.type = 'button'; more.className = 'btn-icon area-more';
+    more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
+    more.setAttribute('aria-label', 'Действия с площадью ' + (r.label || ''));
+    more.innerHTML = ICON_DOTS;
+    more.addEventListener('click', (e) => { e.stopPropagation(); openAreaMenu(more, r.id); });
+    row.append(pick, name, verts, val, more);
     /* Оговорка идёт СТРОКОЙ ПОД числом, а не подсказкой браузера: подсказку
        на планшете не открыть вовсе, а знать про приближение надо до того, как
        число выпишут в тетрадь. */
@@ -2610,6 +2602,50 @@ function updateAreaCalcPanel() {
     table.appendChild(row);
   });
   box.appendChild(table);
+}
+/* Меню «⋯» площади — то же окно, что у точки (openMarkMenu), со своими пунктами. Убрать площадь — точки остаются. */
+function openAreaMenu(anchor, id) {
+  if (!_markMenu) {
+    _markMenu = document.createElement('div');
+    _markMenu.className = 'pop pts-menu';
+    _markMenu.setAttribute('role', 'menu');
+    document.body.appendChild(_markMenu);
+  }
+  if (_markMenu.classList.contains('open') && _markMenu.dataset.area === String(id)) { closePop(); return; }
+  delete _markMenu.dataset.mark;
+  _markMenu.dataset.area = String(id);
+  const menu = _markMenu;
+  const r = areaById(id);
+  menu.innerHTML = '';
+  if (!r) return;
+  menu.setAttribute('aria-label', 'Площадь ' + (r.label || ''));
+  const item = (text, fn, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pts-mi' + (cls ? ' ' + cls : ''); b.setAttribute('role', 'menuitem');
+    b.textContent = text;
+    b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    menu.appendChild(b);
+  };
+  item('Переименовать', () => {
+    closePop();
+    CANVAS.areaRename = id;
+    updateAreaCalcPanel();
+    const ed = document.querySelector('#info-areacalc [data-area="' + String(id) + '"] .area-name.edval');
+    if (ed) ed.focus();
+  });
+  const crow = document.createElement('div');
+  crow.className = 'pts-mi pts-mi-color';
+  const cl = document.createElement('span'); cl.textContent = 'Цвет';
+  crow.append(cl, makeColorPicker(r.color, (hex) => { const a = areaById(id); if (a) { a.color = hex; redrawAll(); } }, 'Цвет площади'));
+  menu.appendChild(crow);
+  const sep = document.createElement('div'); sep.className = 'pts-mi-sep'; sep.setAttribute('role', 'separator');
+  menu.appendChild(sep);
+  item('Убрать', () => {
+    closePop();
+    STATE.areaCalcList = (STATE.areaCalcList || []).filter(a => String(a.id) !== String(id));
+    redrawAll();
+  }, 'pts-mi-danger');
+  openPop(anchor, menu, { alignRight: true, noFocus: true });
 }
 
 // Выпадашка кривых и список точек: пересобираются под текущую сцену.
@@ -4795,15 +4831,17 @@ function buildMarkRow(mk) {
   // Имя: формулой; «Переименовать» при точке за окном правит его здесь (CANVAS.markRename).
   let nameEl;
   if (String(CANVAS.markRename) === String(mk.id)) {
+    let pend = mk.text || '';
     nameEl = makeEditableValue({
       kind: 'text',
-      get: () => mk.text || '',
-      set: (v) => { const t = String(v).trim(); if (t) { mk.text = t; CANVAS.markRename = null; renderMarkList(); redrawAll(); } },
+      get: () => pend,
+      set: (v) => { pend = String(v); },
       // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает пробелы.
       tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
       title: 'Имя точки',
     });
     nameEl.classList.add('mark-name');
+    renameCommit(nameEl, () => { const m = markById(mk.id); const t = String(pend).trim(); if (m && t) m.text = t; CANVAS.markRename = null; renderMarkList(); redrawAll(); });
   } else {
     nameEl = document.createElement('span');
     nameEl.className = 'mark-name';
@@ -4849,6 +4887,7 @@ function openMarkMenu(anchor, id) {
     document.body.appendChild(_markMenu);
   }
   if (_markMenu.classList.contains('open') && _markMenu.dataset.mark === String(id)) { closePop(); return; }
+  delete _markMenu.dataset.area;
   _markMenu.dataset.mark = String(id);
   fillMarkMenu();
   openPop(anchor, _markMenu, { alignRight: true, noFocus: true });

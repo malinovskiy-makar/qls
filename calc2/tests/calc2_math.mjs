@@ -1233,8 +1233,10 @@ const CASES = [
           var range = '[' + rangeNums.join('; ') + ']';
           var rangeEditable = rangeEl.querySelectorAll('.edval').length;
           btn.click();
-          var head = [].map.call(document.querySelectorAll('.area-head span'),
-                                 function (s) { return s.textContent; }).join('|');
+          /* С сессии 7 строки своих площадей без шапки «Название | Площадь» (README пакета calc2_panels_20261014, 9;
+             макет 04_screen_points): «заголовки» — у строки есть имя и число. */
+          var line = document.querySelector('#info-areacalc .area-line');
+          var head = line && line.querySelector('.area-name') && line.querySelector('.area-val') ? 'Название|Площадь|' : '';
           var areaVal = STATE.areaCalcList[0].value;
           /* С сессии 7 площадь по точкам — по ОТМЕЧЕННЫМ точкам списка (README пакета 9, решение …81e0…): «заперта» —
              плашки «Площадь по точкам» нет, пока отмечено меньше трёх; «у каждой вершины крестик» — у каждой
@@ -1260,7 +1262,7 @@ const CASES = [
              ['отрезок [0; 100]', 'rangeOk', 1, 0],
              ['и обе границы правятся (Н52)', 'rangeEd', 2, 0],
              ['площадь под D = 5000', 'area', 5000, 1],
-             ['заголовки «Название» и «Площадь» (Н53)', 'headOk', 1, 0],
+             ['у строки площади имя и число (Н53; шапки нет с сессии 7)', 'headOk', 1, 0],
              ['без вершин кнопка заперта (две отмечены — плашки нет)', 'lockedPoly', 1, 0],
              ['три вершины — открылась («Площадь по точкам»)', 'openPoly', 1, 0],
              ['у каждой вершины крестик («⋯» с «Убрать»)', 'verts', 3, 0]],

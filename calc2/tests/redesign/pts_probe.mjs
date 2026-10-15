@@ -500,7 +500,99 @@ async function sectionV3() {
   await undo(page);
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5], ['В3', sectionV3]];
+/* ── В6: строки площадей; шаг 10 — первый свободный индекс ── */
+const areaRows = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const tex = (e) => e ? [...e.querySelectorAll('annotation')].map(a => a.textContent).join(' ') : '';
+  return [...document.querySelectorAll('#info-areacalc .area-line')].filter(r => r.getClientRects().length).map(r => ({
+    id: r.dataset.area, sw: !!r.querySelector('.area-sw .cpick-btn'), name: tex(r.querySelector('.area-name')), verts: tx(r.querySelector('.area-verts')),
+    vertsTex: tex(r.querySelector('.area-verts')), val: tx(r.querySelector('.area-val')), more: !!r.querySelector('.area-more[aria-haspopup]') }));
+});
+async function sectionV6() {
+  head('В6. Строки своих площадей');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  let rows = await areaRows(page);
+  const s1 = rows[0] || {};
+  const rot = ['ABC', 'BCA', 'CAB', 'CBA', 'BAC', 'ACB'];
+  ok('строка «S₁ ABC 200»: образец цвета, имя KaTeX, вершины — имена точек в порядке обхода, число, «⋯»',
+    s1.sw && s1.name === 'S_{1}' && rot.includes(s1.vertsTex.replace(/\s+/g, '')) && s1.val === '200' && s1.more, JSON.stringify(rows));
+  const btns = await page.evaluate(() => ['ac-curve', 'ac-poly'].map(id => document.getElementById(id).textContent.trim()).join('|'));
+  ok('кнопки раздела — «+ Под кривой» и «+ По точкам»', btns === '+ Под кривой|+ По точкам', btns);
+  const dead = await page.evaluate(() => document.querySelectorAll('#info-areacalc .area-head, #info-areacalc [data-area-key], #info-areacalc .area-name-fixed').length);
+  ok('строк закрасок модели и шапки «Название | Площадь» нет', dead === 0, String(dead));
+  // Меню «⋯» площади: пункты; Переименовать — один шаг.
+  await page.locator('#info-areacalc .area-line[data-area="' + s1.id + '"] .area-more').click();
+  await settle(page, 400);
+  const items = await page.evaluate(() => [...document.querySelectorAll('.pts-menu.open .pts-mi')].map(x => x.textContent.trim()).join('|'));
+  ok('«⋯» площади: Переименовать, Цвет, Убрать', items === 'Переименовать|Цвет|Убрать', items);
+  let u0 = await undoLen(page);
+  await menuItem(page, 'Переименовать');
+  await settle(page, 400);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('DWL');
+  await page.keyboard.press('Enter');
+  await settle(page);
+  const a = await areasNow(page);
+  ok('переименование площади: в строке, на холсте (легенда) и в «Ответе»; один шаг', a.st[0].label === 'DWL' && a.drawn.includes('DWL') && a.ans.some(x => /DWL/.test(x.lab)) && (await undoLen(page)) === u0 + 1, JSON.stringify(a) + ' шагов ' + (await undoLen(page)) + '/' + u0);
+  await undo(page);
+  ok('«Отменить» вернула S₁', (await areasNow(page)).st[0].label === 'S₁');
+}
+async function sectionV10() {
+  head('В6, шаг 10. Имя новой площади — первый свободный индекс');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  let a = await areasNow(page);
+  const s1 = a.st.find(r => r.label === 'S₁');
+  await page.locator('#info-areacalc .area-line[data-area="' + s1.id + '"] .area-more').click();
+  await settle(page, 400);
+  await menuItem(page, 'Убрать');
+  await settle(page);
+  a = await areasNow(page);
+  ok('площадь S₁ убрана, точки остались', !a.st.some(r => r.label === 'S₁') && (await marks(page)).length >= 3, JSON.stringify(a.st));
+  for (const id of CH.ids) { await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-pick input').click(); await settle(page, 300); }
+  await page.locator('#sec-view .pts-selbar-go').click();
+  await settle(page);
+  a = await areasNow(page);
+  ok('10. убрали S₁, добавили новую — она S₁, а не ' + 'S' + '₃', a.st.some(r => r.label === 'S₁') && a.st.length === (CH.v7 ? 2 : 1), JSON.stringify(a.st.map(r => r.label)));
+}
+/* ── В4, шаг 9: площадь под кривой — число живое ── */
+async function sectionV9() {
+  head('В4, шаг 9. Площадь под кривой: число = заливка');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  await page.locator('#ac-curve').click();
+  await settle(page, 500);
+  await page.locator('#ac-pick-btns .ac-cbtn', { hasText: 'D' }).first().click();
+  await settle(page, 500);
+  await page.locator('#ac-calc').click();
+  await settle(page);
+  let a = await areasNow(page);
+  let rows = await areaRows(page);
+  ok('«+ Под кривой» → D → 5 000; строка «S₁ D, [0; 100] 5 000»', a.st.length === 1 && near(a.st[0].value, 5000, 0.5) && rows[0] && /^D, \[0; 100\]$/.test(rows[0].verts) && rows[0].val.replace(/\s/g, '') === '5000', JSON.stringify({ st: a.st, rows }));
+  await page.locator('#pts-done').click();
+  await settle(page, 600);
+  /* У «Налогов» ползунка «Сдвиг» нет (NO_CURVE_DRAG, 30-curves.js: кривые здесь не двигаются): сдвиг D на 10 —
+     запись D = 110 − Q в поле карточки D (отступление от шага задания записано в журнале сессии 7). */
+  const moved = await page.evaluate(() => {
+    const d = (STATE.curves || []).find(c => c.role === 'demand');
+    const inp = d && document.getElementById('curve-expr-' + d.id);
+    if (!inp) return null;
+    setFieldValue(inp, '110 - Q'); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    return 10;
+  });
+  await settle(page);
+  a = await areasNow(page);
+  const fillArea = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d').length : 0; });
+  ok('D сдвинут на 10 (110 − Q в «Условии») → «Ответ», Свои площади: 6 000', moved === 10 && a.ans[0] && a.ans[0].val === '6000' && near(a.st[0].value, 6000, 0.5) && fillArea > 0, JSON.stringify({ moved, ans: a.ans, st: a.st }));
+  await enterPts(page);
+  rows = await areaRows(page);
+  ok('снова «Точки и площади» → в строке 6 000', rows[0] && rows[0].val.replace(/\s/g, '') === '6000', JSON.stringify(rows));
+  ok('шаг 9: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В5', sectionV5], ['В3', sectionV3], ['В6', sectionV6], ['В10', sectionV10], ['В9', sectionV9]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {
