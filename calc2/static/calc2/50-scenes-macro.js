@@ -111,7 +111,7 @@ function recomputeMacro() {
     return;
   }
   if (m === 'phillips') {
-    // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\\ \\pi_e)$.
+    // $\pi = \pi^{e} - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\\ \\pi^{e})$.
     const f = (u) => P.pe - P.beta * (u - P.ustar);
     const sr = texTag({ fn: f }, 'rec', { expr: '(' + P.pe + ') - (' + P.beta + ') * (u - (' + P.ustar + '))', v: 'u' });
     const lrp = makeVerticalCurve(P.ustar);
@@ -360,15 +360,16 @@ function updateMacroPanel() {
         : '<b>Инфляционный разрыв</b>: фактический выпуск выше потенциального на ' + fmt(g) + ': экономика перегрета, давление на цены вверх.')}</div>`;
   } else if (r.kind === 'phillips') {
     const f = r.f;
-    html += `<div class="stat"><span>Ожидаемая инфляция πe</span><b>${fmt(P.pe)}</b></div>`;
+    // Ожидаемая инфляция — одним обозначением \pi^{e} в «Условии», «Ответе» и формуле таблицы (сессия 7, А3.2).
+    html += `<div class="stat"><span>Ожидаемая инфляция $\\pi^{e}$</span><b>${fmt(P.pe)}</b></div>`;
     html += `<div class="stat"><span>Естественный уровень $u^*$</span><b>${fmt(P.ustar)}</b></div>`;
     html += `<div class="stat"><span>Наклон β</span><b>${fmt(P.beta)}</b></div>`;
     // Обратные слэши УДВОЕНЫ: в строке JS «\p» схлопывается в «p», а «\b» это
     // вовсе символ забоя, и KaTeX на нём падает красной рамкой.
-    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>$\\pi = \\pi_e - \\beta(u - u^*)$</th></tr>';
+    html += '<table class="tx-table" style="margin-top:6px;"><tr><th>u</th><th>$\\pi = \\pi^{e} - \\beta(u - u^*)$</th></tr>';
     [P.ustar - 2, P.ustar, P.ustar + 2].forEach(u => { html += `<tr><td>${fmt(u)}</td><td>${fmt(f(u))}</td></tr>`; });
     html += '</table>';
-    html += '<div class="hint">Краткосрочная кривая проходит через точку $(u^*;\\ \\pi_e)$ с наклоном $-\\beta$: снизить ' +
+    html += '<div class="hint">Краткосрочная кривая проходит через точку $(u^*;\\ \\pi^{e})$ с наклоном $-\\beta$: снизить ' +
       'безработицу ниже естественной можно только ценой более высокой инфляции. Долгосрочная идёт вертикалью ' +
       'при u = u*: в долгом периоде ожидания подстраиваются, и размена нет.</div>';
   } else if (r.kind === 'money') {
