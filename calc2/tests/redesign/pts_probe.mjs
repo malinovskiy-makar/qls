@@ -397,10 +397,13 @@ async function sectionV1() {
   await chainStart();
   const page = CH.page;
   const u0 = await undoLen(page);
+  const sig0 = await page.evaluate(() => histSig(collectModelState()));
   for (const id of CH.ids) { await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-pick input').click(); await settle(page, 400); }
+  const sig1 = await page.evaluate(() => histSig(collectModelState()));
   const bar = await page.evaluate(() => { const b = document.querySelector('#sec-view .pts-selbar'); return b && !b.hidden ? b.textContent.replace(/\s+/g, ' ').trim() : ''; });
   ok('отмечены три точки → плашка «Выбрано 3 · Площадь по точкам»', /^Выбрано 3\s*Площадь по точкам$/.test(bar), bar);
-  ok('выбор галочками — не шаги истории', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  // Выбор — вид: ни шага истории, ни следа в состоянии модели (оно идёт в ссылку и автосохранение).
+  ok('11. выбор галочками — не шаги истории и не состояние модели', (await undoLen(page)) === u0 && sig0 === sig1, (await undoLen(page)) + ' против ' + u0 + '; подпись ' + (sig0 === sig1 ? 'та же' : 'другая'));
   await page.locator('#sec-view .pts-selbar-go').click();
   await settle(page);
   let a = await areasNow(page);

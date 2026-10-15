@@ -50,7 +50,7 @@ function ptsControls() {
   });
   const rows = {
     marks: [...P.querySelectorAll('#mark-list .mark-row, #mark-list [data-mark]')].filter(vis).length,
-    areas: [...P.querySelectorAll('#info-areacalc .area-row:not(.area-head), #info-areacalc [data-area-id]')].filter(vis).length,
+    areas: [...P.querySelectorAll('#info-areacalc .area-row:not(.area-head), #info-areacalc [data-area-id], #info-areacalc .area-line')].filter(vis).length,
     text: clean(P).slice(0, 600),
   };
   return { open: true, controls: out, rows };
