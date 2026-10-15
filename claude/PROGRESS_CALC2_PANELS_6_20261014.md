@@ -250,3 +250,96 @@ adas, islm Y — буква оси). Правка: `buildPultExtra` (88-params.j
 «Налогов» на макете нет «Платит» и пределов, «Сдвиг» без пунктира под числом).
 
 **Следующий шаг:** финал (`claude/panels_s6/final.sh`), Notion, отчёт.
+
+## Финал (15.10, 01:34–03:47)
+
+- `manage.py check` — 0 ошибок; `makemigrations --check --dry-run` — «No changes detected»; `calc2_map` — карта
+  обновлена; `scripts/check_em_dash.py` — 0; метка статики `?v=` считается по содержимому сама; старт моделей не
+  менялся (формулы, цвета, окна) — превью свежие (`tex/ci_quick`: «превью сверено 42»).
+- Django `calc2` + `problems.tests.test_design_canon`: 34 теста, 1 провал — `test_canon`, ключ `label_shake` (m-graph,
+  52,8 px) — **старый**, тот же на коде старта (canon_checks «до»).
+
+### Новые и расширенные приборы, Chromium и WebKit — `claude/panels_s6/probes/FINAL_new/summary.txt`
+
+| Прибор | Chromium | WebKit |
+|---|---|---|
+| `redesign/cards_probe.mjs` (+ К, М, Д, Е, Ж, З) | 417 / 417 | 417 / 417 |
+| `redesign/view_probe.mjs` (строка-сегмент, глаз MSB) | 18 / 18 | 18 / 18 |
+| `redesign/answer_panel_probe.mjs` (+ Ж) | 111 / 111 | 111 / 111 |
+| `redesign/quiet_probe.mjs` (К переписан) | 21 / 21 (после правки прибора) | 21 / 21 |
+
+На коде старта `cards_probe` сессии 5 — 195 / 195 в Chromium и в WebKit (`probes/before_extra/cards_start_*.log`).
+
+### Приборы фазы −1: до (`76c55cfa`, сервер 8098) → после — `probes/before/`, `probes/FINAL/`, `FINAL_extra/`
+
+| Прибор | До | После |
+|---|---|---|
+| `redesign/view_probe` | 18 / 18 | 18 / 18 |
+| `redesign/answer_panel_probe` | 101 / 101 | 111 / 111 (+ Ж) |
+| `redesign/quiet_probe` | 21 / 21 | 21 / 21 |
+| `redesign/state_probe` | 44 / 44 | 44 / 44 |
+| `redesign/session_probe` | 0 провалов | 0 провалов |
+| `redesign/parity_quick` | 1 945 / 0 | 1 945 / 0 |
+| `redesign/answer_probe` | 44 | 44 |
+| `redesign/answer_rows_probe` | 123 | 123 |
+| `control_numbers` | 516 | 516 |
+| `calc2_math` | 240 / 0 | 240 / 0 (после правки прибора «Сложение (л)»; первый прогон — 239 / 1) |
+| `redesign/layout_probe` | норма | норма |
+| `tex/ci_quick` | цела | цела |
+| `calc2_nodrag_probe` | 0 сдвинутых | 0 сдвинутых |
+| `check_font_scale` | чисто | чисто |
+| `canon_checks` | `label_shake` 1 (старый) | `label_shake` 1 (старый) |
+| `razbor_check` | 3 замечания (новыми правилами; прежними 0) | 0 |
+| `input_probe` Ш | всё сошлось | всё сошлось |
+| `math_answer_probe` | 117 / 117 | 117 / 117 |
+| `webkit_probe` | 136 / 136 | 136 / 136 |
+| `final_fn_probe` (старый красный) | 5 | 5 |
+| `priyomka_probe` (старый красный) | 3 | 3 |
+| `calc2_ui` | 159 / 159 (сессия 5) | 159 / 159 (после правки прибора; первый прогон — 158 / 159) |
+| `modes_probe`, `memory_probe` | 55, 30 | 55, 30 |
+
+⚠️ Приборы, которые покраснели в финале и научены (ожидание противоречило README / заданию):
+- `quiet_probe` К «Сдвиг MC одним обозначением»: строка сдвига теперь «Сдвиг» и число (README 4, Д1) — обозначение MC
+  проверяется в имени регулятора (`texifyName` → `\mathrm{MC}`), строка — «Сдвиг» и число.
+- `calc2_math` «Сложение (л) подписи ползунков различимы»: все строки сдвига — «Сдвиг 0»; различимость — по обозначению
+  карточки, под которой ползунок стоит.
+- `calc2_ui` «удаление строки убирает кривую»: первой кнопкой-значком строки стала «⋯» карточки (Г2) — прибор щёлкает
+  «Убрать функцию».
+
+### Таблица «прибор → что поменяли» (вся сессия)
+
+| Прибор | Что поменяли |
+|---|---|
+| `redesign/cards_probe.mjs` | + К (один вид карточки, числа плашкой), М (КТВ), Д (потребитель), Е (макро), Ж (неравенство, математика), З (строки, тумблеры, сегменты, глаз MSB); проверка второй КПВ (А6); ввод событиями `input` и `change`; модели без карточек (`NO_CARDS_MODELS`); поле «@graph»; «новые поля формул» (`inp-ppf2b`) не считаются подменой |
+| `redesign/answer_panel_probe.mjs` | + Ж (МРОТ в «Ответе») |
+| `redesign/view_probe.mjs` | строка-сегмент «Вида» (вид «seg»); глаз карточки MSB / MSC — тот же орган условия |
+| `redesign/quiet_probe.mjs` | К «Сдвиг MC» — по имени регулятора (README 4) |
+| `calc2_math.mjs`, `calc2_ui.mjs` | различимость ползунка по карточке; «Убрать функцию» из «⋯» |
+| `redesign/inpage.js` | `findUpgradedSelect` (список под `upgradeSelect`); классы `sc-…` не в ключе органа |
+| `redesign/fates.mjs`, `layer_new.mjs`, `parity_quick.mjs`, `PARITY.md` | буквы «т», «у», «ф»; `FATES_MODEL` и `fateOf(ключ, модель)`; «с» для тумблеров ineq, min/max, ограничения, стороны налога, заводов; «ж» для MSB, MSC; переезд кнопки цвета f «Касательной» |
+| пакет: `tools/panels_compare.mjs` | allow `questions` («переименован / убран», с причиной) |
+| `claude/panels_s5/razbor_check.mjs` | `WRONG` (закрытый список неверных утверждений), «вопросы одной модели не повторяют друг друга» |
+| `claude/panels_s6/*` | новые: `before.sh`, `model_check.sh`, `peek.mjs`, `fit_scan.mjs`, `shots_left.mjs`, `side_by_side.py`, `dead_axis_probe.mjs`, `custom_enter_probe.mjs`, `teeth_A.py`, `teeth_BV.py`, `teeth_G.py`, `teeth_D.py`, `stage_end_G.sh`, `stage_end_D.sh`, `final.sh` |
+
+### Содержимое `allow` (с причинами)
+- `A_allow.json`: costs — вопрос «Почему средние постоянные издержки нигде не пересекаются с остальными?» →
+  «Почему ATC и AVC сближаются, но никогда не пересекаются?» (неверное утверждение); money — вопрос «Почему
+  предложение денег нарисовано вертикальным?» убран (повтор, ответ слит).
+- `B_allow.json`: consumer, cons-slutsky — `cons-type` (системный список под `upgradeSelect`, выбирают кнопкой-списком).
+- `D_allow.json`: плюс quota — `seg-quota` (полоса из одной кнопки, выбирать не из чего); ext — `chk-msb`, `chk-msc`
+  (галочка — глаз карточки, README 8).
+
+### Сверки `panels_compare` по этапам
+А: `S6_before → S6_A` (A_allow) — расхождений нет; Б: `S6_A → S6_B` (B_allow); В: `S6_B → S6_V`; Г: `S6_V → S6_G`;
+Д: `S6_G → S6_D` (D_allow) — везде **расхождений нет**. Подсказок на экране 1 208 → 1 204 (ушёл чип r: 4 `data-tip`).
+
+### Итог сессии
+- Этап А — все семь правок (А1–А7) и зубастость; этапы Б–Г — все модели (consumer, cons-slutsky, 7 моделей макро,
+  ineq, 6 моделей «Математики»); этап Д — восемь деталей. Предохранители не срабатывали, откатов нет.
+- WebKit: `cards_probe`, `view_probe`, `answer_panel_probe`, `quiet_probe` — полностью; `webkit_probe`; Д, Е, Ж, З, К по
+  этапам. Остальное — Chromium.
+- Отступления (в ADR 0154): приставка уходит, если запись не помещается и в 16 px (TC «Издержек»); «Какую функцию
+  ищем» не переименована (контрольные числа); дорожки — системные с `accent-color`; раздел «С МРОТ», а не таблица.
+- Ничего не запушено, в `main` ничего не слито.
+
+**Следующий шаг:** приёмка владельцем в Safari по сценариям отчёта; после «да» — пуш ветки; затем сессия 7 (точки и площади).
