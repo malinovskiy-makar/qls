@@ -7,6 +7,7 @@
  "costs": { "self": "setSelfMode(true);" },
  "m-tangent": { "self": "setSelfMode(true);" },
  "labor-mono": { "self": "setSelfMode(true);" },
+ "labor-bilat": { "mrot45": "var c=document.getElementById('chk-labmin'); if(c&&!c.checked) c.click(); setLaborMin(45);" },
  "prod": { "self": "setSelfMode(true);" },
  "sd": {
   "marks-area": "STATE.marks.push(newMark(30, 70, null, 'coords')); STATE.marks.push(newMark(60, 20, null, 'coords')); if (typeof renderMarkList === 'function') renderMarkList(); syncAreaCalcUI(); var sel = document.getElementById('ac-pick'); sel.value = areaTargets()[0].name; STATE.acFrom = 10; STATE.acTo = 40; runAreaCalc();",

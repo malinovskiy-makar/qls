@@ -11,13 +11,17 @@
    B (40; 40), C (60; 50) и площадь S₁ по ним): проверка текста, дефектов записи нет, в файле $A$, $B$, $C$ и
    многоугольник S₁ по вершинам (30; 70), (40; 40), (60; 50) с записью в легенде $S_{1}$.
 
+   Рынок труда (сессия 15.10, ADR 0156): в .tex старта «Профсоюза» — точка «MRL = 0» в (50; 0) и ни одного другого
+   кружка цвета MRL (точки «MRL = S» нет); состояние labor-bilat@mrot45 — полоса торга 45 … 50, «45 min», MCLэфф, M,
+   «Безработица = 15», дефектов записи нет.
+
    Сторож свежести превью экрана выбора (ADR 0141): у каждой модели из
    calc2/static/calc2/previews.json отпечаток описи старта (previews/inpage.js)
    совпадает с записанным в файле. Не совпал — старт модели поменялся, а
    превью нет: «превью устарело: <модель>, пересоберите командой …».
 
    node calc2/tests/tex/ci_quick.mjs          (CALC2_BASE_URL — сервер)
-   OUT=папка — записать 44 файла (тест соберёт их pdflatex, где он есть).
+   OUT=папка — записать 46 файлов: 44 старта, taxes@pts-areas и labor-bilat@mrot45 (тест соберёт их pdflatex, где он есть).
    Коды: 0 — всё сошлось; 1 — провал; 3 — calc2 не загрузился; 4 — нет Playwright. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -99,6 +103,35 @@ for (const k of KEYS) {
   if (why.length) fails.push('taxes@pts-areas: ' + why.join(' | '));
   if (OUT) fs.writeFileSync(path.join(OUT, 'taxes@pts-areas.tex'), r.tex);
 }
+// Рынок труда (сессия 15.10, ADR 0156). Старт «Профсоюза»: точка «MRL = 0» на оси L (50; 0) цветом MRL, других
+// кружков этого цвета (прежней точки «MRL = S» на уровне предложения) нет.
+{
+  const lines = (files['labor-union'] || '').split('\n');
+  const lab = lines.find(l => l.indexOf('{$\\mathrm{MRL} = 0$}') >= 0) || '';
+  const col = (/text=(c[0-9A-F]{6})/.exec(lab) || [])[1];
+  const dots = col ? lines.filter(l => l.indexOf('\\fill[' + col + ']') === 0 && / circle\[/.test(l)) : [];
+  const why = [];
+  if (!lab) why.push('нет подписи «MRL = 0»');
+  if (dots.length !== 1 || dots[0].indexOf('(axis cs:50,0) circle') < 0) why.push('кружки цвета MRL: ' + (dots.join(' / ') || 'нет'));
+  if (why.length) fails.push('labor-union (старт): ' + why.join(' | '));
+}
+// «Двусторонняя монополия» с МРОТ 45 (состояние labor-bilat@mrot45): полоса торга 45 … 50, линия МРОТ «45 min», полка
+// MCLэфф, точка M (55; 45), полоса безработицы «Безработица = 15»; дефектов записи нет.
+{
+  const code = loadRecipes()['labor-bilat@mrot45'];
+  await openScene(wide, 'labor-bilat');
+  await wide.evaluate((c) => { (new Function(c))(); redrawAll(); }, code);
+  await wide.waitForTimeout(300);
+  const r = await texOf(wide);
+  const why = [];
+  const lint = lintTex(r.tex);
+  if (!lint.ok) why.push('проверка текста: ' + lint.problems.slice(0, 3).join('; '));
+  DEF.forEach(d => { if (r.stats[d]) why.push(d + ' ' + r.stats[d]); });
+  ['{$45_{\\mathrm{min}}$}', '{MCLэфф}', '{Безработица $= 15$}', '{$M$}', '(axis cs:55,45) circle'].forEach(t => { if (r.tex.indexOf(t) < 0) why.push('нет ' + t); });
+  if (!/\(axis cs:0,45\) rectangle \(axis cs:[\d.]+,50\);\s+% Диапазон возможных зарплат/.test(r.tex)) why.push('нет полосы торга 45 … 50');
+  if (why.length) fails.push('labor-bilat@mrot45: ' + why.join(' | '));
+  if (OUT) fs.writeFileSync(path.join(OUT, 'labor-bilat@mrot45.tex'), r.tex);
+}
 const narrow = await open(390, 844, 'dark');
 for (const k of TWO) {
   await openScene(narrow, k);
@@ -109,5 +142,5 @@ await browser.close();
 const s = ((Date.now() - t0) / 1000).toFixed(1);
 fails.forEach(f => console.log('ПРОВАЛ ' + f));
 console.log((fails.length ? 'ВЫГРУЗКА .tex: провалов ' + fails.length : 'ВЫГРУЗКА .tex ЦЕЛА') +
-  ' | стартов ' + KEYS.length + ', своих точек и площадей 1, двух окон ' + TWO.length + ', превью сверено ' + pvChecked + ', ' + s + ' с');
+  ' | стартов ' + KEYS.length + ', своих точек и площадей 1, двусторонней с МРОТ 1, двух окон ' + TWO.length + ', превью сверено ' + pvChecked + ', ' + s + ' с');
 process.exit(fails.length ? 1 : 0);

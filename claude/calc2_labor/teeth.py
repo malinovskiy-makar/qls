@@ -60,6 +60,15 @@ STAGES = {
    [(S + '89-model-state.js', "const MODEL_STATE_VERSION = 1;", "const MODEL_STATE_VERSION = 2;")],
    PROBE + 'В'),
  ],
+ 'Г': [
+  ('1 вернуть точку «MRL = S» (tex/ci_quick, старт labor-union)',
+   [(L, "    // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).",
+        "    g.append('circle').attr('cx', px).attr('cy', toPx(u.Lu, evalCurve(STATE.laborS, u.Lu))[1]).attr('r', 3.5).attr('fill', COL.MR);\n    // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).")],
+   'node calc2/tests/tex/ci_quick.mjs'),
+  ('2 МРОТ в двусторонней по-старому (tex/ci_quick, labor-bilat@mrot45)',
+   [(L, "    STATE.laborMin = (STATE.laborStruct === 'monopsony' || STATE.laborStruct === 'bilateral')", "    STATE.laborMin = (STATE.laborStruct === 'monopsony')")],
+   'node calc2/tests/tex/ci_quick.mjs'),
+ ],
 }
 stage = sys.argv[1]
 only = sys.argv[2:]   # номера зубов (первое слово названия); без них — все

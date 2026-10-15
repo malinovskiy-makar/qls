@@ -1003,6 +1003,7 @@
  {"id":"costs@self","key":"costs","src":"recipe","recipe":"costs@self","file":"40-extra.json"},
  {"id":"m-tangent@self","key":"m-tangent","src":"recipe","recipe":"m-tangent@self","file":"40-extra.json"},
  {"id":"labor-mono@self","key":"labor-mono","src":"recipe","recipe":"labor-mono@self","file":"40-extra.json"},
+ {"id":"labor-bilat@mrot45","key":"labor-bilat","src":"recipe","recipe":"labor-bilat@mrot45","file":"40-extra.json"},
  {"id":"prod@self","key":"prod","src":"recipe","recipe":"prod@self","file":"40-extra.json"},
  {"id":"sd@marks-area","key":"sd","src":"recipe","recipe":"sd@marks-area","file":"40-extra.json"},
  {"id":"sd@area-poly","key":"sd","src":"recipe","recipe":"sd@area-poly","file":"40-extra.json"},
