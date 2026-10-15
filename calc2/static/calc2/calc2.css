@@ -4285,3 +4285,11 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 #pts-panel .seg.ac-mode { background: transparent; border: 0; padding: 0; gap: 8px; }
 #pts-panel .seg.ac-mode .seg-btn { border: 1px solid var(--border); border-radius: var(--r); background: transparent; min-height: 36px; }
 #pts-panel #sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { border-color: var(--border); }
+/* Г2. «Сначала сам»: координаты своих точек в строках и числа своих площадей спрятаны, на их месте «?» (прежнее
+   правило целилось в старые узлы .mark-xy .edval и #info-areacalc .stat > b). «Показать всё» (body.self-all) — видно. */
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit),
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val { position: relative; color: transparent; }
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit) .katex { visibility: hidden; }
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit)::after,
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { content: '?'; position: absolute; left: 0; top: 0; color: var(--text2); }
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: auto; right: 0; }

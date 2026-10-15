@@ -23,6 +23,9 @@
         остаётся; в сценарии из 20 шагов (включить, выключить, отменить,
         повторить, сменить модель) кнопка и режим не расходятся ни разу;
         ссылка «Поделиться» с галочкой несёт режим (&self=1).
+     Е. (тихие панели, сессия 7, Г2) «Налоги», режим «Точки и площади», три свои точки и площадь S₁ по ним, режим
+        включён: в строках панели точек координаты точек и число площади не видны (на месте — «?»), в «Ответе» число
+        своей площади не видно, на холсте у своих точек нет чисел; «Показать всё» — всё видно.
 */
 import { chromium } from 'playwright';
 import { keepAnswerOpen, answerShown } from './answer_open.mjs';
@@ -319,6 +322,35 @@ if (want('Д')) {
     undoOff: document.getElementById('btn-undo').disabled }));
   ok('по ссылке модель открыта в режиме: кнопка и режим согласны, «Отменить» выключена', r2.on && r2.pressed === 'true' && r2.undoOff, JSON.stringify(r2));
   await p2.context().close();
+}
+
+if (want('Е')) {
+  head('Е. Свои точки и площади в режиме «Сначала сам» (сессия 7, Г2)');
+  await ev(() => { if (SELF.on) setSelfMode(false); resetSceneMemory(); pickScene('taxes'); closePicker(); setPtsMode(true);
+    var ids = [[40, 60], [40, 40], [50, 50]].map(function (q) { var m = newMark(q[0], q[1], null, 'coords'); STATE.marks.push(m); return m.id; });
+    renderMarkList(); addPolyArea(ids); });
+  await page.waitForTimeout(600);
+  const look = () => ev(() => {
+    const shown = (e) => { if (!e) return false; for (let n = e; n; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden') return false; } return getComputedStyle(e).color !== 'rgba(0, 0, 0, 0)'; };
+    const xy = [...document.querySelectorAll('#mark-list .mark-row > .mark-xy .katex')].filter(shown).length;
+    const av = [...document.querySelectorAll('#info-areacalc .area-line > .area-val')].filter(shown).length;
+    const q = [...document.querySelectorAll('#mark-list .mark-row > .mark-xy, #info-areacalc .area-line > .area-val')].map(e => getComputedStyle(e, '::after').content).filter(c => c === '"?"').length;
+    const own = [...document.querySelectorAll('#ans-hero .ans-own-cell .ans-val')].filter(shown).length;
+    const cv = [...document.querySelectorAll('#chart g.marks text')].filter(t => /\d/.test(t.textContent) && getComputedStyle(t).display !== 'none' && getComputedStyle(t).visibility !== 'hidden' && t.getAttribute('opacity') !== '0').length;
+    return { rows: document.querySelectorAll('#mark-list .mark-row').length, areas: document.querySelectorAll('#info-areacalc .area-line').length, xy, av, q, own, cv };
+  });
+  const before = await look();
+  ok('без режима: координаты точек и число площади видны', before.rows === 3 && before.areas === 1 && before.xy === 3 && before.av === 1 && before.own === 1, JSON.stringify(before));
+  await ev(() => setSelfMode(true));
+  await page.waitForTimeout(900);
+  const on = await look();
+  ok('режим: в строках ни координат точек, ни числа площади — на месте «?»; в «Ответе» числа своей площади нет; на холсте у своих точек чисел нет',
+    on.xy === 0 && on.av === 0 && on.q === 4 && on.own === 0 && on.cv === 0, JSON.stringify(on));
+  await ev(() => { const g = document.getElementById('self-gate'); if (g) g.click(); });
+  await page.waitForTimeout(900);
+  const all = await look();
+  ok('«Показать всё» — координаты и число площади видны', all.xy === 3 && all.av === 1 && all.own === 1, JSON.stringify(all));
+  await ev(() => { setSelfMode(false); setPtsMode(false); });
 }
 
 ok('ошибок страницы нет', !errs.length, errs.slice(0, 3).join(' | '));
