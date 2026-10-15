@@ -357,7 +357,7 @@ const STATE = {
   // 'competition' | 'monopsony' | 'union' | 'bilateral' (двусторонняя монополия, Фаза 12)
   laborStruct: 'competition',
   laborBilateral: null,        // диапазон зарплат [Wм; Wп] — модель НЕ даёт одной точки
-  unionModel: 'monopoly',      // профсоюз: 'monopoly': монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
+  unionModel: 'monopoly',      // профсоюз: 'monopoly': монополист труда (фонд оплаты W·L, MRL = 0; ADR 0156), 'wagefloor' — диктат зарплаты
   unionWage: 0,                // уровень зарплаты профсоюза при диктате (0 = не задан)
   unionWageVisited: false,     // первый вход в диктат — выставить зарплату-ориентир
   laborUnion: null,            // результат профсоюза (Lп, Wп, безработица, DWL)

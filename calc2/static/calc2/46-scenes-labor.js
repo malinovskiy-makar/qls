@@ -82,19 +82,41 @@ function laborMinCompetition(Wmin) {
   return { binding, Wmin, Qd, Qs, employment, unemployment };
 }
 
-// Профсоюз как монополист труда (ЧК4) — зеркало монопсонии. Профсоюз продаёт труд
-// монопольно: спрос на труд D (=MRPL) — его «спрос», предельный доход MRL ниже D;
-// «предельные издержки» — кривая предложения S (резервная зарплата). Оптимум Lп:
-// MRL = S. Зарплата Wп берётся с кривой спроса D в точке Lп (выше конкурентной).
+/* Профсоюз как монополист труда (ЧК4) — зеркало монопсонии. Профсоюз продаёт труд монопольно: спрос на труд
+   D (=MRPL) — его «спрос», предельный доход профсоюза MRL ниже D.
+   ⚠️ ЦЕЛЬ — ФОНД ОПЛАТЫ W·L, как у Сафронова (8.7: «принято считать, что профсоюз максимизирует L·w»; решение
+   владельца 15.10, Notion …81ac…, ADR 0156), а НЕ выигрыш членов MRL = S. Фонд L·D(L) растёт, пока MRL > 0, и
+   максимален при MRL = 0 (спрос на труд там единичной эластичности). Нанять больше, чем хотят работать, нельзя:
+   при W ≥ Wk это L ≤ Lk. Поэтому кандидаты — корни MRL = 0 внутри (0; Lk) и угол Lk; у нелинейного спроса
+   сравниваем фонд кандидатов, а не положение корня. Угол (MRL = 0 не левее Lk) — профсоюзу выгодна конкурентная
+   ставка, потерь нет. Зарплата Wп берётся с кривой спроса D в точке Lп. Без равновесия D = S — null. */
 function laborUnionMonopoly() {
   const D = STATE.laborD, S = STATE.laborS, eq = STATE.laborEq;
-  if (!D || !S) return null;
-  const Lu = findRoot(l => { const mr = marginalRevenue(D, l), s = evalCurve(S, l); return (isNaN(mr) || isNaN(s)) ? NaN : mr - s; });
-  if (Lu == null || Lu <= 1e-6) return null;
-  const Wu = evalCurve(D, Lu);                       // зарплата = D(Lп), НЕ MRL и НЕ S
-  let dwl = null;
-  if (eq) { const lo = Math.min(Lu, eq.Q), hi = Math.max(Lu, eq.Q); dwl = areaBetween(l => evalCurve(D, l) - evalCurve(S, l), lo, hi); }
-  return { Lu, Wu, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
+  if (!D || !S || !eq || !(eq.Q > 1e-6)) return null;
+  const Lk = eq.Q, Wk = eq.P;
+  const mrl = (l) => marginalRevenue(D, l);
+  const fundAt = (l) => { const w = evalCurve(D, l); return isNaN(w) ? NaN : w * l; };
+  // Корни MRL = 0 внутри (0; Lk − 1e-6), где MRL меняет знак с «+» на «−» (максимумы фонда).
+  const hiIn = Lk - 1e-6, N = 1000, cands = [];
+  let prevL = 0, prevG = mrl(0);
+  for (let i = 1; i <= N; i++) {
+    const l = hiIn * i / N, g = mrl(l);
+    if (!isNaN(prevG) && !isNaN(g) && prevG > 0 && g <= 0) cands.push(g === 0 ? l : bisect(mrl, prevL, l));
+    prevL = l; prevG = g;
+  }
+  // Лучший внутренний корень по фонду; угол Lk выигрывает, если его фонд не меньше.
+  let L0 = null, best = null;
+  cands.forEach(l => { const f = fundAt(l); if (!isNaN(f) && (best == null || f > best + 1e-9)) { best = f; L0 = l; } });
+  const corner = (L0 == null || !(best > Lk * Wk + 1e-9));
+  // Для холста и «Разбора»: где MRL = 0 вообще (в углу — правее Lk или нигде).
+  if (corner) L0 = findRoot(mrl);
+  const Lu = corner ? Lk : L0;
+  const Wu = corner ? Wk : evalCurve(D, Lu);         // зарплата = D(Lп), НЕ MRL и НЕ S
+  const fund = Wu * Lu;
+  const Qs = corner ? Lk : invCurve(S, Wu);           // желающих работать при Wп = S⁻¹(Wп)
+  const unemployment = corner ? 0 : (Qs != null ? Math.max(0, Qs - Lu) : null);
+  const dwl = corner ? 0 : areaBetween(l => evalCurve(D, l) - evalCurve(S, l), Lu, Lk);
+  return { Lu, Wu, Lk, Wk, dwl, fund, Qs, unemployment, L0, corner };
 }
 
 // Профсоюз диктует зарплату W выше конкурентной (ЧК4): занятость падает по кривой
@@ -138,7 +160,7 @@ function recomputeLabor() {
       STATE.laborMono = { Lm, Wm, Lk: eq ? eq.Q : null, Wk: eq ? eq.P : null, dwl };
     }
   }
-  // Профсоюз (ЧК4): монополист труда (MRL=S) или диктат зарплаты (ценовой пол).
+  // Профсоюз (ЧК4): монополист труда (максимум фонда оплаты, MRL = 0) или диктат зарплаты (ценовой пол).
   if (STATE.laborStruct === 'union') {
     STATE.laborUnion = (STATE.unionModel === 'wagefloor')
       ? laborUnionWageFloor(STATE.unionWage)
@@ -157,7 +179,8 @@ function recomputeLabor() {
     if (m && u) {
       const lo = Math.min(m.Wm, u.Wu), hi = Math.max(m.Wm, u.Wu);
       STATE.laborBilateral = { Wlo: lo, Whi: hi, Wm: m.Wm, Lm: m.Lm, Wu: u.Wu, Lu: u.Lu,
-                               Wk: eq ? eq.P : null, Lk: eq ? eq.Q : null };
+                               Wk: eq ? eq.P : null, Lk: eq ? eq.Q : null,
+                               Ulo: 0, Uhi: u.unemployment };
     }
   }
   // Минимальная зарплата (МРОТ).
@@ -464,7 +487,7 @@ function drawLaborGapDWL(La, Lb) {
     { from: lo, to: hi, lo: S, hi: D, v: 'L' });
 }
 
-// Точки профсоюза: оптимум монополиста (MRL=S, зарплата вверх на D) или диктат зарплаты.
+// Точки профсоюза: оптимум монополиста (MRL = 0 или угол Lk, зарплата вверх на D) или диктат зарплаты.
 function drawLaborUnionPoints() {
   const u = STATE.laborUnion; if (!u) return;
   drawLaborGhost(u.Lk, u.Wk, 'К');                 // конкурентный ориентир
@@ -472,12 +495,18 @@ function drawLaborUnionPoints() {
   const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
     .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   if (STATE.unionModel === 'monopoly') {
-    const S = STATE.laborS, sAt = evalCurve(S, u.Lu);
-    const [px, pyW] = toPx(u.Lu, u.Wu), [, pyS] = toPx(u.Lu, sAt);
+    const [px, pyW] = toPx(u.Lu, u.Wu);
     // Вертикаль Lп: от оси вверх до зарплаты Wп на спросе.
     g.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', pyW).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-    // Точка MRL=S (фиолетовая) на уровне предложения.
-    g.append('circle').attr('cx', px).attr('cy', pyS).attr('r', 3.5).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.2);
+    /* Точка «MRL = 0» на оси L (фонд оплаты максимален там, где MRL = 0; решение …81ac…, ADR 0156) — цветом MRL,
+       подпись словами над осью справа от точки: под осью стоят числа Lп и Lk. Прежней точки «MRL = S» на уровне
+       предложения нет. В углу (MRL = 0 правее Lk) точка стоит там, где MRL = 0, а E′ совпадает с K. */
+    if (u.L0 != null && u.L0 >= sx.domain()[0] && u.L0 <= sx.domain()[1]) {
+      const p0 = sx(u.L0);
+      g.append('circle').attr('cx', p0).attr('cy', oy).attr('r', 3.5).attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.2);
+      const t = haloText(g, p0 + 7, oy - 7, 'MRL = 0', 'start', 'auto');
+      if (t) t.attr('fill', COL.MR).attr('class', 'labor-mrl0');
+    }
     // Зарплата профсоюза Wп на кривой спроса (выше конкурентной).
     dash(ox, pyW, px, pyW);
     g.append('circle').attr('cx', px).attr('cy', pyW).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
@@ -592,6 +621,9 @@ function updateLaborBilateralPanel() {
   html += `<div class="stat"><span>Диапазон зарплаты</span><b>${fmt(b.Wlo)} … ${fmt(b.Whi)}</b></div>`;
   if (b.Wk != null) html += `<div class="stat"><span>Конкурентный ориентир Wk</span><b>${fmt(b.Wk)}</b></div>`;
   html += `<div class="stat"><span>Занятость на границах</span><b>${fmt(b.Lm)} и ${fmt(b.Lu)}</b></div>`;
+  /* Безработица на обеих границах (решение …813c…): внизу без МРОТ всегда 0 — монопсонист нанимает по предложению;
+     вверху — желающие при ставке профсоюза минус нанятые по спросу. */
+  if (b.Ulo != null && b.Uhi != null) html += `<div class="stat"><span>Безработица на границах</span><b>${fmt(b.Ulo)} и ${fmt(b.Uhi)}</b></div>`;
   /* «Один наниматель против одного профсоюза… нет единственного равновесия…» убрано (сессия 5, А4): та же мысль —
      вопросы «Разбора» «Что такое двусторонняя монополия?», «Почему модель не даёт одного числа?», «От чего зависит
      итог внутри диапазона?». */
@@ -639,13 +671,21 @@ function updateLaborPanel() {
     const u = STATE.laborUnion;
     if (!u) { box.innerHTML = '<div class="warn">Оптимум профсоюза не найден.</div>'; return; }
     if (STATE.unionModel === 'monopoly') {
+      /* Фонд оплаты и безработица при ставке профсоюза (решения …81ac…, …813c…; ADR 0156). Строки «Желающих
+         работать» и «Безработица» — те же, что у «Диктата зарплаты». В углу (профсоюзу выгодна конкурентная ставка)
+         безработицы и потерь нет — их строк нет. */
       html += `<div class="stat"><span>$L_п$ (занятость)</span><b>${fmt(u.Lu)}</b></div>`;
       html += `<div class="stat"><span>$W_п$ (зарплата)</span><b>${fmt(u.Wu)}</b></div>`;
-      if (u.Lk != null) html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
-      if (u.Wk != null) html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
-      if (u.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
+      html += `<div class="stat"><span>Фонд оплаты $W_п \\cdot L_п$</span><b>${fmt(u.fund)}</b></div>`;
+      if (!u.corner && u.Qs != null) html += `<div class="stat"><span>Желающих работать</span><b>${fmt(u.Qs)}</b></div>`;
+      if (!u.corner && u.unemployment > 1e-6) html += `<div class="stat"><span>Безработица</span><b>${fmt(u.unemployment)}</b></div>`;
+      html += `<div class="stat"><span>$L_k$ (конкуренция)</span><b>${fmt(u.Lk)}</b></div>`;
+      html += `<div class="stat"><span>$W_k$ (конкуренция)</span><b>${fmt(u.Wk)}</b></div>`;
+      if (!u.corner && u.dwl != null) html += `<div class="stat"><span>$DWL$ (недозанятость)</span><b>${fmt(u.dwl)}</b></div>`;
       // Как профсоюз выбирает Lп и Wп — абзац «Условия» в «Разборе»; здесь только чтение картинки (сессия 5, А4).
-      html += '<div class="hint">Серым закрашены потери общества.</div>';
+      html += u.corner
+        ? '<div class="hint">Фонд оплаты растёт до самой конкурентной точки: профсоюзу выгодна конкурентная ставка, потерь нет.</div>'
+        : '<div class="hint">Серым закрашены потери общества.</div>';
     } else {
       html += `<div class="stat"><span>Зарплата профсоюза Wп</span><b>${fmt(u.W)}</b></div>`;
       if (u.binding) {

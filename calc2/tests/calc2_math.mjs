@@ -133,22 +133,40 @@ const CASES = [
              ['налог Пигу', 'tax', 20, 0.2], ['Pопт', 'Popt', 60, 0.4]],
   },
   {
+    /* Кривые задаются ЯВНО (сессия «рынок труда», 15.10, ADR 0156): старт модели сменился на D = 100 − L,
+       S = 10 + 0,5L, а этот случай — «Старый пример» D = 100 − L, S = L, числа прежние. */
     name: 'Труд · монопсония D=100−L, S=L',
-    run: `setMode('labor'); setLaborStruct('monopsony'); redrawAll();
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('monopsony'); redrawAll();
           var m = STATE.laborMono || {};
           return { Lm: m.Lm, Wm: m.Wm };`,
     checks: [['Lм', 'Lm', 33.33, 0.1], ['Wм', 'Wm', 33.33, 0.1]],
   },
   {
-    name: 'Труд · профсоюз-монополист',
-    run: `setMode('labor'); setLaborStruct('union'); redrawAll();
+    /* Профсоюз максимизирует фонд оплаты W·L (решение владельца 15.10, Notion …81ac…, ADR 0156), а не выигрыш
+       членов MRL = S (прежде 33,33 / 66,67). На «Старом примере» D = 100 − L, S = L MRL = 0 ровно в Lk = 50 — угол:
+       профсоюзу выгодна конкурентная ставка, фонд 2 500, безработицы и потерь нет. */
+    name: 'Труд · профсоюз-монополист, старый пример D=100−L, S=L ⇒ угол 50 / 50 (фонд оплаты)',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
           var u = STATE.laborUnion || {};
-          return { Lu: u.Lu, Wu: u.Wu };`,
-    checks: [['Lп', 'Lu', 33.33, 0.2], ['Wп', 'Wu', 66.67, 0.2]],
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, un: u.unemployment, dwl: u.dwl, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 50, 0.2], ['Wп', 'Wu', 50, 0.2], ['фонд', 'fund', 2500, 5], ['безработица', 'un', 0, 0.01],
+             ['DWL', 'dwl', 0, 0.01], ['угол', 'corner', 1, 0.1]],
   },
   {
     name: 'Труд · МРОТ=50 в монопсонии ⇒ занятость растёт к 50',
-    run: `setMode('labor'); setLaborStruct('monopsony');
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('monopsony');
           STATE.laborMinOn = true; setLaborMin(50); redrawAll();
           var min = STATE.laborMin || {};
           // занятость при связывающем МРОТ: Lstar (короткая сторона)
@@ -518,7 +536,9 @@ const CASES = [
 
   /* ── Фазы 12–13: двусторонняя монополия, коэффициент фондов ──────────── */
   {
-    name: 'Двусторонняя монополия · D=100−L, S=L ⇒ диапазон зарплаты [33.33; 66.67], не точка',
+    /* Верхняя граница — профсоюз по фонду оплаты (ADR 0156): на «Старом примере» угол 50, диапазон 33,33 … 50
+       (прежде 33,33 … 66,67). МРОТ выключен явно: с ним модель считает границы торга иначе. */
+    name: 'Двусторонняя монополия · D=100−L, S=L ⇒ диапазон зарплаты [33.33; 50], не точка',
     // Границы берутся из уже проверенных монопсонии и профсоюза-монополиста.
     // Кривые задаём явно: предыдущие кейсы могли оставить набор без роли S
     // (например «монополист и мировой рынок» держит D и MC), и тогда рынок труда
@@ -527,13 +547,115 @@ const CASES = [
           STATE.curves = [];
           addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
           addCurve('L');       setRole(STATE.curves[1], 'supply');
-          setLaborStruct('bilateral'); redrawAll();
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
           var b = STATE.laborBilateral || {};
-          return { Wm: b.Wm, Wu: b.Wu, lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu };`,
-    checks: [['Wм (монопсония)', 'Wm', 33.33, 0.15], ['Wп (профсоюз)', 'Wu', 66.67, 0.2],
-             ['нижняя граница', 'lo', 33.33, 0.15], ['верхняя граница', 'hi', 66.67, 0.2],
+          return { Wm: b.Wm, Wu: b.Wu, lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['Wм (монопсония)', 'Wm', 33.33, 0.15], ['Wп (профсоюз)', 'Wu', 50, 0.2],
+             ['нижняя граница', 'lo', 33.33, 0.15], ['верхняя граница', 'hi', 50, 0.2],
              ['конкурентный ориентир', 'Wk', 50, 0.2],
-             ['Lм', 'Lm', 33.33, 0.15], ['Lп', 'Lu', 33.33, 0.25]],
+             ['Lм', 'Lm', 33.33, 0.15], ['Lп', 'Lu', 50, 0.25],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 0, 0.05]],
+  },
+  /* ── Рынок труда, 15.10 (ADR 0156): профсоюз по фонду оплаты, новый пример, наборы кривых задаются ЯВНО ─── */
+  {
+    name: 'Труд · профсоюз по фонду оплаты, новый пример D=100−L, S=10+0,5L ⇒ Lп 50, Wп 50, фонд 2500, безработица 30',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, Qs: u.Qs, un: u.unemployment, Lk: u.Lk, Wk: u.Wk, dwl: u.dwl,
+                   L0: u.L0, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 50, 0.2], ['Wп', 'Wu', 50, 0.2], ['фонд', 'fund', 2500, 5], ['желающих', 'Qs', 80, 0.3],
+             ['безработица', 'un', 30, 0.3], ['Lk', 'Lk', 60, 0.2], ['Wk', 'Wk', 40, 0.2], ['DWL', 'dwl', 75, 1],
+             ['MRL = 0 при L', 'L0', 50, 0.2], ['не угол', 'corner', 0, 0.1]],
+  },
+  {
+    name: 'Труд · профсоюз, угол D=100−L, S=2L ⇒ MRL = 0 правее Lk, конкурентная ставка 33,33 / 66,67, потерь нет',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('2*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, un: u.unemployment, dwl: u.dwl, L0: u.L0, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 33.33, 0.2], ['Wп', 'Wu', 66.67, 0.2], ['фонд', 'fund', 2222.22, 5],
+             ['безработица', 'un', 0, 0.01], ['DWL', 'dwl', 0, 0.01], ['MRL = 0 при L', 'L0', 50, 0.2], ['угол', 'corner', 1, 0.1]],
+  },
+  {
+    name: 'Труд · профсоюз, второй пример D=120−2L, S=20+L ⇒ Lп 30, Wп 60, фонд 1800, безработица 10, DWL 16,67',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, Qs: u.Qs, un: u.unemployment, Lk: u.Lk, Wk: u.Wk, dwl: u.dwl };`,
+    checks: [['Lп', 'Lu', 30, 0.2], ['Wп', 'Wu', 60, 0.2], ['фонд', 'fund', 1800, 5], ['желающих', 'Qs', 40, 0.3],
+             ['безработица', 'un', 10, 0.3], ['Lk', 'Lk', 33.33, 0.2], ['Wk', 'Wk', 53.33, 0.2], ['DWL', 'dwl', 16.67, 0.5]],
+  },
+  {
+    name: 'Двусторонняя монополия · новый пример D=100−L, S=10+0,5L без МРОТ ⇒ 32,5 … 50, занятость 45 и 50, безработица 0 и 30',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
+          var b = STATE.laborBilateral || {};
+          return { lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['нижняя граница', 'lo', 32.5, 0.15], ['верхняя граница', 'hi', 50, 0.2], ['Wk', 'Wk', 40, 0.2],
+             ['занятость внизу', 'Lm', 45, 0.2], ['занятость вверху', 'Lu', 50, 0.2],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 30, 0.3]],
+  },
+  {
+    name: 'Двусторонняя монополия · второй пример D=120−2L, S=20+L без МРОТ ⇒ 45 … 60, занятость 25 и 30, безработица 0 и 10',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
+          var b = STATE.laborBilateral || {};
+          return { lo: b.Wlo, hi: b.Whi, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['нижняя граница', 'lo', 45, 0.15], ['верхняя граница', 'hi', 60, 0.2],
+             ['занятость внизу', 'Lm', 25, 0.2], ['занятость вверху', 'Lu', 30, 0.2],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 10, 0.3]],
+  },
+  {
+    name: 'Труд · конкуренция и монопсония, новый пример D=100−L, S=10+0,5L ⇒ 60 / 40 и 45 / 32,5; МРОТ 45 ⇒ занятость 55',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('competition'); redrawAll();
+          var eq = STATE.laborEq || {}, wcs = STATE.laborWorkerCS, fcs = STATE.laborFirmCS;
+          STATE.laborMinOn = true; setLaborMin(45);
+          var cm = STATE.laborMin || {}, cw = STATE.laborMinWelfare || {};
+          STATE.laborMinOn = false; setLaborStruct('monopsony'); redrawAll();
+          var m = STATE.laborMono || {};
+          STATE.laborMinOn = true; setLaborMin(45);
+          var mm = STATE.laborMin || {}, mw = STATE.laborMinWelfare || {};
+          return { Lk: eq.Q, Wk: eq.P, wcs: wcs, fcs: fcs, cEmp: cm.employment, cUn: cm.unemployment, cQs: cm.Qs,
+                   cW: cw.workerCS, cF: cw.firmCS, cD: cw.dwl, Lm: m.Lm, Wm: m.Wm, mDwl: m.dwl,
+                   mL: mm.Lstar, mWage: mm.wage, mUn: mm.unemployment, mW: mw.workerCS, mF: mw.firmCS, mD: mw.dwl };`,
+    checks: [['Lk', 'Lk', 60, 0.2], ['Wk', 'Wk', 40, 0.2], ['излишек рабочих', 'wcs', 900, 3], ['излишек фирм', 'fcs', 1800, 3],
+             ['конкуренция + МРОТ 45: занятость', 'cEmp', 55, 0.2], ['безработица', 'cUn', 15, 0.2], ['желающих', 'cQs', 70, 0.3],
+             ['излишек рабочих при МРОТ', 'cW', 1168.75, 3], ['излишек фирм при МРОТ', 'cF', 1512.5, 3], ['DWL при МРОТ', 'cD', 18.75, 0.5],
+             ['Lм', 'Lm', 45, 0.2], ['Wм', 'Wm', 32.5, 0.15], ['DWL монопсонии', 'mDwl', 168.75, 1],
+             ['монопсония + МРОТ 45: занятость', 'mL', 55, 0.3], ['зарплата', 'mWage', 45, 0.1], ['безработица', 'mUn', 15, 0.3],
+             ['излишек рабочих при МРОТ', 'mW', 1168.75, 3], ['излишек фирм при МРОТ', 'mF', 1512.5, 3], ['DWL при МРОТ', 'mD', 18.75, 0.5]],
+  },
+  {
+    name: 'Труд · конкуренция, старый пример D=100−L, S=L, МРОТ 65 ⇒ занятость 35, безработица 30, излишки 1662,5 и 612,5, DWL 225',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('competition'); STATE.laborMinOn = true; setLaborMin(65);
+          var cm = STATE.laborMin || {}, cw = STATE.laborMinWelfare || {};
+          return { emp: cm.employment, un: cm.unemployment, w: cw.workerCS, f: cw.firmCS, d: cw.dwl };`,
+    checks: [['занятость', 'emp', 35, 0.2], ['безработица', 'un', 30, 0.2], ['излишек рабочих', 'w', 1662.5, 3],
+             ['излишек фирм', 'f', 612.5, 3], ['DWL', 'd', 225, 1]],
   },
   {
     name: 'Коэф. фондов · доходы 10,15,20,25,30,35,40,50,70,150 ⇒ 150/10 = 15 (а P90/P10 = 5.38)',
