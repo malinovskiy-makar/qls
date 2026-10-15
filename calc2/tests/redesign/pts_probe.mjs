@@ -308,7 +308,50 @@ async function sectionB3() {
   await ctx.close();
 }
 
-const SECTIONS = [['Б1', sectionB1], ['Б3', sectionB3], ['Б4', sectionB4]];
+/* ── Б2: раздел «Точки», строки ── */
+async function sectionB2() {
+  head('Б2. Раздел «Точки»: строки точек');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  const hdr = await page.evaluate(() => {
+    const row = document.querySelector('#sec-view .pts-sec-row');
+    const add = document.querySelector('#sec-view .btn-mark-add');
+    return { inRow: !!(row && add && row.contains(add)), notInHead: !!(add && !add.closest('h3')), text: add ? add.textContent.trim() : '',
+      head: row ? row.querySelector('h3.pts-sec-head').textContent.trim() : '' };
+  });
+  ok('«+ По координатам» — в строке заголовка «Точки», рядом с h3', hdr.inRow && hdr.notInHead && hdr.text === '+ По координатам' && hdr.head === 'Точки', JSON.stringify(hdr));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50], [20, 80]]) await clickModel(page, x, y);
+  const r = await rows(page);
+  const want = [
+    ['A', '(40;\\ 60)', /точка/, [/Q_\{1\}/, /P_\{b\}/]],
+    ['B', '(40;\\ 40)', /точка/, [/Q_\{1\}/, /P_\{s\}/]],
+    ['C', '(50;\\ 50)', /пересечение/, [/^D\b|\bD\b/, /\bS\b/]],
+  ];
+  want.forEach(([n, xy, word, texs], i) => {
+    const q = r[i] || {};
+    ok('строка ' + n + ' ' + xy + ' «' + (q.on || '') + '»: имя, координаты и «на чём стоит» формулой, галочка и «⋯»',
+      q.nameTex === n && q.xyTex === xy && word.test(q.on) && texs.every(t => t.test(q.onTex)) && q.pick && q.more, JSON.stringify(q));
+  });
+  const d = r[3] || {};
+  ok('четвёртая точка — «(20; 80) на D», буква не D, S, P, Q', d.xyTex === '(20;\\ 80)' && /^на D$/.test(d.on.replace(/\s+/g, ' ')) && d.onTex === 'D' && /^[A-Z]$/.test(d.nameTex) && !/[DSPQ]/.test(d.nameTex), JSON.stringify(d));
+  ok('в строке ничего больше нет: галочка и «⋯» — все органы строки', r.every(q => q.extra === 2), JSON.stringify(r.map(q => q.extra)));
+  // Вид: имя 19 px, координаты 16 px, «на чём стоит» 12 / 500 --text3.
+  const st = await page.evaluate(() => {
+    const r0 = document.querySelector('#mark-list .mark-row:not(.mark-draft)');
+    const cs = (sel) => { const e = r0.querySelector(sel); const c = e && getComputedStyle(e); return c ? [c.fontSize, c.fontWeight, c.color].join(' ') : ''; };
+    return { name: cs('.mark-name'), xy: cs('.mark-xy'), on: cs('.mark-on'), text3: getComputedStyle(document.body).getPropertyValue('--text3').trim() };
+  });
+  ok('вид строки: имя 19 px, координаты 16 px, «на …» 12 / 500', /^19px/.test(st.name) && /^16px/.test(st.xy) && /^12px 500 /.test(st.on), JSON.stringify(st));
+  // Галочка выбора — вид, не модель: щелчок не шаг истории.
+  const u0 = await undoLen(page);
+  await page.locator('#mark-list .mark-row .mark-pick input').first().click();
+  await settle(page);
+  ok('галочка выбора — не шаг истории и не STATE', (await undoLen(page)) === u0 && (await page.evaluate(() => JSON.stringify(STATE).indexOf('ptsSel') < 0 && CANVAS.ptsSel.length === 1)), String(await undoLen(page)));
+  ok('Б2: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4]];
 for (const name of ENGINES) {
   eng = name; engName = name; ctxCount = 0;
   try { browser = await pw[name].launch(); } catch (e) {

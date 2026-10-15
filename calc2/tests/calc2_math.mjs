@@ -1144,14 +1144,18 @@ const CASES = [
   {
     /* П28. Пайплайн добавления точки: кнопка → тумблер → два поля координат.
        Точка появляется, как только заполнены ОБА поля, и переезжает на каждый
-       введённый символ. Кнопка «Добавить точку» стоит ПОД созданными точками. */
+       введённый символ. Кнопка «Добавить точку» стоит ПОД созданными точками.
+       С сессии 7 «тихих панелей» (README пакета calc2_panels_20261014, раздел 9) кнопка «+ По координатам» —
+       в строке заголовка раздела «Точки» (#sec-view .pts-sec-row), а не под списком: «последней» — значит
+       в строке заголовка, вне списка. */
     name: 'Точки · точка появляется, как только заполнены оба поля',
     run: `openPicker(); pickScene('sd'); closePicker();
           STATE.marks = []; renderMarkList();
           var box = document.getElementById('mark-list');
-          var only = box.children.length === 1 && box.firstElementChild.classList.contains('btn-mark-add') ? 1 : 0;
-          box.querySelector('.btn-mark-add').click();
-          var noBtn = box.querySelector('.btn-mark-add') ? 0 : 1;
+          var hdr = document.querySelector('#sec-view .pts-sec-row');
+          var only = box.children.length === 0 && hdr.querySelector('.btn-mark-add') ? 1 : 0;
+          hdr.querySelector('.btn-mark-add').click();
+          var noBtn = document.querySelector('#sec-view .btn-mark-add') ? 0 : 1;
           /* Н36, Н47: координаты — не поля в рамке, а редактируемые значения
              (contenteditable внутри .edval). Печатаем в них так же, как человек:
              ставим текст и будим «input». */
@@ -1168,8 +1172,8 @@ const CASES = [
           var y1 = live ? live.y : -1;
           type(f[1], '50');
           var y2 = STATE.marks.filter(function (m) { return !m.pending; })[0].y;
-          var back = document.getElementById('mark-list').querySelector('.btn-mark-add') ? 1 : 0;
-          var lastIsBtn = document.getElementById('mark-list').lastElementChild.classList.contains('btn-mark-add') ? 1 : 0;
+          var back = document.querySelector('#sec-view .btn-mark-add') ? 1 : 0;
+          var lastIsBtn = hdr.lastElementChild.classList.contains('btn-mark-add') && !box.querySelector('.btn-mark-add') ? 1 : 0;
           return { only: only, noBtn: noBtn, half: half, y1: y1, y2: y2, back: back, last: lastIsBtn };`,
     checks: [['сначала только кнопка', 'only', 1, 0], ['после щелчка кнопки нет', 'noBtn', 1, 0],
              ['одно поле — точки нет', 'half', 0, 0], ['«5» ⇒ точка (50; 5)', 'y1', 5, 0.001],

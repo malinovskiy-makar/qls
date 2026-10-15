@@ -4221,3 +4221,31 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
 .pts-menu .pts-mi-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .pts-menu .pts-mi-sep { height: 1px; margin: 6px 4px; background: var(--border-soft); }
 .pts-menu .pts-mi-danger { color: var(--error-ink); }
+/* Б2. Раздел «Точки»: заголовок слева, тихая «+ По координатам» справа; строка точки — галочка, имя KaTeX 19 px,
+   координаты KaTeX 16 px, «на D» 12 / 500 --text3 справа, «⋯». Не помещается — «на …» уходит второй строкой. */
+#pts-panel #sec-view .pts-sec-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 6px; }
+#pts-panel #sec-view .pts-sec-row .pts-sec-head { padding: 0; }
+#pts-panel .pts-sec-row .btn-mark-add {
+  margin: 0; padding: 0 6px; min-height: 28px; border: 0; background: transparent; color: var(--text2);
+  font-size: 13px; font-weight: 600; cursor: pointer; border-radius: var(--r);
+}
+#pts-panel .pts-sec-row .btn-mark-add:hover { background: var(--chip-bg); color: var(--text); }
+#pts-panel .mark-row:not(.mark-draft):not(:has(.mark-xy-edit)) {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: 8px; row-gap: 0; padding: 6px 0; min-height: 44px;
+  border-bottom: 1px solid var(--border-soft);
+}
+#pts-panel .mark-row .mark-pick { display: inline-flex; align-items: center; margin: 0; flex: 0 0 auto; }
+#pts-panel .mark-row .mark-pick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+#pts-panel .mark-row > .mark-name { flex: 0 0 auto; font-size: 19px; font-weight: 400; color: var(--text); }
+#pts-panel .mark-row > .mark-name .katex { font-size: 1em; }
+#pts-panel .mark-row > .mark-xy:not(.mark-xy-edit) { flex: 0 0 auto; margin: 0; font-size: 16px; color: var(--text2); }
+#pts-panel .mark-row > .mark-xy .katex { font-size: 1em; }
+#pts-panel .mark-row > .mark-on {
+  flex: 1 1 auto; margin: 0; text-align: right; font-size: 12px !important; font-weight: 500 !important; color: var(--text3);
+}
+#pts-panel .mark-row > .mark-on .katex { font-size: 1.15em; }
+#pts-panel .mark-row > .mark-more { flex: 0 0 auto; width: 28px; height: 28px; margin-left: auto; color: var(--text3); }
+#pts-panel .mark-row > .mark-more svg { width: 18px; height: 18px; }
+#pts-panel .mark-row:has(.mark-xy-edit) { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+#pts-panel .mark-row:has(.mark-xy-edit) > .mark-name { font-size: 19px; }
+#pts-panel .mark-xy-edit { margin: 0; align-items: center; }

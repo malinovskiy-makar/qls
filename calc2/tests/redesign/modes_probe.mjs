@@ -108,10 +108,13 @@ if (want('А')) {
   const m = await page.evaluate(() => {
     const done = (STATE.marks || []).filter(x => !x.pending);
     const row = document.querySelector('#mark-list .mark-row:not(.mark-draft) .mark-on');
-    return { n: done.length, x: done[0] && done[0].x, y: done[0] && done[0].y, on: row ? row.textContent : '' };
+    const c = row ? row.cloneNode(true) : null; if (c) c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    return { n: done.length, x: done[0] && done[0].x, y: done[0] && done[0].y, on: c ? c.textContent.replace(/\s+/g, ' ').trim() : '' };
   });
-  ok('щелчок в (30; 70) на D: в списке точка (30; 70) «на спросе»',
-    m.n === 1 && Math.abs(m.x - 30) < 0.05 && Math.abs(m.y - 70) < 0.05 && m.on === 'на спросе', JSON.stringify(m));
+  /* С сессии 7 «на чём стоит» — обозначением кривой, как на холсте («на D»), а не ролью словами («на спросе»):
+     README пакета calc2_panels_20261014, раздел 9. */
+  ok('щелчок в (30; 70) на D: в списке точка (30; 70) «на D»',
+    m.n === 1 && Math.abs(m.x - 30) < 0.05 && Math.abs(m.y - 70) < 0.05 && m.on === 'на D', JSON.stringify(m));
   const m2 = await mode(page);
   ok('после щелчка режим остаётся', m2.pts && m2.cm === 'pts', JSON.stringify(m2));
   await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });

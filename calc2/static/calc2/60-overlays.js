@@ -4505,7 +4505,10 @@ function restoreSceneSnapshot(key) {
    «на спросе», «на кривой f», «пересечение D и S», «точка E». Привязка к кривой
    (snapTo) живая и говорит сама; ключевая точка и пересечение запоминаются
    при постановке (mk.on) и забываются, когда точку увели. */
-const MARK_ON_ROLE = { demand: 'на спросе', supply: 'на предложении' };
+/* «На чём стоит» — обозначениями, как на холсте (сессия 7, Б2; README пакета 9): «на D», «на S», «на оси Q»,
+   «на кривой Лоренц» (у кривой без обозначения — её имя), «пересечение D и S», «точка Q1 и Pb»; в строке
+   обозначения набираются формулой (markOnTex). Раньше роль словами: «на спросе», «на предложении». */
+const NOTATION_TOKEN_RE = /^[A-Za-z][A-Za-z0-9]{0,4}['′*]?$/;
 function keyOnText(hit) {
   if (!hit) return '';
   if (hit.cross) return 'пересечение ' + hit.name;
@@ -4518,10 +4521,32 @@ function markOnText(mk) {
   if (t) {
     if (/^ось /.test(t)) return 'на оси ' + t.slice(4);
     if (t === 'начало координат') return 'в начале координат';
-    const c = (STATE.curves || []).find(x => curveShortName(x) === t);
-    return (c && MARK_ON_ROLE[c.role]) || ('на кривой ' + t);
+    return NOTATION_TOKEN_RE.test(t) ? 'на ' + t : 'на кривой ' + t;
   }
   return mk.on || '';
+}
+/* Обозначение словом → TeX: «Q1» → Q_{1}, «Pb» → P_{b}, «MC» → \mathrm{MC}, «TC1» → \mathrm{TC}_{1}, «D» → D. */
+function notationTex(w) {
+  let m = /^([A-Z]{2,})(\d*)$/.exec(w);
+  if (m) return '\\mathrm{' + m[1] + '}' + (m[2] ? '_{' + m[2] + '}' : '');
+  m = /^([A-Za-z])(\d+|[a-z]{1,4})?(['′*])?$/.exec(w);
+  if (m) return m[1] + (m[2] ? '_{' + m[2] + '}' : '') + (m[3] ? (m[3] === '*' ? '^{*}' : "'") : '');
+  return null;
+}
+function markOnInto(el, text) {
+  el.textContent = '';
+  String(text || '').split(/(\s+)/).forEach(w => {
+    const tex = /\S/.test(w) ? notationTex(w) : null;
+    if (tex && typeof katexInto === 'function') { const k = document.createElement('span'); k.className = 'tex'; katexInto(k, tex); el.appendChild(k); }
+    else el.appendChild(document.createTextNode(w));
+  });
+}
+/* Имя точки в строке — формулой: буква «A», «A₁» → A, A_{1}; своё имя человека — текстом, как было. */
+function markNameTex(text) {
+  const t = String(text || '');
+  const m = /^([A-Z])([₀-₉]*)$/.exec(t);
+  if (m) return m[1] + (m[2] ? '_{' + m[2].replace(/[₀-₉]/g, (d) => '₀₁₂₃₄₅₆₇₈₉'.indexOf(d)) + '}' : '');
+  return '\\text{' + t.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
 }
 
 function addMarkAt(x, y, snapTo, panel, on) {
@@ -4669,32 +4694,31 @@ function markSnapFn(mk) {
   return t ? t.f : null;
 }
 
-/* Список своих точек (П28, П29).
-   Порядок на экране: сначала уже созданные точки, потом заготовка, если она
-   есть, и в самом низу кнопка «Добавить точку». Пока заготовка не превратилась
-   в точку, кнопки нет: два незаконченных ввода разом только путают. */
+/* Список своих точек (П28, П29; сессия 7, Б2 — README пакета 9, макет 04_screen_points).
+   Строка точки: галочка выбора (для площади, этап В; вид, не модель — CANVAS.ptsSel), имя KaTeX 19 px,
+   координаты «(40; 60)» KaTeX 16 px, «на D» / «пересечение D и S» 12 / 500 --text3, справа «⋯». Больше в строке
+   ничего нет: цвет, переименование, координаты, галочки «Пунктир к осям», «Координаты на графике» и «Убрать» — в
+   меню «⋯» (Б3). «+ По координатам» — в строке заголовка раздела; пока заготовка не стала точкой, кнопки нет. */
 function renderMarkList() {
   const box = document.getElementById('mark-list');
   if (!box) return;
   box.innerHTML = '';
   (STATE.marks || []).forEach(mk => box.appendChild(buildMarkRow(mk)));
-
   if (!pendingMark()) ensureAddMarkButton();
+  else { const add = document.querySelector('#sec-view .btn-mark-add'); if (add) add.remove(); }
 }
 
-/* Н38. Кнопка «Добавить точку» всегда стоит ПОД списком: новая точка появляется
-   выше неё, а кнопка съезжает вниз. Отдельная функция, потому что кнопку надо
-   вернуть и в тот момент, когда заготовка превратилась в точку прямо во время
-   набора координат, без пересборки всего списка (иначе теряется фокус). */
+/* «+ По координатам» — тихая кнопка в строке заголовка раздела «Точки» (рядом с h3, не внутри: его текст сверяют
+   приборы). Та же кнопка, что «+ Точка по координатам» под списком до сессии 7: класс и действие прежние. */
 function ensureAddMarkButton() {
-  const box = document.getElementById('mark-list');
-  if (!box || box.querySelector('.btn-mark-add')) return;
+  const row = document.querySelector('#sec-view .pts-sec-row');
+  const host = row || document.getElementById('mark-list');
+  if (!host || document.querySelector('#sec-view .btn-mark-add')) return;
   const add = document.createElement('button');
   add.type = 'button'; add.className = 'btn-sm btn-mark-add';
-  // Щелчок по графику ставит точку сам (режим «Точки и площади»); кнопка — для координат.
-  add.textContent = '+ Точка по координатам';
+  add.textContent = '+ По координатам';
   add.addEventListener('click', () => startMarkDraft());
-  box.appendChild(add);
+  host.appendChild(add);
 }
 
 function buildMarkRow(mk) {
@@ -4703,16 +4727,7 @@ function buildMarkRow(mk) {
   row.dataset.mark = String(mk.id);
   if (mk.pending) row.classList.add('mark-draft');
 
-  /* Тумблер «Ввести координаты | Указать на графике» (П28). Он живёт только
-     у заготовки: как только точка появилась на плоскости, способ ввода уже
-     выбран и менять его нечем — тумблер из строки уходит совсем. Держать его
-     навсегда серым в каждой строке было бы мёртвым элементом. */
-  /* С 13.10 (ADR 0148) тумблера «Ввести координаты | Указать на графике» у
-     заготовки нет: «на графике» точку ставит сам режим «Точки и площади»
-     щелчком, а кнопка под списком — «+ Точка по координатам». Заготовка
-     «на графике» (mode 'graph') осталась только у прежнего входа armMark. */
-  const seg = null;
-
+  /* С 13.10 (ADR 0148) заготовка «на графике» (mode 'graph') осталась только у прежнего входа armMark. */
   if (mk.pending && mk.mode === 'graph') {
     const hint = document.createElement('div');
     hint.className = 'mark-hint';
@@ -4721,130 +4736,116 @@ function buildMarkRow(mk) {
     return row;
   }
 
-  /* Координаты. У заготовки они и есть способ создания: точка появляется, как
-     только оба поля заполнены, и переезжает на каждый введённый символ —
-     поэтому слушаем input, а не change, и НЕ пересобираем список (иначе
-     потерялся бы фокус посреди набора). */
-  const xy = document.createElement('div');
-  xy.className = 'mark-xy';
-  const nums = {};
-  /* Н47, Н36. Координата это набранное «x = 50», а не подпись и прямоугольное
-     поле рядом. Правится тем же компонентом, что и всюду: пунктир снизу, правка
-     на месте, применение на каждый символ. */
-  const mkNum = (key) => {
-    // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
-    const letter = axisLetter(key);
-    const n = makeEditableValue({
-      get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
-      tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
-      title: 'Координата ' + letter,
-      set: (v) => {
-        mk[key] = isFinite(v) ? v : NaN;
-        mk.on = '';   // координаты правят руками: с ключевой точки она ушла
-        // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
-        const f = markSnapFn(mk);
-        if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
-        const ready = isFinite(mk.x) && isFinite(mk.y);
-        if (mk.pending && ready) {
-          mk.pending = false;
-          if (seg) seg.remove();          // способ ввода выбран, тумблер больше не нужен
-          row.classList.remove('mark-draft');
-          ensureAddMarkButton();
-        } else if (!ready && !mk.pending) {
-          mk.pending = true;                     // стёрли координату — точка ушла
-        }
-        redrawAll();
-      },
-    });
-    nums[key] = n;
-    xy.append(n);
-  };
-  mkNum('x');
-  mkNum('y');
-  if (mk.pending) {
-    /* Н37. Галочка подтверждения. Точка встаёт и сама, как только заполнены обе
-       координаты, но без видимого «готово» заготовка выглядит незавершённой. */
+  /* Поля координат: у заготовки они и есть способ создания (точка появляется, как только оба поля заполнены, и
+     переезжает на каждый введённый символ — слушаем input, список НЕ пересобираем, иначе потерялся бы фокус); у
+     готовой точки — по «Изменить координаты» из «⋯» (CANVAS.markEdit, вид). «✓» заканчивает. */
+  const editing = mk.pending || String(CANVAS.markEdit) === String(mk.id);
+  if (editing) {
+    const xy = document.createElement('div');
+    xy.className = 'mark-xy mark-xy-edit';
+    const mkNum = (key) => {
+      // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
+      const letter = axisLetter(key);
+      const n = makeEditableValue({
+        get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
+        tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
+        title: 'Координата ' + letter,
+        set: (v) => {
+          mk[key] = isFinite(v) ? v : NaN;
+          mk.on = '';   // координаты правят руками: с ключевой точки она ушла
+          // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
+          const f = markSnapFn(mk);
+          if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
+          const ready = isFinite(mk.x) && isFinite(mk.y);
+          if (mk.pending && ready) {
+            mk.pending = false;
+            row.classList.remove('mark-draft');
+            ensureAddMarkButton();
+          } else if (!ready && !mk.pending) {
+            mk.pending = true;                     // стёрли координату — точка ушла
+          }
+          redrawAll();
+        },
+      });
+      xy.append(n);
+    };
+    if (!mk.pending) {
+      const nm = document.createElement('span');
+      nm.className = 'mark-name';
+      katexInto(nm, markNameTex(mk.text));
+      row.appendChild(nm);
+    }
+    mkNum('x');
+    mkNum('y');
+    /* Н37. Галочка подтверждения: точка встаёт и сама, как только заполнены обе координаты, но без видимого
+       «готово» строка выглядит незавершённой. */
     const ok = document.createElement('button');
     ok.type = 'button'; ok.className = 'btn-icon mark-ok';
     ok.textContent = '✓';
-    ok.setAttribute('data-tip', 'Поставить точку');
+    ok.setAttribute('aria-label', mk.pending ? 'Поставить точку' : 'Готово');
     ok.addEventListener('click', () => {
       if (!isFinite(mk.x) || !isFinite(mk.y)) return;
       mk.pending = false;
+      CANVAS.markEdit = null;
       ensureAddMarkButton();
       renderMarkList(); redrawAll();
     });
     xy.appendChild(ok);
     row.appendChild(xy);
-    return row;                                  // остальное — когда точка встанет
+    return row;
   }
 
-  /* Н46. Сразу после цвета идёт ИМЯ точки, и правится оно щелчком по самому
-     имени, а не в отдельном текстовом поле под строкой. Надписи «Своя точка»
-     больше нет: она ничего не сообщала. */
-  const top = document.createElement('div');
-  top.className = 'mark-top';
-  const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
-  const nameEl = makeEditableValue({
-    kind: 'text',
-    get: () => mk.text || '',
-    set: (v) => { mk.text = String(v).trim(); redrawAll(); },
-    // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает
-    // пробелы, и «Точка A» превратилась бы в «ТочкаA».
-    tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
-    title: 'Имя точки',
+  // Галочка выбора — для площади по точкам (этап В). Вид, не модель: без id, состояние в CANVAS.ptsSel.
+  const pickW = document.createElement('label');
+  pickW.className = 'mark-pick';
+  const pick = document.createElement('input');
+  pick.type = 'checkbox';
+  pick.checked = (CANVAS.ptsSel || []).some(x => String(x) === String(mk.id));
+  pick.setAttribute('aria-label', 'Выбрать точку ' + (mk.text || ''));
+  pick.addEventListener('change', () => {
+    const sel = (CANVAS.ptsSel || []).filter(x => String(x) !== String(mk.id));
+    if (pick.checked) sel.push(mk.id);
+    CANVAS.ptsSel = sel;
+    if (typeof syncPtsSelBar === 'function') syncPtsSelBar();
   });
-  nameEl.classList.add('mark-name');
-  const del = document.createElement('button');
-  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.setAttribute('data-tip', 'Убрать точку');
-  del.addEventListener('click', () => {
-    STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
-    renderMarkList(); redrawAll();
-  });
-  // «⋯» точки (сессия 7, Б3): меню всплывающим окном; кнопка без id и с aria-haspopup — вне формы модели.
+  pickW.appendChild(pick);
+
+  // Имя: формулой; «Переименовать» при точке за окном правит его здесь (CANVAS.markRename).
+  let nameEl;
+  if (String(CANVAS.markRename) === String(mk.id)) {
+    nameEl = makeEditableValue({
+      kind: 'text',
+      get: () => mk.text || '',
+      set: (v) => { const t = String(v).trim(); if (t) { mk.text = t; CANVAS.markRename = null; renderMarkList(); redrawAll(); } },
+      // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает пробелы.
+      tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
+      title: 'Имя точки',
+    });
+    nameEl.classList.add('mark-name');
+  } else {
+    nameEl = document.createElement('span');
+    nameEl.className = 'mark-name';
+    katexInto(nameEl, markNameTex(mk.text));
+  }
+
+  const xy = document.createElement('span');
+  xy.className = 'mark-xy';
+  katexInto(xy, '(' + fmt(mk.x) + ';\\ ' + fmt(mk.y) + ')');
+
+  const on = document.createElement('span');
+  on.className = 'mark-on';
+  markOnInto(on, markOnText(mk));
+
+  // «⋯» точки (Б3): меню всплывающим окном; кнопка без id и с aria-haspopup — вне формы модели.
   const more = document.createElement('button');
   more.type = 'button'; more.className = 'btn-icon mark-more';
   more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
   more.setAttribute('aria-label', 'Действия с точкой ' + (mk.text || ''));
   more.innerHTML = ICON_DOTS;
   more.addEventListener('click', (e) => { e.stopPropagation(); openMarkMenu(more, mk.id); });
-  top.append(pick, nameEl, del, more);
-  const onText = markOnText(mk);
 
-  const toggle = (label, key, def) => {
-    const w = document.createElement('label');
-    w.className = 'chk';
-    const c = document.createElement('input');
-    c.type = 'checkbox';
-    c.checked = (mk[key] === undefined) ? def : !!mk[key];
-    c.addEventListener('change', () => { mk[key] = c.checked; redrawAll(); });
-    w.append(c, document.createTextNode(label));
-    return w;
-  };
-
-  /* Н48. Координаты в столбик, галочки правее: две строки вместо четырёх, и
-     строка точки перестала быть самой высокой в панели. */
-  const body = document.createElement('div');
-  body.className = 'mark-body';
-  const chks = document.createElement('div');
-  chks.className = 'mark-chks';
-  chks.append(toggle('Пунктир к осям', 'showDash', true),
-              toggle('Координаты', 'showCoords', true));
-  xy.classList.add('mark-xy-col');
-  body.append(xy, chks);
-  row.append(top);
-  if (onText) {
-    const on = document.createElement('div');
-    on.className = 'mark-on';
-    on.textContent = onText;
-    row.appendChild(on);
-  }
-  row.appendChild(body);
-
-  /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому
-     поведению — отдельная строка «Удерживать точку на КПВ» ничего не добавляла
-     и только занимала место в списке. Отпустить точку по-прежнему можно:
-     достаточно оттащить её от линии дальше порога отрыва. */
+  /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому поведению. */
+  row.append(pickW, nameEl, xy, on, more);
   return row;
 }
 

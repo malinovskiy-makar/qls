@@ -59,7 +59,7 @@
 | `#ac-curve`, `#ac-poly` | button (radio) | + Под кривой, + Между точками | `#ac-mode` | на месте |
 | `#ac-pick-btns>button.ac-cbtn` | button (radio) | имя кривой | `#ac-pane-curve` | на месте |
 | `#ac-vert-arm`, `#ac-vert-clear` | button | Отмечать вершины, Убрать все вершины | `#ac-pane-poly` | на месте |
-| `#mark-list>…` строки точек: `button.swatch`, `span.edval` (имя, Q, P), `button.btn-icon` ✕, две галочки | — | Цвет точки, Имя точки, Координата, Убрать точку, Пунктир к осям, Координаты | `#mark-list` | на месте |
+| `#mark-list>…` строки точек: `button.swatch`, `span.edval` (имя, Q, P), `button.btn-icon` ✕, две галочки | — | Цвет точки, Имя точки, Координата, Убрать точку, Пунктир к осям, Координаты | `#mark-list` | на месте до сессии 7; с Б2–Б3 **переехали в «⋯» строки** (меню `.pts-menu` в body: Переименовать, Изменить координаты, Цвет, Пунктир к осям, Координаты на графике, Убрать); в строке — галочка выбора (новая, вид) и «⋯» (`pts_probe` Б2, Б3) |
 | `#info-areacalc>…` строки площадей: `button.swatch`, `span.edval` (имя), `button.btn-icon` × | — | Цвет площади, имя, Убрать эту площадь | `#info-areacalc` | на месте |
 
 ## 1. Органы управления (базовый снимок, все модели)
@@ -1855,7 +1855,7 @@
 | `#macro-pane-money>button.mkbd-tab[1]` | button | Спрос на деньги: M = f(i) | #sec-macro (через #fh-auto-ma-md) | 1 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
 | `#macro-pane-money>button.mkbd-tab[2]` | button | Спрос на деньги: M = f(i) | #sec-macro (через #fh-auto-ma-md) | 1 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
 | `#mark-list>button.btn-icon` | button | Поставить точку | #sec-view (через #mark-list>button.btn-sm) | 44 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
-| `#mark-list>button.btn-sm` | button | Добавить точку | #sec-view | 44 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
+| `#mark-list>button.btn-sm` | button | Добавить точку | #sec-view | 44 | на месте — переехала в строку заголовка раздела «Точки» как «+ По координатам» (сессия 7, Б2; `layer_new.mapKey` → `#sec-view>button.btn-sm`) |  | snapshot.mjs (layer new) + compare.mjs; `pts_probe` Б2 |
 | `#mark-list>button.tgl-sw` | switch | Ввести координаты | #sec-view (через #mark-list>button.btn-sm) | 44 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
 | `#mark-list>span.edval` | edval | Координата Y | #sec-view (через #mark-list>button.btn-sm) | 44 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
 | `#mark-list>span.edval[1]` | edval | Координата P | #sec-view (через #mark-list>button.btn-sm) | 44 | на месте |  | snapshot.mjs (layer new) + compare.mjs |
