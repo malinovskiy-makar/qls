@@ -196,7 +196,8 @@ function updateConsumerPanel() {
   html += `<div class="stat"><span>Оптимум $(x^*; y^*)$</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
   html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
-  html += `<div class="stat"><span>$\\frac{P_x}{P_y}$</span><b>${fmt(b.px / b.py)}</b></div>`;
+  // Строка подписана словами и формулой, а не одной мелкой дробью (сессия 7, А3.3; Notion …81fd…).
+  html += `<div class="stat"><span>Отношение цен $P_x/P_y$</span><b>${fmt(b.px / b.py)}</b></div>`;
   html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}; ${fmt(b.yInt)}</b></div>`;
   // Свойство, характерное для выбранного типа предпочтений.
   const t = STATE.consType;
