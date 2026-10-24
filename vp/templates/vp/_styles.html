@@ -269,6 +269,19 @@ html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px)
   display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--r-card);
   border: var(--line, 1px) dashed var(--border);
 }
+.vp-gapmark {
+  display: inline-block; min-width: 1.6em; padding: 0 5px; margin: 0 2px; border-radius: var(--r);
+  border-bottom: 2px solid var(--accent); font-size: 12px; font-weight: 600; text-align: center; color: var(--text2);
+}
+.vp-mrows { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.5; display: grid; gap: 4px; }
+.vp-nums { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; }
+.vp-nums dt { font-size: 12.5px; color: var(--text3); }
+.vp-nums dd { margin: 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vp-mres { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vp-mres-row { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 12px; border-radius: var(--r); border: var(--line, 1px) solid var(--border); }
+.vp-mres-row.is-wrong { border-color: var(--error-border); }
+.vp-mres-label { flex: 1 1 260px; font-size: 14.5px; line-height: 1.45; min-width: 0; }
+.vp-mres-pick { flex: 0 1 auto; font-size: 14.5px; }
 .vp-group-cap { font-size: 12.5px; font-weight: 600; color: var(--text2); padding: 0 4px; }
 .vp-scroll table { border-collapse: collapse; font-size: 14px; width: 100%; }
 .vp-scroll th { background: var(--surface-info); text-align: left; padding: 8px 12px; font-weight: 600; }

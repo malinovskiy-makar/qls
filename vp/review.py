@@ -9,6 +9,7 @@
 «Дорешать вне зачёта» (`practice_check`) должно проверять, а не читать готовое с
 экрана. Их отдаёт только проверка ответа.
 """
+import re
 from bisect import bisect_left
 from decimal import Decimal
 from statistics import median
@@ -16,7 +17,7 @@ from statistics import median
 from django.core.cache import cache
 
 from vp import blocks, scoring
-from vp.loader import chain_letters
+from vp.loader import GAP_MARK, chain_letters
 from vp.models import VPAttempt, VPItem
 
 #: Меньше стольких людей — процентиля нет: «вы лучше 100% участников» на трёх
@@ -97,20 +98,72 @@ def chain_review(attempt):
 
 # ------------------------------------------------------------ тесты 31–44
 
+def _option_texts(item):
+    return {o['n']: o['text'] for o in (item.options or []) if isinstance(o, dict) and 'n' in o}
+
+
+def match_labels(item):
+    """Подписи ключей сопоставления: у пропусков «Пропуск k», у соотнесения — текст строки.
+
+    Это не ответы — то же, что видно на странице прохождения.
+    """
+    if item.block == VPItem.Block.MATCHING:
+        return {str(i): text for i, text in enumerate(item.rows or [], start=1)}
+    keys = item.correct if isinstance(item.correct, dict) else {}
+    return {key: f'Пропуск {key}' for key in keys}
+
+
 def right_answer(item):
-    """Эталон словами: короткий ответ или «3. вариант» через «;» для выбора."""
-    if item.kind == VPItem.Kind.SHORT_TEXT:
+    """Эталон словами: короткий ответ или число, «3. вариант» через «;» для выбора,
+    «Пропуск 1: развитый; …» для сопоставления."""
+    if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER):
         return item.answer
+    if item.kind == VPItem.Kind.MATCH:
+        texts, labels = _option_texts(item), match_labels(item)
+        correct = item.correct if isinstance(item.correct, dict) else {}
+        return '; '.join(f'{labels.get(key, key)}: {texts.get(scoring._to_int(value), value)}'
+                         for key, value in correct.items())
     correct = set(_numbers(item.correct))
     return '; '.join(f"{o['n']}. {o['text']}" for o in (item.options or [])
                      if isinstance(o, dict) and o.get('n') in correct)
 
 
+def _number_fix(explain):
+    """Как надо было записать СВОЙ ответ при ошибке «точка» или «пробел» — для строки
+    «Нужно «37,5», а не «37.5»». Только оформление строки, балла не касается."""
+    given = explain['given']
+    if explain['format_error'] == 'dot':
+        return given.replace('.', ',')
+    if explain['format_error'] == 'space':
+        return re.sub(r'\s', '', given)
+    return ''
+
+
+def _match_rows(item, explain):
+    """Строки разбора сопоставления: подпись, выбранное и верное СЛОВАМИ, верно ли."""
+    texts, labels = _option_texts(item), match_labels(item)
+    return [{'key': p['key'], 'label': labels.get(p['key'], p['key']),
+             'chosen': texts.get(p['chosen'], '') if p['chosen'] is not None else '',
+             'right': texts.get(p['right'], ''), 'ok': p['ok']}
+            for p in explain['pairs']]
+
+
+def gap_chunks(text):
+    """Текст с пропусками → куски `{text, key}`: на месте `[[k]]` разбор ставит номер."""
+    chunks = GAP_MARK.split(text or '')
+    return [{'text': chunks[i], 'key': chunks[i + 1] if i + 1 < len(chunks) else ''}
+            for i in range(0, len(chunks), 2)]
+
+
 def tests_review(attempt):
-    """Разбор заданий вне змейки (31–44): что выбрано, что верно, откуда балл.
+    """Разбор заданий вне змейки (1 тур — 31–44, 2 тур — все): что выбрано, что верно,
+    откуда балл.
 
     Для неотвеченного задания эталон, верные варианты, разбор баллов и решение НЕ
     кладутся в строку вовсе (см. модуль): их отдаст `practice_check` после ответа.
+    У числа и сопоставления (2 тур) к строке добавляются `right` (эталон — только
+    отвеченному), `number_fix` и `match_rows`; у неотвеченного — `practice_keys`
+    (подписи ключей без ответов) для «Дорешать вне зачёта».
     """
     answers = _answers(attempt)
     rows = []
@@ -121,6 +174,7 @@ def tests_review(attempt):
         blank = scoring.is_blank(raw)
         chosen = [] if blank else _numbers(raw)
         correct = [] if blank else _numbers(item.correct)
+        explain = None if blank else scoring.explain_item(item, raw)
         rows.append({
             'item': item,
             'number': item.number,
@@ -138,7 +192,15 @@ def tests_review(attempt):
             'max': item.points,
             'chosen': chosen,
             'correct': correct,
-            'explain': None if blank else scoring.explain_item(item, raw),
+            'explain': explain,
+            'block': item.block,
+            'gap_chunks': gap_chunks(item.statement) if item.block == VPItem.Block.GAPTEXT else [],
+            'match_text_rows': list(item.rows or []) if item.block == VPItem.Block.MATCHING else [],
+            'right': '' if blank or item.kind != VPItem.Kind.NUMBER else item.answer,
+            'number_fix': _number_fix(explain) if explain and explain['kind'] == 'number' else '',
+            'match_rows': _match_rows(item, explain) if explain and explain['kind'] == 'match' else [],
+            'practice_keys': ([{'key': k, 'label': v} for k, v in match_labels(item).items()]
+                              if blank and item.kind == VPItem.Kind.MATCH else []),
             'solution': '' if blank else item.solution,
             'figure': item.figure, 'figure_caption': item.figure_caption,
             'figure_source': item.figure_source, 'table_html': item.table_html,

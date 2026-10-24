@@ -53,6 +53,7 @@
     {% if is_owner %}
     <div hidden>{% csrf_token %}</div>
 
+    {% if chain %}
     <div class="vp-card" id="vp-chain">
       <div class="vp-card-head">
         <h2 class="vp-h3">Змейка целиком</h2>
@@ -93,10 +94,11 @@
         {% endfor %}
       </ol>
     </div>
+    {% endif %}
 
     <div class="vp-card" id="vp-tests">
-      <h2 class="vp-h3">Откуда взялись баллы за тесты</h2>
-      <p class="vp-mute vp-mt-xs">В заданиях с несколькими верными балл делится по долям, а лишние варианты его уменьшают.</p>
+      <h2 class="vp-h3">{% if chain %}Откуда взялись баллы за тесты{% else %}Откуда взялись баллы{% endif %}</h2>
+      <p class="vp-mute vp-mt-xs">В заданиях с несколькими верными балл делится по долям, а лишние варианты его уменьшают.{% if not chain %} В пропусках и соотнесении балл делится по долям без штрафа. Ответ-число в неверном формате – 0 баллов, как на туре.{% endif %}</p>
       <div class="vp-tests">
         {% for t in tests %}
         <article class="vp-tcard is-{{ t.tone }}" id="vp-r-{{ t.number }}">
@@ -105,7 +107,14 @@
             <span class="vp-tcard-title">{{ t.block_title }}</span>
             <span class="vp-tcard-score">{{ t.score|num }} из {{ t.max|num }}</span>
           </header>
+          {% if t.block == 'gaptext' %}
+          <div class="vp-tcard-text">{% for g in t.gap_chunks %}{{ g.text|linebreaksbr }}{% if g.key %}<span class="vp-gapmark" aria-label="пропуск {{ g.key }}">{{ g.key }}</span>{% endif %}{% endfor %}</div>
+          {% else %}
           <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+          {% endif %}
+          {% if t.match_text_rows and t.blank %}
+          <ol class="vp-mrows">{% for r in t.match_text_rows %}<li>{{ r }}</li>{% endfor %}</ol>
+          {% endif %}
           {% if t.figure_url %}
           <figure class="vp-figure">
             <img src="{{ t.figure_url }}" alt="{{ t.figure_caption|default:'Рисунок к заданию' }}" loading="lazy">
@@ -116,7 +125,39 @@
 
           {% if t.blank %}
           <p class="vp-mute vp-mt-sm">Не отвечено – 0 баллов.</p>
-          {% include 'vp/_practice.html' with number=t.number kind=t.kind options=t.options prefix='' suffix='' %}
+          {% include 'vp/_practice.html' with number=t.number kind=t.kind options=t.options prefix='' suffix='' keys=t.practice_keys %}
+          {% elif t.kind == 'number' %}
+          {% with e=t.explain %}
+          <dl class="vp-nums">
+            <div><dt>Ваш ответ</dt><dd class="vp-numval">{{ e.given }}</dd></div>
+            <div><dt>Верный ответ</dt><dd class="vp-numval">{{ t.right }}</dd></div>
+          </dl>
+          {% if e.format_error %}
+          <p class="vp-tcard-line vp-numwhy">{{ e.score|num }} из {{ e.points|num }}: {% if e.format_error == 'dot' %}точка вместо запятой. Нужно писать «{{ t.number_fix }}», а не «{{ e.given }}».{% elif e.format_error == 'space' %}пробел внутри числа. Нужно «{{ t.number_fix }}», а не «{{ e.given }}».{% elif e.format_error == 'units' %}лишние знаки или единицы. В поле – только число.{% elif e.format_error == 'decimals' %}больше двух знаков после запятой. Ответ нужно округлить до сотых.{% else %}число записано не по правилам ввода.{% endif %}
+            {% if e.would_be_correct %}Само число верное: на туре этот ответ тоже получил бы 0 из-за формата.{% else %}Число тоже неверное.{% endif %}</p>
+          {% elif e.accepted_match %}
+          <p class="vp-tcard-line">Засчитано: такой ответ дан в ключе ВШЭ.</p>
+          {% endif %}
+          {% endwith %}
+          {% if t.solution %}
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          {% endif %}
+          {% elif t.kind == 'match' %}
+          {% with e=t.explain %}
+          <ul class="vp-mres">
+            {% for m in t.match_rows %}
+            <li class="vp-mres-row{% if not m.ok %} is-wrong{% endif %}">
+              <span class="vp-mres-label">{% if t.block == 'gaptext' %}<span class="vp-gapmark">{{ m.key }}</span>{% else %}<span class="vp-topt-n">{{ m.key }}</span> {{ m.label }}{% endif %}</span>
+              <span class="vp-mres-pick">{% if m.chosen %}{{ m.chosen }}{% else %}<span class="vp-mute">не выбрано</span>{% endif %}{% if m.ok %} <span class="vp-tag vp-tag--right">верно</span>{% else %} <span class="vp-tag vp-tag--wrong">верно: {{ m.right }}</span>{% endif %}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          <p class="vp-tcard-line">Верно {{ e.hit }} из {{ e.total }}.</p>
+          <div class="vp-math">{{ e.points|num }} × {{ e.hit }}/{{ e.total }} = {{ e.score|dec2 }}</div>
+          {% endwith %}
+          {% if t.solution %}
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          {% endif %}
           {% else %}
           <ul class="vp-topts">
             {% for o in t.options %}

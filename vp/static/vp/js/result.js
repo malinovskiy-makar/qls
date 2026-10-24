@@ -64,7 +64,14 @@
   /* ── Дорешать вне зачёта ───────────────────────────────────────────────── */
   function value(box, kind) {
     var form = box.querySelector('[data-practice-form]');
-    if (kind === 'short_text') return form.elements.raw.value;
+    if (kind === 'short_text' || kind === 'number') return form.elements.raw.value;
+    if (kind === 'match') {
+      var pairs = {};
+      Array.prototype.forEach.call(form.querySelectorAll('select[data-key]'), function (select) {
+        if (select.value !== '') pairs[select.getAttribute('data-key')] = Number(select.value);
+      });
+      return pairs;
+    }
     var marked = Array.prototype.map.call(
       form.querySelectorAll('input[name=raw]:checked'), function (input) { return input.value; });
     return kind === 'multi' ? marked : (marked[0] || '');
@@ -81,7 +88,8 @@
     var kind = box.getAttribute('data-kind');
     var out = box.querySelector('[data-practice-out]');
     var raw = value(box, kind);
-    if (!raw || !raw.length) { show(out, 'Сначала ответьте.', 'bad'); return; }
+    var empty = kind === 'match' ? !Object.keys(raw).length : (!raw || !raw.length);
+    if (empty) { show(out, 'Сначала ответьте.', 'bad'); return; }
     show(out, 'Проверяем…', '');
     fetch(practiceUrl, {
       method: 'POST',
@@ -108,7 +116,7 @@
       form.hidden = !hidden;
       open.setAttribute('aria-expanded', hidden ? 'true' : 'false');
       if (hidden) {
-        var first = form.querySelector('input');
+        var first = form.querySelector('input, select');
         if (first) first.focus();
       }
     });
