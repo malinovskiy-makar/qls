@@ -1,4 +1,4 @@
-"""Модели тренажёра 1 тура «Высшей пробы» (ADR 0124).
+"""Модели тренажёра «Высшей пробы», 1 и 2 тур отборочного этапа (ADR 0124).
 
 ⚠️ Эти модели НАМЕРЕННО не ссылаются на `problems.Problem`: пункты теста чужого
 формата не должны попасть в каталог, поиск, эмбеддинги и статистику банка, а
@@ -10,7 +10,8 @@ from django.db import models
 
 
 class VPVariant(models.Model):
-    """Один вариант 1 тура: 44 задания, 100 баллов, 30 минут."""
+    """Один вариант тура: 1 тур — 44 задания и 30 минут, 2 тур — 17 или 18 заданий
+    и 70 минут; всегда 100 баллов. Правила по турам — `vp.loader.TOUR_RULES`."""
 
     class SourceKind(models.TextChoices):
         DEMO = 'demo', 'Демонстрационный'
@@ -22,7 +23,7 @@ class VPVariant(models.Model):
     olympiad_slug = models.CharField(
         'Слаг олимпиады', max_length=60, default='vysshaya-proba')
     tour = models.PositiveSmallIntegerField('Тур', default=1)
-    grade_band = models.CharField('Классы', max_length=10)  # '9-10' или '11'
+    grade_band = models.CharField('Классы', max_length=10)  # 1 тур: '9-10'/'11'; 2 тур: '9'/'10'/'11'
     year = models.PositiveSmallIntegerField('Год')
     source_kind = models.CharField(
         'Происхождение', max_length=10, choices=SourceKind.choices)
@@ -73,12 +74,17 @@ class VPItem(models.Model):
         MULTI = 'multi', 'Несколько верных'
         ANALYTIC = 'analytic', 'Аналитическое'
         SINGLE = 'single', 'Один верный'
+        # 2 тур
+        NUMBER = 'number', 'Ввод числа'
+        GAPTEXT = 'gaptext', 'Текст с пропусками'
+        MATCHING = 'matching', 'Соотнесение'
 
     class Kind(models.TextChoices):
         SHORT_TEXT = 'short_text', 'Короткий ответ'
         SINGLE = 'single', 'Один вариант'
         MULTI = 'multi', 'Несколько вариантов'
         MATCH = 'match', 'Сопоставление'
+        NUMBER = 'number', 'Число'
 
     variant = models.ForeignKey(
         VPVariant, on_delete=models.CASCADE, related_name='items',
@@ -99,6 +105,13 @@ class VPItem(models.Model):
     options = models.JSONField('Варианты', default=list, blank=True)
     # [2] | [1, 3, 5] | {"а": 3, "б": 1}
     correct = models.JSONField('Верные', default=list, blank=True)
+    # Соотнесение (2 тур): тексты утверждений слева, по порядку ключей «1»…«N»
+    # в `correct`; справа — категории из `options`.
+    rows = models.JSONField('Строки соотнесения', default=list, blank=True)
+    # Пара задач с общим условием (2 тур): одинаковый номер группы у подряд
+    # идущих заданий варианта; условие первого — общее.
+    group = models.PositiveSmallIntegerField(
+        'Пара с общим условием', null=True, blank=True)
     answer = models.CharField('Эталон короткого ответа', max_length=200,
                               blank=True)
     accepted = models.JSONField('Также засчитываем', default=list, blank=True)

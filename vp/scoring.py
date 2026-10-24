@@ -14,8 +14,9 @@
 Считаем ТОЧНЫМИ ДРОБЯМИ (`fractions.Fraction`), округляем один раз, только
 результат: до сотых, `ROUND_HALF_UP`. Промежуточных float нет.
 """
+import re
 from collections import namedtuple
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from fractions import Fraction
 from math import floor
 
@@ -24,6 +25,12 @@ from problems.answer_check import normalize_text
 # Балл за ОДНО задание с долевым подсчётом (multi) не бывает отрицательным.
 # Итог попытки в любом случае не ниже нуля — это `score_attempt`.
 CLAMP_MULTI_AT_ZERO = True
+
+#: Строгий формат ответа-числа 2 тура (правило ВШЭ): без пробелов, единиц и знаков,
+#: дробь — десятичная, через запятую, до сотых. Эталон в файле обязан ему отвечать
+#: (проверяет загрузчик). ⚠️ Звать через `fullmatch`: `$` пропускает хвостовой перевод
+#: строки; `re.ASCII` — чтобы `\d` не принял цифры других письменностей.
+NUMBER_FORMAT = re.compile(r'^-?\d+(,\d{1,2})?$', re.ASCII)
 
 _CENT = Decimal('0.01')
 _ZERO = Decimal('0.00')
@@ -149,11 +156,94 @@ def _score_match(item, raw):
     return value, value == points
 
 
+# ------------------------------------------------------------ число (2 тур)
+
+#: Знаки, которых в ответе-числе быть не может вовсе: всё, кроме цифр, запятой,
+#: точки, минуса и пробелов, — единицы, «%», «₽», «руб».
+_NOT_NUMBER_CHAR = re.compile(r'[^0-9,.\-\s]')
+_SPACE = re.compile(r'\s')
+_TOO_MANY_DECIMALS = re.compile(r'-?\d+,\d{3,}', re.ASCII)
+
+
+def _number_value(text):
+    """«37,5» → Decimal('37.5'); не число — None."""
+    try:
+        value = Decimal(text.replace(',', '.'))
+    except (InvalidOperation, ValueError):
+        return None
+    return value if value.is_finite() else None
+
+
+def _format_error(text):
+    """Почему строка не прошла строгий формат — первая подходящая причина.
+
+    `units` — буквы и знаки («25000 руб», «20%»), `space` — пробел внутри
+    («25 000»), `dot` — точка вместо запятой, `decimals` — больше двух знаков после
+    запятой, `other` — всё остальное («,5», «5,», «--5»).
+    """
+    if _NOT_NUMBER_CHAR.search(text):
+        return 'units'
+    if _SPACE.search(text):
+        return 'space'
+    if '.' in text:
+        return 'dot'
+    if _TOO_MANY_DECIMALS.fullmatch(text):
+        return 'decimals'
+    return 'other'
+
+
+def _would_be_correct(item, text):
+    """Верно ли само число, если забыть про формат: для строки разбора.
+
+    Мягкая починка: убрать пробелы, буквы, «%» и «₽», точку заменить на запятую,
+    типографский минус — на обычный. Верно, если совпало с `accepted`, или значение
+    равно эталону, или округление до сотых (половина — от нуля) даёт эталон.
+    На балл НЕ влияет: на туре такой ответ получает 0.
+    """
+    soft = ''.join(ch for ch in text if not (ch.isspace() or ch.isalpha() or ch in '%₽'))
+    soft = soft.replace('.', ',').replace('\u2212', '-')
+    if soft in {a.strip() for a in (item.accepted or [])}:
+        return True
+    value, truth = _number_value(soft), _number_value(item.answer or '')
+    if value is None or truth is None:
+        return False
+    return value == truth or value.quantize(_CENT, rounding=ROUND_HALF_UP) == truth
+
+
+def _number_parts(item, raw):
+    """Разбор ответа-числа по правилу ВШЭ: и балл, и разбор берут его ОТСЮДА.
+
+    Порядок: пробелы по краям срезаются молча; совпадение с `accepted` — верно;
+    строгий формат не пройден — 0 и причина; иначе сравниваются ЗНАЧЕНИЯ, поэтому
+    «37,50» при эталоне «37,5» верно.
+    """
+    text = str(raw).strip()
+    parts = {'given': text, 'accepted_match': False, 'format_error': None,
+             'would_be_correct': None, 'is_correct': False}
+    if text in {a.strip() for a in (item.accepted or [])}:
+        parts.update(accepted_match=True, is_correct=True)
+    elif not NUMBER_FORMAT.fullmatch(text):
+        parts.update(format_error=_format_error(text),
+                     would_be_correct=_would_be_correct(item, text))
+    else:
+        truth = _number_value(item.answer or '')
+        parts['is_correct'] = truth is not None and _number_value(text) == truth
+    return parts
+
+
+def _score_number(item, raw):
+    # Неверное число и неверный формат — 0, без штрафа: так считает ВШЭ.
+    if _number_parts(item, raw)['is_correct']:
+        return Fraction(item.points), True
+    return Fraction(0), False
+
+
 _SCORERS = {
     'short_text': _score_short,
     'single': _score_single,
     'multi': _score_multi,
     'match': _score_match,
+    'number': _score_number,
 }
 
 
@@ -191,7 +281,14 @@ def explain_item(item, raw) -> dict:
       прибавка и штраф, `clamped` — итог ушёл бы ниже нуля и поднят до нуля
       (`before_clamp` — каким он был бы: «−0,50 → 0,00»). `penalty` — есть ли у
       задания штраф вообще;
-    * `binary` — короткий ответ и «один верный»: `score` и `is_correct`.
+    * `binary` — короткий ответ и «один верный»: `score` и `is_correct`;
+    * `number` — ответ-число 2 тура: `given` (что введено, без пробелов по краям),
+      `accepted_match`, `format_error` (`units` / `space` / `dot` / `decimals` /
+      `other` или `None`), `would_be_correct` (при ошибке формата: верно ли само число),
+      `points`, `score`, `is_correct`. ⚠️ Эталона в структуре НЕТ: его кладёт только
+      экран владельца попытки;
+    * `match` — сопоставление (пропуски, соотнесение): `pairs` по ключам
+      (`key`, `chosen`, `right`, `ok`), `hit` из `total`, `points`, `score`.
 
     ⚠️ `gain` и `loss` округлены каждый сам, а `score` — один раз из точных дробей,
     поэтому у заданий с «некруглым» баллом разность может отличаться от `score` на
@@ -213,6 +310,24 @@ def explain_item(item, raw) -> dict:
             'clamped': parts.gain - parts.loss < 0,
             'score': score, 'is_correct': is_correct,
         }
+    if item.kind == 'number':
+        parts = _number_parts(item, raw)
+        return {'kind': 'number', 'given': parts['given'],
+                'accepted_match': parts['accepted_match'],
+                'format_error': parts['format_error'],
+                'would_be_correct': parts['would_be_correct'],
+                'points': _round(Fraction(item.points)),
+                'score': score, 'is_correct': is_correct}
+    if item.kind == 'match':
+        correct = item.correct if isinstance(item.correct, dict) else {}
+        given = raw if isinstance(raw, dict) else {}
+        pairs = [{'key': key, 'chosen': _to_int(given.get(key)), 'right': _to_int(truth),
+                  'ok': key in given and _to_int(given[key]) == _to_int(truth)}
+                 for key, truth in correct.items()]
+        return {'kind': 'match', 'pairs': pairs, 'total': len(pairs),
+                'hit': sum(1 for p in pairs if p['ok']),
+                'points': _round(Fraction(item.points)),
+                'score': score, 'is_correct': is_correct}
     return {'kind': 'binary', 'score': score, 'is_correct': is_correct}
 
 

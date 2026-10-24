@@ -11,6 +11,7 @@
 ⚠️ `chain_first` / `chain_second` заполняются ЗДЕСЬ, а не в `save()`: логика не
 должна прятаться в сохранении модели.
 """
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
@@ -19,10 +20,35 @@ from django.core.validators import validate_slug
 from django.db import transaction
 
 from vp.models import VPItem, VPVariant
+from vp.scoring import NUMBER_FORMAT
 
 TOUR1_NUMBERS = list(range(1, 45))
 TOUR1_MAX_SCORE = Decimal('100')
 GRADE_BANDS = ('9-10', '11')
+
+#: Правила по турам: какие классы бывают и как устроен вариант.
+#: `structure` — по классу: {блок: (сколько заданий, баллов за каждое)}.
+#: У 1 тура структуры нет: его держат прежние проверки (номера 1..44, сумма 100),
+#: и ни одна из них не ослаблена. Формат 2 тура — рекомендации ВШЭ 2026/27.
+TOUR_RULES = {
+    1: {'grade_bands': GRADE_BANDS, 'max_score': TOUR1_MAX_SCORE, 'structure': None},
+    2: {'grade_bands': ('9', '10', '11'), 'max_score': Decimal('100'),
+        'structure': {
+            '9': {'number': (12, Decimal('6')), 'multi': (3, Decimal('4')),
+                  'matching': (1, Decimal('8')), 'gaptext': (1, Decimal('8'))},
+            '10': {'number': (14, Decimal('5')), 'multi': (2, Decimal('6')),
+                   'matching': (1, Decimal('9')), 'gaptext': (1, Decimal('9'))},
+            '11': {'number': (14, Decimal('5')), 'multi': (2, Decimal('6')),
+                   'matching': (1, Decimal('9')), 'gaptext': (1, Decimal('9'))},
+        }},
+}
+
+#: Какой вид ответа у блока 2 тура: блок говорит, что рисовать, вид — как считать.
+TOUR2_BLOCK_KINDS = {'number': 'number', 'multi': 'multi',
+                     'matching': 'match', 'gaptext': 'match'}
+
+#: Метка пропуска в тексте: `[[3]]`.
+GAP_MARK = re.compile(r'\[\[(\d+)\]\]')
 
 BLOCKS = {value for value, _ in VPItem.Block.choices}
 KINDS = {value for value, _ in VPItem.Kind.choices}
@@ -35,7 +61,7 @@ _ITEM_TEXT_FIELDS = ('intro', 'statement', 'prefix', 'suffix', 'answer',
                      'table_html', 'solution')
 _ITEM_KNOWN_KEYS = set(_ITEM_TEXT_FIELDS) | {
     'n', 'block', 'kind', 'options', 'correct', 'accepted', 'points',
-    'wrong_penalty', 'penalty'}
+    'wrong_penalty', 'penalty', 'rows', 'group'}
 _VARIANT_TEXT_FIELDS = ('title', 'olympiad_slug', 'grade_band', 'source_kind',
                         'source_note', 'author')
 
@@ -204,6 +230,21 @@ def _normalize_item(raw, position, errors, warnings):
         accepted = []
     values['accepted'] = [_text(a) for a in accepted]
 
+    rows = raw.get('rows') or []
+    if not isinstance(rows, list) or any(isinstance(r, (list, dict)) for r in rows):
+        errors.append(f'{where}: `rows` должен быть списком строк')
+        rows = []
+    values['rows'] = [_text(r) for r in rows]
+
+    group = raw.get('group')
+    if group is not None:
+        number_ = _int(group)
+        if number_ is None or number_ <= 0 or isinstance(group, float):
+            errors.append(f'{where}: `group` должен быть целым числом больше нуля ({group!r})')
+            number_ = None
+        group = number_
+    values['group'] = group
+
     _normalize_choices(raw, values, where, errors)
 
     if values['kind'] == 'short_text' and not values['answer']:
@@ -276,9 +317,6 @@ def _normalize_variant(data, errors):
     values['olympiad_slug'] = values['olympiad_slug'] or 'vysshaya-proba'
     if not values['title']:
         errors.append('вариант: пустое `title`')
-    if values['grade_band'] not in GRADE_BANDS:
-        errors.append(f'вариант: `grade_band` = «{values["grade_band"]}», '
-                      f'допустимо: {", ".join(GRADE_BANDS)}')
     if values['source_kind'] not in SOURCE_KINDS:
         errors.append(f'вариант: `source_kind` = «{values["source_kind"]}», '
                       f'допустимо: {", ".join(sorted(SOURCE_KINDS))}')
@@ -289,6 +327,13 @@ def _normalize_variant(data, errors):
                           f'({data.get(name)!r})')
             number = default or 0
         values[name] = number
+    rules = TOUR_RULES.get(values['tour'])
+    if rules is None:
+        errors.append(f'вариант: `tour` = {values["tour"]}, допустимо: '
+                      f'{", ".join(str(t) for t in TOUR_RULES)}')
+    elif values['grade_band'] not in rules['grade_bands']:
+        errors.append(f'вариант: `grade_band` = «{values["grade_band"]}», '
+                      f'допустимо: {", ".join(rules["grade_bands"])}')
     values.update(_normalize_source(data, errors))
     return values
 
@@ -334,10 +379,14 @@ def normalize(data):
             parsed.items.append(values)
 
     _check_numbering(parsed)
+    rules = TOUR_RULES.get(parsed.variant.get('tour'))
+    if rules and rules['structure']:
+        _check_tour2(parsed, rules)
+    max_score = rules['max_score'] if rules else TOUR1_MAX_SCORE
     total = summarize(parsed.items)['total']
-    if total != TOUR1_MAX_SCORE:
+    if total != max_score:
         parsed.errors.append(f'сумма `points` по всем заданиям {total}, '
-                             f'а должна быть {TOUR1_MAX_SCORE}')
+                             f'а должна быть {max_score}')
     return parsed
 
 
@@ -354,6 +403,116 @@ def _check_numbering(parsed):
             parsed.errors.append(
                 'при tour=1 номера заданий не образуют ровно 1..44: '
                 f'не хватает {missing}, лишние {extra}')
+
+
+# ------------------------------------------------------------ 2 тур
+
+def _check_tour2(parsed, rules):
+    """Проверки варианта 2 тура: структура класса, номера, число, соотнесение,
+    пропуски и пары с общим условием. Всё — ошибки, а не предупреждения."""
+    errors = parsed.errors
+    items = sorted(parsed.items, key=lambda i: i['number'])
+    structure = rules['structure'].get(parsed.variant.get('grade_band'))
+    if structure is None:
+        return  # класс уже назван ошибкой в шапке варианта
+
+    expected = sum(count for count, _ in structure.values())
+    numbers = [i['number'] for i in items]
+    if numbers != list(range(1, expected + 1)):
+        errors.append(f'при tour=2 номера заданий не образуют ровно 1..{expected} '
+                      f'(класс {parsed.variant["grade_band"]}): в файле {numbers}')
+
+    counts = {}
+    for item in items:
+        where = f'№{item["number"]}'
+        block = item['block']
+        if block not in structure:
+            errors.append(f'{where}: блок «{block}» не бывает во 2 туре '
+                          f'(допустимо: {", ".join(structure)})')
+            continue
+        counts[block] = counts.get(block, 0) + 1
+        need_points = structure[block][1]
+        if item['points'] is not None and item['points'] != need_points:
+            errors.append(f'{where}: в блоке «{block}» задание стоит {need_points} '
+                          f'баллов, а в файле {item["points"]}')
+        need_kind = TOUR2_BLOCK_KINDS[block]
+        if item['kind'] != need_kind:
+            errors.append(f'{where}: у блока «{block}» вид ответа `{need_kind}`, '
+                          f'а в файле `{item["kind"]}`')
+            continue
+        if block == 'number':
+            _check_number_item(item, where, errors)
+        elif block == 'matching':
+            _check_matching_item(item, where, errors)
+        elif block == 'gaptext':
+            _check_gaptext_item(item, where, errors)
+    for block, (count, _) in structure.items():
+        if counts.get(block, 0) != count:
+            errors.append(f'блок «{block}»: заданий {counts.get(block, 0)}, а у '
+                          f'{parsed.variant["grade_band"]} класса должно быть {count}')
+    _check_groups(items, errors)
+
+
+def _check_number_item(item, where, errors):
+    """Эталон числа сам проходит строгий формат ВШЭ; `accepted` — как есть."""
+    if not item['answer']:
+        errors.append(f'{where}: у задания с числом пусто поле `answer`')
+    elif not NUMBER_FORMAT.fullmatch(item['answer']):
+        errors.append(f'{where}: эталон «{item["answer"]}» не в формате ответа ВШЭ '
+                      f'(цифры, минус, запятая и до двух знаков после неё: «37,5»)')
+
+
+def _option_refs(item, where, errors):
+    known = {o['n'] for o in item['options']}
+    if not known:
+        errors.append(f'{where}: пусто `options`')
+    for key, value in item['correct'].items():
+        if _int(value) not in known:
+            errors.append(f'{where}: `correct` «{key}» ссылается на {value!r}, '
+                          f'которого нет в options (их {len(known)})')
+
+
+def _check_matching_item(item, where, errors):
+    """Соотнесение: строка на каждый ключ «1»…«N», значения — номера категорий."""
+    correct, rows = item['correct'], item['rows']
+    if not rows:
+        errors.append(f'{where}: у соотнесения пусто `rows` (тексты утверждений)')
+    elif len(rows) != len(correct):
+        errors.append(f'{where}: строк `rows` {len(rows)}, а ключей `correct` {len(correct)}')
+    if correct and sorted(correct) != sorted(str(k) for k in range(1, len(correct) + 1)):
+        errors.append(f'{where}: ключи `correct` должны быть «1»…«{len(correct)}», '
+                      f'а в файле {sorted(correct)}')
+    _option_refs(item, where, errors)
+
+
+def _check_gaptext_item(item, where, errors):
+    """Пропуски: метки `[[k]]` в тексте ровно те же, что ключи `correct`."""
+    marks = GAP_MARK.findall(item['statement'])
+    if len(marks) != len(set(marks)):
+        errors.append(f'{where}: метка пропуска повторяется в тексте')
+    marks, keys = set(marks), set(item['correct'])
+    if marks != keys:
+        def listed(labels):
+            return '[' + ', '.join(sorted(labels, key=lambda k: (len(k), k))) + ']'
+        errors.append(f'{where}: метки пропусков в тексте {listed(marks)} '
+                      f'не совпадают с ключами `correct` {listed(keys)}'
+                      + (f'; без ключа: {listed(marks - keys)}' if marks - keys else '')
+                      + (f'; без метки: {listed(keys - marks)}' if keys - marks else ''))
+    _option_refs(item, where, errors)
+
+
+def _check_groups(items, errors):
+    """Пара с общим условием: в группе минимум два задания, и они идут подряд."""
+    groups = {}
+    for item in items:
+        if item.get('group') is not None:
+            groups.setdefault(item['group'], []).append(item['number'])
+    for group, numbers in sorted(groups.items()):
+        if len(numbers) < 2:
+            errors.append(f'группа {group}: в ней одно задание ({numbers[0]}), '
+                          f'а общее условие бывает минимум у двух')
+        elif numbers != list(range(numbers[0], numbers[0] + len(numbers))):
+            errors.append(f'группа {group}: задания {numbers} идут не подряд')
 
 
 # ----------------------------------------------------------------- запись

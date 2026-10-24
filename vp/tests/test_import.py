@@ -15,6 +15,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from vp.loader import StaleItemsError, normalize, write_variant
 from vp.models import VPAttempt, VPItem, VPVariant
 from vp.scoring import score_attempt
 from vp.tests.helpers import answer_all
@@ -182,22 +183,18 @@ class IdempotencyTests(ImportTestCase):
 
     def test_removed_item_is_deleted_when_no_attempts(self):
         self.run_import(str(SELFTEST))
-        # Файл теперь короче на одно задание — но tour=1 требует 44; берём tour=2.
-        data = self.without(44)
-        data['tour'] = 2
-        data['items'][-1]['points'] = 9  # 4 + 5, чтобы сумма осталась 100
-        out, _ = self.run_import(data)
-        self.assertIn('Удалены задания: [44]', out)
+        # Файл короче на одно задание. Команда такой файл 1 тура не пропустит
+        # (номера ровно 1..44), а правило удаления живёт в записи — зовём её прямо.
+        # Прежний обход через `tour: 2` закрыт: у 2 тура теперь своя структура.
+        result = write_variant(normalize(self.without(44)))
+        self.assertEqual(result.deleted, [44])
         self.assertEqual(VPItem.objects.filter(variant__slug='vp-selftest').count(), 43)
 
     def test_removed_item_refused_when_attempts_exist(self):
         self.run_import(str(SELFTEST))
         VPAttempt.objects.create(variant=VPVariant.objects.get(), public_code='abc')
-        data = self.without(44)
-        data['tour'] = 2
-        data['items'][-1]['points'] = 9
-        _, err = self.run_import(data, expect_error=True)
-        self.assertIn('есть попытки', err)
+        with self.assertRaisesMessage(StaleItemsError, 'есть попытки'):
+            write_variant(normalize(self.without(44)))
         self.assertEqual(VPItem.objects.count(), 44)
 
 
