@@ -4293,3 +4293,9 @@ body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit) .
 body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit)::after,
 body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { content: '?'; position: absolute; left: 0; top: 0; color: var(--text2); }
 body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: auto; right: 0; }
+
+/* Монополия, ADR 0157 (24.10): вторая строка вердикта «Выгоднее не производить» /
+   «безразлично» — пояснение под главной фразой статуса «Ответа». */
+.mono-verdict-sub { font-weight: 400; margin-top: 2px; }
+/* Своя левая часть в поле («Q = 100 − 2P», ADR 0157) — приставка уходит, иначе «Q = Q = …». */
+#tools-panel .fc-card > .crow-formula.fc-pre-own > .fc-prefix { display: none; }

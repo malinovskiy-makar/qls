@@ -74,9 +74,101 @@ function marginalRevenue(D, q) {
   return (a - b) / (2 * h);
 }
 
+/* Все корни g на (lo; hi) — сетка ПОСТОЯННОЙ плотности (шаг тот же, что у findRoot,
+   ADR 0020): отрезок вдвое длиннее — узлов вдвое больше, иначе два близких корня
+   слипнутся в один узел. Узел с NaN пропускается (разрыв кривой — не смена знака). */
+function monoRootsIn(g, lo, hi) {
+  const out = [];
+  if (!(hi > lo)) return out;
+  const n = Math.max(1000, Math.ceil((hi - lo) / (Math.max(100, CONFIG.Qmax) / 1000)));
+  let pq = lo, pg = g(lo);
+  for (let i = 1; i <= n; i++) {
+    const q = lo + (hi - lo) * i / n, c = g(q);
+    if (isNaN(c)) continue;
+    if (!isNaN(pg) && pg * c <= 0 && pg !== c) {
+      const r = (pg === 0) ? pq : (c === 0 ? q : bisect(g, pq, q));
+      if (r > lo && r < hi && !out.some(x => Math.abs(x - r) < 1e-9)) out.push(r);
+    }
+    pq = q; pg = c;
+  }
+  return out;
+}
+
+/* Правая граница выпуска монополиста (решение владельца 24.10, Notion …81ba…): меньшее из
+   конца спроса и ПЕРВОЙ точки, где MC, падая, проходит через ноль сверху вниз — дальше этого
+   выпуска кривой MC нет (экономическая кривая живёт при P ≥ 0, ADR 0019). MC, которая
+   начинается ниже нуля и растёт (Q − 20), границы не ставит: её низ обрезает mcFloor.
+   qEnd — конец спроса (Infinity — спрос не кончается, тогда край — область модели span).
+   Возврат: { hi, cap: 'demand' | 'mc' | 'span' }. */
+function monoOutputCap(mcFn, qEnd, span) {
+  let hi = qEnd, cap = 'demand';
+  if (!isFinite(hi)) { hi = span; cap = 'span'; }
+  if (!(hi > 0)) return { hi: 0, cap };
+  const n = Math.max(1000, Math.ceil(hi / (Math.max(100, CONFIG.Qmax) / 1000)));
+  let pq = 0, pv = mcFn(0);
+  for (let i = 1; i <= n; i++) {
+    const q = hi * i / n, v = mcFn(q);
+    if (isNaN(v)) continue;
+    if (pv > 0 && v <= 0) return { hi: (v === 0) ? q : bisect(mcFn, pq, q), cap: 'mc' };
+    pq = q; pv = v;
+  }
+  return { hi, cap };
+}
+
+/* ⚠️ ВЫПУСК МОНОПОЛИСТА — МАКСИМУМ ПРИБЫЛИ ПО КАНДИДАТАМ, А НЕ ПЕРВЫЙ КОРЕНЬ MR = MC
+   (карточка Notion …8118…, решения владельца 24.10 …81ba… и …81e0…, ADR 0157).
+
+   findRoot отдаёт ПЕРВЫЙ корень MR = MC. Пока MC растёт или постоянна, он и есть
+   максимум. Убывающая MC режет MR СВЕРХУ, и первый корень — МИНИМУМ прибыли: у
+   D: Q = 120 − P и MC = 160 − 4Q калькулятор писал Qm 20, P 100 и TR − VC = −400.
+
+   Правило — то же сравнение кандидатов, что у «Составного спроса» и потолка:
+   • правая граница Qhi — monoOutputCap (конец спроса или MC, упавшая до нуля);
+   • кандидаты — Q = 0, все корни MR = MC + shift на (0; Qhi) и сама Qhi. Ещё корни
+     MR = mcFloor(MC) + shift: там, где MC ≤ 0, вершина прибыли ниже — MR = 0;
+   • прибыль кандидата — TR − VC − shift·Q, VC = ∫₀^Q mcFloor(MC): постоянные
+     издержки на выбор выпуска не влияют; shift — ставка (+t налог, −s субсидия);
+   • безразличие — |Δприбыли| ≤ 1e-6·max(1, |прибыль|): отдаются ОБА варианта
+     (решение …81e0…), главный — с наибольшим Q > 0, остальные — в alts.
+   opts: shift, tr (выручка от Q, если спрос не одна кривая), qEnd (конец спроса), span.
+   Возврат: { Q, profit, alts, cap, Qhi, cands }; cap === 'span' и Q = Qhi — значит, прибыль
+   растёт до края области поиска (выпуск не ограничен). mcFloor здесь — та же мера VC, что
+   у площадей; сами площади помощник не трогает. */
+function monoBestOutput(mrAt, mcFn, D, opts) {
+  opts = opts || {};
+  const shift = opts.shift || 0;
+  const span = opts.span || modelSpanQ();
+  const tr = opts.tr || (q => { const p = evalCurve(D, q); return isNaN(p) ? NaN : p * q; });
+  let qEnd = opts.qEnd;
+  if (qEnd === undefined) {
+    const p0 = evalCurve(D, 0);
+    if (!(p0 > 0)) qEnd = 0;                                   // спроса нет: даже первую единицу не купят
+    else { const z = findRoot(q => evalCurve(D, q), span); qEnd = (z != null) ? z : Infinity; }
+  }
+  const { hi, cap } = monoOutputCap(mcFn, qEnd, span);
+  const qs = [0];
+  if (hi > 0) {
+    monoRootsIn(q => mrAt(q) - mcFn(q) - shift, 0, hi).forEach(r => qs.push(r));
+    monoRootsIn(q => mrAt(q) - mcFloor(mcFn(q)) - shift, 0, hi).forEach(r => { if (!qs.some(x => Math.abs(x - r) < 1e-9)) qs.push(r); });
+    if (!qs.some(x => Math.abs(x - hi) < 1e-9)) qs.push(hi);
+  }
+  const profitAt = (q) => {
+    if (q === 0) return 0;
+    const t = tr(q), vc = integrate(x => mcFloor(mcFn(x)), 0, q);
+    return (isNaN(t) || isNaN(vc)) ? NaN : t - vc - shift * q;
+  };
+  const cands = qs.map(Q => ({ Q, profit: profitAt(Q) })).filter(c => !isNaN(c.profit));
+  let top = -Infinity;
+  cands.forEach(c => { if (c.profit > top) top = c.profit; });
+  const tol = 1e-6 * Math.max(1, Math.abs(top));
+  const ties = cands.filter(c => Math.abs(c.profit - top) <= tol).map(c => c.Q).sort((a, b) => b - a);
+  const Q = ties[0];
+  return { Q, profit: profitAt(Q), alts: ties.slice(1), cap, Qhi: hi, cands };
+}
+
 // Заливки монополии: области CS / VC / PS до Qm (Задача 1) и DWL (между D и MC от Qm до Qc).
 function drawMonopolyAreas() {
-  if (!STATE.mono) return;
+  if (!STATE.mono || STATE.mono.noProd) return;   // выгоднее не производить: закрасок нет
   const m = STATE.mono;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
@@ -200,7 +292,7 @@ function drawMcDragHandle() {
 
 // Точки оптимума, проекции и конкурентный ориентир (бледный, по галочке «было → стало»).
 function drawMonopolyPoints() {
-  if (!STATE.mono) return;
+  if (!STATE.mono || STATE.mono.noProd) return;   // выгоднее не производить: точки M нет
   const m = STATE.mono;
   const ox = sx(0), oy = sy(0);
   const g = svg.append('g');
@@ -246,6 +338,21 @@ function updateMonoPanel() {
   if (!STATE.mono) { box.innerHTML = '<div class="warn">Оптимум MR = MC не найден в первой четверти.</div>'; return; }
   const m = STATE.mono;
   let html = '';
+  /* ADR 0157: выгоднее не производить — так и пишем; безразличие — оба варианта
+     (решение владельца 24.10, Notion …81e0…). Строка .warn — статус «Ответа». */
+  if (m.noProd) {
+    html += '<div class="warn mono-verdict">Выгоднее не производить: $Q = 0$' + (m.Pm != null ? ', $P = ' + fmt(m.Pm) + '$' : '')
+      + '<div class="mono-verdict-sub">при любом $Q > 0$ выручка меньше переменных издержек</div></div>';
+    html += `<div class="stat"><span>Qm (монополия)</span><b>${fmt(0)}</b></div>`;
+    if (m.Pm != null) html += `<div class="stat"><span>Pm (цена)</span><b>${fmt(m.Pm)}</b></div>`;
+    box.innerHTML = html;
+    return;
+  }
+  if (m.alts && m.alts.length) {
+    const others = m.alts.map(q => (q > 0 ? '$Q = ' + fmt(q) + '$, $P = ' + fmt(evalCurve(STATE.D, q)) + '$' : '$Q = 0$')).join(' или ');
+    html += '<div class="warn mono-verdict">Монополисту безразлично: $Q = ' + fmt(m.Qm) + '$, $P = ' + fmt(m.Pm) + '$ или ' + others
+      + '<div class="mono-verdict-sub">прибыль (TR&nbsp;−&nbsp;VC) в обоих вариантах ' + fmt(m.gain) + '</div></div>';
+  }
   html += `<div class="stat"><span>Qm (монополия)</span><b>${fmt(m.Qm)}</b></div>`;
   html += `<div class="stat"><span>Pm (цена)</span><b>${fmt(m.Pm)}</b></div>`;
   if (m.Qc != null) {
@@ -324,13 +431,16 @@ function monopolyCeiling(Pc) {
     if (Q > Qhat) r += integrate(q => marginalRevenue(D, q) - mcAt(q), Qhat, Q);
     return r;
   };
-  // Кандидаты на оптимум: 0, точка MC=Pc на плоской части, сам Q̂, обычный MR=MC за изломом.
+  // Кандидаты на оптимум: 0, точки MC=Pc на плоской части, сам Q̂, обычный MR=MC за изломом.
+  /* ВСЕ корни, а не первый, и не дальше границы выпуска (ADR 0157): убывающая MC за точкой,
+     где она падает до нуля, не продолжается (решение 24.10, monoOutputCap). */
+  const qEndD = invCurve(D, 0);
+  const capHi = monoOutputCap(mcAt, (qEndD != null && qEndD > 0) ? qEndD : Infinity, modelSpanQ()).hi;
   const cands = [{ Q: 0 }];
-  const qmc = findRootIn(q => Pc - mcAt(q), 0, Qhat);
-  if (qmc != null) cands.push({ Q: qmc });
-  cands.push({ Q: Qhat });
-  const qfall = findRootIn(q => marginalRevenue(D, q) - mcAt(q), Qhat, CONFIG.Qmax);
-  if (qfall != null) cands.push({ Q: qfall });
+  monoRootsIn(q => Pc - mcAt(q), 0, Math.min(Qhat, capHi)).forEach(r => cands.push({ Q: r }));
+  cands.push({ Q: Math.min(Qhat, capHi) });
+  monoRootsIn(q => marginalRevenue(D, q) - mcAt(q), Qhat, capHi).forEach(r => cands.push({ Q: r }));
+  if (capHi > Qhat) cands.push({ Q: capHi });
   cands.forEach(c => c.R = Rel(c.Q));
   let best = cands[0];
   cands.forEach(c => { if (c.R > best.R + 1e-6 || (Math.abs(c.R - best.R) <= 1e-6 && c.Q > best.Q)) best = c; });
@@ -446,7 +556,9 @@ function monopolyTax(shift) {
   const D = STATE.D, m = STATE.mono;
   if (!D || !m) return null;
   const mcEff = (q) => mcAt(q) + shift;                          // MC, сдвинутая на ставку
-  const Qt = findRoot(q => marginalRevenue(D, q) - mcEff(q));    // MR = MC ± ставка
+  /* MR = MC ± ставка — максимумом прибыли по кандидатам, а не первым корнем (ADR 0157):
+     граница выпуска — у НАСТОЯЩЕЙ MC, ставка входит в прибыль слагаемым −shift·Q. */
+  const Qt = monoBestOutput(q => marginalRevenue(D, q), mcAt, D, { shift }).Q;
   if (Qt == null || !(Qt > 0)) return null;
   const Pt = evalCurve(D, Qt);                                   // цена — с кривой спроса
   const rate = Math.abs(shift), isTax = (shift > 0);
@@ -1053,11 +1165,21 @@ function updateMonoInterventionPanel() {
    ===================================================================== */
 
 // Построить «кривую» из произвольной формулы (число или f(Q)) — пригодна для evalCurve.
+/* Запись любой формы — общая дверь buildAnyCurve (80-ui.js, ADR 0157): «120 − P» и
+   «Q = 120 − P» — Q(P), «P = 120 − Q» и «120 − Q» — P(Q). Прежде здесь стоял голый
+   compileFormula, и запись Q(P) давала «Undefined symbol P» (дискриминация, внешний
+   рынок) или пустой экран (составной спрос). */
 function makeCurve(expr) {
-  const { compiled, error } = compileFormula((expr || '').trim());
-  if (error) return { error };
+  const b = buildAnyCurve((expr || '').trim());
+  if (b.error) return { error: b.error };
+  if (b.form === 'QP') {
+    /* Запись для .tex: у прямой Q(P) — P(Q) по коэффициентам (curveFormula), у непрямой —
+       записи нет, кривая уходит узлами с причиной (markCurve → markNumeric). srcForm — не
+       перечислимое: снимок состояния модели видит объект прежним (texTag). */
+    return texTag({ compiled: null, linear: b.linear, fn: b.fn, error: null }, 'srcForm', 'QP');
+  }
   // expr — для записи при рисовании (выгрузка .tex): формула кривой строкой, как набрана (texTag: в состояние не входит)
-  return texTag({ compiled, linear: detectLinear(compiled), error: null }, 'expr', (expr || '').trim());
+  return texTag({ compiled: b.compiled, linear: b.linear, error: null }, 'expr', b.rhs);
 }
 
 /* Формула куска спроса строкой (для записи при рисовании, 72-export-tex.js):
@@ -1162,7 +1284,20 @@ function recomputeDiscr3() {
     const m1 = marginalRevenue(c1, q1), m2 = marginalRevenue(c2, Qtot - q1);
     return Math.max(isNaN(m1) ? -Infinity : m1, isNaN(m2) ? -Infinity : m2);   // MR следующей единицы (в лучшем рынке)
   };
-  const Qtot = findRootIn((Q) => commonMR(Q) - mc(Q), 1e-6, 2 * CONFIG.Qmax);
+  /* Общий выпуск — максимум прибыли по кандидатам, а не первый корень общего MR = MC
+     (ADR 0157): при убывающей MC первый корень — минимум прибыли (замер 24.10: Qtot 20 у
+     MC = 160 − 4Q). Выручка — по распределению MR₁ = MR₂; конец спроса — сумма концов
+     рынков (горизонтальный мировой спрос не кончается). Прибыль растёт до края области
+     поиска — выпуск не ограничен, ветка ниже, как и раньше. */
+  const span = 2 * CONFIG.Qmax;
+  const endOf = (c) => { if (!(evalCurve(c, 0) > 0)) return 0; const z = findRoot(q => evalCurve(c, q), span); return (z != null) ? z : Infinity; };
+  const trAt = (Q) => {
+    const a = allocateMR(c1, c2, Q), p1 = evalCurve(c1, a), p2 = evalCurve(c2, Q - a);
+    return (isNaN(p1) || isNaN(p2)) ? NaN : a * p1 + (Q - a) * p2;
+  };
+  const best = monoBestOutput(commonMR, mc, null, { tr: trAt, qEnd: endOf(c1) + endOf(c2), span });
+  const unbounded = (best.cap === 'span' && Math.abs(best.Q - best.Qhi) < 1e-9);
+  const Qtot = unbounded ? null : best.Q;
   if (Qtot == null || !(Qtot > 0)) {
     /* ⚠️ «ОБЩЕГО ВЫПУСКА НЕТ» НЕ ЗНАЧИТ «ОТВЕТА НЕТ». Если предельные издержки
        нигде не дорастают до мировой цены, выгодна любая лишняя единица, и
@@ -1172,7 +1307,9 @@ function recomputeDiscr3() {
        продаётся столько, что MR внутри = Pw. Раньше эта ветка не считала
        ничего, и сцена оставалась без обеих панелей. */
     let ub = null;
-    if (STATE.d3World) {
+    // «Не ограничен» — только когда прибыль растёт до края области поиска, а не когда
+    // выгоднее не производить (убывающая MC тоже уходит ниже Pw, ADR 0157).
+    if (STATE.d3World && unbounded) {
       const Pw = evalCurve(c2, 0);                     // мировая цена = уровень горизонтального спроса
       const mcFar = evalCurve(cm, 2 * CONFIG.Qmax);    // куда дорастают предельные издержки
       if (!isNaN(Pw) && !isNaN(mcFar) && mcFar < Pw) {
@@ -1181,12 +1318,13 @@ function recomputeDiscr3() {
         ub = { Pw, q1: has ? q1 : 0, P1: has ? evalCurve(c1, q1) : NaN };
       }
     }
-    STATE.discr3 = { c1, c2, cm, found: false, unbounded: ub };
+    // Прибыль ни при каком Q > 0 не выше нуля и выпуск ограничен — выгоднее не производить (ADR 0157).
+    STATE.discr3 = { c1, c2, cm, found: false, unbounded: ub, noProd: !ub && Qtot === 0 };
     return;
   }
   const q1 = allocateMR(c1, c2, Qtot), q2 = Qtot - q1;
   const P1 = evalCurve(c1, q1), P2 = evalCurve(c2, q2), mcLevel = mc(Qtot);
-  STATE.discr3 = { c1, c2, cm, found: true, Qtot, q1, q2, P1, P2, mcLevel };
+  STATE.discr3 = { c1, c2, cm, found: true, Qtot, q1, q2, P1, P2, mcLevel, alts: best.alts, gain: best.profit };
 }
 
 // Мини-график одного рынка в пиксельной полосе [gx0, gx1]: D, MR, MC и точка (qi, Pi).
@@ -1492,11 +1630,22 @@ function updateDiscr3Panel() {
       box.innerHTML = html;
       return;
     }
+    if (d.noProd) {
+      box.innerHTML = '<div class="warn mono-verdict">Выгоднее не производить: $Q = 0$'
+        + '<div class="mono-verdict-sub">при любом $Q > 0$ выручка меньше переменных издержек</div></div>';
+      return;
+    }
     box.innerHTML = '<div class="warn">Оптимум MR = MC не найден.</div>'; return;
   }
+  // Безразличие между общим выпуском и Q = 0 (ADR 0157, решение …81e0…): оба варианта словами.
+  const tie = (d.alts && d.alts.length)
+    ? '<div class="warn mono-verdict">Фирме безразлично: общий выпуск $Q = ' + fmt(d.Qtot) + '$ или '
+      + d.alts.map(q => '$Q = ' + fmt(q) + '$').join(' или ')
+      + '<div class="mono-verdict-sub">прибыль (TR&nbsp;−&nbsp;VC) в обоих вариантах ' + fmt(d.gain) + '</div></div>'
+    : '';
   if (world) {
     // Экспорт по мировой цене: сегмент 2 — горизонтальный спрос, поэтому MR₂ = Pw.
-    let html = '';
+    let html = tie;
     /* ⚠️ ВНУТРЕННЕЙ ЦЕНЫ ПРИ НУЛЕВОМ ВЫПУСКЕ НЕ СУЩЕСТВУЕТ. Когда мировая цена
        выше резервной цены покупателя (Pw > D(0)), дома не покупает никто:
        весь выпуск идёт на экспорт. Прежняя строка печатала «(0; 100)» —
@@ -1517,7 +1666,7 @@ function updateDiscr3Panel() {
   }
   // Эластичность в точке оптимума: |E| = |P / (Q·dP/dQ)|. Меньше эластичный → выше цена.
   const less = (d.P1 >= d.P2) ? '1' : '2';
-  let html = '';
+  let html = tie;
   html += `<div class="stat"><span>Рынок 1: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
   html += `<div class="stat"><span>Рынок 2: (q₂; P₂)</span><b>(${fmt(d.q2)}; ${fmt(d.P2)})</b></div>`;
   html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;

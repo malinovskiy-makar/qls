@@ -28,6 +28,10 @@ let curveCounter = 0;   // сквозной счётчик id кривых
    Внутренние вызовы движка (пресеты сцен, ensureMonopolyCurves) формулу с
    одинокой P не пишут, поэтому для них ничего не меняется. */
 function curveSrcForm(expr) {
+  // Левая часть записи сильнее букв правой (ADR 0157): «Q = 100 − 2P» — Q(P), «P = …» — P(Q).
+  const sp = splitCurveLhs(expr);
+  if (sp.form) return sp.form;
+  if (!sp.error) expr = sp.rhs;
   /* ⚠️ ФОРМУ ЧИТАЕМ ПО ПОДГОТОВЛЕННОЙ ЗАПИСИ, А НЕ ПО СЫРОЙ СТРОКЕ.
      Соседи буквы решают всё: правила ниже требуют, чтобы слева от P или Q
      стоял символ, которым имя продолжаться не может. В записи «100-2P» слева
@@ -39,10 +43,112 @@ function curveSrcForm(expr) {
      «цифра слева — это множитель» живёт в одном месте (60-overlays.js). */
   let t = String(expr || '');
   try { if (typeof prepExpr === 'function') t = prepExpr(t); } catch (e) { /* разбор не удался — судим по сырой строке */ }
-  const has = (re) => re.test(t);
-  const hasQ = has(/(^|[^A-Za-z0-9_])[Qq]([^A-Za-z0-9_]|$)/);
-  const hasP = has(/(^|[^A-Za-z0-9_])[Pp]([^A-Za-z0-9_]|$)/);
+  const hasQ = exprHasLetter(t, 'Qq') || (priceLetters().indexOf('W') >= 0 && exprHasLetter(t, 'Ll'));
+  const hasP = exprHasLetter(t, priceLetters());
   return (hasP && !hasQ) ? 'QP' : 'PQ';
+}
+
+/* Стоит ли в подготовленной записи ОДИНОЧНАЯ буква из набора (соседи — не буква, не цифра,
+   не «_»): «100-2*P» — да, «Pw», «P_1» — нет. Набор — строка букв. */
+function exprHasLetter(t, letters) {
+  const set = String(letters).replace(/[^A-Za-z]/g, '');
+  return set ? new RegExp('(^|[^A-Za-z0-9_])[' + set + ']([^A-Za-z0-9_]|$)').test(String(t)) : false;
+}
+/* Буквы цены в записи Q(P): P (и p), а на рынке труда, где вертикальная ось W, ещё W —
+   «L = 100 − W» (ADR 0157). Считает такая запись через P: buildAnyCurve меняет W на P
+   (в общую область Q(P) букву W не кладём — она не буква оси и стала бы ползунком). */
+function priceLetters() {
+  const y = /^[A-Za-z]+/.exec(String(STATE.axisYDefault || ''));
+  return (y && y[0] === 'W') ? 'PpWw' : 'Pp';
+}
+
+/* Запись P(Q) прямой для строки «Q(P) · в расчётах P = …» (ADR 0157): числа общим
+   форматтером calc2 (fmt — запятая), простая дробь со знаменателем до 12 — дробью:
+   «P = 50 − \frac{1}{2}Q», «P = \frac{1}{3}Q». Прежде здесь стояло «0.33·Q» с точкой. */
+function niceNumTex(v) {
+  const a = Math.abs(v);
+  for (let d = 2; d <= 12; d++) {
+    const n = Math.round(a * d);
+    if (n % d !== 0 && Math.abs(a * d - n) < 1e-9) return '\\frac{' + n + '}{' + d + '}';
+  }
+  return fmt(a);
+}
+function linearTexNice(a, b, V) {
+  const v = V || 'Q', P = 'P = ';
+  const eps = 1e-12;
+  const coef = (x) => { const t = niceNumTex(x); return (Math.abs(Math.abs(x) - 1) < eps) ? v : t + (t.indexOf('frac') >= 0 ? '' : '\\cdot ') + v; };
+  if (Math.abs(a) < eps) return P + (b < 0 ? '-' : '') + niceNumTex(b);
+  const aq = coef(a);
+  if (Math.abs(b) < eps) return P + (a < 0 ? '-' : '') + aq;
+  if (a < 0) return P + (b < 0 ? '-' : '') + niceNumTex(b) + ' - ' + aq;
+  return P + aq + (b < 0 ? ' - ' : ' + ') + niceNumTex(b);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ЛЕВАЯ ЧАСТЬ ЗАПИСИ (24.10, карточка Notion …81be…, ADR 0157).
+   Ученик переписывает функцию из условия как есть (решение 22.08 «тип записи
+   определяется сам»): «Q = 100 − 2P», «Qd = 100 − 2P», «P = 100 − Q». Math.js
+   понимает «=» как присваивание: ошибки не было, а кривая молча оставалась
+   прежней (или бралась с полдороги набора — «Q=100-2» давало горизонталь 98).
+
+   Левая часть решает форму записи:
+     • объём — Q, Qd, Qs, Q_d, Q_s, L, Ld, Ls, Y → запись Q(P) (Y(P) в макро);
+     • цена — P, Pd, Ps, W → запись P(Q);
+     • обозначение поля (MC, TC, ATC, AVC, MSB, MSC, AD, SRAS, D, S, своё имя
+       поля fieldKind) → обычная форма поля, её решают буквы правой части;
+     • иное — ошибка. Справа от «P =» не должно быть P (с Q — так же); два «=» —
+       ошибка. Разбирается строка, уже приведённая мостом MathLive (latexToMath):
+       «Q_{d}» приходит как «Q_d», «\cdot» — как «*».
+   Возврат: { rhs, lhs, form: 'QP' | 'PQ' | null } или { error } — текст по-русски.
+   ═══════════════════════════════════════════════════════════════════════ */
+const LHS_VOLUME = new Set(['Q', 'QD', 'QS', 'L', 'LD', 'LS', 'Y']);
+const LHS_PRICE = new Set(['P', 'PD', 'PS', 'W']);
+const LHS_OWN = new Set(['MC', 'TC', 'ATC', 'AVC', 'MSB', 'MSC', 'AD', 'SRAS', 'D', 'S']);
+function lhsKey(s) {
+  return String(s || '').replace(/\\(mathrm|text|operatorname|mathit)/g, '').replace(/[\s{}_*\\]/g, '').toUpperCase();
+}
+function splitCurveLhs(expr, fieldKind) {
+  const raw = String(expr == null ? '' : expr).trim();
+  const parts = raw.split(/(?<![<>=!])=(?!=)/);
+  if (parts.length === 1) return { rhs: raw, lhs: '', form: null };
+  if (parts.length > 2) return { error: 'В записи два знака «=», нужен один' };
+  const lhs = parts[0].trim(), rhs = parts[1].trim();
+  if (!lhs || !rhs) return { error: 'По одну сторону знака «=» пусто' };
+  const k = lhsKey(lhs);
+  if (LHS_OWN.has(k) || (fieldKind && k === lhsKey(fieldKind))) return { rhs, lhs, form: null };
+  const vol = LHS_VOLUME.has(k), price = LHS_PRICE.has(k);
+  if (!vol && !price) return { error: 'Слева от „=“ понятны Q, P или имя поля' };
+  /* Буква левой части не может стоять и справа: «P = 100 − 2P» — уравнение, а не запись
+     кривой. У объёма Q запрещены Q и q, у L — L и l; у цены P — P и p, у W — W и w. */
+  const letter = k.charAt(0);
+  let t = rhs;
+  try { if (typeof prepExpr === 'function') t = prepExpr(rhs); } catch (e) { /* судим по сырой строке */ }
+  if (exprHasLetter(t, letter + letter.toLowerCase())) return { error: 'Справа от „' + letter + ' =“ не должно быть ' + letter };
+  return { rhs, lhs, form: vol ? 'QP' : 'PQ' };
+}
+
+/* Кривая из записи ЛЮБОЙ формы — одна дверь для списка кривых и сцен со своими полями
+   (makeCurve, «Лаффер»): левая часть (splitCurveLhs) → форма (curveSrcForm) → Q(P)
+   приводится к канону buildCurveFromQP, P(Q) компилируется как раньше.
+   Возврат: { form, rhs, compiled | fn, linear, srcCompiled, srcLinear } или { error }. */
+function buildAnyCurve(expr, fieldKind) {
+  const sp = splitCurveLhs(expr, fieldKind);
+  if (sp.error) return { error: sp.error };
+  const form = sp.form || curveSrcForm(sp.rhs);
+  if (form === 'QP') {
+    let rhs = sp.rhs;
+    if (priceLetters().indexOf('W') >= 0) {
+      try {
+        rhs = math.parse(prepExpr(rhs)).transform(n => (n && n.isSymbolNode && (n.name === 'W' || n.name === 'w') ? new math.SymbolNode('P') : n)).toString();
+      } catch (e) { /* не разобралось — пусть ошибку назовёт buildCurveFromQP */ }
+    }
+    const b = buildCurveFromQP(rhs);
+    if (b.error) return { error: b.error };
+    return Object.assign({ form, rhs, compiled: null }, b);
+  }
+  const { compiled, error } = compileFormula(sp.rhs);
+  if (error) return { error };
+  return { form: 'PQ', rhs: sp.rhs, compiled, linear: detectLinear(compiled), fn: null };
 }
 
 // Добавить кривую по формуле. form: 'PQ' — P = f(Q) (канон движка),
@@ -51,7 +157,11 @@ function curveSrcForm(expr) {
 function addCurve(expr, form) {
   expr = (expr || '').trim();
   if (!expr) { showError('Введите формулу, например 100 - Q'); return; }
-  if (!form) form = curveSrcForm(expr);
+  // Левая часть (ADR 0157): «Q = 100 − 2P» — Q(P); в кривую уходит правая часть.
+  const sp = splitCurveLhs(expr);
+  if (sp.error) { showError(sp.error); return; }
+  if (!form) form = sp.form || curveSrcForm(sp.rhs);
+  expr = sp.rhs;
   if (form === 'QP') {
     const built = buildCurveFromQP(expr);
     if (built.error) { showError('Не понял формулу Q(P): ' + built.error); return; }
@@ -113,18 +223,19 @@ function updateCurveExpr(curve, expr) {
   if (curve.kind === 'vertical') return 'у вертикальной линии формулы нет';
   // Форму записи пересматриваем на КАЖДОЙ правке: переключателя нет, и
   // «100 - Q», переписанное в «100 - 2*P», обязано стать «объёмом от цены».
-  curve.srcForm = curveSrcForm(expr);
-  if (curve.srcForm === 'QP') {
-    const built = buildCurveFromQP(expr);
-    if (built.error) return built.error;
-    curve.expr = expr; curve.compiled = null;
-    curve.linear = built.linear; curve.fn = built.fn;
-    curve.srcExpr = expr; curve.srcCompiled = built.srcCompiled; curve.srcLinear = built.srcLinear;
+  /* Одна дверь buildAnyCurve (ADR 0157): левая часть «Q =», «P =», «D =» решает форму,
+     в кривую уходит правая часть. Ошибка — и форма, и формула остаются прежними
+     (раньше форма успевала смениться до проверки). */
+  const b = buildAnyCurve(expr, curveShortName(curve));
+  if (b.error) return b.error;
+  curve.srcForm = b.form;
+  if (b.form === 'QP') {
+    curve.expr = b.rhs; curve.compiled = null;
+    curve.linear = b.linear; curve.fn = b.fn;
+    curve.srcExpr = b.rhs; curve.srcCompiled = b.srcCompiled; curve.srcLinear = b.srcLinear;
   } else {
-    const { compiled, error } = compileFormula(expr);
-    if (error) return error;
-    curve.expr = expr; curve.compiled = compiled;
-    curve.linear = detectLinear(compiled);
+    curve.expr = b.rhs; curve.compiled = b.compiled;
+    curve.linear = b.linear;
     curve.fn = null;   // синтетическая функция (S + t и т.п.) больше не действует
   }
   /* ⚠️ НОВАЯ ФОРМУЛА — НОВАЯ ТОЧКА ОТСЧЁТА СДВИГА (решение владельца 24.08).
@@ -343,6 +454,7 @@ function renderCurveList() {
         if (!err) {
           if (!rowTag) paintNotation(nm, curveShortName(curve));
           syncQpLine();
+          if (typeof row._syncPrefix === 'function') row._syncPrefix();
           redrawAll();
           if (typeof updatePult === 'function') updatePult();
         }
@@ -453,7 +565,7 @@ function renderCurveList() {
       const chip = document.createElement('span'); chip.className = 'form-badge'; chip.textContent = 'Q(P)';
       const mid = document.createElement('span'); mid.className = 'fc-qp-mid'; mid.textContent = 'в расчётах';
       const tail = document.createElement('span'); tail.className = 'fc-qp-math';
-      if (curve.linear && typeof renderTexRaw === 'function') renderTexRaw(tail, 'P = ' + mathToTex(fmtLinear(curve.linear.a, curve.linear.b)));
+      if (curve.linear && typeof renderTexRaw === 'function') renderTexRaw(tail, linearTexNice(curve.linear.a, curve.linear.b));
       else tail.textContent = 'P = f(Q), обратная функция, считаем численно';
       qpLine.append(chip, mid, tail);
     }
@@ -466,6 +578,20 @@ function renderCurveList() {
       if (typeof katexInto === 'function') katexInto(pre, curvePrefix(curve).replace(' =', '\\,='));
       else pre.textContent = curvePrefix(curve);
       fLine.append(pre, fInp);
+      /* Приставка идёт за формой записи СРАЗУ (ADR 0157): «100 − Q» → «100 − 2P» — «P =» → «Q =»
+         без перезагрузки. Своя левая часть в поле («Q = 100 − 2P») — приставка уходит
+         (класс fc-pre-own), иначе читалось бы «Q = Q = …». */
+      row._syncPrefix = () => {
+        const txt = curvePrefix(curve);
+        if (pre._txt !== txt) {
+          pre._txt = txt;
+          if (typeof katexInto === 'function') katexInto(pre, txt.replace(' =', '\\,='));
+          else pre.textContent = txt;
+        }
+        const sp = splitCurveLhs(fInp.value);
+        fLine.classList.toggle('fc-pre-own', !!(sp && sp.lhs));
+      };
+      pre._txt = curvePrefix(curve);
       /* Кусочная функция: на месте поля — запись скобкой с карандашом; вся
          запись — кнопка и открывает окно «Кусочная функция» (README макета,
          6.6). Поле остаётся в разметке: его значение — источник записи. */
@@ -530,6 +656,7 @@ function refreshCurveRow(curve) {
   const tipped = row.querySelector('.crow-top .curve-name');
   if (tipped) tipped.setAttribute('data-tip', tipExpr(curve.expr));
   if (typeof row._syncQp === 'function') row._syncQp();
+  if (typeof row._syncPrefix === 'function') row._syncPrefix();
   return true;
 }
 

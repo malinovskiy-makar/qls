@@ -154,7 +154,15 @@ function recompute() {
        блоке «Итоговая функция». simplifyRecord упрощает ПОКУСОЧНО и сверяет
        результат с исходником численно — не сошлось, оставит исходник. */
     const sSrc = (STATE.S && STATE.S.expr) ? String(STATE.S.expr) : '';
-    const sAfter = adv
+    /* ⚠️ КРИВАЯ Q(P) (24.10, ADR 0157): её expr — запись человека ОТ P («3P − 60»), и
+       прибавка ставки к ней как к P(Q) давала «P = 3·P − 36». Здесь две ветки:
+       P(Q) — как было, побайтно; Q(P) — запись тоже Q(P), с подстановкой вместо P
+       (qpRecordAfter), а для выгрузки .tex — P(Q) по прямой либо запись «по вертикали». */
+    const sAfter = (STATE.S && STATE.S.srcForm === 'QP')
+      ? qpAfter(STATE.S, adv ? 'Q / ' + factor : 'Q - (' + shift + ')',
+          adv ? q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; } : q => evalCurve(STATE.S, q) + shift,
+          adv ? (e => '(' + e + ') * ' + factor) : (e => '(' + e + ') + (' + shift + ')'))
+      : adv
       ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; },
           texExpr: sSrc ? simplifyRecord('(' + sSrc + ') * ' + factor) : '' }
       : { fn: q => evalCurve(STATE.S, q) + shift,
@@ -169,7 +177,12 @@ function recompute() {
        Строится ЗДЕСЬ, рядом с sAfter: при налоге на покупателя рисуется именно
        она, и её отсутствие означало бы неподвижный график ровно так же. */
     const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
-    STATE.taxAfterD = adv
+    STATE.taxAfterD = (STATE.D && STATE.D.srcForm === 'QP')
+      // Спрос Q(P): потоварно P → P + ставка, процентно P → P·factor (ADR 0157).
+      ? qpAfter(STATE.D, adv ? 'Q * ' + factor : 'Q + (' + shift + ')',
+          adv ? q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; } : q => evalCurve(STATE.D, q) - shift,
+          adv ? (e => '(' + e + ') / ' + factor) : (e => '(' + e + ') - (' + shift + ')'))
+      : adv
       ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
           texExpr: dSrc ? simplifyRecord('(' + dSrc + ') / ' + factor) : '' }
       /* ⚠️ ЗНАК БЕРЁТСЯ У `shift`, А НЕ У СТАВКИ.
@@ -326,11 +339,22 @@ function recompute() {
     }
   }
 
-  // Монополия: оптимум MR = MC, цена берётся с кривой спроса (Задача 3).
+  // Монополия: максимум прибыли по кандидатам (ADR 0157), цена берётся с кривой спроса (Задача 3).
   STATE.mono = null;
   if (STATE.market === 'monopoly' && STATE.D && (mcSourceCurve() || curveByRole('tc'))) {
-    const Qm = findRoot(q => marginalRevenue(STATE.D, q) - mcAt(q));   // MR(Q) = MC(Q)
-    if (Qm != null && Qm > 0) {
+    /* ⚠️ НЕ ПЕРВЫЙ КОРЕНЬ MR = MC: у убывающей MC он — минимум прибыли (24.10,
+       monoBestOutput в 42-scenes-mono.js). alts — варианты с той же прибылью. */
+    const best = monoBestOutput(q => marginalRevenue(STATE.D, q), mcAt, STATE.D);
+    const Qm = best.Q;
+    if (!(Qm > 0)) {
+      /* Выгоднее не производить: при любом Q > 0 выручка меньше переменных издержек.
+         Точки M, закрасок и потерь нет (noProd); прежнее «не найден» остаётся только
+         для неразобранных или пустых кривых. */
+      const P0 = evalCurve(STATE.D, 0);
+      STATE.mono = { Qm: 0, Pm: isNaN(P0) ? null : P0, mcAtQm: mcAt(0), Qc: null, Pc: null, dwl: null,
+                     profit: null, csM: 0, vcM: 0, psM: 0, noProd: true, alts: [], gain: 0 };
+    }
+    if (Qm > 0) {
       const Pm = evalCurve(STATE.D, Qm);          // цена монополии — на кривой спроса
       const mcAtQm = mcAt(Qm);
       const Qc = findRoot(q => evalCurve(STATE.D, q) - mcAt(q));       // конкуренция: D = MC
@@ -348,7 +372,7 @@ function recompute() {
       const csM = integrate(q => evalCurve(STATE.D, q) - Pm, 0, Qm);  // ∫ (D − Pm) dQ — излишек потребителя
       const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qm);           // ∫ max(0, MC) dQ — переменные издержки (VC(0)=0)
       const psM = integrate(q => Pm - mcFloor(mcAt(q)), 0, Qm);      // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
-      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM };
+      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM, alts: best.alts, gain: best.profit };
     }
   }
 
@@ -380,7 +404,7 @@ function recompute() {
   // Естественная монополия (Фаза 3в): считается ПОВЕРХ обычной монополии —
   // Qm/Pm/Qc берутся из STATE.mono, добавляются FC, ATC и два режима регулирования.
   STATE.natural = null;
-  if (STATE.market === 'monopoly' && STATE.monoMode === 'natural' && STATE.mono) recomputeNatural();
+  if (STATE.market === 'monopoly' && STATE.monoMode === 'natural' && STATE.mono && !STATE.mono.noProd) recomputeNatural();
 
   // Ценовая дискриминация 1-й степени (Задача 4): монополист забирает весь излишек,
   // продавая каждую единицу по её цене спроса до точки, где спрос = MC (= конкурентный выпуск).
@@ -2231,8 +2255,11 @@ function drawShiftedSupply() {
     pts.push(isNaN(v) ? null : [q, v]);
   }
   // Формулу объявляем экспорту: на бумагу кривая уйдёт формулой, а не таблицей.
-  markExpr(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
-    .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line), after);
+  // Непрямая кривая Q(P) — записью человека «по вертикали» (qpAfter, ADR 0157).
+  const shPath = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
+    .attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  if (!after.texExpr && after.recY) markExpr(shPath, after.recY, 'P', null, { axis: 'y' });
+  else markExpr(shPath, after);
   // Ярлык сдвинутой кривой. Ищем видимый якорь (Фаза 3): при адвалорной ставке
   // кривая круто уходит вверх и на фиксированной точке ярлык раньше пропадал.
   const pf = pctForm();
@@ -2929,6 +2956,21 @@ function setTaxKind(kind) {
   setTaxForm(adv ? (STATE.intervType === 'subsidy' ? 'subbuyer' : 'vat') : 'unit');
 }
 
+/* Кривая после вмешательства у записи Q(P) (24.10, ADR 0157). fn — та же функция, что
+   у P(Q) (числа модели не меняются); finalExpr — запись Q(P) с подстановкой sub вместо P
+   и левой частью из формы кривой (finalLhs); texExpr — запись P(Q) для выгрузки .tex,
+   если кривая прямая (curveFormula, обёрнутая pqWrap); у непрямой — recY, запись
+   человека «по вертикали» (так же уходит в файл и сама кривая, markCurve). */
+function qpAfter(c, sub, fn, pqWrap) {
+  const src = String(c.srcExpr || c.expr || '');
+  const rec = src ? qpRecordAfter(src, sub) : '';
+  const pq = curveFormula(c);
+  const out = { fn, texExpr: pq ? simplifyRecord(pqWrap(pq)) : '', finalExpr: rec,
+                finalLhs: (typeof curvePrefix === 'function' ? curvePrefix(c) : 'Q =').replace(/\s*=\s*$/, '') };
+  if (!pq && rec) out.recY = rec;
+  return out;
+}
+
 // Табло налога: таблица «До / После / Δ» и распределение бремени.
 function updateTaxPanel() {
   const box = document.getElementById('info-tax');
@@ -2954,12 +2996,15 @@ function updateTaxPanel() {
     const onBuyer = intervOnBuyer();
     const after = onBuyer ? STATE.taxAfterD : STATE.taxAfterS;
     const base = onBuyer ? STATE.D : STATE.S;
-    if (STATE.taxCurveOn && after && after.texExpr && base) {
+    /* Запись — в той форме, в какой человек набрал кривую (ADR 0157): у Q(P) это
+       finalExpr с левой частью «Q», у P(Q) — texExpr с «P», как было. */
+    const ffExpr = after && (after.finalExpr || after.texExpr);
+    if (STATE.taxCurveOn && after && ffExpr && base) {
       const what = onBuyer ? 'Спрос' : 'Предложение';
       const tag = onBuyer ? "$D'$" : "$S'$";
       setFinalFunctions([{
         name: what + ' после ' + (isSub ? 'субсидии' : 'налога') + ' ' + tag,
-        color: base.color, lhs: 'P', expr: after.texExpr,
+        color: base.color, lhs: after.finalLhs || 'P', expr: ffExpr,
       }]);
     } else {
       setFinalFunctions([]);

@@ -39,6 +39,22 @@ function axisScope(q, extra) {
   return c;
 }
 
+/* ОШИБКИ РАЗБОРА — ПО-РУССКИ (24.10, ADR 0157). Math.js отвечает по-английски
+   («Undefined symbol P»), и эта строка доходила до экрана под полем и в «Ответе».
+   Перевод в ОДНОМ месте — в catch у compileFormula, compileFormulaP и compileVar
+   (макро); английского текста ошибки никто из приборов и сцен не сравнивает
+   (grep 24.10). Незнакомое — «Не понял формулу» без английских слов. */
+function mathErrorRu(msg) {
+  const m = String(msg == null ? '' : msg);
+  let r = /Undefined symbol\s+([^\s(]+)/.exec(m);
+  if (r) return 'Не знаю букву ' + r[1];
+  if (/Undefined function\s+/.test(m)) { r = /Undefined function\s+([^\s(]+)/.exec(m); return 'Не знаю функцию ' + r[1]; }
+  if (/Unexpected end of expression/.test(m)) return 'Формула оборвалась';
+  if (/Parenthesis \) expected/.test(m)) return 'Не хватает закрывающей скобки';
+  if (/Unexpected operator|Value expected|Unexpected "/.test(m)) return 'Лишний или пропущенный знак';
+  return 'Не понял формулу';
+}
+
 function compileFormula(expr) {
   try {
     const compiled = math.parse(prepExpr(expr)).compile();
@@ -50,7 +66,7 @@ function compileFormula(expr) {
     compiled.evaluate(ctx);
     return { compiled, error: null };
   } catch (e) {
-    return { compiled: null, error: e.message };
+    return { compiled: null, error: mathErrorRu(e.message) };
   }
 }
 
@@ -100,6 +116,24 @@ function simplifyRecord(expr) {
   if (_simpCache.size > SIMPLIFY_CACHE_MAX) _simpCache.clear();
   _simpCache.set(key, out);
   return out;
+}
+
+/* Запись Q(P) после вмешательства — тоже Q(P) (карточка Notion …8149…, ADR 0157).
+   Кривая, набранная как «Q = 3P − 60», в записи хранит строку от P. Прибавлять к ней
+   ставку как к P(Q) нельзя: выходило «P = 3·P − 36». Вместо этого буква P заменяется
+   подстановкой sub — строкой от временной буквы Q (налог продавцу: «Q − (24)»), — и
+   запись упрощается тем же simplifyRecord, что у P(Q). Сверка simplifyRecord идёт по
+   букве Q (axisScope), поэтому упрощается запись от Q, а P возвращается в конце.
+   Вход src — запись человека от P без Q (так её и распознал curveSrcForm). */
+function qpRecordAfter(src, sub) {
+  if (typeof math === 'undefined') return '';
+  const isP = (n) => n && n.isSymbolNode && (n.name === 'P' || n.name === 'p');
+  try {
+    const subNode = math.parse('(' + sub + ')');
+    const put = math.parse(prepExpr(String(src))).transform(n => (isP(n) ? subNode : n));
+    const simple = simplifyRecord(put.toString());
+    return math.parse(prepExpr(simple)).transform(n => (n && n.isSymbolNode && n.name === 'Q' ? new math.SymbolNode('P') : n)).toString();
+  } catch (e) { return ''; }
 }
 
 /* «Здесь функции нет» — служебный хвост участка. Узел константы со значением
@@ -391,7 +425,7 @@ function compileFormulaP(expr) {
     compiled.evaluate(scopeFor(expr, { P: 1, p: 1, x: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) {
-    return { compiled: null, error: e.message };
+    return { compiled: null, error: mathErrorRu(e.message) };
   }
 }
 

@@ -1402,12 +1402,19 @@ function buildMathfield(inp) {
           fieldProblem(inp, 'Не понимаю команду ' + bad + ': калькулятор её не считает');
         return;
       }
+      const hadTex = !!inp.dataset.texUnknown;
       delete inp.dataset.texUnknown;
-      if (typeof fieldProblem === 'function') fieldProblem(inp, '');
       const text = latexToMath(mf.value);
+      /* ⚠️ СООБЩЕНИЕ СНИМАЕТСЯ, ТОЛЬКО КОГДА ТЕКСТ СМЕНИЛСЯ (24.10, ADR 0157). Мост зовётся
+         на каждое событие поля, и на Enter тоже; раньше он стирал сообщение всегда, а
+         обработчик поля ставил его заново только на новом тексте — «P = 100 − 2P» после
+         Enter оставалась красной рамкой без слов (обход 24.10: «ошибки нет»). */
       if (inp.value !== text) {
+        if (typeof fieldProblem === 'function') fieldProblem(inp, '');
         inp.value = text;
         inp.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (hadTex && typeof fieldProblem === 'function') {
+        fieldProblem(inp, '');
       }
     } finally { syncing = false; }
   };
@@ -1628,16 +1635,27 @@ function formulaInputError(inp) {
     const r = parsePpfEquation(v);
     return r && r.error ? r.error : null;
   }
+  /* Поля спроса и предложения сцен (дискриминация, внешний рынок, составной спрос, Лаффер,
+     AD–AS): левая часть записи — та же проверка, что у списка кривых (splitCurveLhs, ADR 0157),
+     ошибка встаёт под полем, график держит последнюю верную запись. */
+  if (LHS_FIELD_IDS.has(id) && typeof splitCurveLhs === 'function') {
+    const sp = splitCurveLhs(v);
+    if (sp.error) return sp.error;
+    try { math.parse(sp.rhs); return null; } catch (e) { return mathErrorRu(e.message || e); }
+  }
   // Запись целиком (в том числе кусочная «x < 50 ? … : …») — первым делом.
   try { math.parse(v.replace(/≤/g, '<=').replace(/≥/g, '>=')); return null; } catch (e) { /* дальше по частям */ }
   const parts = v.split(/(?<![<>=!])=(?!=)/);
   if (parts.length > 2) return 'В записи больше одного знака равенства';
   for (const part of parts) {
     if (!part.trim()) return 'По одну сторону знака равенства пусто';
-    try { math.parse(part); } catch (e) { return String(e.message || e).replace(/\s*\(char \d+\)/, ''); }
+    // По-русски (ADR 0157): английский текст Math.js на экран не идёт.
+    try { math.parse(part); } catch (e) { return mathErrorRu(e.message || e); }
   }
   return null;
 }
+const LHS_FIELD_IDS = new Set(['inp-d3-1', 'inp-d3-2', 'inp-d3-mc', 'inp-ki-1', 'inp-ki-2', 'inp-ki-3',
+  'inp-kp-1', 'inp-kp-2', 'inp-kink-mc', 'ma-lafd', 'ma-lafs', 'ma-ad', 'ma-sras']);
 function markFormulaField(inp, err) {
   if (!inp) return;
   inp.classList.toggle('bad', !!err);

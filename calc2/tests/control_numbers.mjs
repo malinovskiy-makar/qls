@@ -1312,6 +1312,105 @@ r = await run(`return { qc: (STATE.kinked || {}).Qc, q: CONFIG.Qmax };`);
 cmp('конкурентный выпуск', r.qc, 120, 1e-3);
 cmp('окно достало до конца потерь', r.q >= 120, true, 0);
 
+/* --- А1 24.10 (ADR 0157): монополия — максимум прибыли, «Итоговая функция» Q(P) ------
+   Числа сверены перебором и вручную (задачи Бахарева 6.4в, 6.5а, 9.13). Правила:
+   выпуск — наибольшая прибыль TR − VC по кандидатам, а не первый корень MR = MC;
+   убывающая MC кончается там, где падает до нуля (решение 24.10, Notion …81ba…);
+   безразличие — оба варианта словами (…81e0…); запись Q(P) после вмешательства — Q(P). */
+const A1 = `
+  var plain = function (el) { if (!el) return ''; var c = el.cloneNode(true);
+    [].forEach.call(c.querySelectorAll('.katex-mathml, annotation'), function (n) { n.remove(); }); return c.textContent.replace(/\\s+/g, ' '); };
+  var raws = function () { return [].slice.call(document.querySelectorAll('#chart [data-raw]')).map(function (e) { return e.getAttribute('data-raw'); }); };
+  var legends = function () { return [].slice.call(document.querySelectorAll('#chart [data-legend]')).map(function (e) { return e.getAttribute('data-legend'); }); };
+  var status = function () { return plain(document.getElementById('ans-status')); };
+  var ffTex = function () { var a = document.querySelector('#info-final annotation'); var all = document.querySelectorAll('#info-final annotation');
+    a = all.length ? all[all.length - 1] : null; return a ? a.textContent.replace(/\\\\cdot/g, '*').replace(/\\s/g, '') : ''; };
+`;
+head('А1 24.10 · монополия: максимум прибыли, а не первый корень MR = MC');
+for (const [mc, want] of [
+  ['160-4*Q', { Q: 40, P: 80, gain: 0, tie: 1, none: 0 }],
+  ['150-3*Q', { Q: 0, P: 120, none: 1 }],
+  ['Q^2-42*Q+520', { Q: 0, P: 120, none: 1 }],
+  ['2*Q', { Q: 30, P: 90, gain: 1800, tie: 0, none: 0 }],
+  ['40', { Q: 40, P: 80, gain: 1600, tie: 0, none: 0 }]]) {
+  r = await run(MKT + A1 + `setDS('mono', '120-P', '${mc}'); redrawAll();
+    var m = STATE.mono || {};
+    return { found: STATE.mono ? 1 : 0, Q: m.Qm, P: m.Pm, gain: m.gain, alts: (m.alts || []).join(','), none: m.noProd ? 1 : 0,
+      panel: plain(document.getElementById('info-mono')),
+      M: raws().indexOf('M') >= 0 ? 1 : 0, areas: legends().filter(function (s) { return /Излишек|Потери|Переменные/.test(s); }).length };`);
+  await page.waitForTimeout(250);
+  const st = await run(A1 + 'return status();');
+  const tag = 'D: Q = 120 − P, MC = ' + mc + ': ';
+  cmp(tag + 'ответ есть (не «не найден»)', r.found, 1, 0);
+  cmp(tag + 'выпуск', r.Q, want.Q, 1e-6);
+  cmp(tag + 'цена', r.P, want.P, 1e-6);
+  if (want.none) {
+    cmp(tag + '«Выгоднее не производить» в «Ответе»', /Выгоднее не производить/.test(st) ? 1 : 0, 1, 0);
+    cmp(tag + 'пояснение «выручка меньше переменных издержек»', /выручка меньше переменных издержек/.test(st) ? 1 : 0, 1, 0);
+    cmp(tag + 'точки M нет', r.M, 0, 0);
+    cmp(tag + 'закрасок излишков и DWL нет', r.areas, 0, 0);
+    cmp(tag + 'прежнего «не найден» нет', /не найден/.test(r.panel) ? 1 : 0, 0, 0);
+  } else {
+    cmp(tag + 'прибыль TR − VC', r.gain, want.gain, 1e-6);
+    cmp(tag + 'точка M на холсте', r.M, 1, 0);
+    cmp(tag + 'безразличие названо словами', /безразлично/.test(st) ? 1 : 0, want.tie, 0);
+    if (want.tie) {
+      cmp(tag + 'второй вариант — Q = 0', r.alts, '0', 0);
+      cmp(tag + 'в статусе оба варианта', (/Q\s*=\s*40/.test(st) && /Q\s*=\s*0/.test(st)) ? 1 : 0, 1, 0);
+    }
+  }
+}
+r = await run(MKT + `setDS('mono', '120-P', '150-3*Q'); var tr = 50 * 70, vc = integrate(function (q) { return mcFloor(150 - 3 * q); }, 0, 50); return { p50: tr - vc };`);
+cmp('MC = 150 − 3Q: при Q = 50 прибыль была бы', r.p50, -250, 1e-6);
+r = await run(MKT + `setDS('mono', '120-P', '2*Q+30'); setType('tax'); setTax(45); redrawAll();
+  var t = STATE.monoTax || {}; return { Q: t.Qt, P: t.Pt };`);
+cmp('MC = 2Q + 30, налог 45: выпуск', r.Q, 11.25, 1e-6);
+cmp('MC = 2Q + 30, налог 45: цена', r.P, 108.75, 1e-6);
+for (const [scene, d2, mc, wQ, wq1, wq2, tie, none] of [
+  ['mono-d3', '80 - Q', '160 - 4*Q', 40, 30, 10, 0, 0],
+  ['mono-d3', '80 - Q', '150 - 3*Q', 50, 35, 15, 0, 0],
+  ['monoexport', '30', '160 - 4*Q', 40, 40, 0, 1, 0],
+  ['monoexport', '30', '150 - 3*Q', 0, 0, 0, 0, 1]]) {
+  r = await run(A1 + `resetSceneMemory(); pickScene('${scene}'); STATE.d3D1 = '120 - Q'; STATE.d3D2 = '${d2}'; STATE.d3MC = '${mc}'; redrawAll();
+    var d = STATE.discr3 || {}; return { found: d.found ? 1 : 0, Q: d.Qtot, q1: d.q1, q2: d.q2, tie: (d.alts || []).length ? 1 : 0,
+      none: d.noProd ? 1 : 0, unb: d.unbounded ? 1 : 0, panel: plain(document.getElementById('info-d3')) };`);
+  const tag = scene + ', D₂ ' + d2 + ', MC ' + mc + ': ';
+  if (none) {
+    cmp(tag + 'выгоднее не производить', r.none, 1, 0);
+    cmp(tag + '«не ограничен» не пишется', r.unb, 0, 0);
+    cmp(tag + 'в табло словами', /Выгоднее не производить/.test(r.panel) ? 1 : 0, 1, 0);
+  } else {
+    cmp(tag + 'общий выпуск', r.Q, wQ, 1e-6);
+    cmp(tag + 'q₁', r.q1, wq1, 1e-6);
+    cmp(tag + 'q₂', r.q2, wq2, 1e-6);
+    cmp(tag + 'безразличие с Q = 0', r.tie, tie, 0);
+  }
+}
+
+head('А1 24.10 · «Итоговая функция» для записи Q(P) (задача 9.13)');
+for (const [tag, setup, ff, Pb, Q, money] of [
+  ['налог 24 на продавца', "setType('tax'); setTaxForm('unit'); setTaxSide('seller'); setTax(24);", 'Q=3*P-132', 78, 102, null],
+  ['НДС 50 %', "setType('tax'); setTaxForm('vat'); setTax(50);", 'Q=2*P-60', 80, 100, ['tx', 8000 / 3]],
+  ['субсидия 24 продавцу', "setType('subsidy'); setTaxForm('unit'); setTaxSide('seller'); setTax(24);", 'Q=3*P+12', 42, 138, ['spend', 3312]],
+  ['субсидия 25 % от цены продавца', "setType('subsidy'); setTaxForm('subseller'); setTax(25);", 'Q=4*P-60', 48, 132, null],
+  ['налог 24 на покупателя', "setType('tax'); setTaxForm('unit'); setTaxSide('buyer'); setTax(24);", 'Q=156-P', null, 102, null]]) {
+  r = await run(MKT + A1 + `setDS('taxes', '180-P', '3*P-60'); ${setup} redrawAll();
+    var e = STATE.taxEq || {}; return { ff: ffTex(), Pb: e.Pb, Ps: e.Ps, Q: e.Q, tx: STATE.tx, spend: Math.abs(STATE.budget || 0) };`);
+  cmp('Qd = 180 − P, Qs = 3P − 60, ' + tag + ': запись', r.ff, ff, 0);
+  if (Pb != null) cmp('…цена покупателя', r.Pb, Pb, 1e-6); else cmp('…цена продавца', r.Ps, 54, 1e-6);
+  cmp('…объём', r.Q, Q, 1e-6);
+  if (money) cmp('…' + (money[0] === 'tx' ? 'сбор' : 'расход'), r[money[0]], money[1], 1e-3);
+}
+for (const [tag, setup, ff] of [
+  ['субсидия покупателю', "setType('subsidy'); setTaxForm('unit'); setTaxSide('buyer'); setTax(20);", 'P=120-Q'],
+  ['субсидия продавцу', "setType('subsidy'); setTaxForm('unit'); setTaxSide('seller'); setTax(20);", 'P=Q-20'],
+  ['налог покупателю', "setType('tax'); setTaxForm('unit'); setTaxSide('buyer'); setTax(20);", 'P=80-Q'],
+  ['налог продавцу', "setType('tax'); setTaxForm('unit'); setTaxSide('seller'); setTax(20);", 'P=Q+20']]) {
+  r = await run(MKT + A1 + `setDS('taxes', '100-Q', 'Q'); ${setup} redrawAll(); return { ff: ffTex() };`);
+  cmp('P(Q) не сдвинулась (приёмка 31.08), ' + tag, r.ff, ff, 0);
+  cmp('…без «- (-», «+ (-», «(Q)»', /-\(-|\+\(-|\(Q\)/.test(r.ff) ? 1 : 0, 0, 0);
+}
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

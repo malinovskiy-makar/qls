@@ -26,7 +26,7 @@ function compileVar(expr, names) {
     if (paramsAllowed()) freeSymbols(expr).forEach(n => { if (ctx[n] === undefined) ctx[n] = 1; });
     compiled.evaluate(ctx);
     return { compiled, error: null };
-  } catch (e) { return { compiled: null, error: e.message }; }
+  } catch (e) { return { compiled: null, error: mathErrorRu(e.message) }; }
 }
 function evalVar(compiled, v, names) {
   try {
@@ -70,6 +70,24 @@ function macroCurveInv(expr, names, yMax) {
   } }, 'rec', { expr, v: names[0], axis: 'y' });
 }
 
+/* AD и SRAS — запись любой формы (24.10, ADR 0157): «P = …», «AD = …» и запись от Y —
+   как раньше, y = f(Y); «Y = 400 + 1600/P» и запись от P без Y — Y(P), обращается тем же
+   приёмом, что «количество от ставки» на денежном рынке (macroCurveInv по букве P; окно
+   цен до 1 000, сетка обращения доходит до трёх таких). Прежде такая запись давала
+   «Undefined symbol P». */
+function macroCurveAny(expr, names) {
+  const sp = splitCurveLhs(expr);
+  if (sp.error) return { error: sp.error };
+  let form = sp.form;
+  if (!form) {
+    let t = sp.rhs;
+    try { t = prepExpr(t); } catch (e) { /* судим по сырой строке */ }
+    const vl = names.join('') + names.join('').toLowerCase();
+    form = (exprHasLetter(t, 'Pp') && !exprHasLetter(t, vl)) ? 'QP' : 'PQ';
+  }
+  return form === 'QP' ? macroCurveInv(sp.rhs, ['P', 'p'], 1000) : macroCurveY(sp.rhs, names);
+}
+
 // Реестр моделей: подписи осей и пресеты полей. Поля живут в STATE.macro[model].
 const MACRO = {
   adas:     { title: 'AD–AS', xl: 'Y', yl: 'P', vars: ['Y'] },
@@ -98,7 +116,7 @@ function recomputeMacro() {
   const fail = (msg) => { STATE.macroErr = msg; };
 
   if (m === 'adas') {
-    const sras = macroCurveY(P.sras, V), ad = macroCurveY(P.ad, V);
+    const sras = macroCurveAny(P.sras, V), ad = macroCurveAny(P.ad, V);
     if (sras.error || ad.error) return fail(sras.error || ad.error);
     const lras = makeVerticalCurve(P.lras);
     const eq = findEquilibrium(ad, sras, MACRO_SEARCH);     // краткосрочное равновесие
@@ -176,10 +194,10 @@ function recomputeMacro() {
   if (m === 'laffer') {
     // Фаза 21: НЕ отдельная формула — прогоняем уже проверенный механизм
     // «равновесие с потоварным налогом» по сетке ставок и копим пары (t, доход).
-    const dr = compileFormula(P.d), sr = compileFormula(P.s);
-    if (dr.error || sr.error) return fail(dr.error || sr.error);
-    const D = { compiled: dr.compiled, linear: detectLinear(dr.compiled) };
-    const S = { compiled: sr.compiled, linear: detectLinear(sr.compiled) };
+    /* Спрос и предложение — запись любой формы (buildAnyCurve, ADR 0157): «120 − P» и
+       «Q = 120 − P» — Q(P). Прежде голый compileFormula отвечал «Undefined symbol P». */
+    const D = buildAnyCurve(P.d), S = buildAnyCurve(P.s);
+    if (D.error || S.error) return fail(D.error || S.error);
     const pts = [];
     let best = { t: 0, rev: 0, Q: null };
     const N = 200, tMax = P.tmax;

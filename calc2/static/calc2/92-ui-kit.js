@@ -615,6 +615,19 @@ function wrapFieldInCard(field, o) {
   paintCard(field);
   return field._scCard;
 }
+/* Приставка карточки спроса и предложения — по форме набранной записи (24.10, ADR 0157):
+   своя левая часть в поле («Q = 120 − P») — приставки нет; запись от цены без объёма —
+   «Q =» (у AD и SRAS — «Y =»); иначе «P =». Прежде приставка была постоянной «P =», и запись
+   «120 − P» читалась «P = 120 − P». vol — буква объёма (Q по умолчанию). */
+function formPrefix(inputId, vol) {
+  const v = vol || 'Q';
+  const e = document.getElementById(inputId), raw = e ? String(e.value || '') : '';
+  const sp = splitCurveLhs(raw);
+  if (sp.lhs) return '';
+  let t = sp.error ? raw : sp.rhs;
+  try { t = prepExpr(t); } catch (er) { /* судим по сырой строке */ }
+  return (exprHasLetter(t, 'Pp') && !exprHasLetter(t, v + v.toLowerCase())) ? v + ' =' : 'P =';
+}
 /* Обозначение, имя, приставка и цвет значка — по состоянию (у «Монополиста и внешнего рынка» поля те же, что у
    дискриминации 3-й степени, а смысл другой): зовётся на каждой перерисовке. */
 function paintCard(field) {
@@ -647,20 +660,20 @@ const SC_CARDS = [
   { m: 'isoquant', input: 'inp-iso', sym: 'Q', name: 'Производственная функция', prefix: 'Q =', col: 'isoq' },
   // «Монополист и внешний рынок» — те же поля, что у дискриминации 3-й степени (STATE.d3World): подписи пишет
   // сцена (applyD3WorldLabels) — они остаются спрятанными, карточка берёт смысл по состоянию.
-  { m: 'mono-d3', input: 'inp-d3-1', sym: () => (STATE.d3World ? 'D' : 'D_1'), name: () => (STATE.d3World ? 'Внутренний спрос' : 'Спрос рынка 1'), prefix: 'P =', col: 'D', keepLabel: true },
-  { m: 'mono-d3', input: 'inp-d3-2', sym: () => (STATE.d3World ? 'P_w' : 'D_2'), name: () => (STATE.d3World ? 'Мировая цена' : 'Спрос рынка 2'), prefix: () => (STATE.d3World ? 'P_w =' : 'P ='), col: () => (STATE.d3World ? 'reg' : 'D'), keepLabel: true },
+  { m: 'mono-d3', input: 'inp-d3-1', sym: () => (STATE.d3World ? 'D' : 'D_1'), name: () => (STATE.d3World ? 'Внутренний спрос' : 'Спрос рынка 1'), prefix: () => formPrefix('inp-d3-1'), col: 'D', keepLabel: true },
+  { m: 'mono-d3', input: 'inp-d3-2', sym: () => (STATE.d3World ? 'P_w' : 'D_2'), name: () => (STATE.d3World ? 'Мировая цена' : 'Спрос рынка 2'), prefix: () => (STATE.d3World ? 'P_w =' : formPrefix('inp-d3-2')), col: () => (STATE.d3World ? 'reg' : 'D'), keepLabel: true },
   { m: 'mono-d3', input: 'inp-d3-mc', sym: '\\mathrm{MC}', name: () => (STATE.d3World ? 'Предельные издержки от общего выпуска' : 'Предельные издержки'), prefix: '\\mathrm{MC} =', col: 'S', keepLabel: true },
-  { m: 'mono-kink', input: 'inp-ki-1', sym: 'D_1', name: 'Спрос 1', prefix: 'P =', col: 'D' },
-  { m: 'mono-kink', input: 'inp-ki-2', sym: 'D_2', name: 'Спрос 2', prefix: 'P =', col: 'D' },
-  { m: 'mono-kink', input: 'inp-ki-3', sym: 'D_3', name: 'Спрос 3, необязательно', prefix: 'P =', col: 'D' },
-  { m: 'mono-kink', input: 'inp-kp-1', sym: 'D_1', name: 'Верхний кусок', prefix: 'P =', col: 'D' },
-  { m: 'mono-kink', input: 'inp-kp-2', sym: 'D_2', name: 'Нижний кусок', prefix: 'P =', col: 'D' },
+  { m: 'mono-kink', input: 'inp-ki-1', sym: 'D_1', name: 'Спрос 1', prefix: () => formPrefix('inp-ki-1'), col: 'D' },
+  { m: 'mono-kink', input: 'inp-ki-2', sym: 'D_2', name: 'Спрос 2', prefix: () => formPrefix('inp-ki-2'), col: 'D' },
+  { m: 'mono-kink', input: 'inp-ki-3', sym: 'D_3', name: 'Спрос 3, необязательно', prefix: () => formPrefix('inp-ki-3'), col: 'D' },
+  { m: 'mono-kink', input: 'inp-kp-1', sym: 'D_1', name: 'Верхний кусок', prefix: () => formPrefix('inp-kp-1'), col: 'D' },
+  { m: 'mono-kink', input: 'inp-kp-2', sym: 'D_2', name: 'Нижний кусок', prefix: () => formPrefix('inp-kp-2'), col: 'D' },
   { m: 'mono-kink', input: 'inp-kink-mc', sym: '\\mathrm{MC}', name: 'Предельные издержки', prefix: '\\mathrm{MC} =', col: 'S' },
   // Макро (сессия 6, этап В; README 8; макет 05_left_Adas): без глаза и «⋯» (видимости и меню у этих кривых нет),
   // точка — простой значок цвета кривой (цвета сцены, 50-scenes-macro.js).
   { m: 'adas', input: 'ma-lras', sym: '\\mathrm{LRAS}', name: 'Потенциальный выпуск', prefix: 'Y^{*} =', col: 'MC', number: true },
-  { m: 'adas', input: 'ma-sras', sym: '\\mathrm{SRAS}', name: 'Краткосрочное предложение', prefix: 'P =', col: 'S' },
-  { m: 'adas', input: 'ma-ad', sym: '\\mathrm{AD}', name: 'Совокупный спрос', prefix: 'P =', col: 'D' },
+  { m: 'adas', input: 'ma-sras', sym: '\\mathrm{SRAS}', name: 'Краткосрочное предложение', prefix: () => formPrefix('ma-sras', 'Y'), col: 'S' },
+  { m: 'adas', input: 'ma-ad', sym: '\\mathrm{AD}', name: 'Совокупный спрос', prefix: () => formPrefix('ma-ad', 'Y'), col: 'D' },
   { m: 'islm', input: 'ma-is', sym: '\\mathrm{IS}', name: 'Равновесие рынка товаров', prefix: 'r =', col: 'D' },
   { m: 'islm', input: 'ma-lm', sym: '\\mathrm{LM}', name: 'Равновесие денежного рынка', prefix: 'r =', col: 'S' },
   { m: 'money', input: 'ma-md', sym: 'M_d', name: 'Спрос на деньги', prefix: 'M =', col: 'D' },
@@ -668,8 +681,8 @@ const SC_CARDS = [
   { m: 'loanable', input: 'ma-ld', sym: 'D', name: 'Частные инвестиции', prefix: 'D =', col: 'D' },
   { m: 'fx', input: 'ma-fxd', sym: 'D', name: 'Спрос на валюту', prefix: 'Q =', col: 'D' },
   { m: 'fx', input: 'ma-fxs', sym: 'S', name: 'Предложение валюты', prefix: 'Q =', col: 'S' },
-  { m: 'laffer', input: 'ma-lafd', sym: 'D', name: 'Спрос', prefix: 'P =', col: 'D' },
-  { m: 'laffer', input: 'ma-lafs', sym: 'S', name: 'Предложение', prefix: 'P =', col: 'S' },
+  { m: 'laffer', input: 'ma-lafd', sym: 'D', name: 'Спрос', prefix: () => formPrefix('ma-lafd'), col: 'D' },
+  { m: 'laffer', input: 'ma-lafs', sym: 'S', name: 'Предложение', prefix: () => formPrefix('ma-lafs'), col: 'S' },
   // Математика (сессия 6, Г3): «Деформации», «Оптимум», «Касательная» — общее поле f (подпись math-f-label пишет
   // сюжет — остаётся спрятанной). Точка — цвет кривой f; у «Касательной» — кнопка цвета tanF (scMathSync).
   { m: 'm-math', input: 'inp-mathf', sym: 'f', name: 'Функция', prefix: 'y =', col: () => (STATE.mathSub === 'tangent' ? COL.tanF : COL.D), keepLabel: true },
