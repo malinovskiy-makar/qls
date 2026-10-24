@@ -2,7 +2,8 @@
 Одно задание на странице прохождения. Ждёт `row` (словарь из `vp.views._row`).
 
 ⚠️ Имена узлов держит `static/vp/js/take.js`: `#vp-item-<n>`, `data-kind`, поля
-`name="item-<n>"` (у `match` — `item-<n>.<ключ пары>`). Менять их, не поправив
+`name="item-<n>"` (у `match` — `item-<n>.<ключ пары>`: и у пропусков, и у соотнесения
+2 тура; у числа — текстовое поле, как у короткого ответа). Менять их, не поправив
 скрипт, нельзя.
 ⚠️ У заданий с вариантами перед радио/галочками стоит скрытое пустое поле с тем же
 именем: без него снятая до нуля отметка исчезла бы из отправляемой формы, и
@@ -11,7 +12,16 @@
 <section class="vp-item" id="vp-item-{{ row.number }}" data-n="{{ row.number }}" data-kind="{{ row.kind }}">
   <div class="vp-item-num" aria-hidden="true">{{ row.number }}</div>
   <div class="vp-item-body">
+    {% if row.block == 'gaptext' %}
+    {% comment %}
+    Текст с пропусками (2 тур): на месте метки `[[k]]` — выпадающий список из общего
+    пула слов, имя поля `item-<n>.<k>` (как у `match` 1 тура: `take.js` собирает
+    словарь). Списки стоят в строке и переносятся вместе с текстом.
+    {% endcomment %}
+    <div class="vp-item-text vp-gaptext"><span class="vp-sr">Задание {{ row.number }}. </span>{% for g in row.gaps %}{{ g.text|linebreaksbr }}{% if g.key %}<span class="vp-gapsel"><label class="vp-gapnum" for="vp-gap-{{ row.number }}-{{ g.key }}"><span class="vp-sr">Пропуск </span>{{ g.key }}</label><span class="vp-gapwrap"><select class="vp-select vp-select--gap" id="vp-gap-{{ row.number }}-{{ g.key }}" data-key="{{ g.key }}" name="item-{{ row.number }}.{{ g.key }}"><option value="">–</option>{% for o in row.options %}<option value="{{ o.n }}"{% if o.n == g.value %} selected{% endif %}>{{ o.text }}</option>{% endfor %}</select></span></span>{% endif %}{% endfor %}</div>
+    {% else %}
     <div class="vp-item-text"><span class="vp-sr">Задание {{ row.number }}. </span>{% for chunk in row.statement|gap_parts %}{{ chunk|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+    {% endif %}
     {% if row.figure_url %}
     <figure class="vp-figure">
       <img src="{{ row.figure_url }}" alt="{{ row.figure_caption|default:'Рисунок к заданию' }}" loading="lazy">
@@ -34,6 +44,28 @@
              value="{{ row.text }}" maxlength="200" lang="ru" autocomplete="off"
              autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
       {% if row.suffix %}<span class="vp-affix">{{ row.suffix }}</span>{% endif %}
+    </div>
+    {% elif row.kind == 'number' %}
+    <div class="vp-answer vp-answer--number">
+      <label class="vp-sr" for="vp-in-{{ row.number }}">Ответ на задание {{ row.number }}, число</label>
+      <input class="vp-input vp-input--number" id="vp-in-{{ row.number }}" name="item-{{ row.number }}" type="text"
+             value="{{ row.text }}" maxlength="40" inputmode="decimal" autocomplete="off"
+             autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"
+             aria-describedby="vp-hint-{{ row.number }}">
+      <span class="vp-hint" id="vp-hint-{{ row.number }}">Только число: запятая, до сотых</span>
+    </div>
+    {% elif row.block == 'gaptext' %}{# списки уже стоят в тексте #}
+    {% elif row.block == 'matching' %}
+    <div class="vp-match">
+      {% for r in row.rows %}
+      <div class="vp-match-row">
+        <label class="vp-match-text" for="vp-m-{{ row.number }}-{{ r.key }}"><span class="vp-pair-key">{{ r.key }}</span> {{ r.text }}</label>
+        <span class="vp-select-wrap"><select class="vp-select" id="vp-m-{{ row.number }}-{{ r.key }}" data-key="{{ r.key }}" name="item-{{ row.number }}.{{ r.key }}">
+          <option value="">–</option>
+          {% for o in row.options %}<option value="{{ o.n }}"{% if o.n == r.value %} selected{% endif %}>{{ o.text }}</option>{% endfor %}
+        </select></span>
+      </div>
+      {% endfor %}
     </div>
     {% elif row.kind == 'match' %}
     <div class="vp-pairs">

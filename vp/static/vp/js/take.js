@@ -49,7 +49,7 @@
     var box = card(n);
     if (!box) { return null; }
     var kind = box.dataset.kind;
-    if (kind === 'short_text') {
+    if (kind === 'short_text' || kind === 'number') {
       var field = box.querySelector('input[type=text]');
       return field ? field.value.trim() : '';
     }
@@ -141,7 +141,9 @@
   // ========================================================== 3. клавиатура
   /** Enter ведёт по заданиям вниз (Shift+Enter — вверх): из поля змейки — в
    * следующее поле змейки, из последнего — в первое задание следующего блока.
-   * Tab работает нативно: порядок фокуса совпадает с порядком заданий. */
+   * Во 2 туре змейки нет (`textNumbers` пуст): из поля числа Enter ведёт к
+   * следующему заданию. Tab работает нативно: порядок фокуса совпадает с порядком
+   * заданий. */
   function moveFrom(n, direction) {
     var texts = cfg.textNumbers || [];
     var next = texts[texts.indexOf(n) + direction];
@@ -358,7 +360,7 @@
     var box = card(n);
     if (!box) { return; }
     var kind = box.dataset.kind;
-    if (kind === 'short_text') {
+    if (kind === 'short_text' || kind === 'number') {
       var field = box.querySelector('input[type=text]');
       if (field) { field.value = value || ''; }
     } else if (kind === 'match') {

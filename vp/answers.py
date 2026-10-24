@@ -41,11 +41,13 @@ def _option_number(value, allowed):
 
 def clean_answer(item, value):
     """Присланное → то, что кладётся в `raw`. Пусто → `None` («не отвечено»)."""
-    if item.kind == VPItem.Kind.SHORT_TEXT:
+    if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER):
+        # Число хранится СТРОКОЙ, как введено (без пробелов по краям): формат ответа
+        # — часть проверки, и «37.5» должно дойти до подсчёта точкой, а не числом.
         if value is None:
             return None
         if not isinstance(value, str):
-            raise AnswerError('короткий ответ — строка')
+            raise AnswerError('ответ — строка')
         text = value.strip()
         if len(text) > MAX_ANSWER_LENGTH:
             raise AnswerError('ответ длиннее %d знаков' % MAX_ANSWER_LENGTH)

@@ -2,7 +2,7 @@
 {% load static vp_extras %}
 {% comment %}
 Прохождение варианта: одна страница, все задания в разметке сразу, сплошной список
-(«змейка» ведётся клавишей Enter), липкая шапка с таймером и счётчиком, навигатор
+(Enter ведёт к следующему полю: в 1 туре — по змейке), липкая шапка с таймером и счётчиком, навигатор
 по номерам. Раскладка — макеты Take / Tests / Mobile.
 
 ⚠️ РАЗМЕТКА ПОДЧИНЕНА `static/vp/js/take.js`: узлы `#vp-form`, `#vp-timer`,
@@ -64,9 +64,10 @@
         <h2 class="vp-h2" id="vp-sec-{{ s.first }}">{% if s.first == s.last %}Задание{% else %}Задания{% endif %} {{ s.range }}. {{ s.titles.heading }}</h2>
         <span class="vp-mute">· {% if s.uniform %}{{ s.uniform|points_each }}{% else %}от {{ s.points_min|num }} до {{ s.points_max|points_word }}{% endif %}{% if s.penalty %} · за лишние варианты балл уменьшается{% endif %}</span>
       </div>
+      {% if s.block == 'number' %}<div class="vp-note vp-note--rule"><b>Правило ввода.</b> {{ number_rule }}</div>{% endif %}
       {% if s.intro %}<div class="vp-note">{{ s.intro|linebreaksbr }}</div>{% endif %}
       <div class="vp-list">
-        {% for row in s.rows %}{% include 'vp/_take_item.html' %}{% endfor %}
+        {% for row in s.rows %}{% if row.group_first %}<div class="vp-group" role="group" aria-label="{{ row.group_label }}"><div class="vp-group-cap">{{ row.group_label }}</div>{% endif %}{% include 'vp/_take_item.html' %}{% if row.group_last %}</div>{% endif %}{% endfor %}
       </div>
     </section>
     {% endfor %}

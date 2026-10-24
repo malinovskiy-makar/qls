@@ -98,3 +98,32 @@ def at(moment):
     """
     from unittest import mock
     return mock.patch('django.utils.timezone.now', return_value=moment)
+
+
+# ---------------------------------------------------------------- 2 тур
+
+def load_demo(band='10', publish=True):
+    """Демоверсия 2 тура из `data/vp/` в тестовую базу тем же загрузчиком, что и `import_vp`."""
+    import pathlib
+
+    import yaml
+
+    from vp import loader
+
+    path = (pathlib.Path(__file__).resolve().parents[2] / 'data' / 'vp'
+            / f'vp-2tur-2026-demo-{band}.yaml')
+    parsed = loader.normalize(yaml.safe_load(path.read_text(encoding='utf-8')))
+    assert not parsed.errors, parsed.errors
+    loader.write_variant(parsed, publish=publish)
+    return VPVariant.objects.get(slug=parsed.variant['slug'])
+
+
+def perfect_raw(item):
+    """Верный ответ на задание любого вида — в том виде, в каком его шлёт страница."""
+    if item.kind in ('short_text', 'number'):
+        return item.answer
+    if item.kind == 'single':
+        return item.correct[0]
+    if item.kind == 'multi':
+        return list(item.correct)
+    return {key: int(value) for key, value in item.correct.items()}

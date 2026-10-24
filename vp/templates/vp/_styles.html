@@ -248,6 +248,28 @@ html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px)
 .vp-figure img { max-width: 100%; height: auto; border-radius: var(--r); background: var(--surface-2); }
 .vp-figure figcaption { margin-top: 6px; font-size: 12px; color: var(--text3); }
 .vp-scroll { overflow-x: auto; max-width: 100%; }
+/* 2 тур: число, текст с пропусками, соотнесение, пара с общим условием. */
+.vp-input--number { width: 180px; font-variant-numeric: tabular-nums; }
+.vp-hint { font-size: 12.5px; color: var(--text3); }
+.vp-note--rule { color: var(--text); }
+.vp-gaptext { line-height: 2.3; }
+.vp-gapsel { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; margin: 0 2px; vertical-align: middle; line-height: 1.2; }
+.vp-gapnum { font-size: 11px; font-weight: 600; color: var(--text3); }
+.vp-gapwrap { position: relative; display: inline-block; max-width: 100%; min-width: 0; }
+.vp-gapwrap::after {
+  content: '▾'; position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; color: var(--text2); pointer-events: none;
+}
+.vp-select--gap { width: auto; max-width: 100%; min-height: 36px; padding: 5px 24px 5px 9px; }
+.vp-match { display: flex; flex-direction: column; gap: 10px; }
+.vp-match-row { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.vp-match-text { flex: 1 1 320px; font-size: 14.5px; line-height: 1.45; min-width: 0; }
+.vp-match-row .vp-select-wrap { flex: 0 1 260px; }
+.vp-group {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--r-card);
+  border: var(--line, 1px) dashed var(--border);
+}
+.vp-group-cap { font-size: 12.5px; font-weight: 600; color: var(--text2); padding: 0 4px; }
 .vp-scroll table { border-collapse: collapse; font-size: 14px; width: 100%; }
 .vp-scroll th { background: var(--surface-info); text-align: left; padding: 8px 12px; font-weight: 600; }
 .vp-scroll td { padding: 7px 12px; border-bottom: 1px solid var(--border-soft); font-variant-numeric: tabular-nums; }
@@ -943,6 +965,8 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-item-num { width: 22px; padding-top: 2px; text-align: left; }
   .vp-item-body { padding-top: 0; }
   .vp-input { width: 100%; flex: 1 1 auto; }
+  .vp-match-row .vp-select-wrap { flex: 1 1 100%; max-width: none; }
+  .vp-group { padding: 6px; }
   .vp-brow { flex-wrap: wrap; gap: 4px 12px; }
   .vp-brow-name { width: 100%; }
   .vp-brow-track { flex: 1 1 120px; }

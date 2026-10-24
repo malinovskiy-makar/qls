@@ -41,6 +41,7 @@ from catalog import seo
 from problems import exam_engine
 from vp import answers, blocks, board, landing, review, scoring, tracking
 from vp.config import BANDS, TOUR_DATES
+from vp.loader import GAP_MARK
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 from vp.templatetags.vp_extras import grade_label
 
@@ -550,7 +551,8 @@ def _row(item, raw):
 
     Сами `VPItem` в шаблон не уходят: эталон, `correct`, `accepted`, решение и буквы
     связки страница не получает (тест `test_take_hides_answers`). Для `match` наружу
-    идут только подписи пар (ключи `correct`), но не значения.
+    идут только подписи пар (ключи `correct`), но не значения; у пропусков — куски
+    текста и метки `[[k]]`, у соотнесения — тексты строк `rows`.
     """
     options = [{'n': o['n'], 'text': o['text']} for o in (item.options or [])
                if isinstance(o, dict) and 'n' in o]
@@ -559,21 +561,40 @@ def _row(item, raw):
         chosen = [n for n in raw if isinstance(n, int)]
     elif item.kind == VPItem.Kind.SINGLE and isinstance(raw, int):
         chosen = [raw]
-    pairs = []
+    pairs, gaps, rows = [], [], []
+    given = raw if isinstance(raw, dict) else {}
     if item.kind == VPItem.Kind.MATCH and isinstance(item.correct, dict):
-        given = raw if isinstance(raw, dict) else {}
         pairs = [{'key': key, 'value': given.get(key)} for key in item.correct]
+    if item.block == VPItem.Block.GAPTEXT:
+        # Текст с пропусками: [текст, ключ, текст, ключ, …, текст] → куски, у каждого
+        # (кроме последнего) свой выпадающий список. Ключ — метка `[[k]]` из текста.
+        chunks = GAP_MARK.split(item.statement)
+        for index in range(0, len(chunks), 2):
+            key = chunks[index + 1] if index + 1 < len(chunks) else None
+            gaps.append({'text': chunks[index], 'key': key,
+                         'value': given.get(key) if key else None})
+    elif item.block == VPItem.Block.MATCHING:
+        # Строка соотнесения №i — ключ «i» в ответе (так их проверяет загрузчик).
+        rows = [{'key': str(i), 'text': text, 'value': given.get(str(i))}
+                for i, text in enumerate(item.rows or [], start=1)]
+    text = ''
+    if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER) and isinstance(raw, str):
+        text = raw
     return {
         'number': item.number,
         'kind': item.kind,
+        'block': item.block,
         'statement': item.statement,
         'prefix': item.prefix,
         'suffix': item.suffix,
         'options': options,
         'pills': bool(options) and all(len(o['text']) <= PILL_MAX_LENGTH for o in options),
         'chosen': chosen,
-        'text': raw if (item.kind == VPItem.Kind.SHORT_TEXT and isinstance(raw, str)) else '',
+        'text': text,
         'pairs': pairs,
+        'gaps': gaps,
+        'rows': rows,
+        'group': item.group,
         'figure_url': _figure_url(item.figure),
         'figure_caption': item.figure_caption,
         'figure_source': item.figure_source,
@@ -596,6 +617,7 @@ def take(request, code):
     for section in sections:
         section['rows'] = [_row(item, raw.get(item.pk)) for item in section['items']]
         del section['items']          # в шаблон — только безопасные строки
+        _mark_groups(section['rows'])
 
     numbers = [item.number for item in items]
     answered = [row['number'] for s in sections for row in s['rows'] if row['answered']]
@@ -614,8 +636,30 @@ def take(request, code):
         'answered_count': len(answered), 'total': len(numbers),
         'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
         'finish_url': reverse('vp:finish', args=[code]),
+        'number_rule': blocks.NUMBER_RULE,
         'vp_events': tracking.take_deferred(request),
     })
+
+
+def _mark_groups(rows):
+    """Пары задач с общим условием: у первой строки группы — `group_first` и подпись
+    «Задачи 17–18 – общее условие», у последней — `group_last` (шаблон закрывает рамку).
+
+    Группа — подряд идущие строки с одинаковым `group` (загрузчик не пустит другую).
+    """
+    for index, row in enumerate(rows):
+        group = row['group']
+        before = rows[index - 1]['group'] if index else None
+        after = rows[index + 1]['group'] if index + 1 < len(rows) else None
+        row['group_first'] = group is not None and group != before
+        row['group_last'] = group is not None and group != after
+        row['group_label'] = ''
+        if row['group_first']:
+            last = index
+            while last + 1 < len(rows) and rows[last + 1]['group'] == group:
+                last += 1
+            row['group_label'] = (f'Задачи {blocks.number_range(row["number"], rows[last]["number"])}'
+                                  ' – общее условие')
 
 
 # ------------------------------------------------------- автосохранение
