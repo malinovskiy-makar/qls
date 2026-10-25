@@ -9,11 +9,12 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from vp.models import VPAttempt
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 User = get_user_model()
 
 
+@tour1_screens
 class StartRequiresLoginTests(TestCase):
     """Кто может завести попытку, а кого разворачивает на регистрацию."""
 
@@ -55,6 +56,7 @@ class StartRequiresLoginTests(TestCase):
         self.assertIn('/register/', response['Location'])
 
 
+@tour1_screens
 class IntroGateMarkupTests(TestCase):
     """Окно на интро: гостю есть, вошедшему нет."""
 
@@ -84,6 +86,7 @@ class IntroGateMarkupTests(TestCase):
                 self.assertNotContains(Client().get(url), 'Регистрация не нужна')
 
 
+@tour1_screens
 class RegisterNextTests(TestCase):
     """`/register/` умеет `next`, но только свой адрес."""
 

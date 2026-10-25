@@ -6,11 +6,16 @@
 при равном балле — меньше потраченного времени, затем раньше сдал, затем меньший id.
 Гостей в таблице нет: у их попыток нет пользователя.
 
+С 2 тура таблиц несколько: ОТДЕЛЬНАЯ на каждый тур и класс (решение владельца
+24.10.2026: 9, 10 и 11 класс 2 тура). Правило отбора одно на все — это модуль.
+Без тура и класса таблица общая, как была у 1 тура.
+
 ⚠️ ЭТО ЕДИНСТВЕННОЕ МЕСТО, ГДЕ РЕШАЕТСЯ, ЧТО ТАКОЕ ТАБЛИЦА. Медалей, HTML и слов
 здесь нет — их рисует шаблон; места считаются подряд, с единицы, без пропусков.
 """
 import math
 
+from vp import config
 from vp.models import VPAttempt
 
 #: Сколько строк показывает посадочная.
@@ -39,16 +44,21 @@ def spent_seconds(attempt):
     return max(0, min(limit if attempt.is_auto_submitted else spent, limit))
 
 
-def ranked_attempts():
+def ranked_attempts(tour=None, band=None):
     """Сданные зачётные попытки вошедших — всё, из чего строится таблица.
 
     ⚠️ Только по ОПУБЛИКОВАННЫМ вариантам (24.09.2026): попытки сотрудников на
-    черновиках иначе попадали в публичную таблицу.
+    черновиках иначе попадали в публичную таблицу. `tour` / `band` — какая таблица.
     """
-    return (VPAttempt.objects
-            .filter(is_ranked=True, submitted_at__isnull=False, user__isnull=False,
-                    variant__is_published=True)
-            .select_related('user', 'variant'))
+    attempts = (VPAttempt.objects
+                .filter(is_ranked=True, submitted_at__isnull=False, user__isnull=False,
+                        variant__is_published=True)
+                .select_related('user', 'variant'))
+    if tour is not None:
+        attempts = attempts.filter(variant__tour=tour)
+    if band is not None:
+        attempts = attempts.filter(variant__grade_band=band)
+    return attempts
 
 
 def close_lapsed_ranked():
@@ -76,7 +86,7 @@ def _key(attempt):
             attempt.submitted_at, attempt.pk)
 
 
-def rows():
+def rows(tour=None, band=None):
     """Все строки таблицы — по одной на человека, уже с местами.
 
     Ключи строки: `place`, `user`, `name` (логин, как в Wecon Rush), `band`
@@ -84,7 +94,7 @@ def rows():
     """
     close_lapsed_ranked()
     best = {}
-    for attempt in ranked_attempts():
+    for attempt in ranked_attempts(tour, band):
         key = _key(attempt)
         current = best.get(attempt.user_id)
         if current is None or key < current[0]:
@@ -101,38 +111,68 @@ def rows():
     } for place, (_, attempt) in enumerate(ordered, 1)]
 
 
-def top(me=None, limit=TOP):
+def top(me=None, limit=TOP, tour=None, band=None):
     """Что показывает посадочная.
 
     Возвращает `(строки топа, моя строка вне топа или None, людей в таблице,
     зачётных сданных попыток)`. Своя строка приходит отдельно только тогда, когда
     она НЕ попала в топ: иначе человек увидел бы себя дважды.
     """
-    all_rows = rows()
+    all_rows = rows(tour, band)
     head = all_rows[:limit]
     mine = None
     if me is not None and getattr(me, 'is_authenticated', False):
         mine = next((r for r in all_rows if r['user'].pk == me.pk), None)
         if mine is not None and mine['place'] <= limit:
             mine = None
-    return head, mine, len(all_rows), ranked_attempts().count()
+    return head, mine, len(all_rows), ranked_attempts(tour, band).count()
 
 
-def my_best(user):
-    """Лучшая зачётная сданная попытка человека и её место, или `(None, None)`."""
+def tables(tour=None):
+    """Таблицы тура (по умолчанию текущего): `[(класс или None, подпись), …]`.
+
+    У 1 тура таблица одна на все классы (так она жила в сезоне 2026/27), у 2 тура —
+    по классу.
+    """
+    tour = config.CURRENT_TOUR if tour is None else tour
+    if tour == 1:
+        return [(None, '')]
+    return list(config.bands(tour))
+
+
+def my_rows(user, tour=None):
+    """Строки человека во всех таблицах тура: `[(класс, строка), …]`."""
     if user is None or not getattr(user, 'is_authenticated', False):
+        return []
+    tour = config.CURRENT_TOUR if tour is None else tour
+    found = []
+    for band, _ in tables(tour):
+        row = next((r for r in rows(tour, band) if r['user'].pk == user.pk), None)
+        if row is not None:
+            found.append((band, row))
+    return found
+
+
+def my_best(user, tour=None):
+    """Лучшая зачётная сданная попытка человека в таблицах тура и её место (в таблице
+    своего класса), или `(None, None)`. Из нескольких классов — лучшая по тому же
+    ключу, что и порядок таблицы."""
+    found = my_rows(user, tour)
+    if not found:
         return None, None
-    row = next((r for r in rows() if r['user'].pk == user.pk), None)
-    return (row['attempt'], row['place']) if row else (None, None)
+    _, row = min(found, key=lambda pair: _key(pair[1]['attempt']))
+    return row['attempt'], row['place']
 
 
 def place_of(attempt):
-    """Место этой попытки в таблице или `None`, если она в таблицу не идёт.
+    """Место этой попытки в таблице её тура и класса или `None`, если она в таблицу не идёт.
 
     Место есть только у той попытки, которая для своего человека ЛУЧШАЯ:
     строка на человека одна, вторая зачётная попытка места не получает.
     """
     if not attempt.is_ranked or attempt.submitted_at is None or attempt.user_id is None:
         return None
-    row = next((r for r in rows() if r['user'].pk == attempt.user_id), None)
+    tour = attempt.variant.tour
+    band = None if tour == 1 else attempt.variant.grade_band
+    row = next((r for r in rows(tour, band) if r['user'].pk == attempt.user_id), None)
     return row['place'] if row and row['attempt'].pk == attempt.pk else None

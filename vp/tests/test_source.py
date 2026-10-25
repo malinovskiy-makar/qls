@@ -21,7 +21,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from vp.models import VPAttempt, VPVariant
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 SELFTEST = pathlib.Path(__file__).resolve().parents[2] / 'data' / 'vp' / '_selftest.yaml'
 OLMAT_LABEL = 'Олмат'
@@ -88,6 +88,7 @@ def variant_card(html, title):
 
 # --------------------------------------------------------------- импорт
 
+@tour1_screens
 class ImportTestCase(TestCase):
     """Тот же приём, что в test_import.py: пишем YAML во временный файл и зовём команду."""
 
@@ -112,6 +113,7 @@ class ImportTestCase(TestCase):
         return out.getvalue(), err.getvalue()
 
 
+@tour1_screens
 class ImportSourceTests(ImportTestCase):
     def test_1_source_block_fills_both_fields(self):
         data = load_data()
@@ -165,6 +167,7 @@ class ImportSourceTests(ImportTestCase):
 
 # -------------------------------------------------------- модель напрямую
 
+@tour1_screens
 class ModelInvariantTests(TestCase):
     """Тот же инвариант, но без импорта — прямой `.save()` в обход loader.py."""
 
@@ -194,6 +197,7 @@ class ModelInvariantTests(TestCase):
 
 # --------------------------------------------------------------- экраны
 
+@tour1_screens
 class RenderingBase(TestCase):
     def setUp(self):
         self.olmat = make_published('vp-olmat')
@@ -218,6 +222,7 @@ class RenderingBase(TestCase):
         return response.content.decode()
 
 
+@tour1_screens
 class IndexCardSourceTests(RenderingBase):
     def test_5a_olmat_card_links_to_the_source(self):
         card = variant_card(self.index_html(), self.olmat.title)
@@ -231,6 +236,7 @@ class IndexCardSourceTests(RenderingBase):
         self.assertNotIn(OLMAT_URL, card)
 
 
+@tour1_screens
 class IntroSourceTests(RenderingBase):
     def test_6a_olmat_intro_links_to_the_source(self):
         html = self.intro_html(self.olmat.slug)
@@ -244,6 +250,7 @@ class IntroSourceTests(RenderingBase):
         self.assertNotIn(OLMAT_URL, html)
 
 
+@tour1_screens
 class TakeSourceTests(RenderingBase):
     def test_7_take_page_has_no_source_line_or_link(self):
         # ⚠️ Не проверяем отсутствие слова «Олмат» целиком: оно легитимно есть
@@ -261,6 +268,7 @@ class TakeSourceTests(RenderingBase):
         self.assertNotIn(OLMAT_URL, html)
 
 
+@tour1_screens
 class MarkupSafetyTests(RenderingBase):
     def test_8a_index_source_link_is_not_nested_in_another_anchor(self):
         card = variant_card(self.index_html(), self.olmat.title)

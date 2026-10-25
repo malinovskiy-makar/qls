@@ -143,7 +143,8 @@ class StaticSitemap(Sitemap):
 class VPSitemap(Sitemap):
     """Страницы опубликованных вариантов «Высшей пробы» (`/vp/<слаг>/`).
 
-    ⚠️ ТОЛЬКО опубликованные: черновик отдаёт 404 всем, кроме персонала. Страниц попыток
+    ⚠️ ТОЛЬКО видимые (`vp/visibility.py`: опубликованные варианты туров из
+    `vp.config.VISIBLE_TOURS`): черновик и скрытый тур отдают 404 всем, кроме персонала. Страниц попыток
     и результатов (`/vp/a/…`, `/vp/r/…`) в карте нет и быть не может — это личные
     адреса людей (на них `noindex`, попытки закрыты и в `robots.txt`).
     """
@@ -152,8 +153,8 @@ class VPSitemap(Sitemap):
     priority = 0.7
 
     def items(self):
-        from vp.models import VPVariant     # приложение сезонное: не тянем его при импорте
-        return VPVariant.objects.filter(is_published=True).only('slug', 'created_at').order_by('order', 'id')
+        from vp.visibility import visible_variants   # приложение сезонное: не тянем его при импорте
+        return visible_variants().only('slug', 'created_at').order_by('order', 'id')
 
     def location(self, variant):
         return reverse('vp:intro', args=[variant.slug])
@@ -201,9 +202,13 @@ GAME_DESCRIPTION = (
 VP_DESCRIPTION = (
     'Варианты 1 тура олимпиады «Высшая проба» по экономике онлайн: решайте на время, '
     'получайте автоматическую проверку, разбор змейки и тестов.')
+VP2_DESCRIPTION = (
+    'Тренажёр 2 тура отборочного этапа олимпиады «Высшая проба» по экономике: варианты '
+    'для 9, 10 и 11 классов на 70 минут, задачи с вводом числа, тесты, соотнесение и '
+    'текст с пропусками, автопроверка и разбор.')
 
 
-def vp_landing_meta(has_demo):
+def vp_landing_meta(has_demo, tour=1):
     """`seo_title` и `seo_description` посадочной `/vp/`.
 
     Слово «демоверсия» — в заголовке, только если демонстрационный вариант
@@ -212,13 +217,21 @@ def vp_landing_meta(has_demo):
     """
     what = 'тренажёр и демоверсия' if has_demo else 'тренажёр с автопроверкой'
     return {
-        'seo_title': 'Высшая проба, 1 тур по экономике – %s | %s' % (what, BRAND),
-        'seo_description': VP_DESCRIPTION,
+        'seo_title': 'Высшая проба, %s тур по экономике – %s | %s' % (tour, what, BRAND),
+        'seo_description': VP2_DESCRIPTION if tour == 2 else VP_DESCRIPTION,
     }
 
 
-def vp_variants_meta():
+def vp_variants_meta(tour=1):
     """`seo_title` и `seo_description` экрана выбора варианта `/vp/variants/`."""
+    if tour == 2:
+        return {
+            'seo_title': 'Варианты 2 тура «Высшей пробы» по экономике | %s' % BRAND,
+            'seo_description': (
+                'Варианты 2 тура отборочного этапа олимпиады «Высшая проба» по экономике '
+                'для 9, 10 и 11 классов: демоверсии ВШЭ, на время или без таймера, с '
+                'автопроверкой и разбором.'),
+        }
     return {
         'seo_title': 'Варианты 1 тура «Высшей пробы» по экономике | %s' % BRAND,
         'seo_description': (
@@ -228,14 +241,14 @@ def vp_variants_meta():
     }
 
 
-def vp_variant_meta(title, band_label, year):
+def vp_variant_meta(title, band_label, year, tour=1):
     """`seo_title` и `seo_description` страницы варианта `/vp/<слаг>/`."""
     return {
-        'seo_title': '%s – вариант 1 тура «Высшая проба» по экономике | %s' % (title, BRAND),
+        'seo_title': '%s – вариант %s тура «Высшая проба» по экономике | %s' % (title, tour, BRAND),
         'seo_description': (
-            'Вариант 1 тура олимпиады «Высшая проба» по экономике, %s, %s год: пройдите '
+            'Вариант %s тура олимпиады «Высшая проба» по экономике, %s, %s год: пройдите '
             'на время или без таймера: автопроверка и разбор ответов сразу после сдачи.'
-            % (band_label, year)),
+            % (tour, band_label, year)),
     }
 
 

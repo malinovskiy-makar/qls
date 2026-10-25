@@ -18,22 +18,22 @@
 ⚠️ ТОЛЬКО ТО, ЧТО РАБОТАЕТ СЕГОДНЯ. Режимов и кнопок, которых нет в приложении, на
 странице нет. Длинного тире в видимом тексте нет (правило сайта, `scripts/check_em_dash.py`).
 {% endcomment %}
-{% block title %}Высшая проба, 1 тур{% endblock %}
+{% block title %}Высшая проба, {{ tour }} тур{% endblock %}
 {% block content %}
 <div class="vp-land">
 
   {# ─── Зона A: тур ─────────────────────────────────────────────── #}
   <div class="vp-land-card vp-land-hero">
     <div class="vp-land-eyebrow">
-      <span>Отборочный этап · 1 тур</span>
+      <span>Отборочный этап · {{ tour }} тур</span>
       {% if tour_dates %}<span class="vp-land-dot" aria-hidden="true"></span><span class="vp-land-dates">{{ tour_dates }}</span>{% endif %}
     </div>
-    <h1 class="vp-land-h1">Высшая проба по экономике<small>тренажёр нового первого тура</small></h1>
+    <h1 class="vp-land-h1">Высшая проба по экономике<small>{% if tour == 2 %}тренажёр второго тура{% else %}тренажёр нового первого тура{% endif %}</small></h1>
     <p class="vp-land-lead">Вариант на время, как на олимпиаде, автоматическая проверка и разбор после сдачи.</p>
 
     {% if facts %}
     <div class="vp-land-facts" aria-label="Формат варианта">
-      <div class="vp-land-fact"><b>{{ facts.count }}</b><span>{{ facts.count|plural_word:"задание,задания,заданий" }}</span></div>
+      <div class="vp-land-fact"><b>{{ facts.count_text }}</b><span>{{ facts.count|plural_word:"задание,задания,заданий" }}</span></div>
       <div class="vp-land-fact"><b>{{ facts.minutes }}</b><span>минут</span></div>
       <div class="vp-land-fact"><b>{{ facts.total|num }}</b><span>баллов</span></div>
       {% if tour_dates_short %}<div class="vp-land-fact is-date"><b>{{ tour_dates_short }}</b><span>дни тура</span></div>{% endif %}
@@ -77,13 +77,22 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
       <span>Лучшие попытки</span>
     </h2>
-    <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.</p>
+    <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.{% if boards|length > 1 %} Таблица своя у каждого класса.{% endif %}</p>
 
-    {% if rows %}
+    {% if boards|length > 1 %}
+    {# Вкладки — ссылки `?board=`: без JS страница откроется с нужной таблицей, с JS переключит на месте. #}
+    <div class="vp-land-tabs" role="tablist" aria-label="Классы">
+      {% for b in boards %}<a class="vp-land-tab" role="tab" href="?board={{ b.band }}" data-board-tab="{{ b.band }}" aria-selected="{% if b.active %}true{% else %}false{% endif %}" aria-controls="vp-board-{{ b.band }}">{{ b.label }}</a>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% for b in boards %}
+    <div class="vp-land-panel" id="vp-board-{{ b.band|default:'all' }}" data-board-panel="{{ b.band }}"{% if boards|length > 1 %} role="tabpanel"{% endif %}{% if not b.active %} hidden{% endif %}>
+    {% if b.rows %}
     {# `ym-hide-content` — логины в запись Вебвизора не попадают (ADR 0133). #}
     <div class="vp-land-rows ym-hide-content">
       <div class="vp-land-row is-head"><span>#</span><span>Игрок</span><span>Класс</span><span class="is-num">Балл</span><span class="is-num">Время</span></div>
-      {% for r in rows %}
+      {% for r in b.rows %}
       <div class="vp-land-row">
         <span class="vp-land-pl">{% if r.place < 4 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</span>
         <span class="vp-land-who">{{ r.name }}</span>
@@ -93,14 +102,14 @@
       </div>
       {% endfor %}
     </div>
-    {% if my_row %}
+    {% if b.my_row %}
     <div class="vp-land-pin ym-hide-content">
       <div class="vp-land-row is-me">
-        <span class="vp-land-pl">{{ my_row.place }}</span>
-        <span class="vp-land-who">Вы · {{ my_row.name }}</span>
-        <span class="vp-land-cls">{{ my_row.band|grade_chip }}</span>
-        <span class="vp-land-sc">{{ my_row.score|num }}</span>
-        <span class="vp-land-tm">{{ my_row.seconds|mmss }}</span>
+        <span class="vp-land-pl">{{ b.my_row.place }}</span>
+        <span class="vp-land-who">Вы · {{ b.my_row.name }}</span>
+        <span class="vp-land-cls">{{ b.my_row.band|grade_chip }}</span>
+        <span class="vp-land-sc">{{ b.my_row.score|num }}</span>
+        <span class="vp-land-tm">{{ b.my_row.seconds|mmss }}</span>
       </div>
     </div>
     {% endif %}
@@ -110,13 +119,15 @@
 
     <p class="vp-land-bfoot">
       {% if not user.is_authenticated %}
-        В таблицу попадают только зарегистрированные. Попыток в таблице: {{ board_attempts }}.
+        В таблицу попадают только зарегистрированные. Попыток в таблице: {{ b.attempts }}.
       {% elif mine.best %}
-        Попыток в таблице: {{ board_attempts }}. Ваша лучшая – {{ mine.best_place }}-е место; выше можно подняться первой попыткой по другому варианту.
+        Попыток в таблице: {{ b.attempts }}. Ваша лучшая – {{ mine.best_place }}-е место; выше можно подняться первой попыткой по другому варианту.
       {% else %}
-        Попыток в таблице: {{ board_attempts }}. Первая попытка с таймером по любому варианту попадёт сюда.
+        Попыток в таблице: {{ b.attempts }}. Первая попытка с таймером по любому варианту попадёт сюда.
       {% endif %}
     </p>
+    </div>
+    {% endfor %}
   </aside>
 
   {# ─── Зона C: полоса «моё» или приглашение гостю ──────────────── #}

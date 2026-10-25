@@ -9,13 +9,14 @@ from django.urls import reverse
 
 from vp import loader
 from vp.models import VPAnswer, VPAttempt, VPItem
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 SECRET_ANSWER = 'ЭТАЛОН-СЕКРЕТ-7'
 SECRET_ACCEPTED = 'СИНОНИМ-СЕКРЕТ-8'
 SECRET_SOLUTION = 'РЕШЕНИЕ-СЕКРЕТ-40'
 
 
+@tour1_screens
 class PageBase(TestCase):
     def setUp(self):
         self.variant = make_published()
@@ -44,6 +45,7 @@ class PageBase(TestCase):
         VPAnswer.objects.create(attempt=self.attempt, item=item, raw=raw)
 
 
+@tour1_screens
 class LayoutTests(PageBase):
     def test_all_forty_four_items_are_in_the_markup_in_order(self):
         html = self.html()
@@ -110,6 +112,7 @@ class LayoutTests(PageBase):
         self.assertIn('noindex', self.html())
 
 
+@tour1_screens
 class ControlsTests(PageBase):
     def test_short_text_fields_have_labels_and_keyboard_attributes(self):
         html = self.html()
@@ -222,6 +225,7 @@ class ControlsTests(PageBase):
         self.assertEqual(self.config(html)['numbers'][-1], 44)
 
 
+@tour1_screens
 class RestoreTests(PageBase):
     def test_saved_answers_are_rendered_into_fields_and_marks(self):
         self.answer(1, 'мой ответ')
@@ -260,6 +264,7 @@ class RestoreTests(PageBase):
         self.assertRegex(block, r'<option value="1" selected>спрос</option>')
 
 
+@tour1_screens
 class SecrecyTests(PageBase):
     def setUp(self):
         super().setUp()

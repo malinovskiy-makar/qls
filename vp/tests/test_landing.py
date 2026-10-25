@@ -20,7 +20,8 @@ from django.urls import reverse
 from catalog.tests.test_no_slop import visible_text
 from vp import landing, views
 from vp.models import VPVariant
-from vp.tests.helpers import make_published
+from vp import config
+from vp.tests.helpers import make_published, tour1_screens
 from vp.tests.test_review import chain_word, make_review_variant, submit
 
 User = get_user_model()
@@ -75,12 +76,14 @@ def set_chain(variant, letters, tail):
         item.save()
 
 
+@tour1_screens
 class LandingBase(TestCase):
     def setUp(self):
         self.variant = make_published('vp-land')
         self.guest = Client()
 
 
+@tour1_screens
 class LandingTests(LandingBase):
     def test_01_guest_opens_the_landing_without_login(self):
         response = self.guest.get(reverse('vp:index'))
@@ -216,17 +219,18 @@ class LandingTests(LandingBase):
         self.assertIn('Чтобы пройти вариант, нужна короткая бесплатная регистрация', html)
 
 
+@tour1_screens
 class TourDatesTests(LandingBase):
     def test_dates_come_from_config_not_from_the_template(self):
         self.assertIn('26 и 30 сентября 2026', page(self.guest))
-        with mock.patch.object(views, 'TOUR_DATES', (date(2027, 10, 3), date(2027, 10, 10))):
+        with mock.patch.dict(config.TOUR_DATES, {1: ('days', (date(2027, 10, 3), date(2027, 10, 10)))}):
             html = page(self.guest)
         self.assertIn('3 и 10 октября 2027', html)
         self.assertIn('3 и 10 окт.', html)
         self.assertNotIn('сентября', html)
 
     def test_no_dates_no_phrase_and_no_tile(self):
-        with mock.patch.object(views, 'TOUR_DATES', ()):
+        with mock.patch.dict(config.TOUR_DATES, {1: ('days', ())}):
             html = page(self.guest)
         self.assertNotIn('дни тура', html)
         self.assertIn('1 тур появился в отборочном этапе впервые.', rules(html))
@@ -251,6 +255,7 @@ class TourDatesTests(LandingBase):
         self.assertEqual(landing.dates_text([]), '')
 
 
+@tour1_screens
 class ClassesTests(LandingBase):
     def eleven(self, points_of_first=None):
         variant = make_published('vp-eleven')
@@ -287,6 +292,7 @@ class ClassesTests(LandingBase):
         self.assertIn('Формат различается по классам', rules(html))
 
 
+@tour1_screens
 class DurationTests(LandingBase):
     def test_variants_that_differ_only_in_duration_share_a_table_but_not_the_minutes_claim(self):
         """Длительность в таблице не видна: две одинаковые таблицы были бы шумом. А «за 30 минут» на
@@ -301,6 +307,7 @@ class DurationTests(LandingBase):
         self.assertIn('44 задания, 30 минут, 100 баллов', page(self.guest))
 
 
+@tour1_screens
 class ScoringRulesTests(LandingBase):
     def test_three_rules_ranges_and_penalty_example_follow_the_data(self):
         html = rules(page(self.guest))
@@ -315,6 +322,7 @@ class ScoringRulesTests(LandingBase):
         self.assertIn('верный даёт +3, лишний отнимает 2.', html)
 
 
+@tour1_screens
 class SnakeExampleTests(TestCase):
     def setUp(self):
         self.guest = Client()
@@ -372,6 +380,7 @@ class SnakeExampleTests(TestCase):
                          {'before': 'ликвидность', 'mark': '', 'after': ''})
 
 
+@tour1_screens
 class MenuTests(TestCase):
     def nav(self, client=None):
         response = (client or Client()).get(reverse('vp:index'))
@@ -403,6 +412,7 @@ class MenuTests(TestCase):
         self.assertTrue(variant.is_published)
 
 
+@tour1_screens
 class SeoTests(LandingBase):
     def test_landing_title_answers_the_live_query(self):
         title = TITLE.search(page(self.guest)).group(1)
@@ -478,6 +488,7 @@ class SeoTests(LandingBase):
         self.assertNotIn('Disallow: /vp/\n', text)
 
 
+@tour1_screens
 class PublicResultDoesNotNameTheOwnerTests(TestCase):
     """Пункт 7: тест сессии 2 в исходном смысле (полный вариант — в `test_take`)."""
 

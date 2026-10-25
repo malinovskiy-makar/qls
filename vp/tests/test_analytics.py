@@ -21,7 +21,7 @@ from django.utils import timezone
 from problems.models_platform import Event
 from vp.funnel import funnel
 from vp.models import VPAttempt
-from vp.tests.helpers import at
+from vp.tests.helpers import at, tour1_screens
 from vp.tests.test_review import chain_word, make_review_variant
 
 User = get_user_model()
@@ -37,6 +37,7 @@ def events_in(html):
     return json.loads(found.group(1)) if found else []
 
 
+@tour1_screens
 class EventsBase(TestCase):
     def setUp(self):
         cache.clear()
@@ -73,6 +74,7 @@ class EventsBase(TestCase):
         return attempt
 
 
+@tour1_screens
 class PageEventsTests(EventsBase):
     def test_landing_open(self):
         response = self.get('vp:index')
@@ -117,6 +119,7 @@ class PageEventsTests(EventsBase):
             self.assertIn(script, html)
 
 
+@tour1_screens
 class SubmitAndResultEventsTests(EventsBase):
     def result(self, attempt, client=None):
         return self.get('vp:result', attempt.public_code, client=client)
@@ -186,6 +189,7 @@ class SubmitAndResultEventsTests(EventsBase):
             self.assertNotIn(private, payload)
 
 
+@tour1_screens
 class ThroughTheExistingEndpointTests(EventsBase):
     """События страниц принимает существующий `/api/track/`: своего эндпоинта раздел не заводит."""
 
@@ -224,6 +228,7 @@ def track(name, visitor, ts=None, **props):
     return event
 
 
+@tour1_screens
 class FunnelTests(TestCase):
     def setUp(self):
         # А: посадочная дважды → старт → сдача. Б: посадочная → старт, не сдал. В: посадочная,

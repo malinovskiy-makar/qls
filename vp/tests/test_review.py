@@ -19,7 +19,7 @@ from django.utils import timezone
 from vp import review, scoring, views
 from vp.loader import chain_letters
 from vp.models import VPAnswer, VPAttempt, VPItem
-from vp.tests.helpers import guest_attempt, make_published
+from vp.tests.helpers import guest_attempt, make_published, tour1_screens
 
 User = get_user_model()
 
@@ -98,6 +98,7 @@ def set_started(attempt, moment):
     VPAttempt.objects.filter(pk=attempt.pk).update(started_at=moment)
 
 
+@tour1_screens
 class ReviewBase(TestCase):
     def setUp(self):
         self.variant = make_review_variant()
@@ -109,6 +110,7 @@ class ReviewBase(TestCase):
 
 # ------------------------------------------------------ арифметика тестов
 
+@tour1_screens
 class ExplainItemTests(ReviewBase):
     def test_03_multi_two_right_and_one_extra(self):
         """3 балла, верных 2 из 5: два верных и один неверный → 3,00 − 1,00 = 2,00."""
@@ -162,6 +164,7 @@ class ExplainItemTests(ReviewBase):
 
 # ------------------------------------------------------------------ змейка
 
+@tour1_screens
 class ChainReviewTests(ReviewBase):
     def wrong_fourth(self):
         answers = right_answers(self.variant)
@@ -233,6 +236,7 @@ class ChainReviewTests(ReviewBase):
         self.assertEqual(attempt.score, D('100') - D('2') - D('2') - D('2') - D('3') - D('1') - D('3'))
 
 
+@tour1_screens
 class TestsReviewTests(ReviewBase):
     def test_answered_rows_carry_marks_and_explanation(self):
         attempt = submit(self.variant, {**right_answers(self.variant), 37: [1, 3, 2]})
@@ -260,6 +264,7 @@ class TestsReviewTests(ReviewBase):
 
 # ------------------------------------------------------------- процентиль
 
+@tour1_screens
 class PercentileTests(ReviewBase):
     def cohort(self, lower, higher, mine=50):
         """Моя попытка + `lower` чужих ниже неё + `higher` выше; все — разные люди."""
@@ -344,6 +349,7 @@ class PercentileTests(ReviewBase):
 
 # --------------------------------------------------- свой и чужой результат
 
+@tour1_screens
 class ResultViewTests(ReviewBase):
     def setUp(self):
         super().setUp()
@@ -483,6 +489,7 @@ class ResultViewTests(ReviewBase):
 
 # -------------------------------------------------------- перенос на аккаунт
 
+@tour1_screens
 class AdoptGuestAttemptsTests(TestCase):
     def setUp(self):
         self.variant = make_published('vp-adopt')
@@ -548,6 +555,7 @@ class AdoptGuestAttemptsTests(TestCase):
 
 # ------------------------------------------------------ дорешать вне зачёта
 
+@tour1_screens
 class PracticeCheckTests(ReviewBase):
     def setUp(self):
         super().setUp()

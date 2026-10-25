@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from catalog.tests.test_no_slop import visible_text
 from vp.models import VPAttempt, VPVariant
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 User = get_user_model()
 
@@ -26,6 +26,7 @@ def cards(html):
     return html.split('<article class="vp-vcard')[1:]
 
 
+@tour1_screens
 class VariantsScreenTests(TestCase):
     """Девять опубликованных вариантов: четыре у 9–10, пять у 11."""
 
@@ -132,6 +133,7 @@ class VariantsScreenTests(TestCase):
         self.assertIn(reverse('vp:my'), page(client))
 
 
+@tour1_screens
 class EmptyVariantsScreenTests(TestCase):
     def test_no_variants_is_honest_and_does_not_crash(self):
         html = page(Client())

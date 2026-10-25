@@ -17,13 +17,14 @@ from django.urls import reverse
 from problems import exam_engine
 from vp import scoring, views
 from vp.models import VPAnswer, VPAttempt
-from vp.tests.helpers import at, guest_attempt, make_published
+from vp.tests.helpers import at, guest_attempt, make_published, tour1_screens
 
 User = get_user_model()
 
 T0 = datetime(2026, 9, 26, 10, 0, 0, tzinfo=dt_timezone.utc)
 
 
+@tour1_screens
 class ViewBase(TestCase):
     """Общая обвязка сценариев прохождения.
 
@@ -64,6 +65,7 @@ class ViewBase(TestCase):
         return reverse('vp:take', args=[attempt.public_code])
 
 
+@tour1_screens
 class StartTests(ViewBase):
     def test_01_timed_start_expires_exactly_after_the_duration(self):
         with at(T0):
@@ -141,6 +143,7 @@ class StartTests(ViewBase):
         self.assertContains(client.get(reverse('vp:variants')), 'Не опубликован')
 
 
+@tour1_screens
 class OwnerTests(ViewBase):
     def test_start_remembers_the_code_in_the_session(self):
         attempt, _ = self.start()
@@ -221,6 +224,7 @@ class OwnerTests(ViewBase):
         self.assertGreater(len(codes), 45)
 
 
+@tour1_screens
 class IntroTests(ViewBase):
     def test_intro_numbers_come_from_the_database(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
@@ -296,6 +300,7 @@ class IntroTests(ViewBase):
                             'Опубликованных вариантов пока нет')
 
 
+@tour1_screens
 class PenaltyExampleTests(TestCase):
     """Пример на входе считает scoring и совпадает с настоящим подсчётом баллов."""
 
@@ -309,6 +314,7 @@ class PenaltyExampleTests(TestCase):
             self.assertEqual(score_item(item, [1, 2, 3])[0], D(points) - per_wrong)
 
 
+@tour1_screens
 class SaveTests(ViewBase):
     def save_url(self, attempt):
         return reverse('vp:save', args=[attempt.public_code])
@@ -494,6 +500,7 @@ def all_correct_batch(variant):
     return batch
 
 
+@tour1_screens
 class TimeAndFinishBase(ViewBase):
     def post_save(self, client, attempt, answers):
         return client.post(reverse('vp:save', args=[attempt.public_code]),
@@ -514,6 +521,7 @@ class TimeAndFinishBase(ViewBase):
         return attempt
 
 
+@tour1_screens
 class ExpiryTests(TimeAndFinishBase):
     def test_06_save_after_expiry_is_409_and_the_attempt_is_auto_submitted(self):
         attempt = self.started(with_timer='1')
@@ -587,6 +595,7 @@ class ExpiryTests(TimeAndFinishBase):
         self.assertIsNone(attempt.submitted_at)
 
 
+@tour1_screens
 class TimeLeftTests(TimeAndFinishBase):
     def test_10_time_left_decreases_between_calls(self):
         attempt = self.started(with_timer='1')
@@ -622,6 +631,7 @@ class TimeLeftTests(TimeAndFinishBase):
         self.assertEqual(response.status_code, 405)
 
 
+@tour1_screens
 class FinishTests(TimeAndFinishBase):
     def test_07_all_correct_answers_give_exactly_one_hundred(self):
         attempt = self.started(with_timer='1')
@@ -835,6 +845,7 @@ class FinishTests(TimeAndFinishBase):
         self.assertEqual(manual.answers.count(), 44)
 
 
+@tour1_screens
 class ResultTests(TimeAndFinishBase):
     def submitted(self, **fields):
         attempt = self.started(with_timer='1')

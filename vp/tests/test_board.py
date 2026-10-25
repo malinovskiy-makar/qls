@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from vp import board
 from vp.models import VPAttempt
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 User = get_user_model()
 
@@ -50,6 +50,7 @@ def _attempt(variant, user, *, score, seconds, ranked=True, timer=True,
     return attempt
 
 
+@tour1_screens
 class BoardRowsTests(TestCase):
     """Инварианты 1–3: кто попадает в таблицу, в каком порядке и что видно в топе."""
 
@@ -136,6 +137,7 @@ class BoardRowsTests(TestCase):
         self.assertEqual(board.rows(), [])
 
 
+@tour1_screens
 class StartMarksRankedTests(TestCase):
     """Инвариант 4: зачётность ставит `views.start`, и ставит ровно по правилу."""
 
@@ -179,6 +181,7 @@ class StartMarksRankedTests(TestCase):
     # Это проверяет `test_gate.py` — там же, где живёт сама стена.
 
 
+@tour1_screens
 class BoardHardeningTests(TestCase):
     """24.09.2026: брошенные зачётные сдаются, черновики не видны, перенос гостя."""
 

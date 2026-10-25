@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from vp.models import VPAttempt
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 User = get_user_model()
 
@@ -22,6 +22,7 @@ def rows(html):
             if not chunk.startswith(' is-head')]
 
 
+@tour1_screens
 class AccessTests(TestCase):
     def test_guest_is_sent_to_login_with_a_way_back(self):
         response = Client().get(reverse('vp:my'))
@@ -37,6 +38,7 @@ class AccessTests(TestCase):
         self.assertIn('Все · 0', html)
 
 
+@tour1_screens
 class MyAttemptsTests(TestCase):
     """Шесть попыток: 2 зачётные, 3 тренировки, 1 несданная."""
 
@@ -130,6 +132,7 @@ class MyAttemptsTests(TestCase):
         self.assertEqual(len(rows(other.get(reverse('vp:my')).content.decode())), 0)
 
 
+@tour1_screens
 class IntroAttemptsBlockTests(TestCase):
     def setUp(self):
         self.variant = make_published('my-intro')

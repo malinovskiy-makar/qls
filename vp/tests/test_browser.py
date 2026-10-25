@@ -30,6 +30,7 @@ from django.utils import timezone
 from problems.models_platform import Event
 from vp.models import VPAttempt, VPVariant
 from vp.tests import browser_fixture
+from vp.tests.helpers import tour1_screens
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_take.mjs')
 
@@ -100,6 +101,7 @@ EXPECTED = {
 # воркерами шага A нельзя. Прогон около двух минут: часть проверок ждёт настоящих
 # секунд (таймер, «время вышло», возврат связи).
 @tag('vp', 'browser', 'serial')
+@tour1_screens
 class TakeInBrowserTest(StaticLiveServerTestCase):
     def setUp(self):
         # Живой сервер и тест делят одно соединение SQLite в памяти: параллельные запросы

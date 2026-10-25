@@ -39,8 +39,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from catalog import seo
 from problems import exam_engine
-from vp import answers, blocks, board, landing, review, scoring, tracking
-from vp.config import BANDS, TOUR_DATES
+from vp import answers, blocks, board, config, landing, review, scoring, tracking, visibility
 from vp.loader import GAP_MARK
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 from vp.templatetags.vp_extras import grade_label
@@ -71,11 +70,9 @@ def _is_staff(request):
 
 
 def _variant_or_404(request, slug):
-    """Опубликованный вариант. Черновик видит только персонал — проверить до выпуска."""
-    variants = VPVariant.objects.all()
-    if not _is_staff(request):
-        variants = variants.filter(is_published=True)
-    return get_object_or_404(variants, slug=slug)
+    """Видимый вариант (опубликован, тур виден — `vp/visibility.py`). Черновик и вариант
+    скрытого тура видит только персонал — проверить до выпуска, посмотреть архив."""
+    return get_object_or_404(visibility.variants_for(request), slug=slug)
 
 
 def _remember(request, code):
@@ -217,9 +214,37 @@ def _load_attempt(request, code):
 # --------------------------------------------------------- список и вход
 
 def _published(request=None):
-    """Опубликованные варианты с заданиями. Черновики сюда не попадают никогда:
-    числа страницы не должны меняться от того, кто её открыл."""
-    return list(VPVariant.objects.filter(is_published=True).prefetch_related('items'))
+    """Видимые варианты с заданиями (опубликованные, тур из `config.VISIBLE_TOURS`).
+    Черновики сюда не попадают никогда: числа страницы не должны меняться от того,
+    кто её открыл."""
+    return list(visibility.visible_variants().prefetch_related('items'))
+
+
+def _boards(request):
+    """Таблицы лучших попыток посадочной: одна на тур (1 тур) или по классу (2 тур).
+
+    Открыта вкладка из `?board=`, иначе класса последней попытки вошедшего в текущем
+    туре, иначе первая (9 класс).
+    Строки и правило отбора — `vp/board.py`.
+    """
+    tour = config.CURRENT_TOUR
+    active = None
+    if request.user.is_authenticated:
+        last = (VPAttempt.objects.filter(user=request.user, variant__tour=tour)
+                .order_by('-started_at', '-id').select_related('variant').first())
+        active = last.variant.grade_band if last else None
+    result = []
+    for band, label in board.tables(tour):
+        rows, my_row, humans, attempts = board.top(me=request.user, tour=tour, band=band)
+        result.append({'band': band or '', 'label': label, 'rows': rows, 'my_row': my_row,
+                       'humans': humans, 'attempts': attempts})
+    codes = [b['band'] for b in result]
+    asked = request.GET.get('board')        # вкладка-ссылка без JS
+    chosen = (asked if asked in codes else active if active in codes
+              else codes[0] if codes else '')
+    for item in result:
+        item['active'] = item['band'] == chosen
+    return result
 
 
 def _source_links(published):
@@ -249,8 +274,10 @@ def index(request):
     groups = landing.format_groups(published)
     facts = landing.facts(groups)
     snake = landing.snake_example(published)
-    rows, my_row, humans, attempts = board.top(me=request.user)
+    boards = _boards(request)
+    current_board = next((b for b in boards if b['active']), None)
     has_demo = any(v.source_kind == VPVariant.SourceKind.DEMO for v in published)
+    tour_dates, tour_dates_short = landing.tour_dates()
 
     # Диапазон номеров змейки — из таблицы блоков, а не из головы.
     snake_row = next((r for g in groups for r in g['rows'] if r['block'] == 'snake'), None)
@@ -262,19 +289,22 @@ def index(request):
     return render(request, 'vp/index.html', {
         'groups': groups,
         'facts': facts,
-        'tour_dates': landing.dates_text(TOUR_DATES),
-        'tour_dates_short': landing.dates_short(TOUR_DATES),
+        'tour': config.CURRENT_TOUR,
+        'tour_dates': tour_dates,
+        'tour_dates_short': tour_dates_short,
+        'number_rule': blocks.NUMBER_RULE,
         'has_snake': snake_row is not None,
         'snake_range': snake_row['range'] if snake_row else '',
         'snake': snake,
         'snake_total': snake_total,
-        'rows': rows, 'my_row': my_row, 'board_humans': humans, 'board_attempts': attempts,
+        'boards': boards,
+        'board_attempts': current_board['attempts'] if current_board else 0,
         'mine': landing.my_block(request, published),
         'source_links': _source_links(published),
         'register_url': '' if request.user.is_authenticated else f"{reverse('register')}?{guest_next}",
         'login_url': '' if request.user.is_authenticated else f"{reverse('login')}?{guest_next}",
         'vp_events': [tracking.event('vp_landing_open')],
-        **seo.vp_landing_meta(has_demo),
+        **seo.vp_landing_meta(has_demo, config.CURRENT_TOUR),
     })
 
 
@@ -301,14 +331,13 @@ def variants(request):
     варианта. Персонал видит и черновики, с плашкой. Класс выбирается ссылкой
     `?band=`, без JS; неизвестное значение – первый класс, у которого есть варианты.
     """
-    everything = VPVariant.objects.all()
-    if not _is_staff(request):
-        everything = everything.filter(is_published=True)
+    everything = (VPVariant.objects.filter(tour__in=config.VISIBLE_TOURS) if _is_staff(request)
+                  else visibility.visible_variants())
     everything = list(everything.prefetch_related('items'))
     published = [v for v in everything if v.is_published]
 
     bands = []
-    for code, label in BANDS:
+    for code, label in config.bands():
         chosen = sorted((v for v in everything if v.grade_band == code),
                         key=lambda v: (v.order, v.pk))
         if chosen:
@@ -330,7 +359,8 @@ def variants(request):
     return render(request, 'vp/variants.html', {
         'bands': bands, 'current': current, 'cards': cards,
         'vp_events': [tracking.event('vp_variants_open')],
-        **seo.vp_variants_meta(),
+        'tour': config.CURRENT_TOUR,
+        **seo.vp_variants_meta(config.CURRENT_TOUR),
     })
 
 
@@ -390,6 +420,9 @@ def my_attempts(request):
             'answered': _answered_count(attempt),
             'count': attempt.variant.items.count(),
             'seconds': board.spent_seconds(attempt) if attempt.submitted_at else None,
+            # Попытка тура, которого нет в разделе (1 тур скрыт до архива): пометка в строке.
+            'tour_label': ('' if attempt.variant.tour == config.CURRENT_TOUR
+                           else f'{attempt.variant.tour} тур'),
             'place': (best_place if best_attempt is not None
                       and attempt.pk == best_attempt.pk else None),
         })
@@ -426,8 +459,9 @@ def intro(request, slug):
     variant = _variant_or_404(request, slug)
     items = list(variant.items.all())
     sections = blocks.sections(items)
-    partial = [s for s in sections if s['block'] in ('multi', 'analytic')]
-    whole = [s for s in sections if s not in partial]
+    partial = [s for s in sections if s['block'] in blocks.SHARE_WITH_PENALTY]
+    shared = [s for s in sections if s['block'] in blocks.SHARE_NO_PENALTY]
+    whole = [s for s in sections if s not in partial and s not in shared]
 
     example = None
     sample = next((i for s in partial for i in s['items'] if i.penalty), None)
@@ -457,6 +491,9 @@ def intro(request, slug):
         'items_count': len(items),
         'whole_ranges': blocks.merged_ranges(whole),
         'partial_ranges': blocks.merged_ranges(partial),
+        'share_ranges': blocks.merged_ranges(shared),
+        'number_ranges': blocks.merged_ranges([s for s in sections if s['block'] == 'number']),
+        'number_rule': blocks.NUMBER_RULE,
         'penalty_example': example,
         'attempt': attempt,
         'attempt_answered': _answered_count(attempt) if attempt else 0,
@@ -464,7 +501,8 @@ def intro(request, slug):
         'register_url': '' if request.user.is_authenticated else _register_url(slug),
         'login_url': '' if request.user.is_authenticated else _login_url(slug),
         'vp_events': [tracking.event('vp_intro_open', variant=variant.slug)],
-        **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year),
+        **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year,
+                              variant.tour),
     })
 
 
@@ -890,7 +928,7 @@ def result(request, code):
         # школьники.
         context['author'] = 'Участник'
         context['again_url'] = (reverse('vp:intro', args=[attempt.variant.slug])
-                                if attempt.variant.is_published else '')
+                                if visibility.is_visible(attempt.variant) else '')
     return render(request, 'vp/result.html', context)
 
 

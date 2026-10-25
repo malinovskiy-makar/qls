@@ -1,7 +1,32 @@
 """Общие заготовки тестов ВП: полный вариант из 44 заданий по формату 1 тура."""
 from decimal import Decimal
 
+from unittest import mock
+
+from vp import config
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
+
+
+def tour1_screens(cls):
+    """Класс тестов экранов 1 ТУРА: на время каждого теста (вместе с `setUp`) 1 тур —
+    текущий и видимый, как было до 25.10.2026.
+
+    С 25.10.2026 раздел показывает 2 тур, а 1 тур скрыт до архива (`vp.config`). Эти
+    тесты строят варианты 1 тура (`make_published`) и проверяют его экраны: поведение
+    они сторожат то же, и экраны 1 тура вернутся архивом одной настройкой. Обычный
+    `mock.patch` на класс не годится: он не действует в `setUp`, а там тесты уже
+    заводят попытку через `views.start`.
+    """
+    original = cls.setUp
+
+    def setUp(self):
+        patcher = mock.patch.multiple(config, CURRENT_TOUR=1, VISIBLE_TOURS=(1,))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        original(self)
+
+    cls.setUp = setUp
+    return cls
 
 # (номера, блок, вид, баллы) — структура 1 тура 9–10 классов: сумма 100.
 STRUCTURE = [

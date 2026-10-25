@@ -8,11 +8,12 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from vp.tests.helpers import make_published
+from vp.tests.helpers import make_published, tour1_screens
 
 User = get_user_model()
 
 
+@tour1_screens
 class ScreensRenderTests(TestCase):
 
     def test_01_empty_database_renders_every_screen(self):

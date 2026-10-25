@@ -50,6 +50,8 @@
         <div>В заданиях {{ partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд – гарантированный ноль.</div>
         {% if penalty_example %}<div class="vp-note">Если в задании 2 верных и 3 неверных, верный даёт +{{ penalty_example.0|num }}, лишний – −{{ penalty_example.1|num }}. Ниже нуля за одно задание не уходим.</div>{% endif %}
         {% endif %}
+        {% if share_ranges %}<div>В {% if share_ranges|length == 1 %}задании{% else %}заданиях{% endif %} {{ share_ranges|join:" и " }} балл делится по долям: каждый верный пропуск или строка приносит свою долю, штрафа нет.</div>{% endif %}
+        {% if number_ranges %}<div class="vp-note"><b>Ответ-число в неверном формате – 0 баллов, как на туре.</b> {{ number_rule }}</div>{% endif %}
       </div>
     </div>
   </div>

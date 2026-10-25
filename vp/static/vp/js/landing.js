@@ -9,6 +9,26 @@
 (function () {
   'use strict';
 
+  /* Вкладки таблицы лучших попыток по классам (2 тур). Это ссылки `?board=`: без
+     скрипта страница перезагрузится с нужной таблицей, со скриптом — переключит на месте. */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-board-tab]'));
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function (event) {
+      event.preventDefault();
+      var band = tab.getAttribute('data-board-tab');
+      tabs.forEach(function (other) {
+        other.setAttribute('aria-selected', other === tab ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-board-panel]').forEach(function (panel) {
+        panel.hidden = panel.getAttribute('data-board-panel') !== band;
+      });
+    });
+  });
+})();
+
+(function () {
+  'use strict';
+
   var dialog = document.getElementById('vp-rules');
   if (!dialog || typeof dialog.showModal !== 'function') return;
 

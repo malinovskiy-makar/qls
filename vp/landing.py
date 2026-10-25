@@ -11,13 +11,11 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from vp import blocks, scoring
-from vp.config import BANDS
+from vp import blocks, config, scoring
 from vp.loader import chain_letters
 from vp.models import VPAttempt, VPVariant
 
 _ZERO = Decimal('0')
-_BAND_LABELS = dict(BANDS)
 
 _MONTHS = ('января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа',
            'сентября', 'октября', 'ноября', 'декабря')
@@ -64,14 +62,37 @@ def dates_short(dates):
     return _join([f'{d.day} {_MONTHS_SHORT[d.month - 1]}' for d in days])
 
 
+def range_text(start, end):
+    """Период тура словами: «с 13 по 22 ноября 2026», «с 30 сентября по 2 октября 2026»."""
+    if (start.year, start.month) == (end.year, end.month):
+        return f'с {start.day} по {end.day} {_MONTHS[end.month - 1]} {end.year}'
+    return f'с {start.day} {_MONTHS[start.month - 1]} по {end.day} {_MONTHS[end.month - 1]} {end.year}'
+
+
+def range_short(start, end):
+    """Период тура в плитку факта: «13–22 нояб.»."""
+    if (start.year, start.month) == (end.year, end.month):
+        return f'{start.day}–{end.day} {_MONTHS_SHORT[end.month - 1]}'
+    return f'{start.day} {_MONTHS_SHORT[start.month - 1]} – {end.day} {_MONTHS_SHORT[end.month - 1]}'
+
+
+def tour_dates(tour=None):
+    """`(даты словами, даты в плитку)` тура из `config.TOUR_DATES`; нет дат — две пустые строки."""
+    kind, days = config.TOUR_DATES.get(config.CURRENT_TOUR if tour is None else tour, ('days', ()))
+    if kind == 'range' and len(days) == 2:
+        return range_text(*days), range_short(*days)
+    return dates_text(days), dates_short(days)
+
+
 # ---------------------------------------------------------------- формат
 
 def _format_of(variant):
     """Формат одного варианта: блоки таблицы, итоги и то, что нужно для правил баллов."""
     items = list(variant.items.all())
     sections = blocks.sections(items)
-    partial = [s for s in sections if s['block'] in ('multi', 'analytic')]
-    whole = [s for s in sections if s not in partial]
+    partial = [s for s in sections if s['block'] in blocks.SHARE_WITH_PENALTY]
+    shared = [s for s in sections if s['block'] in blocks.SHARE_NO_PENALTY]
+    whole = [s for s in sections if s not in partial and s not in shared]
     sample = next((i for s in partial for i in s['items'] if i.penalty), None)
     rows = [{
         'block': s['block'], 'range': s['range'], 'title': s['titles']['table'],
@@ -84,6 +105,8 @@ def _format_of(variant):
         'minutes': variant.duration_seconds // 60,
         'whole_ranges': blocks.merged_ranges(whole),
         'partial_ranges': blocks.merged_ranges(partial),
+        'share_ranges': blocks.merged_ranges(shared),
+        'number_ranges': blocks.merged_ranges([s for s in sections if s['block'] == 'number']),
         'penalty_example': scoring.penalty_example(sample.points) if sample else None,
     }
     # Подпись — ровно то, что таблица и правила показывают. Баллы отдельных заданий внутри
@@ -93,7 +116,7 @@ def _format_of(variant):
     fmt['signature'] = (fmt['count'], fmt['total'],
                         tuple((r['block'], r['range'], r['count'], r['total']) for r in rows),
                         tuple(fmt['whole_ranges']), tuple(fmt['partial_ranges']),
-                        fmt['penalty_example'])
+                        tuple(fmt['share_ranges']), fmt['penalty_example'])
     return fmt
 
 
@@ -112,21 +135,29 @@ def format_groups(published):
         if variant.grade_band not in group['bands']:
             group['bands'].append(variant.grade_band)
     result = list(groups.values())
+    labels = config.all_band_labels()
     for group in result:
-        group['label'] = ' и '.join(_BAND_LABELS.get(b, f'{b} кл.') for b in group['bands'])
+        group['label'] = ' и '.join(labels.get(b, f'{b} кл.') for b in group['bands'])
     return result
 
 
 def facts(groups):
-    """Число заданий, минуты и баллы «в этом году» — только если формат один на всех.
+    """Число заданий, минуты и баллы «в этом году» — только если они общие для всех.
 
-    Разные длительности у вариантов – тоже «не один»: «за 30 минут» тогда было бы
-    правдой не про все.
+    Разные длительности или максимумы у вариантов – «не один формат», плиток нет: «за
+    30 минут» тогда было бы правдой не про все. Число заданий может разниться по
+    классам (2 тур: 17 у 9 класса, 18 у 10–11) — тогда оно пишется диапазоном
+    `count_text` «17–18», а слово согласуется с большим (`count`).
     """
-    if len(groups) != 1 or len(groups[0]['minutes_all']) != 1:
+    if not groups:
         return None
-    group = groups[0]
-    return {'count': group['count'], 'minutes': group['minutes'], 'total': group['total']}
+    minutes = set().union(*(g['minutes_all'] for g in groups))
+    totals = {g['total'] for g in groups}
+    if len(minutes) != 1 or len(totals) != 1:
+        return None
+    counts = sorted({g['count'] for g in groups})
+    return {'count': counts[-1], 'count_text': blocks.number_range(counts[0], counts[-1]),
+            'minutes': next(iter(minutes)), 'total': next(iter(totals))}
 
 
 # ---------------------------------------------------------------- змейка
@@ -284,7 +315,7 @@ def _dots(user, published):
 
 def _ordered(published):
     """Опубликованные варианты в порядке страницы выбора: по классам, потом `order`."""
-    order = {code: n for n, (code, _) in enumerate(BANDS)}
+    order = {code: n for n, (code, _) in enumerate(config.bands())}
     return sorted(published, key=lambda v: (order.get(v.grade_band, len(order)), v.order, v.pk))
 
 
