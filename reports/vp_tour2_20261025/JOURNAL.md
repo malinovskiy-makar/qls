@@ -130,3 +130,30 @@ worktree `.claude/worktrees/vp-tour2-20261025`: в основной папке �
   Покрытие экранов 1 тура сохранено для будущего архива.
 * Новые тесты `vp/tests/test_tour2_section.py` (13). `manage.py test vp` — 416, OK;
   `catalog.tests.test_seo` + `config.tests` — 129, OK.
+
+## Фаза 6. Данные, зубастость, инварианты — сделано
+
+**Зубастость** (дефект вносится, тесты гоняются, файл откатывается `git checkout`):
+
+| Дефект | Покрасневшие тесты |
+|---|---|
+| подсчёт числа принимает точку как запятую | `test_number`: `test_table`, `test_points_come_from_item`, `test_wrong_value_with_bad_format_is_not_correct`, `test_explain_never_carries_the_answer`; `test_tour2_review`: `test_owner_sees_format_reason_and_true_number`, `test_points_of_9th_grade_come_from_data` |
+| сравнение строк, а не значений («37,50» не засчитан) | `test_number`: `test_table`, `test_points_come_from_item` |
+| `accepted` не учитывается | `test_number`: `test_table`, `test_accepted_match_is_flagged` |
+| загрузчик не проверяет структуру класса | `test_tour2_import`: `test_extra_number_item` |
+| `_row` отдаёт `answer` в шаблон | `test_tour2_take.test_rows_carry_only_safe_fields`, `test_page.test_rows_carry_no_model_instances` |
+| видимость не фильтрует тур | `test_tour2_section`: `test_landing_is_about_tour_2`, `test_intro_and_start_of_hidden_tour`, `test_sitemap_lists_only_visible_variants`, `test_two_format_tables_and_rules_without_snake` |
+| таблица не делит по классам | `test_tour2_section.test_board_tab_of_my_last_attempt_and_separate_tables` |
+
+**Данные (локальная база, общая с сессией calc2):** `import_vp data/vp/vp-2tur-2026-demo-{9,10,11}.yaml --publish`;
+повторный импорт каждого — «Изменений нет».
+
+**Инварианты:**
+* 2 тур: опубликованных вариантов 3; заданий 17 + 18 + 18 = 53; сумма баллов каждого 100,00
+  (`max_score` 100,00); заданий с числом 12 + 14 + 14 = 40; длительность 4200 с.
+* 1 тур до единицы как в фазе −1: `VPVariant` 10 (опубликовано 9), `VPItem` 440,
+  `VPAttempt` 2, `VPAnswer` 88.
+* `manage.py test vp` — 416, OK (`skipped=1`); `manage.py check` — 0; `makemigrations vp
+  --check --dry-run` — «No changes detected»; `ruff check .` — чисто.
+* Браузерный замер «1440×800 без прокрутки» — ПРОПУЩЕН: панель браузера берёт
+  `launch.json` основной папки, а его держит сессия calc2. Проверка — глазами владельца.
