@@ -234,7 +234,7 @@ lockdown_dev_accounts [--apply]   # погасить дев-аккаунты
 seed_olympiads_demo --yes [--wipe] # демо-данные раздела олимпиад (без --yes только план)
 import_olympiads_data             # настоящие факты раздела олимпиад из data/olympiads/out/*.jsonl
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
-import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
+import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант ВП (1 или 2 тур) из data/vp/ (идемпотентно, правила по турам, ADR 0124, 0158)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
 ai_load_probe --ai K --problem ID [--ai-user U --baseline F.json]  # зонд «Сайт не встаёт»: K вопросов к ИИ разом,
@@ -347,8 +347,14 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | `calc2` | Графический калькулятор — единственный |
 | `calendar_stub` | Календарь занятий |
 | `olympiads` | Справочник олимпиад: даты туров, льготы вузов, комплекты |
-| `vp` | Тренажёр 1 тура «Высшей пробы»: варианты из файлов, таймер, подсчёт баллов ([ADR 0124](docs/adr/0124-vp-app-separate-from-bank.md)) |
+| `vp` | Тренажёр «Высшей пробы», 1 и 2 тур: варианты из файлов, таймер, подсчёт баллов ([ADR 0124](docs/adr/0124-vp-app-separate-from-bank.md), [0158](docs/adr/0158-vp-tour2-in-vp-rules-by-tour-number-kind-visibility.md)) |
 | `legal` | Правовые документы `/legal/*`, экран согласия, защита помощника, проверка реквизитов; **модель `ConsentRecord` живёт в `problems/models_legal.py`** (правило «модели только в `problems`» не нарушено) |
+
+**Тренажёр ВП, 2 тур (25.10.2026, ADR 0158):** раздел показывает 2 тур (`vp/config.py`: `CURRENT_TOUR = 2`,
+`VISIBLE_TOURS = (2,)`), 1 тур скрыт — данные и результаты целы, вернуть архивом = добавить 1 в `VISIBLE_TOURS`.
+Видимость — только `vp/visibility.py`. Новые виды: число (строгий формат ВШЭ, 0 за формат с объяснением в
+разборе), текст с пропусками, соотнесение, пара с общим условием; таблица лучших попыток своя у 9, 10, 11
+класса. Подробности — [docs/VP.md](docs/VP.md), раздел «2 тур».
 
 **Тренажёр ВП после сессии 5 (22.09.2026):** читать может любой, ПРОХОДИТЬ — только
 вошедший (стена в `vp.views.start`). Экраны: посадочная `/vp/` в один экран без
