@@ -183,6 +183,91 @@ head('Е · ошибки Math.js по-русски');
   ok('два знака «=» — ошибка, кривая прежняя', /два знака/.test(p.two || '') && p.form === 'PQ', p);
 }
 
+/* ── А2 24.10 (ADR 0158): промежуточная запись не остаётся кривой; правка спрятанной кривой показывает её ── */
+head('Н · «P=100-2P» по символу: кривая идёт за записью, после ошибки — запись до правки');
+{
+  await run(`resetSceneMemory(); pickScene('sd'); redrawAll();`);
+  await page.waitForTimeout(500);
+  const mf = page.locator('#curve-list .fc-card').first().locator('math-field');
+  await mf.click(); await page.waitForTimeout(150);
+  await page.keyboard.press('Meta+a'); await page.waitForTimeout(150);
+  const seen = {};
+  for (const ch of 'P=100-2P') {
+    await page.keyboard.type(ch); await page.waitForTimeout(300);
+    const r = await run(`var d = STATE.curves.find(function (c) { return c.role === 'demand'; }); return { expr: d.expr, Q: STATE.eq && STATE.eq.Q };`);
+    seen[ch === 'P' && seen['2'] ? 'P2' : ch] = r;
+  }
+  ok('по дороге «P=100-2» — кривая идёт за записью (Q* 98)', near(seen['2'] && seen['2'].Q, 98, 1e-6), seen['2']);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(900);
+  const r = await run(`var d = STATE.curves.find(function (c) { return c.role === 'demand'; }); var card = document.querySelector('#curve-list .fc-card');
+    return { expr: d.expr, eq: STATE.eq, why: plain(card.querySelector('.f-why')), bad: card.querySelector('.curve-expr-inp').classList.contains('bad') };`);
+  ok('после Enter: ошибка под полем по-русски', r.bad && !!r.why && !ENGLISH.test(r.why), r.why);
+  ok('…кривая — запись до правки «100 - Q»', r.expr === '100 - Q', r.expr);
+  ok('…равновесие 50; 50', near(r.eq && r.eq.Q, 50, 1e-6) && near(r.eq && r.eq.P, 50, 1e-6), r.eq);
+  ok('…в сообщении — «запись до правки»', /запись до правки/.test(r.why), r.why);
+}
+
+head('Н · правка формулы спрятанной кривой показывает её (один шаг истории)');
+{
+  await run(`resetSceneMemory(); pickScene('sd'); redrawAll();`);
+  await page.waitForTimeout(500);
+  await page.locator('#curve-list .fc-card').first().locator('.fc-eye').click();
+  await page.waitForTimeout(1400);
+  const h = await run(`var d = STATE.curves.find(function (c) { return c.role === 'demand'; }); return { vis: d.visible, eq: STATE.eq };`);
+  ok('D спрятана глазом — равновесия нет', h.vis === false && !h.eq, h);
+  const mf = page.locator('#curve-list .fc-card').first().locator('math-field');
+  await mf.click(); await page.waitForTimeout(150);
+  await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace');
+  await page.keyboard.type('120-Q', { delay: 60 }); await page.keyboard.press('Enter'); await page.waitForTimeout(1400);
+  const r = await run(`var d = STATE.curves.find(function (c) { return c.role === 'demand'; }); var card = document.querySelector('#curve-list .fc-card');
+    var eye = card.querySelector('.fc-eye');
+    return { vis: d.visible, expr: d.expr, eq: STATE.eq, hidden: card.classList.contains('is-hidden'), pressed: eye.getAttribute('aria-pressed') };`);
+  ok('после правки D видна', r.vis === true && !r.hidden && r.pressed === 'false', r);
+  ok('…и в расчёте: равновесие 60; 60', near(r.eq && r.eq.Q, 60, 1e-6) && near(r.eq && r.eq.P, 60, 1e-6), r.eq);
+  await run(`historyUndo();`); await page.waitForTimeout(900);
+  const u = await run(`var d = STATE.curves.find(function (c) { return c.role === 'demand'; }); return { vis: d.visible, expr: d.expr };`);
+  ok('одно «Отменить» возвращает и формулу, и спрятанность', u.vis === false && u.expr === '100 - Q', u);
+
+  await run(`resetSceneMemory(); pickScene('ext'); closePicker(); redrawAll();`);
+  await page.waitForTimeout(600);
+  const e0 = await run(`return { on: STATE.msbOn, chk: document.getElementById('chk-msb').checked };`);
+  ok('«Внешние эффекты»: MSB на старте спрятана', !e0.on && !e0.chk, e0);
+  const mb = page.locator('#inp-msb').locator('xpath=ancestor::*[contains(@class,"f-slot")][1]').locator('math-field');
+  await mb.click(); await page.waitForTimeout(150);
+  await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace');
+  await page.keyboard.type('120-Q', { delay: 60 }); await page.keyboard.press('Enter'); await page.waitForTimeout(1400);
+  const e1 = await run(`var c = document.querySelector('#inp-msb').closest('.sc-extcard'); var eye = c && c.querySelector('.fc-eye');
+    var labels = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent.trim(); });
+    return { on: STATE.msbOn, chk: document.getElementById('chk-msb').checked, eye: eye && eye.getAttribute('aria-pressed'),
+      onChart: labels.indexOf('MSB') >= 0, Qopt: STATE.ext && STATE.ext.Qopt };`);
+  ok('правка MSB включила её глаз', e1.on && e1.chk && e1.eye === 'true', e1);
+  ok('…MSB на графике и в расчёте: оптимум 120 − Q = Q + 20 → Q 50', e1.onChart && near(e1.Qopt, 50, 1e-4), e1);
+  await run(`historyUndo();`); await page.waitForTimeout(900);
+  const e2 = await run(`return { on: STATE.msbOn, chk: document.getElementById('chk-msb').checked, Qopt: STATE.ext && STATE.ext.Qopt };`);
+  ok('одно «Отменить» прячет MSB и возвращает оптимум 40', !e2.on && !e2.chk && near(e2.Qopt, 40, 1e-4), e2);
+  const e3 = await run(`resetSceneMemory(); pickScene('ext'); closePicker(); redrawAll(); return new Promise(function (res) { setTimeout(function () { res({ on: STATE.msbOn }); }, 700); });`);
+  ok('старт сам MSB не включает (умолчание MSB = D — не правка)', e3.on === false, e3);
+}
+
+head('Н · «Квоты»: точное значение цены за коридором прижимается к краю');
+{
+  // Сначала цена 45 (иначе 60 стояло бы и без прижима: это цена по умолчанию).
+  await run(`resetSceneMemory(); pickScene('quota'); closePicker(); redrawAll(); setQuotaPrice(45);`);
+  await page.waitForTimeout(600);
+  ok('предусловие: цена 45', near(await run(`return STATE.qt && STATE.qt.P;`), 45, 1e-9));
+  const eq = page.locator('#quota-price-field .reg-eq');
+  ok('строка «Цена внутри коридора» видна', await eq.count() > 0 && await eq.isVisible(), await eq.count());
+  await eq.click(); await page.waitForTimeout(200);
+  ok('щелчок по строке открыл точный ввод', await run(`var a = document.activeElement; return !!a && a.tagName === 'INPUT' && !!a.closest('#quota-price-field');`));
+  await page.keyboard.press('Meta+a'); await page.keyboard.type('100'); await page.keyboard.press('Enter'); await page.waitForTimeout(700);
+  const r = await run(`var sl = document.getElementById('quota-price-slider'); return { P: STATE.qt && STATE.qt.P, min: +sl.min, max: +sl.max, v: +sl.value,
+    lab: plain(document.querySelector('#quota-price-field .reg-eq')), bbh: sl.dataset.boundsByHand || '' };`);
+  ok('ввод 100 → цена 60 (верх коридора)', near(r.P, 60, 1e-9), r);
+  ok('…ползунок 40…60 и стоит на 60', r.min === 40 && r.max === 60 && r.v === 60, r);
+  ok('…подпись показывает прижатое 60', /60/.test(r.lab) && !/100/.test(r.lab), r.lab);
+  ok('…полоса не переехала', !r.bbh, r.bbh);
+}
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 if (errs.length) bad++;
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' ПРОВЕРОК ВВОДА СОШЛИСЬ'));

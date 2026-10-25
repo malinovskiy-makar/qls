@@ -217,6 +217,18 @@ function addEmptyCurve() {
    месте, сохраняя id, цвет, роль, своё имя и видимость: раньше, чтобы
    поправить опечатку, кривую приходилось удалять и заводить заново, теряя
    все настройки. Возвращает текст ошибки или null, если всё хорошо. */
+/* Запись кривой — то, что меняет updateCurveExpr: снимок и возврат (правка в поле карточки, 80-ui.js ниже). */
+const CURVE_RECORD_KEYS = ['srcForm', 'expr', 'compiled', 'linear', 'fn', 'srcExpr', 'srcCompiled', 'srcLinear', 'shiftBase'];
+function curveRecord(c) {
+  const r = {};
+  CURVE_RECORD_KEYS.forEach(k => { if (Object.prototype.hasOwnProperty.call(c, k)) r[k] = c[k]; });
+  return r;
+}
+function restoreCurveRecord(c, r) {
+  if (!r) return;
+  CURVE_RECORD_KEYS.forEach(k => { if (Object.prototype.hasOwnProperty.call(r, k)) c[k] = r[k]; else delete c[k]; });
+}
+
 function updateCurveExpr(curve, expr) {
   expr = (expr || '').trim();
   if (!expr) return 'пустая формула';
@@ -440,8 +452,19 @@ function renderCurveList() {
       fInp.placeholder = curve.expr ? (curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)')
                                     : 'Например: 100 - Q';
       fInp.setAttribute('aria-label', 'Формула: ' + curveHumanName(curve));
+      /* ⚠️ ПРОМЕЖУТОЧНАЯ ЗАПИСЬ НЕ ОСТАЁТСЯ КРИВОЙ (А2 24.10, ADR 0158, карточка …81e7…88f6…). Кривая идёт за
+         записью, пока человек печатает, но по дороге к «P=100-2P» верной бывает и «P=100-2» (горизонталь 98), и
+         после ошибки график держал её. Правка — сессия от первого символа до Enter или ухода из карточки: в её
+         начале запоминается запись кривой (curveRecord), неверная итоговая запись возвращает кривую к ней, а не
+         к последней верной по дороге. Enter и уход из поля с верной записью принимают её. */
+      const endEdit = () => { delete fInp._editBase; };
+      fInp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !fInp.classList.contains('bad')) endEdit(); });
+      row.addEventListener('focusout', (e) => {
+        if (fInp._editBase && !(e.relatedTarget && row.contains(e.relatedTarget)) && !fInp.classList.contains('bad')) endEdit();
+      });
       fInp.addEventListener('input', () => {
         pushUndo();
+        if (!fInp._editBase) fInp._editBase = curveRecord(curve);
         const raw = String(fInp.value || '').trim();
         // Пустое поле у своей функции законно: кривой просто нет (макет 6.1).
         const err = (!raw && !staff) ? null : updateCurveExpr(curve, fInp.value);
@@ -449,7 +472,20 @@ function renderCurveList() {
         fInp.classList.toggle('bad', !!err);
         fInp.setAttribute('aria-invalid', err ? 'true' : 'false');
         if (typeof fieldProblem === 'function') {
-          fieldProblem(fInp, err ? (err.charAt(0).toUpperCase() + err.slice(1) + '. График держит последнюю верную запись.') : '');
+          fieldProblem(fInp, err ? (err.charAt(0).toUpperCase() + err.slice(1) + '. График держит запись до правки.') : '');
+        }
+        if (err) {
+          // Кривая — к записи до правки (а не к промежуточной), холст — следом.
+          restoreCurveRecord(curve, fInp._editBase);
+          if (!rowTag) paintNotation(nm, curveShortName(curve));
+          redrawAll();
+          if (typeof updatePult === 'function') updatePult();
+        }
+        /* Правка формулы спрятанной кривой показывает её (ADR 0158): глаз включается тем же шагом истории. */
+        if (!err && raw && !curve.visible) {
+          curve.visible = true;
+          paintEye();
+          row.classList.remove('is-hidden');
         }
         if (!err) {
           if (!rowTag) paintNotation(nm, curveShortName(curve));

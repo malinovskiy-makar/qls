@@ -133,7 +133,9 @@ function checkRows(name, a, want) {
     const s = a.stats[i];
     const valOk = !!s && (typeof v === 'string' ? flat(s.val) === flat(v) : near(num(s.val), v, Math.max(0.011, Math.abs(v) * 0.0005)));
     ok(name + ': строка ' + (i + 1) + ' ' + re + ' = ' + v, !!s && re.test(s.lab) && valOk, s ? s.lab + ' = ' + s.val : 'нет строки');
-    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => typeof v === 'string' ? flat(h.val) === flat(v) : near(num(h.val), v, 0.011))), JSON.stringify(s));
+    /* Строка «55 (было 45)», ставшая главной, в «Ответе» — значение 55 и «45 + 10» под ним (ADR 0158, 24.10). */
+    const heroVal = (x) => typeof x === 'string' ? flat(x).replace(/\(было[^)]*\)$/, '') : x;
+    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => typeof v === 'string' ? flat(h.val) === heroVal(v) : near(num(h.val), v, 0.011))), JSON.stringify(s));
   });
 }
 const canvasMRL = (page) => page.evaluate(() => {

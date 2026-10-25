@@ -151,6 +151,8 @@ function monoBestOutput(mrAt, mcFn, D, opts) {
     monoRootsIn(q => mrAt(q) - mcFn(q) - shift, 0, hi).forEach(r => qs.push(r));
     monoRootsIn(q => mrAt(q) - mcFloor(mcFn(q)) - shift, 0, hi).forEach(r => { if (!qs.some(x => Math.abs(x - r) < 1e-9)) qs.push(r); });
     if (!qs.some(x => Math.abs(x - hi) < 1e-9)) qs.push(hi);
+    // Свои кандидаты сцены (изломы составного спроса, А2 24.10): внутри (0; Qhi).
+    (opts.extra || []).forEach(q => { if (q > 0 && q < hi && !qs.some(x => Math.abs(x - q) < 1e-9)) qs.push(q); });
   }
   const profitAt = (q) => {
     if (q === 0) return 0;
@@ -164,6 +166,30 @@ function monoBestOutput(mrAt, mcFn, D, opts) {
   const ties = cands.filter(c => Math.abs(c.profit - top) <= tol).map(c => c.Q).sort((a, b) => b - a);
   const Q = ties[0];
   return { Q, profit: profitAt(Q), alts: ties.slice(1), cap, Qhi: hi, cands };
+}
+
+/* ⚠️ КОНКУРЕНТНЫЙ ВЫПУСК — МАКСИМУМ ∫ (D − MC), А НЕ ПЕРВЫЙ КОРЕНЬ D = MC (А2 24.10, карточка Notion …811a…,
+   ADR 0158). У убывающей MC первый корень — МИНИМУМ общественного выигрыша: D: Q = 120 − P, MC = 160 − 4Q давали
+   Qc 13,33 и DWL 1 066,67. Тот же помощник, что у выпуска монополиста (monoBestOutput), с «выручкой» ∫₀^Q D:
+   кандидаты 0, корни D = MC на (0; Qhi) и сама Qhi (конец спроса или MC, упавшая до нуля). Цена — по спросу:
+   в корне D = MC это то же число, на границе MC = 0 — цена спроса (80 при Qc 40). breaks — изломы спроса
+   (составной спрос): интеграл по кускам и изломы кандидатами. */
+function competitiveOutput(Dcurve, mcFn, breaks) {
+  const Dfn = q => evalCurve(Dcurve, q);
+  const br = breaks || [];
+  const tr = q => (br.length ? integrateBroken(Dfn, 0, q, br) : integrate(Dfn, 0, q));
+  const best = monoBestOutput(Dfn, mcFn, Dcurve, { tr, extra: br });
+  if (!(best.Q > 0)) return { Q: null, P: null };
+  return { Q: best.Q, P: Dfn(best.Q) };
+}
+/* Потери общества при выпуске Q против конкурентного Qc — разность общественного выигрыша ∫ (D − MC) (MC не
+   ниже нуля, mcFloor), со знаком внутри отрезка: у убывающей MC D − MC меняет знак, и площадь «по модулю»
+   приписывала бы потерям выигрыш. */
+function monoDwlAt(Dfn, mcFn, Q, Qc, breaks) {
+  if (Q == null || Qc == null) return null;
+  const lo = Math.min(Q, Qc), hi = Math.max(Q, Qc);
+  const f = q => Dfn(q) - mcFloor(mcFn(q));
+  return Math.abs((breaks && breaks.length) ? integrateBroken(f, lo, hi, breaks) : integrate(f, lo, hi));
 }
 
 // Заливки монополии: области CS / VC / PS до Qm (Задача 1) и DWL (между D и MC от Qm до Qc).
@@ -350,8 +376,12 @@ function updateMonoPanel() {
   }
   if (m.alts && m.alts.length) {
     const others = m.alts.map(q => (q > 0 ? '$Q = ' + fmt(q) + '$, $P = ' + fmt(evalCurve(STATE.D, q)) + '$' : '$Q = 0$')).join(' или ');
+    /* Потери общества — у каждого варианта своя (А2 24.10, карточка …811a…): «0 при Q = 40 и 800 при Q = 0». */
+    const dw = (m.dwl != null && m.dwlAlts && m.dwlAlts.length === m.alts.length)
+      ? '; потери общества ' + [fmt(m.dwl) + ' при $Q = ' + fmt(m.Qm) + '$'].concat(m.alts.map((q, i) => fmt(m.dwlAlts[i]) + ' при $Q = ' + fmt(q) + '$')).join(' и ')
+      : '';
     html += '<div class="warn mono-verdict">Монополисту безразлично: $Q = ' + fmt(m.Qm) + '$, $P = ' + fmt(m.Pm) + '$ или ' + others
-      + '<div class="mono-verdict-sub">прибыль (TR&nbsp;−&nbsp;VC) в обоих вариантах ' + fmt(m.gain) + '</div></div>';
+      + '<div class="mono-verdict-sub">прибыль (TR&nbsp;−&nbsp;VC) в обоих вариантах ' + fmt(m.gain) + dw + '</div></div>';
   }
   html += `<div class="stat"><span>Qm (монополия)</span><b>${fmt(m.Qm)}</b></div>`;
   html += `<div class="stat"><span>Pm (цена)</span><b>${fmt(m.Pm)}</b></div>`;
@@ -1754,22 +1784,26 @@ function recomputeKinked() {
   if (errBox) errBox.style.display = 'none';
   const mc = (q) => evalCurve(km, q);
   const { segs, kinks, Dfn } = built;
-  const cands = [];
-  segs.forEach(s => { const r = findRootIn(q => marginalRevenue(s.D, q) - mc(q), s.q0, s.q1); if (r != null) cands.push({ Q: r, kind: 'MR=MC' }); });
-  kinks.forEach(qk => cands.push({ Q: qk, kind: 'излом' }));
-  // ⚠️ Выбор оптимума идёт по НАСТОЯЩЕЙ MC (см. Rel в monopolyCeiling):
-  // обрезка нулём — правило измерения площади, а не принятия решения.
-  const prof = (Q) => { const p = Dfn(Q); return isNaN(p) ? -Infinity : p * Q - integrate(mc, 0, Q); };
-  cands.forEach(c => c.profit = prof(c.Q));
+  /* ⚠️ ОПТИМУМ — ТЕМИ ЖЕ ПРАВИЛАМИ, ЧТО У «СТАНДАРТНОЙ МОНОПОЛИИ» (monoBestOutput, А2 24.10, карточка …817a…,
+     ADR 0158): правая граница — конец спроса или MC, упавшая до нуля (решение …81ba…); кандидаты — Q = 0, корни
+     MR = MC по кускам, изломы и сама граница; прибыль — TR − ∫ mcFloor(MC); безразличие — оба варианта (решение
+     …81e0…). Прежде брались корни MR = MC по кускам и изломы с прибылью по настоящей MC: у убывающей MC
+     (D: 120 − Q, MC = 160 − 4Q) это давало минимум прибыли Q 20, P 100, прибыль −400. */
+  const segAt = (q) => { for (const sg of segs) { if (q >= sg.q0 - 1e-9 && q < sg.q1 - 1e-9) return sg; } return segs[segs.length - 1]; };
+  const Dk = { fn: Dfn };
+  const best = monoBestOutput(q => marginalRevenue(segAt(q).D, q), mc, Dk,
+    { tr: q => { const p = Dfn(q); return isNaN(p) ? NaN : p * q; }, extra: kinks });
+  const kindOf = (Q) => (Q === 0 ? 'Q = 0' : (kinks.some(x => Math.abs(x - Q) < 1e-6) ? 'излом'
+    : (Math.abs(Q - best.Qhi) < 1e-9 ? 'граница' : 'MR=MC')));
+  const cands = best.cands.map(c => ({ Q: c.Q, profit: c.profit, kind: kindOf(c.Q) }));
   if (!cands.length) { STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: false }; return; }
-  let best = cands[0]; cands.forEach(c => { if (c.profit > best.profit + 1e-6) best = c; });
-  best.win = true;
   const Qstar = best.Q, Pstar = Dfn(Qstar);
-  /* Конкурентный выпуск: там, где ЛОМАНЫЙ спрос встречает MC. Ищем по каждому
-     куску и берём последний найденный — куски идут слева направо, а у
-     убывающего спроса нужен самый правый корень. */
-  let Qc = null;
-  segs.forEach(s => { const r = findRootIn(q => Dfn(q) - mc(q), s.q0, s.q1); if (r != null && r > 0) Qc = r; });
+  const win = cands.find(c => Math.abs(c.Q - Qstar) < 1e-9);
+  if (win) win.win = true;
+  const noProd = !(Qstar > 0);
+  /* Конкурентный выпуск — максимум ∫ (D − MC) по тем же кандидатам (competitiveOutput, изломы — кандидатами и
+     узлами интеграла); прежде — последний корень D = MC по кускам. */
+  const Qc = competitiveOutput(Dk, mc, kinks).Q;
   /* ⚠️ ПЛОЩАДИ СЧИТАЮТСЯ ПО КУСКАМ. Метод трапеций точен на прямой только
      тогда, когда излом попал в УЗЕЛ сетки, а излом ломаного спроса туда
      попадает случайно. Изломы отдаются интегратору списком — тем же приёмом,
@@ -1778,10 +1812,13 @@ function recomputeKinked() {
   const csM = integrateBroken(q => Dfn(q) - Pstar, 0, Qstar, kinks);
   const vcM = integrate(q => mcFloor(mc(q)), 0, Qstar);
   const psM = integrate(q => Pstar - mcFloor(mc(q)), 0, Qstar);
-  const dwl = (Qc != null && Qc > Qstar)
-    ? integrateBroken(q => Dfn(q) - mcFloor(mc(q)), Qstar, Qc, kinks) : null;
+  // Потери — от оптимума до конкурентного выпуска; совпали (убывающая MC до границы) — ноль.
+  const dwl = (Qc != null && Qc > Qstar + 1e-9) ? monoDwlAt(Dfn, mc, Qstar, Qc, kinks)
+    : ((Qc != null && Math.abs(Qc - Qstar) <= 1e-6) ? 0 : null);
+  const alts = best.alts || [];
   STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: true, Qstar, Pstar,
-                   profit: best.profit, winKind: best.kind, cands,
+                   profit: best.profit, winKind: win ? win.kind : '', cands, noProd, alts,
+                   dwlAlts: alts.map(q => monoDwlAt(Dfn, mc, q, Qc, kinks)),
                    Qc, csM, vcM, psM, dwl };
 }
 
@@ -1880,6 +1917,18 @@ function updateKinkPanel() {
   if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC.</div>'; return; }
   if (!k.found) { box.innerHTML = '<div class="warn">Оптимум не найден (нет кандидатов).</div>'; return; }
   let html = '';
+  /* Выгоднее не производить и безразличие — словами, как у «Стандартной монополии» (ADR 0157, 0158). */
+  if (k.noProd) {
+    html += '<div class="warn mono-verdict">Выгоднее не производить: $Q = 0$' + (isFinite(k.Pstar) ? ', $P = ' + fmt(k.Pstar) + '$' : '')
+      + '<div class="mono-verdict-sub">при любом $Q > 0$ выручка меньше переменных издержек</div></div>';
+  } else if (k.alts && k.alts.length) {
+    const others = k.alts.map(q => (q > 0 ? '$Q = ' + fmt(q) + '$, $P = ' + fmt(k.Dfn(q)) + '$' : '$Q = 0$')).join(' или ');
+    const dw = (k.dwl != null && k.dwlAlts && k.dwlAlts.length === k.alts.length && k.dwlAlts.every(x => x != null))
+      ? '; потери общества ' + [fmt(k.dwl) + ' при $Q = ' + fmt(k.Qstar) + '$'].concat(k.alts.map((q, i) => fmt(k.dwlAlts[i]) + ' при $Q = ' + fmt(q) + '$')).join(' и ')
+      : '';
+    html += '<div class="warn mono-verdict">Монополисту безразлично: $Q = ' + fmt(k.Qstar) + '$, $P = ' + fmt(k.Pstar) + '$ или ' + others
+      + '<div class="mono-verdict-sub">прибыль (TR&nbsp;−&nbsp;VC) в обоих вариантах ' + fmt(k.profit) + dw + '</div></div>';
+  }
   html += `<div class="stat"><span>$Q^*$ (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
   html += `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
   html += `<div class="stat"><span>Прибыль π</span><b>${fmt(k.profit)}</b></div>`;

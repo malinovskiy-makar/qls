@@ -3802,6 +3802,8 @@ body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
   text-transform: none; letter-spacing: 0;
 }
 #params-panel #info-tax[data-head]:not(:empty)::before { content: attr(data-head); }
+/* «Излишки» по состоянию (А2 24.10, ADR 0158): «Излишки при автаркии» в «Малой открытой экономике» (areasHead). */
+#params-panel #info-areas[data-head]:not(:empty)::before { content: attr(data-head); }
 
 /* Главные числа: строки на подложке --surface-2 (радиус 10, поля 0 14), строка 11 px
    сверху и снизу, черта --border-soft между строками; подпись 14 / 500 --text2,

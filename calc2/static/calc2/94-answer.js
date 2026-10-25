@@ -84,6 +84,122 @@ const HERO = {
   'ineq': [['info-inequality', 0], ['info-inequality', 1]],
 };
 
+/* ⚠️ ГЛАВНЫЕ СТРОКИ — ПО СОСТОЯНИЮ, А НЕ ПОСТОЯННЫМИ НОМЕРАМИ (А2 24.10, ADR 0158, карточка Notion …81e2…).
+   HERO выше — строки модели БЕЗ вмешательства. Включили тариф, квоту, МРОТ, налог, потолок, пол — наверху
+   «Ответа» встаёт ИТОГ вмешательства, как у «Налогов и субсидий» («Рынок после налога»): на графике цена 40 и
+   импорт 20, а наверху стояла свободная торговля (70; 30; импорт 40), и итог тарифа оказывался в самом низу.
+   Запись — функция от STATE: отдаёт список строк того же вида, что HERO, или null («как обычно»). Не нашлось ни
+   одной строки (вмешательство не связывает — у табло нет его строк) — «Ответ» берёт HERO.
+   Строка списка: [блок, строка, таблица, [подпись, обозначение, TeX], части, доп].
+     · строка — номер, RegExp по подписи строки табло (номер у строки плавает: строки табло бывают через условие)
+       или текст — строка таблицы «До / После» («Было / Стало»);
+     · доп.g — заголовок группы («После тарифа»); строки с одним g — одна группа;
+     · доп.before — число «до» (у частей — список): под значением «70 − 10» (ans-was);
+     · доп.wasText — готовая строка под значением («50 + 50» у потерь из двух треугольников).
+   Значение строки табло вида «55 (было 45)» в «Ответе» — «55», под ним «45 + 10» (answerCellWas). */
+const HERO_STATE = {
+  smallopen: () => {
+    const o = STATE.open;
+    if (!o || o.error) return null;
+    const qds = [['Величина спроса', 'Qd', 'Q_d'], ['Величина предложения', 'Qs', 'Q_s']];
+    const sur = [['Излишек потребителя', 'CS', '\\mathrm{CS}'], ['Излишек производителя', 'PS', '\\mathrm{PS}']];
+    if (o.P1 == null) {
+      const g = { g: 'Свободная торговля' };
+      return [['info-open', /^При Pw/, null, null, qds, g], ['info-open', /^(Импорт|Экспорт)$/, null, null, null, g],
+        ['info-open', /при своб\. торговле$/, null, null, sur, { g: 'Излишки при свободной торговле' }]];
+    }
+    const tar = (o.tool === 'tariff');
+    const g = { g: tar ? 'После тарифа' : 'При квоте' };
+    const dir = o.importing ? 'Импорт' : 'Экспорт';
+    return [
+      ['info-open', /^Внутренняя цена/, null, ['Внутренняя цена', 'P1', 'P_1'], null, g],
+      ['info-open', /^\(Q/, null, null, [['Величина спроса', "Qd'", "Q_d'"], ['Величина предложения', "Qs'", "Q_s'"]],
+        Object.assign({ before: [o.Qd, o.Qs] }, g)],
+      ['info-open', new RegExp('^' + dir + ' после$'), null, [dir, ''], null, g],
+      ['info-open', /^(Доход бюджета|Рента от квоты)$/, null, null, null, g],
+      ['info-open', /^Итого потери$/, null, ['Потери общества', 'DWL'], null,
+        Object.assign({ wasText: fmt(o.dwlProd) + ' + ' + fmt(o.dwlCons) }, g)],
+      ['info-open', /^\(CS; PS\) (после тарифа|при квоте)$/, null, null, sur, { g: tar ? 'Излишки после тарифа' : 'Излишки при квоте' }],
+    ];
+  },
+  'labor-mono': () => {
+    const mn = STATE.laborMin, m = STATE.laborMono;
+    if (STATE.laborStruct !== 'monopsony' || !mn || !mn.binding || !m) return null;
+    const g = { g: 'С МРОТ' };
+    return [['info-labor', /^Занятость с МРОТ$/, null, ['Занятость', 'L'], null, g],
+      ['info-labor', /^Зарплата$/, null, ['Зарплата', 'W'], null, Object.assign({ before: m.Wm }, g)],
+      ['info-labor', /^Безработица$/, null, null, null, g],
+      ['info-labor', /^DWL \(потери\)$/, null, ['Потери общества', 'DWL'], null, Object.assign({ before: m.dwl }, g)]];
+  },
+  labor: () => {
+    const mn = STATE.laborMin, eq = STATE.laborEq;
+    if (STATE.laborStruct === 'monopsony' || STATE.laborStruct === 'union' || STATE.laborStruct === 'bilateral' || !mn || !mn.binding || !eq) return null;
+    const g = { g: 'С МРОТ' };
+    return [['info-labor', /^Занятость$/, null, ['Занятость', 'L'], null, g],
+      ['info-labor', /^МРОТ/, null, ['Зарплата', 'W'], null, Object.assign({ before: eq.P }, g)],
+      ['info-labor', /^Безработица$/, null, null, null, g],
+      ['info-labor', /^DWL \(потери\)$/, null, ['Потери общества', 'DWL'], null, g]];
+  },
+  mono: () => {
+    const it = STATE.intervType;
+    const head = { tax: 'После налога', subsidy: 'После субсидии', quota: 'При квоте', ceiling: 'При потолке цены', floor: 'При поле цены' }[it];
+    if (!head || STATE.monoMode !== 'simple') return null;
+    const g = { g: head };
+    if (it === 'tax' || it === 'subsidy' || it === 'quota') {
+      return [['info-tax', it === 'quota' ? 'Q (выпуск)' : 'Q', null, ['Выпуск монополиста', 'Qm'], null, g],
+        ['info-tax', 'P (цена)', null, ['Цена монополиста', 'Pm'], null, g],
+        ['info-tax', 'DWL', null, ['Потери общества', 'DWL'], null, g],
+        ['info-tax', 'CS', null, ['Излишек потребителя', 'CS'], null, g]];
+    }
+    return [['info-tax', /^Выпуск$/, null, ['Выпуск', 'Q'], null, g], ['info-tax', /^Цена$/, null, ['Цена', 'P'], null, g],
+      ['info-tax', /^Дефицит$/, null, null, null, g], ['info-tax', /^DWL$/, null, ['Потери общества', 'DWL'], null, g]];
+  },
+  /* Пол цены: продаётся величина СПРОСА (продавцы готовы на 70, покупатели берут 30). У потолка продаётся
+     величина предложения — его строки как в HERO. Заголовок группы — «Рынок при поле цены» блока равновесия. */
+  ceil: () => {
+    if (STATE.intervType !== 'floor' || !(STATE.pc && STATE.pc.binding)) return null;
+    return [['sec-eq', 0], ['sec-eq', /^Qd/, null, ['Продаётся', 'Q']], ['sec-eq', /^Избыток$/], ['sec-eq', /^Потери|DWL/, null, ['Потери общества', 'DWL']]];
+  },
+  /* Внешние эффекты (решения владельца 24.10, …810e…, …81e7…): рынок — CS, PS, внешние издержки (выгоды) и SW
+     С НИМИ; оптимум — внешние издержки и SW. Внешнего эффекта нет — как в HERO. */
+  ext: () => {
+    const e = STATE.ext;
+    if (!e || (!e.msbOn && !e.mscOn) || e.Qopt == null) return null;
+    const m = { g: 'Рынок' }, o = { g: 'Общественный оптимум' };
+    return [['sec-eq', 0, null, null, null, m], ['sec-eq', 1, null, null, null, m],
+      ['info-areas', /^CS/, null, ['Излишек потребителя', 'CS'], null, m],
+      ['info-areas', /^PS/, null, ['Излишек производителя', 'PS'], null, m],
+      ['info-areas', /^Внешние (издержки|выгоды)$/, null, null, null, m],
+      ['info-areas', /^SW/, null, ['Общественное благосостояние', 'SW'], null, m],
+      ['info-ext', /^Оптимум/, null, null, null, o],
+      ['info-ext', /^Внешние (издержки|выгоды) в оптимуме$/, null, [(e.extOpt < 0 ? 'Внешние выгоды' : 'Внешние издержки'), ''], null, o],
+      ['info-ext', /^SW в оптимуме$/, null, ['Общественное благосостояние', 'SW'], null, o],
+      ['info-ext', /^DWL/, null, ['Потери общества', 'DWL'], null, o],
+      ['info-ext', /^Корректирующ/, null, null, null, o]];
+  },
+};
+
+/* Заголовок блока «Излишки» — по состоянию (карточка …81e2…): в «Малой открытой экономике» блок держит излишки
+   автаркии, и без подписи их читали как излишки свободной торговли. Атрибут data-head, вид — calc2.css. */
+function areasHead() {
+  if (STATE.scenario === 'openecon') return 'Излишки при автаркии';
+  return '';
+}
+
+/* Число из текста строки табло: «1 168,75», «−10». Не число — NaN. */
+function ansNum(s) {
+  const t = String(s == null ? '' : s).replace(/[\s   ]/g, '').replace(/−/g, '-').replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : NaN;
+}
+/* «до» и изменение арифметикой: «70 − 10» (решение 13.10, ADR 0149). Разность — по ПОКАЗАННЫМ числам, иначе
+   выражение не сходится с тем, что человек видит. Не числа — пусто. */
+function answerCellWas(beforeText, afterText) {
+  const a = ansNum(afterText), b = ansNum(beforeText);
+  if (!isFinite(a) || !isFinite(b)) return '';
+  const d = a - b;
+  return String(beforeText).trim() + (d >= 0 ? ' + ' : ' − ') + fmt(Math.abs(d));
+}
+
 /* Заголовки групп «Ответа» по блоку табло. Блок без записи идёт без
    заголовка; у #sec-eq заголовок свой (копия .section-title); у «Математики»
    группы задают сами строки (data-ans-group, 70-scenes-math.js). */
@@ -158,7 +274,8 @@ function txRow(blkId, label) {
       const cells = [...tr.children];
       if (cells.length < 3 || plainText(cells[0]) !== label) continue;
       const col = (name) => { const i = head.indexOf(name); return i > 0 ? plainText(cells[i]) : ''; };
-      return { before: col('До'), after: col('После'), delta: col('Δ'), tr };
+      // У монополии столбцы «Было / Стало» (42-scenes-mono.js), у рынка — «До / После».
+      return { before: col('До') || col('Было'), after: col('После') || col('Стало'), delta: col('Δ'), tr };
     }
   }
   return null;
@@ -393,6 +510,63 @@ function answerReflow() {
   setTimeout(again, 300);
 }
 
+/* Ячейки главных строк по списку вида HERO (см. HERO_STATE): строка табло помечается is-hero. */
+function answerCells(spec) {
+  const cells = [];
+  const specRows = [];
+  (spec || []).forEach(h => {
+    const [blkId, i, tbl] = h;
+    if (i === '*') {
+      const blk = document.getElementById(blkId);
+      const rows = statRows(blk);
+      rows.forEach((r, k) => { if (r.classList.contains('ans-main')) specRows.push([blkId, k, tbl]); });
+    } else specRows.push(h);
+  });
+  specRows.forEach(h => {
+    const [blkId, i0, tbl, over, parts, opt] = h;
+    const blk = document.getElementById(blkId);
+    if (!blk || !blk.isConnected || blk.style.display === 'none') return;
+    let i = i0;
+    if (i instanceof RegExp) {
+      // Строка по подписи: номер в data-src — настоящий номер строки табло (по нему сверяет паритет).
+      i = statRows(blk).findIndex(r => i0.test(plainText(r.querySelector(':scope > span'))));
+      if (i < 0) return;
+    }
+    if (typeof i === 'number') {
+      const row = statRows(blk)[i];
+      if (!row) return;
+      const lab = row.querySelector(':scope > span'), val = row.querySelector(':scope > b');
+      if (!val || !plainText(val)) return;
+      row.classList.add('is-hero');
+      if (parts) {
+        // Пара «(40; 800)» — по ячейке на часть; текст значения — побайтно часть строки табло.
+        const vals = plainText(val).replace(/^\(|\)$/g, '').split(';').map(x => x.trim());
+        parts.forEach((pt, k) => {
+          if (vals[k] == null || vals[k] === '') return;
+          const before = opt && Array.isArray(opt.before) ? opt.before[k] : null;
+          cells.push({ src: blkId + '#' + i + '.' + (k + 1), blk, row, labText: pt[0], valText: vals[k], over: [pt[0], pt[1], pt[2]], group: row.dataset.ansGroup || '', tx: null,
+            opt, was: (before != null && isFinite(before)) ? answerCellWas(fmt(before), vals[k]) : '' });
+        });
+        return;
+      }
+      const c = { src: blkId + '#' + i, blk, row, lab, val, over, group: row.dataset.ansGroup || '', tx: tbl ? txRow(blkId, tbl) : null, opt, was: '' };
+      /* «55 (было 45)» — значение 55, под ним «45 + 10» (ADR 0158): «было» строки табло — то же «до» и изменение,
+         что у таблицы «До / После». */
+      const m = /^(.+?)\s*\(было\s+(.+)\)$/.exec(plainText(val));
+      if (m) { c.val = null; c.valText = m[1]; c.was = answerCellWas(m[2], m[1]) || ('было ' + m[2]); }
+      else if (opt && typeof opt.before === 'number' && isFinite(opt.before)) c.was = answerCellWas(fmt(opt.before), plainText(val));
+      if (opt && opt.wasText) c.was = opt.wasText;
+      cells.push(c);
+    } else {
+      // Главное число из таблицы «До / После / Δ» (потери общества у налогов).
+      const r = txRow(blkId, i);
+      if (!r || !r.after) return;
+      cells.push({ src: blkId + '@' + i, blk, labText: i, valText: r.after, tx: r, tableRow: true, over, opt });
+    }
+  });
+  return cells;
+}
+
 function buildAnswer() {
   const host = document.getElementById('ans-hero');
   if (!host) return;
@@ -406,45 +580,14 @@ function buildAnswer() {
   document.querySelectorAll('#sb-body .stat.is-hero').forEach(s => s.classList.remove('is-hero'));
   document.querySelectorAll('#sb-body tr.ans-trdup').forEach(s => s.classList.remove('ans-trdup'));
   host.innerHTML = '';
-  const spec = HERO[STATE.sceneKey];
-  const cells = [];
-  const specRows = [];
-  (spec || []).forEach(h => {
-    const [blkId, i, tbl] = h;
-    if (i === '*') {
-      const blk = document.getElementById(blkId);
-      const rows = statRows(blk);
-      rows.forEach((r, k) => { if (r.classList.contains('ans-main')) specRows.push([blkId, k, tbl]); });
-    } else specRows.push(h);
-  });
-  specRows.forEach(h => {
-    const [blkId, i, tbl, over] = h;
-    const blk = document.getElementById(blkId);
-    if (!blk || !blk.isConnected || blk.style.display === 'none') return;
-    if (typeof i === 'number') {
-      const row = statRows(blk)[i];
-      if (!row) return;
-      const lab = row.querySelector(':scope > span'), val = row.querySelector(':scope > b');
-      if (!val || !plainText(val)) return;
-      row.classList.add('is-hero');
-      const parts = h[4];
-      if (parts) {
-        // Пара «(40; 800)» — по ячейке на часть; текст значения — побайтно часть строки табло.
-        const vals = plainText(val).replace(/^\(|\)$/g, '').split(';').map(x => x.trim());
-        parts.forEach((pt, k) => {
-          if (vals[k] == null || vals[k] === '') return;
-          cells.push({ src: blkId + '#' + i + '.' + (k + 1), blk, row, labText: pt[0], valText: vals[k], over: [pt[0], pt[1], pt[2]], group: row.dataset.ansGroup || '', tx: null });
-        });
-        return;
-      }
-      cells.push({ src: blkId + '#' + i, blk, row, lab, val, over, group: row.dataset.ansGroup || '', tx: tbl ? txRow(blkId, tbl) : null });
-    } else {
-      // Главное число из таблицы «До / После / Δ» (потери общества у налогов).
-      const r = txRow(blkId, i);
-      if (!r || !r.after) return;
-      cells.push({ src: blkId + '@' + i, blk, labText: i, valText: r.after, tx: r, tableRow: true });
-    }
-  });
+  /* Главные строки по состоянию (HERO_STATE, ADR 0158); ни одной строки — как в HERO. */
+  const base = HERO[STATE.sceneKey];
+  const live = HERO_STATE[STATE.sceneKey] ? HERO_STATE[STATE.sceneKey]() : null;
+  let cells = live ? answerCells(live) : [];
+  if (!cells.length) {
+    document.querySelectorAll('#sb-body .stat.is-hero').forEach(s => s.classList.remove('is-hero'));
+    cells = answerCells(base);
+  }
   host.hidden = !cells.length;
   _answerMarks = document.querySelectorAll('#sb-body .stat.is-hero').length;
   const isMath = answerIsMath();
@@ -456,13 +599,15 @@ function buildAnswer() {
   const groups = [];
   cells.forEach(c => {
     let key, g = null;
-    if (c.tableRow && groups.length) key = groups[groups.length - 1].key;
+    if (c.opt && c.opt.g) key = 'h:' + c.opt.g;
+    else if (c.tableRow && groups.length) key = groups[groups.length - 1].key;
     else if (c.group) key = 'g:' + c.group;
     else key = 'b:' + c.src.replace(/[#@].*$/, '');
     const last = groups[groups.length - 1];
     if (last && last.key === key) { last.cells.push(c); return; }
     g = { key, cells: [c], title: '' };
-    if (c.group) {
+    if (c.opt && c.opt.g) g.title = c.opt.g;
+    else if (c.group) {
       g.head = [...c.blk.querySelectorAll('.stat[data-ans-head]')].find(x => x.dataset.ansHead === c.group) || null;
       g.title = c.group;
     } else {
@@ -643,6 +788,11 @@ function decorateTables() {
       else if (first.hasAttribute('data-word')) first.removeAttribute('data-word');
     });
   });
+  const ar = document.getElementById('info-areas');
+  if (ar) {
+    const h = areasHead();
+    if (h) { if (ar.dataset.head !== h) ar.dataset.head = h; } else if (ar.hasAttribute('data-head')) ar.removeAttribute('data-head');
+  }
   const tx = document.getElementById('info-tax');
   if (tx) {
     const hasTable = [...tx.querySelectorAll('table.tx-table tr:first-child th')].some(th => /^(До|Было)$/.test(plainText(th)));
@@ -697,7 +847,7 @@ function answerRow(c, isMath) {
   if (parts.not || parts.keep) d.dataset.not = parts.not || parts.keep;
   const l = document.createElement('div'); l.className = 'ans-lab';
   const line = document.createElement('div'); line.className = 'ans-line';
-  if (isMath || (!parts.not && c.lab)) {
+  if (isMath || (!parts.not && c.lab && !c.over)) {
     // Подпись как в табло, вместе с набранными формулой обозначениями.
     if (c.lab) l.append(...labelCopy(c.lab).childNodes); else l.textContent = labText;
   } else {
@@ -720,7 +870,12 @@ function answerRow(c, isMath) {
      выражение равно значению в строке (решение владельца 13.10, Notion …81a2…;
      прежде «было 50 · −10», ADR 0144). Знак — настоящий минус U+2212. */
   const delta = c.tx ? /^([+−-])\s*(.+)$/.exec(String(c.tx.delta || '').trim()) : null;
-  if (c.tx && c.tx.before && (delta || /^0([,.]0*)?$/.test(String(c.tx.delta || '').trim()))) {
+  if (c.was) {
+    // «до» и изменение, собранные по строке табло или по числу «до» (answerCells, ADR 0158).
+    const w = document.createElement('div'); w.className = 'ans-was';
+    w.textContent = c.was;
+    d.appendChild(w);
+  } else if (c.tx && c.tx.before && (delta || /^0([,.]0*)?$/.test(String(c.tx.delta || '').trim()))) {
     const w = document.createElement('div'); w.className = 'ans-was';
     w.textContent = c.tx.before + (delta ? (delta[1] === '+' ? ' + ' : ' − ') + delta[2] : ' + 0');
     d.appendChild(w);

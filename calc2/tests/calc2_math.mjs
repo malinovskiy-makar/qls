@@ -303,7 +303,8 @@ const CASES = [
        Оптимум MSB = MSC ⇒ 120−Q = Q ⇒ Q=60, P = 60.
        DWL = ∫₅₀^60 (120−2q) dq = 100. Субсидия = |D(60) − S(60)| = 20
        (в расчёте она приходит со знаком «минус» — это и значит субсидию). */
-    run: `loadScene('ext'); STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+    // С 24.10 старт — MSC = Q + 20 и видна (решение …81e7…): положительный случай гасит её сам.
+    run: `loadScene('ext'); STATE.mscOn = false; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
           recompileSocial(); redrawAll();
           var e = STATE.ext || {};
           return { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, sub: -e.corrective,
@@ -4749,25 +4750,25 @@ const CASES = [
              ['обозначений всего проверено', 'total', 24, 12]],
   },
   {
-    /* (л) Исходное состояние сюжета внешних эффектов: MSB и MSC выключены и
-       равны частным кривым, поэтому оптимум совпадает с рыночным равновесием,
-       DWL равен нулю, а на графике нет ни одной общественной кривой. */
-    name: '(л) Внешние эффекты: MSB и MSC выключены по умолчанию, DWL=0',
+    /* (л) Исходное состояние сюжета внешних эффектов. С 24.10 (решение владельца …81e7…, ADR 0158; пересматривает
+       стартовую часть решения 21.08): MSC = Q + 20 включена и видна, MSB равна спросу и спрятана. Открыл модель —
+       сразу виден эффект: рынок 50, оптимум 40, DWL 100. Прежде здесь стерёгся старт «обе выключены, DWL = 0». */
+    name: '(л) Внешние эффекты: на старте MSC = Q + 20 видна, MSB спрятана, DWL=100',
     run: `pickScene('ext'); redrawAll();
           var e = STATE.ext || {};
           var labels = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent.trim(); });
           var names = [].map.call(document.querySelectorAll('#chart text.curve-name'), function (t) { return t.textContent.trim(); });
-          return { msbOn: STATE.msbOn ? 1 : 0, mscOn: STATE.mscOn ? 1 : 0,
+          return { msbOn: STATE.msbOn ? 1 : 0, mscOn: STATE.mscOn ? 1 : 0, mscExpr: STATE.mscExpr,
                    boxB: document.getElementById('chk-msb').checked ? 1 : 0,
                    boxC: document.getElementById('chk-msc').checked ? 1 : 0,
-                   onChart: (labels.indexOf('MSB') >= 0 ? 1 : 0) + (labels.indexOf('MSC') >= 0 ? 1 : 0),
+                   msb: labels.indexOf('MSB') >= 0 ? 1 : 0, msc: labels.indexOf('MSC') >= 0 ? 1 : 0,
                    Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl,
                    keepD: names.indexOf('D') >= 0 ? 1 : 0, keepS: names.indexOf('S') >= 0 ? 1 : 0 };`,
-    checks: [['MSB выключен', 'msbOn', 0, 0], ['MSC выключен', 'mscOn', 0, 0],
-             ['галочка MSB снята', 'boxB', 0, 0], ['галочка MSC снята', 'boxC', 0, 0],
-             ['общественных кривых на графике нет', 'onChart', 0, 0],
-             ['рынок', 'Qmkt', 50, 0.3], ['оптимум совпал с рынком', 'Qopt', 50, 0.3],
-             ['DWL', 'dwl', 0, 1e-6],
+    checks: [['MSB выключен', 'msbOn', 0, 0], ['MSC включён', 'mscOn', 1, 0],
+             ['галочка MSB снята', 'boxB', 0, 0], ['галочка MSC стоит', 'boxC', 1, 0],
+             ['MSB на графике нет', 'msb', 0, 0], ['MSC на графике есть', 'msc', 1, 0],
+             ['рынок', 'Qmkt', 50, 0.3], ['оптимум', 'Qopt', 40, 0.3],
+             ['DWL', 'dwl', 100, 1e-6],
              ['кривая D не переименована', 'keepD', 1, 0], ['кривая S не переименована', 'keepS', 1, 0]],
   },
 

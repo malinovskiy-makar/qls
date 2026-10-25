@@ -659,6 +659,8 @@ function syncPultRegulators(activeIds) {
    у каждого разная, поэтому не переписываем её, а достраиваем: границы читаются
    и пишутся прямо в атрибуты min/max/step ползунка, то есть остаются ровно тем,
    чем и были. Сама сцена об этом ничего не знает. */
+/* Регуляторы, у которых пределы — свойство модели, а не окна (точное значение за краем прижимается к краю). */
+const REG_CLAMP_IDS = new Set(['quota-price-field']);
 function upgradeRegulator(field) {
   // Узел может быть КОНТЕЙНЕРОМ переносимой группы (см. #math-secant-row):
   // ползунок внутри есть, но он не его, и подпись у него чужая.
@@ -800,8 +802,11 @@ function upgradeRegulator(field) {
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
     editEqValue(eq, valueOnly() ? '' : nameOf(), valueOf(), (v) => {
+      /* Пределы — свойство модели (коридор цен квоты, А2 24.10): число за краем прижимается к краю, и строка
+         показывает прижатое; полоса не переезжает. */
+      if (REG_CLAMP_IDS.has(field.id)) v = Math.max(+sl.min, Math.min(+sl.max, v));
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
-      if (v < +sl.min || v > +sl.max) {
+      else if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
         sl.min = b.min; sl.max = b.max;
         sl.dataset.boundsByHand = '1';   // границы переставил человек — модель их больше не двигает
@@ -1202,7 +1207,7 @@ function wireControls() {
   if (qSl) qSl.addEventListener('input', () => setQuota(parseFloat(qSl.value)));
   if (qIn) qIn.addEventListener('change', () => { const v = parseFloat(qIn.value); if (!isNaN(v)) setQuota(v); });
   const qP = document.getElementById('quota-price-slider');
-  if (qP) qP.addEventListener('input', () => setQuotaPos(parseFloat(qP.value) / 100));
+  if (qP) qP.addEventListener('input', () => setQuotaPrice(parseFloat(qP.value)));   // в деньгах, пределы — коридор (А2 24.10)
 
   // Сторона налога (Задача 1): продавец / покупатель.
   const tsbSel = document.getElementById('tsb-seller'), tsbBuy = document.getElementById('tsb-buyer');
@@ -1369,7 +1374,19 @@ function wireControls() {
     });
     if (inp) {
       const apply = () => {
+        const prev = STATE[key + 'Expr'];
         STATE[key + 'Expr'] = (inp.value || '').trim();
+        /* ⚠️ ПРАВКА ФОРМУЛЫ СПРЯТАННОЙ КРИВОЙ ВКЛЮЧАЕТ ЕЁ ГЛАЗ (А2 24.10, ADR 0158, карточка …81cc…): вписал в
+           спрятанную MSC «Q + 20» — ответ прежний и на графике ничего, хотя человек ясно хотел эту кривую.
+           Спрятанная кривая в расчёт по-прежнему не входит (ADR 0056); правка — это и есть «покажи». Одно
+           действие — один шаг истории: снимок берётся по затишью после обеих перемен. То же правило — у карточек
+           списка кривых (80-ui.js). ⚠️ Только НОВАЯ запись: syncSocialFields шлёт полю то же событие input с
+           формулой из STATE (умолчание MSB = D), и без сравнения старт включал бы спрятанную MSB сам. */
+        if (!STATE[key + 'On'] && STATE[key + 'Expr'] && STATE[key + 'Expr'] !== prev) {
+          STATE[key + 'On'] = true;
+          if (box) box.checked = true;
+          inp.disabled = false;
+        }
         recompileSocial(); redrawAll();
       };
       onFormulaInput(inp, apply);   // input + change + Enter, см. 82-input.js

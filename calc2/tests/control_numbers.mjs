@@ -231,7 +231,8 @@ cmp('MSC = Q + 20: рыночное Q', r.qm, 50, 0.3);
 cmp('MSC = Q + 20: оптимум Q', r.q, 40, 0.4);
 cmp('MSC = Q + 20: DWL', r.dwl, 100, 2);
 cmp('MSC = Q + 20: налог Пигу', r.tax, 20, 0.2);
-r = await run(`resetSceneMemory(); loadScene('ext'); STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+/* С 24.10 старт «Внешних эффектов» — MSC = Q + 20 и видна (решение …81e7…): положительный случай гасит её сам. */
+r = await run(`resetSceneMemory(); loadScene('ext'); STATE.mscOn = false; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
   recompileSocial(); redrawAll();
   var e = STATE.ext || {};
   return { qm: e.Qmkt, q: e.Qopt, dwl: e.dwl, sub: -e.corrective };`);
@@ -1409,6 +1410,105 @@ for (const [tag, setup, ff] of [
   r = await run(MKT + A1 + `setDS('taxes', '100-Q', 'Q'); ${setup} redrawAll(); return { ff: ffTex() };`);
   cmp('P(Q) не сдвинулась (приёмка 31.08), ' + tag, r.ff, ff, 0);
   cmp('…без «- (-», «+ (-», «(Q)»', /-\(-|\+\(-|\(Q\)/.test(r.ff) ? 1 : 0, 0, 0);
+}
+
+/* --- А2 24.10 (ADR 0158): «Ответ» при вмешательстве, внешние эффекты, квота, хвосты монополии -----------
+   Числа сверены перебором (сессия А2, claude/calc2_a2/README.md). */
+head('А2 24.10 · «Внешние эффекты»: SW с внешними издержками (решения …810e…, …81e7…)');
+r = await run(`resetSceneMemory(); pickScene('ext'); redrawAll();
+  var e = STATE.ext || {};
+  return { on: STATE.mscOn ? 1 : 0, expr: STATE.mscExpr, msb: STATE.msbOn ? 1 : 0, Q: e.Qmkt, P: e.Pmkt, cs: STATE.cs, ps: STATE.ps,
+    ext: e.extMkt, sw: STATE.cs + STATE.ps - e.extMkt, Qo: e.Qopt, Po: e.Popt, swo: e.swOpt, exto: e.extOpt, dwl: e.dwl, pig: e.corrective };`);
+cmp('старт: MSC включена', r.on, 1, 0);
+cmp('старт: MSC = Q + 20', r.expr, 'Q + 20', 0);
+cmp('старт: MSB спрятана', r.msb, 0, 0);
+cmp('рынок: Q', r.Q, 50, 1e-4); cmp('рынок: P', r.P, 50, 1e-4);
+cmp('рынок: CS', r.cs, 1250, 1e-3); cmp('рынок: PS', r.ps, 1250, 1e-3);
+cmp('рынок: внешние издержки', r.ext, 1000, 1e-3);
+cmp('рынок: SW = 2 500 − 1 000', r.sw, 1500, 1e-3);
+cmp('оптимум: Q', r.Qo, 40, 1e-4); cmp('оптимум: P', r.Po, 60, 1e-4);
+cmp('оптимум: внешние издержки', r.exto, 800, 1e-3);
+cmp('оптимум: SW', r.swo, 1600, 1e-3);
+cmp('DWL', r.dwl, 100, 1e-3);
+cmp('DWL = SW оптимума − SW рынка', r.swo - r.sw, 100, 1e-3);
+cmp('налог Пигу', r.pig, 20, 1e-4);
+r = await run(`resetSceneMemory(); pickScene('ext'); STATE.mscOn = false; STATE.mscExpr = ''; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+  syncSocialFields(); recompileSocial(); redrawAll();
+  var e = STATE.ext || {};
+  return { ext: e.extMkt, sw: STATE.cs + STATE.ps - e.extMkt, Qo: e.Qopt, swo: e.swOpt, dwl: e.dwl, sub: -e.corrective,
+    panel: (document.getElementById('info-areas') || {}).textContent || '' };`);
+cmp('MSB = 120 − Q: внешние выгоды', -r.ext, 1000, 1e-3);
+cmp('MSB = 120 − Q: в табло «Внешние выгоды»', /Внешние выгоды/.test(r.panel) ? 1 : 0, 1, 0);
+cmp('MSB = 120 − Q: SW рынка', r.sw, 3500, 1e-3);
+cmp('MSB = 120 − Q: оптимум Q', r.Qo, 60, 1e-4);
+cmp('MSB = 120 − Q: SW оптимума', r.swo, 3600, 1e-3);
+cmp('MSB = 120 − Q: DWL', r.dwl, 100, 1e-3);
+cmp('MSB = 120 − Q: корректирующая субсидия', r.sub, 20, 1e-4);
+
+head('А2 24.10 · квота: цена спроса по умолчанию, ползунок — коридор (…81e0…9219…)');
+r = await run(`resetSceneMemory(); pickScene('quota'); redrawAll();
+  var q = STATE.qt || {}, sl = document.getElementById('quota-price-slider');
+  return { Qq: q.Qq, lo: q.Plo, hi: q.Phi, P: q.P, cs: q.cs, ps: q.ps, dwl: q.dwl, smin: +sl.min, smax: +sl.max, sval: +sl.value };`);
+cmp('квота 40: коридор снизу', r.lo, 40, 1e-6); cmp('квота 40: коридор сверху', r.hi, 60, 1e-6);
+cmp('квота 40: цена по умолчанию = Pd', r.P, 60, 1e-6);
+cmp('квота 40: CS', r.cs, 800, 1e-3); cmp('квота 40: PS', r.ps, 1600, 1e-3); cmp('квота 40: DWL', r.dwl, 100, 1e-3);
+cmp('ползунок: нижний предел = S(квота)', r.smin, 40, 1e-9); cmp('ползунок: верхний предел = D(квота)', r.smax, 60, 1e-9);
+cmp('ползунок стоит на цене', r.sval, 60, 1e-9);
+r = await run(`resetSceneMemory(); pickScene('quota'); redrawAll();
+  var sl = document.getElementById('quota-price-slider');
+  sl.value = 100; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  var a = STATE.qt.P, v1 = +sl.value;
+  sl.value = 45; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  return { a: a, v1: v1, b: STATE.qt.P, pos: STATE.quotaPos };`);
+cmp('ввод 100 → прижата к 60', r.a, 60, 1e-9);
+cmp('…ползунок показывает 60', r.v1, 60, 1e-9);
+cmp('ввод 45 → цена 45', r.b, 45, 1e-9);
+cmp('…доля коридора 0,25', r.pos, 0.25, 1e-9);
+r = await run(`resetSceneMemory(); pickScene('quota'); STATE.quotaPos = 0.5; redrawAll();
+  return { P: (STATE.qt || {}).P, v: +document.getElementById('quota-price-slider').value };`);
+cmp('старая ссылка quotaPos = 0,5 → цена 50', r.P, 50, 1e-9);
+cmp('…ползунок 50', r.v, 50, 1e-9);
+
+head('А2 24.10 · монополия: Qc и DWL при убывающей MC (…811a…)');
+r = await run(MKT + `setDS('mono', '120-P', '160-4*Q'); var m = STATE.mono || {};
+  return { Qm: m.Qm, alts: (m.alts || []).join(','), Qc: m.Qc, Pc: m.Pc, dwl: m.dwl, dwl0: (m.dwlAlts || [])[0],
+    panel: (document.getElementById('info-mono') || {}).textContent || '' };`);
+cmp('D: Q = 120 − P, MC = 160 − 4Q: Qc', r.Qc, 40, 1e-6);
+cmp('…Pc (по спросу)', r.Pc, 80, 1e-6);
+cmp('…безразлично Q 40 или 0', r.Qm === 40 || Math.abs(r.Qm - 40) < 1e-6 ? r.alts : 'нет', '0', 0);
+cmp('…DWL при Q = 40', r.dwl, 0, 1e-6);
+cmp('…DWL при Q = 0', r.dwl0, 800, 1e-3);
+cmp('…в табло потери обоих вариантов', /потери общества 0 при/.test(r.panel) && /800 при/.test(r.panel) ? 1 : 0, 1, 0);
+r = await run(MKT + `setDS('mono', '100-Q', '20'); var m = STATE.mono || {}; return { Qc: m.Qc, Pc: m.Pc, dwl: m.dwl };`);
+cmp('регрессия D = 100 − Q, MC = 20: Qc', r.Qc, 80, 1e-6);
+cmp('…Pc', r.Pc, 20, 1e-6);
+cmp('…DWL', r.dwl, 800, 1e-3);
+
+head('А2 24.10 · «Составной спрос» при убывающей MC (…817a…)');
+r = await run(`resetSceneMemory(); pickScene('mono-kink'); STATE.kinkInput = 'individual';
+  STATE.kiD1 = '120 - P'; STATE.kiD2 = ''; STATE.kiD3 = ''; STATE.kinkMC = '160 - 4*Q'; redrawAll();
+  var k = STATE.kinked || {}; return { Q: k.Qstar, P: k.Pstar, alts: (k.alts || []).join(','), prof: k.profit,
+    st: [].map.call(document.querySelectorAll('#ans-status .ans-status'), function (x) { return x.textContent; }).join(' / ') };`);
+cmp('D₁: Q = 120 − P, MC = 160 − 4Q: Q', r.Q, 40, 1e-6);
+cmp('…P', r.P, 80, 1e-6);
+cmp('…второй вариант Q = 0', r.alts, '0', 0);
+cmp('…прибыль 0', r.prof, 0, 1e-6);
+r = await run(`resetSceneMemory(); pickScene('mono-kink'); STATE.kinkInput = 'individual';
+  STATE.kiD1 = '100 - Q'; STATE.kiD2 = '60 - Q'; STATE.kiD3 = ''; STATE.kinkMC = '20'; redrawAll();
+  var k = STATE.kinked || {}; var at = function (q) { return (k.cands.filter(function (c) { return Math.abs(c.Q - q) < 1e-6; })[0] || {}).profit; };
+  return { Q: k.Qstar, P: k.Pstar, p40: at(40), p60: at(60), alts: (k.alts || []).length };`);
+cmp('регрессия 01.09: Q', r.Q, 60, 1e-3); cmp('…P', r.P, 50, 1e-3);
+cmp('…кандидат 40 → 1 600', r.p40, 1600, 1e-2); cmp('…кандидат 60 → 1 800', r.p60, 1800, 1e-2);
+cmp('…безразличия нет', r.alts, 0, 0);
+
+head('А2 24.10 · открытая экономика: излишки после тарифа и квоты (…81e2…)');
+for (const [tool, money] of [['tariff', 200], ['quota', 200]]) {
+  r = await run(`resetSceneMemory(); pickScene('smallopen'); STATE.openTariff = 10; STATE.openQuota = 20; setOpenTool('${tool}');
+    var o = STATE.open || {}; return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, vol: o.vol1, money: o.money, dwl: o.dwlTotal, cs1: o.cs1, ps1: o.ps1 };`);
+  const tag = tool === 'tariff' ? 'тариф 10' : 'квота ввоза 20';
+  cmp(tag + ': цена', r.P1, 40, 1e-4); cmp(tag + ': Qd', r.Qd1, 60, 1e-4); cmp(tag + ': Qs', r.Qs1, 40, 1e-4);
+  cmp(tag + ': импорт', r.vol, 20, 1e-4); cmp(tag + ': ' + (tool === 'tariff' ? 'бюджет' : 'рента'), r.money, money, 1e-3);
+  cmp(tag + ': потери', r.dwl, 100, 1e-3); cmp(tag + ': CS', r.cs1, 1800, 1e-3); cmp(tag + ': PS', r.ps1, 800, 1e-3);
 }
 
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));

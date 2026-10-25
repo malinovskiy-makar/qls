@@ -357,13 +357,12 @@ function recompute() {
     if (Qm > 0) {
       const Pm = evalCurve(STATE.D, Qm);          // цена монополии — на кривой спроса
       const mcAtQm = mcAt(Qm);
-      const Qc = findRoot(q => evalCurve(STATE.D, q) - mcAt(q));       // конкуренция: D = MC
-      const Pc = (Qc != null) ? mcAt(Qc) : null;
-      let dwl = null;
-      if (Qc != null) {                            // потери — площадь между D и MC от Qm до Qc
-        const lo = Math.min(Qm, Qc), hi = Math.max(Qm, Qc);
-        dwl = areaBetween(q => evalCurve(STATE.D, q) - mcFloor(mcAt(q)), lo, hi);
-      }
+      // Конкуренция — максимум ∫ (D − MC), а не первый корень D = MC (А2 24.10, competitiveOutput).
+      const comp = competitiveOutput(STATE.D, mcAt);
+      const Qc = comp.Q, Pc = comp.P;
+      const Dq = q => evalCurve(STATE.D, q);
+      const dwl = monoDwlAt(Dq, mcAt, Qm, Qc);   // потери — между D и MC от Qm до Qc
+      const dwlAlts = (best.alts || []).map(q => monoDwlAt(Dq, mcAt, q, Qc));
       let profit = null;                           // прибыль (TR − TC) — только если задана ATC
       const ATC = curveByRole('atc');
       if (ATC) { const a = evalCurve(ATC, Qm); if (!isNaN(a)) profit = (Pm - a) * Qm; }
@@ -372,7 +371,7 @@ function recompute() {
       const csM = integrate(q => evalCurve(STATE.D, q) - Pm, 0, Qm);  // ∫ (D − Pm) dQ — излишек потребителя
       const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qm);           // ∫ max(0, MC) dQ — переменные издержки (VC(0)=0)
       const psM = integrate(q => Pm - mcFloor(mcAt(q)), 0, Qm);      // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
-      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM, alts: best.alts, gain: best.profit };
+      STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, dwlAlts, profit, csM, vcM, psM, alts: best.alts, gain: best.profit };
     }
   }
 
@@ -494,9 +493,18 @@ function recompute() {
       pigouEq = findEquilibrium(STATE.D, Sp);
     }
     STATE.extSign = pos ? 'pos' : 'neg';   // знак — ВЫВОД расчёта, а не выбор кнопкой
+    /* ⚠️ ОБЩЕСТВЕННОЕ БЛАГОСОСТОЯНИЕ — С ВНЕШНИМ ЭФФЕКТОМ (решение владельца 24.10, Notion …810e…, ADR 0158).
+       Внешние издержки на [0; Q] — ∫ (MSC − S) − ∫ (MSB − D): плюс — издержки, минус — выгоды (оба эффекта
+       сразу складываются в одно число). SW = CS + PS − внешние издержки = ∫ (MSB − MSC); разность SW оптимума
+       и рынка — ровно DWL (D = 100 − Q, S = Q, MSC = Q + 20: 1 600 − 1 500 = 100). Было «SW = CS + PS»
+       при любом внешнем эффекте. */
+    const extNet = (Q) => (Q > 0) ? integrate(q => (msc(q) - evalCurve(STATE.S, q)) - (msb(q) - evalCurve(STATE.D, q)), 0, Q) : 0;
+    const extMkt = extNet(Qmkt);
+    const extOpt = (Qopt != null) ? extNet(Qopt) : null;
+    const swOpt = (Qopt != null && Qopt > 0) ? integrate(q => msb(q) - msc(q), 0, Qopt) : (Qopt != null ? 0 : null);
     STATE.ext = { pos, msb, msc, social: pos ? msb : msc, other: pos ? msc : msb,
                   msbOn: !!STATE.msbOn, mscOn: !!STATE.mscOn,
-                  Qmkt, Pmkt, Qopt, Popt, dwl,
+                  Qmkt, Pmkt, Qopt, Popt, dwl, extMkt, extOpt, swOpt,
                   corrective, pigou: corrective, pigouEq, applyPigou: STATE.applyPigou };
   }
 
@@ -824,6 +832,10 @@ function updateOpenPanel() {
           'заплатил бы больше, чем он стоит стране, просто не произвели. Левый это потребительское искажение: ' +
           'внутри купили то, что мир ценил дороже.</div>';
     }
+    /* Излишки ПОСЛЕ вмешательства (А2 24.10, карточка …81e2…): закрашены на графике, а числом их не было нигде.
+       Строка — в конце блока, номера прежних строк не сдвигаются; «Ответ» ставит её группой «Излишки после
+       тарифа» / «при квоте» (HERO_STATE, 94-answer.js). */
+    html += `<div class="stat"><span>(CS; PS) ${isTar ? 'после тарифа' : 'при квоте'}</span><b>(${fmt(o.cs1)}; ${fmt(o.ps1)})</b></div>`;
   }
   box.innerHTML = html;
 }
@@ -2205,6 +2217,18 @@ function updateAreasPanel() {
      обещала числа, которые уже стоят рядом на том же экране. */
   if (isMonopolyScene()) { box.innerHTML = ''; return; }
   if (!STATE.eq || STATE.cs == null) { box.innerHTML = ''; return; }   // говорит блок равновесия, см. П7
+  /* «Внешние эффекты» с включённой MSB или MSC: внешние издержки (выгоды) строкой и SW с ними (решение …810e…,
+     ADR 0158). Без внешнего эффекта — как у всех рынков. */
+  const e = (STATE.scenario === 'externality') ? STATE.ext : null;
+  if (e && (e.msbOn || e.mscOn) && e.extMkt != null) {
+    const cost = e.extMkt >= 0;
+    box.innerHTML =
+      `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
+      `<div class="stat"><span>$PS$ (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
+      `<div class="stat"><span>${cost ? 'Внешние издержки' : 'Внешние выгоды'}</span><b>${fmt(Math.abs(e.extMkt))}</b></div>` +
+      `<div class="stat"><span>$SW = CS + PS ${cost ? '-' : '+'}$ ${cost ? 'внешние издержки' : 'внешние выгоды'}</span><b>${fmtSum(STATE.cs, STATE.ps, -e.extMkt)}</b></div>`;
+    return;
+  }
   box.innerHTML =
     `<div class="stat"><span>$CS$ (потребитель)</span><b>${fmt(STATE.cs)}</b></div>` +
     `<div class="stat"><span>$PS$ (производитель)</span><b>${fmt(STATE.ps)}</b></div>` +
@@ -2732,7 +2756,8 @@ function setType(type) {
        выбор вида ничего не менял бы на графике. Стартуем связывающей квотой
        в четырёх пятых равновесного объёма — коридор виден сразу. */
     if (!STATE.quotaSet && STATE.eq && STATE.eq.Q > 0) {
-      STATE.quotaPos = 0.5;
+      // Цена внутри коридора по умолчанию — цена СПРОСА Pd(квота) (решение владельца 24.10, Notion …81e0…9219…).
+      STATE.quotaPos = 1;
       setQuotaFields(Math.round(STATE.eq.Q * 0.8 * 10) / 10);
     }
   } else {
@@ -2802,8 +2827,10 @@ function unitRateMax() { return modelPriceTop(); }
    ⚠️ ТОЛЬКО ВВЕРХ И ТОЛЬКО ПОКА ГРАНИЦЫ НЕ ТРОГАЛ ЧЕЛОВЕК. Выбор человека
    сильнее: правка границ в меню дорожки помечает ползунок `boundsByHand`, и
    дальше модель в его границы не лезет — то же правило, что у зума. */
-const PRICE_REG_FIELDS = ['pc-slider', 'pc-input', 'open-pw-slider', 'open-pw-input',
-                          'quota-price-slider'];
+/* ⚠️ «Цена внутри коридора» (quota-price-slider) сюда НЕ входит (А2 24.10): её пределы — сам коридор
+   [S(квота); D(квота)], их ставит updateQuotaPriceLabel. Прежде дорожка в процентах получала здесь потолок 150:
+   ввод 100 показывал 100, а расчёт молча брал верх коридора. */
+const PRICE_REG_FIELDS = ['pc-slider', 'pc-input', 'open-pw-slider', 'open-pw-input'];
 function applyPriceRegBounds() {
   const top = modelPriceTop();
   PRICE_REG_FIELDS.forEach(id => {
@@ -3380,6 +3407,13 @@ function updateExtPanel() {
       const tool = (e.corrective > 0) ? 'Корректирующий налог (Пигу)' : 'Корректирующая субсидия';
       html += `<div class="stat"><span>${tool}</span><b>${fmt(Math.abs(e.corrective))}</b></div>`;
     }
+    /* Оптимум с внешним эффектом (ADR 0158): внешние издержки (выгоды) и SW = ∫ (MSB − MSC). Строки — после
+       прежних, номера тех не сдвигаются. CS и PS оптимума зависят от того, как в него пришли (налог Пигу или
+       распоряжение), и не пишутся. */
+    if (!none && e.extOpt != null && e.swOpt != null) {
+      html += `<div class="stat"><span>${e.extOpt >= 0 ? 'Внешние издержки' : 'Внешние выгоды'} в оптимуме</span><b>${fmt(Math.abs(e.extOpt))}</b></div>`;
+      html += `<div class="stat"><span>$SW$ в оптимуме</span><b>${fmt(e.swOpt)}</b></div>`;
+    }
     const gap = e.Qopt - e.Qmkt;
     html += `<div class="hint" style="margin-top:4px;">${none
       ? 'MSB и MSC пока совпадают с частными кривыми: внешнего эффекта нет, рынок и так в оптимуме.'
@@ -3645,22 +3679,36 @@ function setQuota(q) {
   redrawAll();
 }
 
-// Положение цены внутри коридора: 0 — нижняя граница, 1 — верхняя.
-// Ползунок размечен в процентах: доля коридора читается без пересчёта окна.
+// Положение цены внутри коридора: 0 — нижняя граница, 1 — верхняя (STATE.quotaPos — доля, как в старых
+// ссылках и автосохранениях; ползунок с 24.10 — в ДЕНЬГАХ, пределы — сам коридор).
 function setQuotaPos(pos) {
   pos = Math.max(0, Math.min(1, pos));
   STATE.quotaPos = pos;
-  const slider = document.getElementById('quota-price-slider');
-  if (slider) slider.value = Math.round(pos * 100);
-  updateQuotaPriceLabel();
   redrawAll();
+  updateQuotaPriceLabel();   // после пересчёта: цена и коридор — уже новые
+}
+/* Цена внутри коридора в деньгах (ползунок, точное значение): прижимается к краю коридора и уходит долей
+   (А2 24.10, решение …81e0…9219…, карточка …8147…, пункт 1). Коридора нет — ничего не меняется. */
+function setQuotaPrice(p) {
+  const q = STATE.qt;
+  if (!q || !(q.Phi > q.Plo) || !isFinite(p)) return;
+  setQuotaPos((Math.max(q.Plo, Math.min(q.Phi, p)) - q.Plo) / (q.Phi - q.Plo));
 }
 
-// Подпись под ползунком цены: сама цена и границы коридора.
+// Подпись под ползунком цены: сама цена и границы коридора; пределы и значение ползунка — коридор и цена.
 function updateQuotaPriceLabel() {
   const lbl = document.getElementById('quota-price-val');
   if (!lbl) return;
   const q = STATE.qt;
+  const sl = document.getElementById('quota-price-slider');
+  if (sl && q && q.P != null && q.Phi > q.Plo) {
+    const lo = String(q.Plo), hi = String(q.Phi), v = String(q.P);
+    if (sl.min !== lo) sl.min = lo;
+    if (sl.max !== hi) sl.max = hi;
+    if (sl.step !== 'any') sl.step = 'any';
+    if (sl.value !== v) sl.value = v;
+    sl._modelValue = q.P;
+  }
   lbl.textContent = (q && q.P != null) ? fmt(q.P) : '…';
   const rng = document.getElementById('quota-price-range');
   if (rng) rng.textContent = (q && q.P != null)

@@ -31,7 +31,9 @@ function loadScene(name) {
   STATE.quota = 0; STATE.quotaPos = 0.5; STATE.qt = null;
   ['quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const qv = document.getElementById('quota-val'); if (qv) qv.textContent = '0';
-  const qp = document.getElementById('quota-price-slider'); if (qp) qp.value = 50;
+  // Пределы «Цены внутри коридора» ставит коридор прошлой модели (updateQuotaPriceLabel) — к разметке страницы.
+  const qp = document.getElementById('quota-price-slider');
+  if (qp) { qp.min = '0'; qp.max = '100'; qp.step = '1'; qp.value = 50; delete qp._modelValue; }
   setTaxKind('unit');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
@@ -51,8 +53,8 @@ function loadScene(name) {
       setMarket('comp');
       if (name === 'tax' || name === 'taxes') { setType('tax'); setTax(20); }
       else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
-      // Квота 40 при D = 100 − Q, S = Q: коридор от 40 до 60, цена по центру.
-      else if (name === 'quota') { setType('quota'); setQuota(40); setQuotaPos(0.5); }
+      // Квота 40 при D = 100 − Q, S = Q: коридор от 40 до 60, цена — цена спроса 60 (решение 24.10, …81e0…9219…).
+      else if (name === 'quota') { setType('quota'); setQuota(40); setQuotaPos(1); }
       else { setType('tax'); }                                  // 'sd' — чистое равновесие
     }
   } else if (name === 'sdsum') {
@@ -78,12 +80,11 @@ function loadScene(name) {
       STATE.elastQ = null; STATE.elastQS = null;   // точки встанут в «умные» стартовые позиции
       setScenario('elasticity');
     } else {
-      /* Сцена открывается ЧИСТОЙ: MSB и MSC равны частным кривым и ВЫКЛЮЧЕНЫ,
-         поэтому оптимум совпадает с рыночным равновесием, а DWL равен нулю.
-         Расхождение появляется только после того, как человек включит чекбокс
-         и поправит формулу. */
-      STATE.msbOn = false; STATE.mscOn = false;
-      STATE.msbExpr = ''; STATE.mscExpr = '';     // подставятся формулы D и S
+      /* Старт С ВНЕШНИМ ЭФФЕКТОМ (решение владельца 24.10, Notion …81e7…; пересматривает стартовую часть
+         решения 21.08): MSC = Q + 20 и ВИДНА — открыл модель и сразу видишь эффект: рынок 50; 50, оптимум
+         40; 60, DWL 100, налог Пигу 20. MSB равна спросу и спрятана, как раньше. */
+      STATE.msbOn = false; STATE.mscOn = true;
+      STATE.msbExpr = ''; STATE.mscExpr = 'Q + 20';   // MSB подставится формулой D
       STATE.applyPigou = false;
       const ep = document.getElementById('ext-pigou'); if (ep) ep.checked = false;
       setScenario('externality');

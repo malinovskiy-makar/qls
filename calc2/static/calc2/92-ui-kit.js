@@ -211,7 +211,7 @@ function howToBuild(el) {
   }
   const foot = document.createElement('div');
   foot.className = 'howto-foot';
-  foot.textContent = 'Умножение можно не писать: 2Q = 2·Q. Ошибка в записи не ломает график: он держит последнюю верную запись, пока вы правите.';
+  foot.textContent = 'Умножение можно не писать: 2Q = 2·Q. Ошибка в записи не ломает график: он держит прежнюю запись, пока вы правите.';
   el.appendChild(foot);
 }
 

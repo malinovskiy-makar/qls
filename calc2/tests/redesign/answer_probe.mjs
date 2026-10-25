@@ -57,6 +57,9 @@ for (const key of keys) {
         const row = blk ? [...blk.querySelectorAll('.stat')][+m[2]] : null;
         if (row) { srcVal = t(row.querySelector(':scope > b')); srcLab = t(row.querySelector(':scope > span')); }
         if (row && m[3]) srcVal = srcVal.replace(/^\(|\)$/g, '').split(';').map(x => x.trim())[+m[3] - 1];
+        /* «55 (было 45)» (ADR 0158, 24.10): в «Ответе» значение 55, а «было» — строкой изменения под ним. */
+        const was = row && !m[3] ? /^(.+?)\s*\(было\s+(.+)\)$/.exec(srcVal) : null;
+        if (was && c.querySelector('.ans-was')) srcVal = was[1];
         if (row && !row.classList.contains('is-hero')) srcVal = '(строка не помечена is-hero)';
       }
       return { src, cap: t(c.querySelector('.ans-lab')), not: t(c.querySelector('.ans-not')), val: t(c.querySelector('.ans-val')), was: t(c.querySelector('.ans-was')), srcVal, srcLab };
