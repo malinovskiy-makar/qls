@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-09-04 (регистрация, профиль, аватар)
+> **Обновлён:** 2026-10-27 (почта: код регистрации, сброс пароля, «Почта», рассылка)
 > **Статус:** актуален
 
 # Карта маршрутов и границ доступа
@@ -69,7 +69,10 @@
 |---|---|---|---|---|---|
 | `/` | `home` | — | — | — | [catalog/views.py:62](../catalog/views.py) |
 | `/login/` | `login` | — | POST: логин/пароль | — | [problems/views_auth.py:8](../problems/views_auth.py) |
-| `/register/` | `register` | — (вошедшего уводит в профиль) | POST: логин, пароль ×2, роль, согласие | — | [problems/views_auth.py](../problems/views_auth.py) `RegisterView` |
+| `/register/` | `register` | — (вошедшего уводит в профиль) | POST: логин, пароль ×2, роль, согласие; при `MAIL_ENABLED` ещё почта и галочка рассылки — аккаунт НЕ создаётся, анкета с хешем пароля в сессию | — | [problems/views_auth.py](../problems/views_auth.py) `RegisterView` |
+| `/register/confirm/` | `register_confirm` | — (только с анкетой в сессии; без `MAIL_ENABLED` 404) | POST: код или `action=resend` | — (аккаунт создаётся из анкеты сессии) | [problems/views_auth.py](../problems/views_auth.py) `RegisterConfirmView` |
+| `/password/forgot/` | `password_forgot` | — (без `MAIL_ENABLED` 404) | POST: почта; ответ одинаков для любой | — | [problems/views_auth.py](../problems/views_auth.py) `password_forgot` |
+| `/password/forgot/code/` | `password_forgot_code` | — (только с запросом в сессии; без `MAIL_ENABLED` 404) | POST: код, новый пароль ×2 или `action=resend` | ✅ пользователь — только владелец ПОДТВЕРЖДЁННОЙ почты из сессии | [problems/views_auth.py](../problems/views_auth.py) `password_forgot_code` |
 | `/logout/` | `logout` | — | **только POST** (GET → 405) | — | Django |
 | `/textbook/` | `textbook` | — | — | — | [catalog/views.py](../catalog/views.py) `textbook` |
 | `/catalog/` | `catalog:problem_list` | — | 10× GET (фильтры, поиск, страница) | — | [catalog/views.py:85](../catalog/views.py) |
@@ -274,6 +277,9 @@ TypeError: Field 'id' expected a number but got
 | `/api/graphs/save/` | `api_graph_save` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:193](../problems/views_platform.py) |
 | `/password/change/` | `password_change` | `login_required` | POST: новый пароль ×2 (`old_password` игнорируется) | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `password_change` |
 | `/password/change/done/` | `password_change_done` | — | — | — | редирект на `/profile/?tab=security` |
+| `/account/email/` | `account_email` | вход (гость → `/login/?next=`); без `MAIL_ENABLED` 404 | GET `next`, `src`; POST: почта, галочка рассылки, код, `action` | ✅ всегда `request.user`; почта пишется только после кода | [problems/views_auth.py](../problems/views_auth.py) `account_email` |
+| `/legal/mail/grant/` | `legal:mail_grant` | `login_required` + POST; без `MAIL_ENABLED` 404 | — | ✅ всегда `request.user`; без подтверждённой почты → «Почта» | [legal/views.py](../legal/views.py) `mail_grant` |
+| `/legal/mail/revoke/` | `legal:mail_revoke` | `login_required` + POST; без `MAIL_ENABLED` 404 | — | ✅ всегда `request.user`; только отметка отзыва | [legal/views.py](../legal/views.py) `mail_revoke` |
 
 ### ⚠️ Обратная связь: единственный маршрут БЕЗ проверки входа
 

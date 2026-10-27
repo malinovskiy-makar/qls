@@ -1237,6 +1237,13 @@ docker compose exec web python manage.py erase_user <логин> --apply   # у�
 
 ---
 
+## Почта (коды подтверждения)
+
+На бою выключена (`MAIL_ENABLED=0` по умолчанию в боевых настройках). Включение —
+по шагам из [MAIL.md](MAIL.md), раздел «Включение на бою»: переменные в `.env` →
+`send_test_email` изнутри контейнера → DKIM/SPF/DMARC → новые правовые тексты →
+`MAIL_ENABLED=1` → пересоздать `web` и `docker compose restart nginx`.
+
 ## Мелочи, на которых легко споткнуться
 
 - `/root` закрыт для `makar` (права 700). `[ -f /root/что-то ]` вернёт
