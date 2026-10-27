@@ -522,3 +522,8 @@ reports/corpus_transfer_20260913/*
 
 # Стенд нагрузки: настоящие значения окружения (образец — deploy/env.loadtest.example).
 deploy/env.loadtest
+
+# Почта, сессия 1 (26.10.2026): журнал сессии в git, лог базовой линии — нет.
+!reports/mail_s1_20261026/
+reports/mail_s1_20261026/*
+!reports/mail_s1_20261026/JOURNAL.md

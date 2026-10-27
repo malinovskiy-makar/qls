@@ -1,0 +1,33 @@
+{% comment %}
+Письмо с кодом (docs/MAIL.md). Только встроенные стили: почтовые программы
+выбрасывают <style> и внешние таблицы. Ни картинок, ни пикселей слежения;
+ссылки только на главную и на Telegram-канал — ссылки, которая что-то делает
+с аккаунтом, в письме нет и быть не должно (решение 26.10.2026).
+{% endcomment %}<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{{ intro }}</title></head>
+<body style="margin:0;padding:0;background:#f4f4f2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e2e2de;border-radius:12px;">
+<tr><td style="padding:28px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#1f1f1d;">
+{{ intro }}
+</td></tr>
+<tr><td style="padding:8px 28px 8px 28px;font-family:'Courier New',Courier,monospace;font-size:28px;font-weight:bold;letter-spacing:4px;color:#1f1f1d;">
+{{ code }}
+</td></tr>
+<tr><td style="padding:8px 28px 20px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#55554f;">
+Код действует 10 минут. Если вы его не запрашивали, просто удалите письмо: без кода с вашей почтой ничего не сделать.
+</td></tr>
+<tr><td style="padding:0 28px 24px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#55554f;">
+Есть вопрос? Ответьте на это письмо или напишите нам в <a href="https://t.me/weconomics_ru" style="color:#2f5d50;">Telegram</a>.
+</td></tr>
+<tr><td style="padding:16px 28px 24px 28px;border-top:1px solid #e2e2de;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#7a7a73;">
+Weconomics, подготовка к олимпиадам по экономике<br>
+<a href="https://weconomics.ai/" style="color:#2f5d50;">weconomics.ai</a>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

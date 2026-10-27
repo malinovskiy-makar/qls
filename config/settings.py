@@ -661,6 +661,29 @@ LEGAL_ENFORCEMENT_ENABLED = (
     os.environ.get('LEGAL_ENFORCEMENT_ENABLED', '0' if _TESTING else '1').strip().lower()
     in ('1', 'true', 'yes', 'on'))
 
+# ─── Почта: коды подтверждения (docs/MAIL.md) ──────────────────────────────
+# MAIL_ENABLED включает регистрацию с почтой, вход почтой, сброс пароля кодом
+# и страницу «Почта». В тестах выключен (новые тесты включают его явно),
+# в боевых настройках выключен до проверки канала на сервере.
+MAIL_ENABLED = (
+    os.environ.get('MAIL_ENABLED', '0' if _TESTING else '1').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '').strip()
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587').strip() or 587)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').strip()
+EMAIL_USE_SSL = EMAIL_PORT == 465
+EMAIL_USE_TLS = not EMAIL_USE_SSL
+EMAIL_TIMEOUT = 10
+# Без EMAIL_HOST письма печатаются в окно runserver: код виден при разработке.
+EMAIL_BACKEND = ('django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST
+                 else 'django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = (os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
+                      or 'Weconomics <noreply@weconomics.ai>')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Куда уходит «Ответить». Пусто — почта для обращений из LEGAL.
+MAIL_REPLY_TO = os.environ.get('MAIL_REPLY_TO', '').strip() or LEGAL['contact_email']
+
 
 def _redis_cache(db_index, prefix):
     """Один алиас кэша в отдельной базе Redis."""
