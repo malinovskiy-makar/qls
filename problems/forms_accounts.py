@@ -12,6 +12,8 @@ import re
 
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.urls import reverse
+from django.utils.html import format_html
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .models import User
@@ -32,9 +34,9 @@ AVATAR_QUALITY = 85
 class RegisterForm(UserCreationForm):
     """Регистрация: логин, пароль дважды, роль и согласие.
 
-    Почты нет намеренно (решение владельца 04.09.2026): подтверждать её
-    нечем — рассылки у платформы нет, а непроверенная почта в базе создаёт
-    ложное чувство, что человека можно найти.
+    Это форма при ВЫКЛЮЧЕННОЙ почте (`MAIL_ENABLED=0`). Решение 04.09.2026
+    «почты нет» пересмотрено 26.10.2026: регистрация — почта + пароль, почта
+    подтверждается кодом (`RegisterWithEmailForm` ниже, docs/MAIL.md).
     """
 
     ROLE_CHOICES = (
@@ -82,6 +84,45 @@ class RegisterForm(UserCreationForm):
         if User.objects.filter(username__iexact=username).exists():
             raise forms.ValidationError('Этот логин занят. Придумайте другой.')
         return username
+
+
+#: Логин с «@» путал бы вход: почтой входят по подтверждённому адресу.
+AT_IN_USERNAME = 'В логине не может быть @: для почты есть отдельное поле.'
+
+
+class RegisterWithEmailForm(RegisterForm):
+    """Регистрация с почтой (решение владельца 26.10.2026, docs/MAIL.md).
+
+    Форма только проверяет поля: аккаунт она НЕ создаёт. Создаёт его шаг
+    подтверждения кода (`RegisterConfirmView`), когда почта доказана.
+    """
+
+    email = forms.EmailField(
+        label='Почта', max_length=254,
+        help_text='На неё придёт код подтверждения. Другие пользователи её не видят.',
+        error_messages={'required': 'Укажите почту: на неё придёт код подтверждения.',
+                        'invalid': 'Это не похоже на адрес почты.'})
+    # ⚠️ НИКОГДА НЕ ОТМЕЧЕНА ЗАРАНЕЕ (ст. 18 закона «О рекламе»). Подпись со
+    # ссылкой на документ рисует `legal/_mail_label.html`.
+    mail_consent = forms.BooleanField(
+        label='Присылать письма о новых тренажёрах, разборах и олимпиадах',
+        required=False, initial=False)
+
+    def clean_username(self):
+        username = super().clean_username()
+        if '@' in username:
+            raise forms.ValidationError(AT_IN_USERNAME)
+        return username
+
+    def clean_email(self):
+        from .email_codes import normalize_email, verified_user_for
+        email = normalize_email(self.cleaned_data['email'])
+        if verified_user_for(email) is not None:
+            raise forms.ValidationError(format_html(
+                'Эта почта уже привязана к аккаунту. <a href="{}">Войдите</a> или '
+                '<a href="{}">восстановите пароль</a>.',
+                reverse('login'), '/password/forgot/'))
+        return email
 
 
 class KnownCodesField(forms.MultipleChoiceField):
@@ -226,6 +267,12 @@ class ProfileForm(forms.ModelForm):
         """Логин можно менять, но он остаётся уникальным."""
         username = self.cleaned_data['username'].strip()
         User._meta.get_field('username').run_validators(username)
+        # «@» запрещена только в НОВОМ логине и только с почтой (docs/MAIL.md):
+        # старые логины с «@» не трогаем.
+        from .email_codes import mail_enabled
+        if (mail_enabled() and '@' in username
+                and username != self.instance.user.username):
+            raise forms.ValidationError(AT_IN_USERNAME)
         clash = (User.objects.filter(username__iexact=username)
                  .exclude(pk=self.instance.user_id).exists())
         if clash:

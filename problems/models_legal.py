@@ -25,12 +25,17 @@ class ConsentRecord(models.Model):
     class Kind(models.TextChoices):
         PD = 'pd', 'Обработка данных и пользовательское соглашение'
         AI = 'ai', 'Помощник на основе ИИ и передача данных в Сингапур'
+        # Рассылка по почте (docs/MAIL.md): отдельная галочка, никогда не
+        # отмеченная заранее (ст. 18 закона «О рекламе»).
+        MAIL = 'mail', 'Рассылка по почте'
 
     class Source(models.TextChoices):
         REGISTER = 'register', 'Регистрация'
         GATE = 'gate', 'Экран согласия при входе'
         CHAT = 'chat', 'Панель помощника'
         PROFILE = 'profile', 'Профиль'
+        EMAIL_PAGE = 'email', 'Страница «Почта»'
+        VP_WALL = 'vp_wall', 'Стена тренажёра ВП'
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                              related_name='consents', verbose_name='Пользователь')

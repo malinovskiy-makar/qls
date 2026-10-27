@@ -43,6 +43,10 @@ urlpatterns = [
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('register/', views_auth.RegisterView.as_view(), name='register'),
+    # Шаг 2 регистрации с почтой: код из письма (docs/MAIL.md). При
+    # MAIL_ENABLED=0 отвечает 404.
+    path('register/confirm/', views_auth.RegisterConfirmView.as_view(),
+         name='register_confirm'),
     # ⚠️ ВЫХОД ВЕДЁТ НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
     # нажал «Выйти» — он закончил, а не собирается войти снова. Главная
     # открыта гостям. Метод только POST: так решил Django 5, и шапка шлёт
