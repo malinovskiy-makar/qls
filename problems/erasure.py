@@ -65,6 +65,11 @@ def explicit_querysets(user):
     for label, field in EXPLICIT:
         model = apps.get_model(label)
         out.append((label, model.objects.filter(**{field: user})))
+    # Коды подтверждения почты (docs/MAIL.md): привязанные к человеку уходят
+    # каскадом, а коды регистрации привязки не имеют — их находим по адресу.
+    if user.email:
+        out.append(('problems.EmailCode', apps.get_model('problems.EmailCode').objects
+                    .filter(user__isnull=True, email__iexact=user.email.strip())))
     return out
 
 

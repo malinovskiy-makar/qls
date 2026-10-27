@@ -793,3 +793,33 @@ class ReviewVerdictAdmin(admin.ModelAdmin):
 # Платформа для репетиторов — админка вынесена в problems/admin_platform.py
 # ---------------------------------------------------------------------------
 from . import admin_platform  # noqa: E402,F401
+
+
+# ── Коды подтверждения почты (docs/MAIL.md) ─────────────────────────────────
+
+from .models_mail import EmailCode  # noqa: E402
+
+
+@admin.register(EmailCode)
+class EmailCodeAdmin(admin.ModelAdmin):
+    """Коды только на просмотр — чтобы разбирать «не пришёл код».
+
+    Отпечатка кода здесь нет ни в списке, ни в карточке: смотреть на него
+    незачем, а показывать лишнее о коде нельзя. Строки живут сутки.
+    """
+
+    list_display = ('email', 'purpose', 'created_at', 'expires_at', 'attempts', 'used_at')
+    list_filter = ('purpose',)
+    search_fields = ('email',)
+    date_hierarchy = 'created_at'
+    fields = ('email', 'purpose', 'user', 'created_at', 'expires_at', 'attempts', 'used_at')
+    raw_id_fields = ('user',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
