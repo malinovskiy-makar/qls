@@ -47,6 +47,12 @@ urlpatterns = [
     # MAIL_ENABLED=0 отвечает 404.
     path('register/confirm/', views_auth.RegisterConfirmView.as_view(),
          name='register_confirm'),
+    # Сброс пароля кодом из письма и страница «Почта» (docs/MAIL.md). При
+    # MAIL_ENABLED=0 все три отвечают 404 — «забыли пароль» ведёт в Telegram.
+    path('password/forgot/', views_auth.password_forgot, name='password_forgot'),
+    path('password/forgot/code/', views_auth.password_forgot_code,
+         name='password_forgot_code'),
+    path('account/email/', views_auth.account_email, name='account_email'),
     # ⚠️ ВЫХОД ВЕДЁТ НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
     # нажал «Выйти» — он закончил, а не собирается войти снова. Главная
     # открыта гостям. Метод только POST: так решил Django 5, и шапка шлёт

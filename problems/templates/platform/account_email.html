@@ -1,0 +1,130 @@
+{% extends 'platform/base.html' %}
+{% comment %}
+Страница «Почта» /account/email/ (docs/MAIL.md). Через неё вошедший добавляет,
+меняет или подтверждает почту и включает рассылку; стена тренажёра ВП ведёт
+сюда с `?next=…&src=vp`. Почта попадает в аккаунт только после кода из письма.
+Цвета — токены, иконки — SVG.
+{% endcomment %}
+
+{% block title %}Почта{% endblock %}
+
+{% block extra_style %}
+.ae-wrap { max-width: 560px; }
+.ae-h1 { font-size: 22px; font-weight: 600; margin: 4px 0 14px; }
+.ae-state {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; margin-bottom: 16px;
+  border-radius: var(--r); border: .5px solid var(--border);
+  background: var(--surface); color: var(--text2); font-size: 14px; line-height: 1.5;
+}
+.ae-state svg { flex: none; margin-top: 2px; }
+.ae-state b { color: var(--text); font-weight: 600; word-break: break-all; }
+.ae-state--ok { border-color: var(--accent-ring); background: var(--accent-tint); color: var(--text); }
+.ae-field { margin-bottom: 16px; }
+.ae-label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+.ae-field input[type="email"], .ae-field input[type="text"] {
+  display: block; width: 100%; height: 40px; font: inherit; font-size: 15px;
+  color: var(--text); background: var(--surface-2);
+  border: .5px solid var(--border); border-radius: var(--r); padding: 0 12px;
+}
+.ae-code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 20px !important;
+           letter-spacing: 6px; text-align: center; }
+.ae-check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px;
+            line-height: 1.5; color: var(--text2); cursor: pointer; }
+.ae-check input { margin-top: 3px; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+.ae-check a { color: var(--accent-ink); }
+.ae-err { font-size: 13px; color: var(--error); margin-top: 5px; }
+.ae-error {
+  padding: 10px 14px; margin-bottom: 14px; border-radius: var(--r);
+  background: var(--error-tint); border: 1px solid var(--error-border); color: var(--error); font-size: 14px;
+}
+.ae-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 18px; }
+.ae-row form { margin: 0; }
+.ae-quiet {
+  font: inherit; font-size: 13px; padding: 8px 14px; color: var(--text);
+  background: transparent; border: .5px solid var(--border); border-radius: var(--r); cursor: pointer;
+}
+.ae-quiet:hover { background: var(--surface-2); }
+.ae-quiet:disabled { color: var(--text3); cursor: not-allowed; background: transparent; }
+.ae-link { font-size: 13px; color: var(--accent-ink); }
+.ae-hint { font-size: 13px; color: var(--text3); margin-top: 14px; line-height: 1.5; }
+@media (max-width: 560px) {
+  .ae-row .btn-primary { width: 100%; height: 44px; }
+  .ae-field input[type="email"], .ae-field input[type="text"] { height: 44px; font-size: 16px; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="ae-wrap">
+  <h1 class="ae-h1">Почта</h1>
+
+  {% if verified %}
+  <div class="ae-state ae-state--ok ym-hide-content">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+    <span>Почта подтверждена: <b>{{ current_email }}</b></span>
+  </div>
+  {% elif current_email %}
+  <div class="ae-state ym-hide-content">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/></svg>
+    <span>Почта не подтверждена: <b>{{ current_email }}</b></span>
+  </div>
+  {% else %}
+  <div class="ae-state">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+    <span>Почта не указана. По ней можно будет восстановить пароль.</span>
+  </div>
+  {% endif %}
+
+  <div class="card pf-card">
+  {% if pending %}
+    {% comment %}Шаг кода: как шаг 2 регистрации.{% endcomment %}
+    <p class="ae-hint" style="margin-top:0">Мы отправили код на <b class="ym-hide-content">{{ pending.email }}</b>. Письмо может идти пару минут, загляните в папку «Спам».</p>
+    {% if error %}<div class="ae-error">{{ error }}</div>{% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="code">
+      <div class="ae-field">
+        <label class="ae-label" for="id_code">Код из письма</label>
+        <input type="text" name="code" id="id_code" class="ae-code ym-disable-keys"
+               inputmode="numeric" autocomplete="one-time-code" maxlength="12" autofocus>
+      </div>
+      <button type="submit" class="btn-primary">Подтвердить</button>
+    </form>
+    <div class="ae-row">
+      <form method="post">
+        {% csrf_token %}
+        {% include 'registration/_resend_button.html' with wait=resend_wait btn_class='ae-quiet' %}
+      </form>
+      <a class="ae-link" href="{{ change_url }}">Изменить почту</a>
+    </div>
+  {% else %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save">
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      {% if src %}<input type="hidden" name="src" value="{{ src }}">{% endif %}
+      {% for e in form.non_field_errors %}<div class="ae-error">{{ e }}</div>{% endfor %}
+      <div class="ae-field">
+        <label class="ae-label" for="id_email">Почта</label>
+        <input type="email" name="email" id="id_email" class="ym-disable-keys"
+               inputmode="email" autocomplete="email"
+               value="{{ form.email.value|default:'' }}">
+        {% for e in form.email.errors %}<div class="ae-err">{{ e }}</div>{% endfor %}
+      </div>
+      <label class="ae-check">
+        <input type="checkbox" name="mail_consent" {% if form.mail_consent.value %}checked{% endif %}>
+        <span>{% include 'legal/_mail_label.html' %}</span>
+      </label>
+      <div class="ae-row">
+        <button type="submit" class="btn-primary">Сохранить</button>
+        {% if next %}<a class="ae-link" href="{{ next }}">Вернуться без изменений</a>{% endif %}
+      </div>
+      <p class="ae-hint">Новая почта сохранится, когда вы введёте код из письма. Другие пользователи её не видят.</p>
+    </form>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

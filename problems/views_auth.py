@@ -429,3 +429,253 @@ class RegisterConfirmView(View):
             # Тот же логин или почту записали параллельно, в ту же секунду.
             raise _Taken('Этот логин успели занять. Начните регистрацию заново.')
         return user
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Сброс пароля кодом из письма (docs/MAIL.md, решение владельца 26.10.2026)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ ОТВЕТ НЕ ВЫДАЁТ, ЕСТЬ ЛИ АККАУНТ С ЭТОЙ ПОЧТОЙ. На любую почту — один и
+# тот же текст и тот же переход; на неверный код — одна и та же ошибка. Таймер
+# кнопки повтора считается от момента ЗАПРОСА в сессии, а не по письмам в
+# базе: иначе он шёл бы только у существующих адресов.
+#
+# ⚠️ СНАЧАЛА ПАРОЛЬ, ПОТОМ КОД. Валидаторы пароля проверяются раньше кода:
+# слишком короткий пароль не должен сжигать код и одну из пяти попыток.
+RESET_SCOPE = 'reset'
+RESET_SESSION_KEY = 'password_reset'
+RESET_SENT_TEXT = 'Если эта почта привязана к аккаунту, мы отправили на неё код.'
+RESET_WRONG_TEXT = 'Неверный или устаревший код.'
+RESET_LOCKED_TEXT = 'Слишком много попыток. Запросите новый код.'
+
+
+def _mail_or_404():
+    if not email_codes.mail_enabled():
+        raise Http404
+
+
+def _reset_send(request, email):
+    """Отправить код сброса, если почта подтверждена у кого-то. Ответ — всегда один."""
+    user = email_codes.verified_user_for(email)
+    if user is not None:
+        email_codes.send_code(email, Purpose.RESET, user=user, request=request)
+    request.session[RESET_SESSION_KEY] = {'email': email, 'requested_at': time.time()}
+
+
+def _reset_wait(request):
+    state = request.session.get(RESET_SESSION_KEY) or {}
+    left = email_codes.RESEND_AFTER - (time.time() - state.get('requested_at', 0))
+    return max(0, int(left + 0.999))
+
+
+def password_forgot(request):
+    """Шаг 1: почта, указанная в аккаунте."""
+    _mail_or_404()
+    from django import forms
+
+    class ForgotForm(forms.Form):
+        email = forms.EmailField(
+            label='Почта, указанная в аккаунте', max_length=254,
+            error_messages={'required': 'Укажите почту.',
+                            'invalid': 'Это не похоже на адрес почты.'})
+
+    form = ForgotForm(request.POST or None)
+    error = ''
+    status = 200
+    if request.method == 'POST' and form.is_valid():
+        email = email_codes.normalize_email(form.cleaned_data['email'])
+        wait = ratelimit.check(RESET_SCOPE, request, email)
+        if wait:
+            error, status = ('Слишком много попыток. Попробуйте через %d мин.'
+                             % minutes(wait)), 429
+        else:
+            _reset_send(request, email)
+            messages.success(request, RESET_SENT_TEXT)
+            return redirect('password_forgot_code')
+    return render(request, 'registration/password_forgot.html',
+                  {'form': form, 'error': error, 'seo_noindex': True}, status=status)
+
+
+def password_forgot_code(request):
+    """Шаг 2: код из письма и новый пароль дважды."""
+    from django.contrib.auth.forms import SetPasswordForm
+
+    _mail_or_404()
+    state = request.session.get(RESET_SESSION_KEY)
+    if not state:
+        return redirect('password_forgot')
+    email = state['email']
+    user = email_codes.verified_user_for(email)
+
+    if request.method == 'POST' and request.POST.get('action') == 'resend':
+        if _reset_wait(request) == 0 and not ratelimit.check(RESET_SCOPE, request, email):
+            _reset_send(request, email)
+        messages.success(request, RESET_SENT_TEXT)
+        return redirect('password_forgot_code')
+
+    # Для похожести пароля на логин нужен пользователь; почты без аккаунта
+    # проверяются на пустышке — так и ошибки пароля одинаковы для всех.
+    form = SetPasswordForm(user or User(email=email), request.POST or None)
+    form.fields['new_password1'].label = 'Новый пароль'
+    form.fields['new_password2'].label = 'Новый пароль ещё раз'
+    error = ''
+    status = 200
+    if request.method == 'POST':
+        wait = ratelimit.check(RESET_SCOPE, request, email)
+        if wait:
+            error, status = RESET_LOCKED_TEXT, 429
+        elif form.is_valid():
+            check = email_codes.check_code(email, Purpose.RESET, request.POST.get('code', ''))
+            if check.ok and user is not None:
+                form.save()     # set_password + save: прежние сессии гаснут сами
+                ratelimit.register_success(RESET_SCOPE, request, email)
+                request.session.pop(RESET_SESSION_KEY, None)
+                messages.success(request, 'Пароль изменён. Войдите с новым паролем.')
+                return redirect('login')
+            ratelimit.register_failure(RESET_SCOPE, request, email)
+            error = RESET_LOCKED_TEXT if check.reason == 'locked' else RESET_WRONG_TEXT
+    return render(request, 'registration/password_forgot_code.html', {
+        'form': form, 'error': error, 'resend_wait': _reset_wait(request),
+        'seo_noindex': True,
+    }, status=status)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Страница «Почта» /account/email/ (docs/MAIL.md)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Через неё вошедший добавляет, меняет или подтверждает почту и включает или
+# выключает рассылку. Стена тренажёра ВП ведёт сюда с `?next=/vp/...&src=vp`:
+# `next` — куда вернуть (только свой адрес), `src=vp` — источник согласия
+# «Стена тренажёра ВП» в записи.
+#
+# ⚠️ ПОЧТА МЕНЯЕТСЯ ТОЛЬКО ПО КОДУ. Новый адрес ложится в сессию, в базу он
+# попадает, когда код из письма сошёлся; занятость адреса проверяется ещё раз
+# внутри транзакции.
+EMAIL_CHANGE_KEY = 'email_change'
+ACCOUNT_EMAIL_DEFAULT_NEXT = '/profile/?tab=data'
+
+
+def _account_email_url(next_url, src):
+    from urllib.parse import urlencode
+    query = {k: v for k, v in (('next', next_url), ('src', src)) if v}
+    return '/account/email/' + ('?' + urlencode(query) if query else '')
+
+
+def _consent_source(src):
+    return (ConsentRecord.Source.VP_WALL if src == 'vp'
+            else ConsentRecord.Source.EMAIL_PAGE)
+
+
+def _apply_mail_consent(user, wanted, src):
+    """Галочка рассылки → запись согласия. Отзыв ничего не удаляет."""
+    if wanted:
+        consent.grant(user, ConsentRecord.Kind.MAIL, _consent_source(src))
+    elif consent.wants_mail(user):
+        consent.revoke(user, ConsentRecord.Kind.MAIL)
+
+
+def account_email(request):
+    from django import forms
+    from django.contrib.auth.views import redirect_to_login
+
+    _mail_or_404()
+    if not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path(), '/login/')
+    user = request.user
+    target = safe_next(request)
+    src = 'vp' if (request.POST.get('src') or request.GET.get('src')) == 'vp' else ''
+    pending = request.session.get(EMAIL_CHANGE_KEY)
+
+    class EmailForm(forms.Form):
+        email = forms.EmailField(
+            label='Почта', max_length=254,
+            error_messages={'required': 'Укажите почту.',
+                            'invalid': 'Это не похоже на адрес почты.'})
+        mail_consent = forms.BooleanField(required=False)
+
+    if request.GET.get('change') and pending:
+        # «Изменить почту» на шаге кода: обратно к форме с прежними значениями.
+        request.session.pop(EMAIL_CHANGE_KEY, None)
+        form = EmailForm(initial={'email': pending['email'],
+                                  'mail_consent': pending['mail_consent']})
+        target, src = pending.get('next') or '', pending.get('src') or ''
+        pending = None
+    else:
+        form = EmailForm(initial={'email': user.email,
+                                  'mail_consent': consent.wants_mail(user)})
+    action = request.POST.get('action') if request.method == 'POST' else ''
+    error = ''
+
+    if action in ('code', 'resend') and pending:
+        email = pending['email']
+        here = _account_email_url(pending.get('next'), pending.get('src'))
+        if action == 'resend':
+            result = email_codes.send_code(email, Purpose.CONFIRM, user=user, request=request)
+            if result.ok:
+                messages.success(request, 'Мы отправили новый код.')
+            else:
+                messages.error(request, send_error(result))
+            return redirect(here)
+        check = email_codes.check_code(email, Purpose.CONFIRM, request.POST.get('code', ''))
+        if check.ok:
+            try:
+                with transaction.atomic():
+                    other = email_codes.verified_user_for(email)
+                    if other is not None and other.pk != user.pk:
+                        raise _Taken('Эта почта уже привязана к другому аккаунту.')
+                    user.email = email
+                    user.email_verified_at = timezone.now()
+                    user.save(update_fields=['email', 'email_verified_at'])
+                    _apply_mail_consent(user, pending['mail_consent'], pending.get('src'))
+            except (_Taken, IntegrityError):
+                request.session.pop(EMAIL_CHANGE_KEY, None)
+                messages.error(request, 'Эта почта уже привязана к другому аккаунту.')
+                return redirect(here)
+            request.session.pop(EMAIL_CHANGE_KEY, None)
+            messages.success(request, 'Почта подтверждена.')
+            return redirect(pending.get('next') or ACCOUNT_EMAIL_DEFAULT_NEXT)
+        error = check_error(check)
+
+    elif action == 'save':
+        form = EmailForm(request.POST)
+        if form.is_valid():
+            email = email_codes.normalize_email(form.cleaned_data['email'])
+            wanted = form.cleaned_data['mail_consent']
+            if (email_codes.has_verified_email(user)
+                    and email == email_codes.normalize_email(user.email)):
+                # Почта та же и уже подтверждена: меняется только галочка, без кода.
+                _apply_mail_consent(user, wanted, src)
+                messages.success(request, 'Сохранено.')
+                return redirect(target or ACCOUNT_EMAIL_DEFAULT_NEXT)
+            other = email_codes.verified_user_for(email)
+            if other is not None and other.pk != user.pk:
+                form.add_error('email', 'Эта почта уже привязана к другому аккаунту.')
+            else:
+                result = email_codes.send_code(email, Purpose.CONFIRM, user=user,
+                                               request=request)
+                previous = (request.session.get(EMAIL_CHANGE_KEY) or {}).get('email')
+                if result.ok or (result.reason == 'wait' and previous == email):
+                    request.session[EMAIL_CHANGE_KEY] = {
+                        'email': email, 'mail_consent': wanted,
+                        'next': target, 'src': src}
+                    if not result.ok:
+                        messages.info(request, 'Код уже отправлен, проверьте почту.')
+                    return redirect(_account_email_url(target, src))
+                form.add_error(None, send_error(result))
+
+    if pending:
+        target, src = pending.get('next') or '', pending.get('src') or ''
+    return render(request, 'platform/account_email.html', {
+        'form': form,
+        'pending': pending,
+        'error': error,
+        'verified': email_codes.has_verified_email(user),
+        'current_email': user.email,
+        'resend_wait': (email_codes.resend_wait(pending['email'], Purpose.CONFIRM)
+                        if pending else 0),
+        'next': target,
+        'src': src,
+        'change_url': _account_email_url(target, src) + ('&' if (target or src) else '?') + 'change=1',
+        'seo_noindex': True,
+    })

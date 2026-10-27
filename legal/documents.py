@@ -54,16 +54,31 @@ _SPEC = (
     ('privacy', 'privacy.md', 'Политика'),
     ('consent', 'consent.md', 'Согласие'),
     ('consent-ai', 'consent_ai.md', 'Согласие на помощника'),
+    # Только при MAIL_ENABLED (docs/MAIL.md): без почты рассылки нет, и документа
+    # нет ни в списке /legal/, ни по адресу. Текст — ЧЕРНОВИК от 26.10.2026,
+    # финальный утверждает владелец до включения почты на бою.
+    ('consent-mail', 'consent_mail.md', 'Согласие на рассылку'),
     ('cookies', 'cookies.md', 'Cookie'),
     ('terms', 'terms.md', 'Соглашение'),
     ('recommendations', 'recommendations.md', 'Рекомендации'),
 )
 
 
+#: Документы, которые существуют только при включённой почте.
+MAIL_ONLY = frozenset({'consent-mail'})
+
+
 @lru_cache(maxsize=1)
-def all_documents():
+def _every_document():
     return tuple(Document(slug, filename, short, _title_of(filename))
                  for slug, filename, short in _SPEC)
+
+
+def all_documents():
+    """Документы сайта. Флаг читается на каждый вызов, кэш — только у разбора файлов."""
+    mail_on = bool(getattr(settings, 'MAIL_ENABLED', False))
+    return tuple(doc for doc in _every_document()
+                 if mail_on or doc.slug not in MAIL_ONLY)
 
 
 def get_document(slug):

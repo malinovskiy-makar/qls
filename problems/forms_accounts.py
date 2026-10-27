@@ -192,6 +192,11 @@ class ProfileForm(forms.ModelForm):
         self.fields['last_name'].initial = user.last_name
         self.fields['username'].initial = user.username
         self.fields['email'].initial = user.email
+        # С почтой (docs/MAIL.md) адрес меняется ТОЛЬКО через код на странице
+        # «Почта»: поля в анкете профиля нет, и `save()` почту не трогает.
+        from .email_codes import mail_enabled
+        if mail_enabled():
+            del self.fields['email']
         self.fields['grade'].required = False
         self.fields['school'].required = False
         self.fields['goal'].widget.attrs.setdefault(
@@ -285,10 +290,12 @@ class ProfileForm(forms.ModelForm):
         user.first_name = self.cleaned_data['first_name'].strip()
         user.last_name = self.cleaned_data['last_name'].strip()
         user.username = self.cleaned_data['username']
-        user.email = self.cleaned_data['email']
+        fields = ['first_name', 'last_name', 'username']
+        if 'email' in self.fields:
+            user.email = self.cleaned_data['email']
+            fields.append('email')
         if commit:
-            user.save(update_fields=['first_name', 'last_name', 'username',
-                                     'email'])
+            user.save(update_fields=fields)
         return profile
 
 
