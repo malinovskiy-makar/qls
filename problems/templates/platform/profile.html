@@ -428,6 +428,8 @@
 .note--mail svg { flex: none; color: var(--text2); }
 .note--mail span { flex: 1 1 220px; }
 .pf-card--mail { max-width: none; }
+/* Под карточкой помощника, в колонке формы: иначе сетка ставит её в узкую колонку связи. */
+@media (min-width: 960px) { .pf-card--mail { grid-column: 1; } }
 .pf-switch { display: inline-flex; align-items: center; gap: 10px; padding: 0;
              font: inherit; font-size: 14px; color: var(--text); background: none;
              border: 0; cursor: pointer; text-align: left; }
