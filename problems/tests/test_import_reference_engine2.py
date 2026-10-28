@@ -142,6 +142,20 @@ class EngineNight2810Tests(_EngineBase):
         self.rollback(journal)
         self.assertFalse(OlympiadRef.objects.filter(problem=self.bank, event_id=EV).exists())
 
+    def test_kit_item_of_other_variant_repeat_is_zero(self):
+        """Пункт комплекта из варианта 2 в задачу, привязанную к варианту 1, — номер «4:2»;
+        повтор его узнаёт и не привязывает снова (МОШ v7, ночь 28.10)."""
+        rows = [_r(4, LONG, task_variant='1'), _r(4, LONG + ' Пункт б.', task_variant='2')]
+        dec = [{'key': f'{EV}:4:1', 'decision': 'link', 'bank_id': self.bank.id, 'decided_by': 'claude:x'},
+               {'key': f'{EV}:4:2', 'decision': 'link', 'bank_id': self.bank.id, 'decided_by': 'claude:x'}]
+        self.apply(rows, decisions=dec)
+        ref = OlympiadRef.objects.get(problem=self.bank, event_id=EV)
+        self.assertEqual(ref.raw_meta['kit_numbers'], ['4:2'])
+        self.apply(rows, decisions=dec)                     # повтор — ноль
+        ref.refresh_from_db()
+        self.assertEqual(ref.raw_meta['kit_numbers'], ['4:2'])
+        self.assertEqual(OlympiadRef.objects.filter(problem=self.bank).count(), 1)
+
     def test_missing_figure_file_hidden_not_crash(self):
         fig = {'path': 'figures_v2/нет_такого.png', 'caption': '', 'flag': '', 'page': 1}
         self.apply([_r(1, LONG, figures=[fig])])

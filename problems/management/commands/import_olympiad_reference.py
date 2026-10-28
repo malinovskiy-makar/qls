@@ -255,7 +255,9 @@ class Command(BaseCommand):
                 variant = ref.record_id.split(':', 3)[3]      # official:<ev>:<№>:<вариант>
             taken.setdefault((ev, ref.number, variant), ref.problem_id)
             for n in (ref.raw_meta or {}).get('kit_numbers') or []:
-                taken.setdefault((ev, str(n), variant), ref.problem_id)
+                # «N:вариант» — пункт комплекта из другого варианта файла (см. _link).
+                num, _sep, kit_variant = str(n).partition(':')
+                taken.setdefault((ev, num, kit_variant or variant), ref.problem_id)
             for extra in (ref.raw_meta or {}).get('also_variants') or []:
                 taken.setdefault((ev, str(extra['number']), extra.get('variant') or ''),
                                  ref.problem_id)
@@ -893,7 +895,12 @@ class Command(BaseCommand):
             ref_id = item['kit_add_ref'] or self._created_refs.get((item['pid'], row['event_id']))
             if ref_id is None:
                 ref_id = OlympiadRef.objects.get(problem_id=item['pid'], event_id=row['event_id']).id
-            self._add_to_ref_meta(ref_id, 'kit_numbers', str(row['number']), created)
+            # Вариант строки пишется рядом с номером: строка тура хранит свой вариант,
+            # и без него повтор не узнал бы пункт «4, вариант 2» и привязал бы снова.
+            number = str(row['number'])
+            if row.get('task_variant'):
+                number = f'{number}:{row["task_variant"]}'
+            self._add_to_ref_meta(ref_id, 'kit_numbers', number, created)
             return
         meta = {'origin': ORIGIN + '_link', 'confirm': item['reason'],
                 'fuzzy': item['ratio'], 'containment': item['contain'], 'candidate_from': item['via'],
