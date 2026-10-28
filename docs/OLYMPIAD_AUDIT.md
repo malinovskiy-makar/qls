@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-29 (сессия Q1: слияние веток импорта, v7 и ВсОШ). Ранее — 2026-10-14 (сессия И2, часть 1: импорт из эталона `import_olympiad_reference`, автопубликация, `merge_enrichment_import`); 2026-10-14 (эталон ВП + МОШ v5: слои заплаток pages_v3 + pages_v5, профиль сборки ECON, apply-fixes / sweeps / reread-queue / max-score)
+> **Обновлён:** 2026-10-29 (сессия Q3: проверка людьми и приёмка, `olympiad_review`; сессия Q1: слияние веток импорта, v7 и ВсОШ). Ранее — 2026-10-14 (сессия И2, часть 1: импорт из эталона `import_olympiad_reference`, автопубликация, `merge_enrichment_import`); 2026-10-14 (эталон ВП + МОШ v5: слои заплаток pages_v3 + pages_v5, профиль сборки ECON, apply-fixes / sweeps / reread-queue / max-score)
 > **Статус:** актуален
 
 # Аудит олимпиад по официальному эталону
@@ -894,6 +894,84 @@ Sonnet, страницы которых ушли Haiku.
 (`key_blocks`, `fill_test_keys`) раздаёт ключ вопросам «тест-N» по видам
 источника по очереди и снимает его с задачи; сетки-отметки («| | ДА | |»)
 не разбираются — остаются флагом `тест_без_ключа`.
+
+## Проверка людьми и приёмка (`olympiad_review`, Q3, 29.10.2026)
+
+Решение 28.10 «Олимпиадные задачи идут на сайт только через контур качества»:
+места, где модели не уверены, разбирают **люди** (Андрей, Анич) на автономной
+странице с кнопками, решения применяются в базу командой; перед открытием
+раздела — выборочная приёмка 100 задач на олимпиаду, порог < 3 дефектов на 100.
+Код — `problems/olympiad_review/`, команда — `olympiad_review`. Папка волны —
+`weconomics-data\quality_20261029\` (`--quality-dir` / `OLYMPIAD_QUALITY_DIR`).
+
+```bash
+# 1. очередь: P1 (link_review.csv, claude_check_14), P2 (morning_vN.1.jsonl), Q1, Q2, дефекты приёмки
+olympiad_review queue                       # → queues\human_queue.jsonl, auto_fixes.jsonl, missing_tasks.jsonl
+# 2. пакеты: следующие N карточек, не выданные никому; самопроверка headless Chrome по file://
+olympiad_review pack --size 60 --reviewer "Андрей" [--olympiad vp] [--source p2_recheck] [--count 2]
+# 3. решения → база / reference_overrides.jsonl
+olympiad_review apply --decisions decisions\*.json [--include-auto]                 # сухой
+olympiad_review apply --decisions … --rehearsal      # на копии (REVIEW_DB_PATH, settings_review)
+olympiad_review apply --decisions … --apply --yes-i-have-owner-approval
+olympiad_review apply --rollback apply\journal_<…>.json --apply --yes-i-have-owner-approval
+# 4. приёмка
+olympiad_review acceptance --olympiad vp --olympiad mosh --n 100 --seed 20261029
+olympiad_review acceptance-report           # → acceptance_report.md, queues\acceptance_defects.jsonl
+```
+
+**Общий формат позиции** (Q1, Q2, Q3 пишут и читают одинаково):
+`{item_id, source, olympiad, ref_key, problem_id, check, details, page_images, current, proposed, confidence}`
+(+ `auto: true` у безопасных автоисправлений Q1 — людям не показываются, применяются `--include-auto`).
+`current`/`proposed` — поля **банка** (title, statement, parts, solution, answer): строка
+эталона переводится в них тем же `reference_import.build_fields`, что и при импорте;
+правка поля эталона P2 → сборка исправленной строки → в предложение только изменившиеся поля.
+
+**Карточка** — позиции об одной задаче, склеенные по `problem_id` и `ref_key` (транзитивно);
+порядок — видимые на сайте, затем ВП → МОШ → ВсОШ ЗЭ/РЭ → остальное. `item_id`
+карточки (`p<id>` или `r:<ключ>`) — то, что рецензент пишет в решении.
+
+**Пакет** — `packs\<дата>_<рецензент>_NN\`: `index.html` (данные внутри, KaTeX вложен,
+разделители и маскировка долларов — дословно `templates/_katex_dollars.html`, задача
+отрисована `problems/rendering.py`), `img\pages\*.webp` (страницы ≤ 1500 px), `img\fig\`,
+`cards.jsonl` — снимок карточек на момент выдачи (по нему `apply` видит, что задачу
+правили после пакета), `selfcheck.json` — ошибки KaTeX и битые картинки. Решения — в
+localStorage браузера и кнопкой «Скачать решения» (JSON:
+`{pack_id, reviewer, mode, decisions: [{item_id, decision, edited, reviewer, comment, ts}]}`).
+Инструкция людям — `packs\КАК_ПРОВЕРЯТЬ.md`.
+
+| Решение | Задача в банке | Строки эталона нет в банке (`reference_overrides.jsonl`) |
+|---|---|---|
+| `ok` | позиция закрыта | `ok` — человек сверил (снимает пропуск `needs_eyes`); у пары — `new` |
+| `accept_proposed` | поля из предложения, снимок в `ProblemVersion` | `edit` с предложением; у пары — `link` к задаче банка |
+| `edit` | поля из правки, снимок в `ProblemVersion` | `edit` с правкой |
+| `hide` | `content_status = needs_fix` | завести скрытой |
+| `not_a_task` | `content_status = junk` (ничего не удаляется) | не заводить |
+| `skip` | карточка снова в очереди (снята с `packs_index.json`) | то же |
+
+Поле правится, только если в базе оно такое же, каким было в пакете (`card.base`) —
+иначе конфликт; меньше подпунктов, чем в банке, — конфликт (удалять подпункты нельзя).
+Два рецензента решили по-разному — спор (`queues\disputed.jsonl`), позиция остаётся.
+Применённые позиции — `queues\closed.jsonl` (повтор `queue` их не показывает).
+
+`reference_overrides.jsonl` лежит в папке аудита олимпиады; `import_olympiad_reference`
+(`--overrides`, `--no-overrides`; по умолчанию файл папки аудита) кладёт поля правки
+поверх сборки и берёт `link`/`new`/`not_a_task` как разметку пар сильнее судьи;
+`update_olympiad_reference` накладывает правку на обе сборки — она не затирается
+новой версией эталона.
+
+**Приёмка.** Выборка — видимые задачи олимпиады (строки `OlympiadRef`; предпринимательство
+МОШ под `mosh-fingram` отделяется по `event_id`), слои (год, этап), внутри слоя перемешивание
+с `seed`, затем по кругу. Рецензентам — чередующиеся задачи выборки. Галочки дефектов
+(`common.ACCEPTANCE_DEFECTS`) или «дефектов нет». Отчёт: задач с дефектом на 100,
+95 % интервал Уилсона, вердикт «можно открывать» при ≥ 100 просмотренных и < 3 на 100.
+
+⚠️ **Ловушки.**
+- `update_olympiad_reference` с конфликтом хотя бы в одном поле не трогает задачу
+  целиком (до 29.10 обновлял остальные поля — у #63751 сменился бы вид теста при старых вариантах).
+- Встроенный браузер и playwright MCP не открывают `file://`; самопроверка пакета —
+  headless Chromium из `%LOCALAPPDATA%\ms-playwright` (`PACK_CHECK_CHROME`).
+- Тексты правок P2 обрезаны на 3000 знаков (`field_text`) — такие предложения людям
+  не предлагаются, только в описании.
 
 ## Следующая олимпиада
 

@@ -11,7 +11,8 @@
 = ключ эталона. Поля задачи собираются тем же `reference_import.build_fields`
 из СТАРОЙ и НОВОЙ строки; меняется только поле, которое изменилось в эталоне,
 и только если в базе оно всё ещё равно старой сборке (никто не правил руками
-и обогащение его не трогало) — иначе конфликт в отчёт. Подпункты — на месте;
+и обогащение его не трогало) — иначе конфликт в отчёт, и тогда задача не
+обновляется целиком (Q3, 29.10: половинчатое обновление ломает тесты). Подпункты — на месте;
 если их в новой версии меньше — конфликт (удалять не берусь: к подпунктам
 привязаны подсказки). Перед изменением — снимок в `ProblemVersion`. Журнал;
 откат возвращает поле, если его с тех пор не меняли.
@@ -104,6 +105,7 @@ class Command(BaseCommand):
                 ov_rules.apply_fields(of, overrides[key])
                 ov_rules.apply_fields(nf, overrides[key])
             problem = Problem.objects.get(pk=pid)
+            had = len(conflicts)
             change = {'id': pid, 'key': key, 'fields': {}, 'parts': None, 'new_fields': nf}
             for field in FIELDS:
                 old, new = of[field], nf[field]
@@ -126,6 +128,10 @@ class Command(BaseCommand):
                     conflicts.append((key, pid, 'parts', 'в новой версии подпунктов меньше'))
                 else:
                     change['parts'] = _parts(nf)
+            if len(conflicts) > had:
+                # Конфликт хотя бы в одном поле — задачу не трогаем целиком: иначе
+                # вид теста сменится, а варианты останутся старыми (ВП v7.1, #63751).
+                continue
             if change['fields'] or change['parts']:
                 plan.append(change)
             else:

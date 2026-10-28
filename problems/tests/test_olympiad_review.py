@@ -436,3 +436,64 @@ class AcceptanceTests(SimpleTestCase):
         items = acc.defect_items(bad)
         self.assertEqual(items[0]['problem_id'], 1)
         self.assertEqual(items[0]['source'], 'acceptance')
+
+
+class UpdateWholeProblemAndOverridesTests(TestCase):
+    """update_olympiad_reference: конфликт в подпунктах — задача не обновляется целиком;
+    правка человека из reference_overrides не затирается новой версией эталона."""
+
+    def setUp(self):
+        from problems.tests import test_import_reference_engine2 as eng
+        self.eng = eng
+        self.base = eng._EngineBase(methodName='run')
+        self.base.setUp()
+        self.addCleanup(self.base.doCleanups)
+
+    def write(self, name, rows):
+        path = os.path.join(self.base.tmp, name)
+        _write_jsonl(path, rows)
+        return path
+
+    def update(self, journal, old, new, *extra):
+        call_command('update_olympiad_reference', '--olympiad', self.eng.ENTR, '--journal', journal,
+                     '--old', old, '--new', new, '--old-digitized', self.base.dig, '--new-digitized',
+                     self.base.dig, '--out-dir', self.base.tmp, '--apply', '--yes-i-have-owner-approval',
+                     *extra, stdout=self.eng._quiet())
+
+    def test_parts_conflict_blocks_whole_problem(self):
+        eng = self.eng
+        text = eng.LONG + '\n\n1) Найдите выручку\n\n2) Найдите прибыль'
+        old = [eng._r(1, text, parts=[{'label': '1', 'text': 'Найдите выручку'},
+                                      {'label': '2', 'text': 'Найдите прибыль'}], answer='1) 10 2) 5')]
+        journal = self.base.apply(old)
+        p = Problem.objects.get(source_references__problem_number=f'{eng.EV}:1')
+        new = [eng._r(1, eng.LONG + '\n\n1) Найдите выручку', parts=[{'label': '1', 'text': 'Найдите выручку'}],
+                      answer='1) 10', title='Новый заголовок')]
+        self.update(journal, self.write('o.jsonl', old), self.write('n.jsonl', new))
+        p.refresh_from_db()
+        self.assertEqual(p.parts.count(), 2)
+        self.assertEqual(ProblemVersion.objects.filter(problem=p).count(), 0)
+        self.assertNotEqual(p.title, 'Новый заголовок')
+
+    def test_override_survives_new_version(self):
+        eng = self.eng
+        ov = self.write('ov.jsonl', [{'ref_key': f'{eng.EV}:1', 'action': 'edit',
+                                      'fields': {'statement': 'Текст, исправленный человеком.'}}])
+        old = [eng._r(1, eng.LONG)]
+        old_path = self.write('o.jsonl', old)
+        queue = os.path.join(self.base.dig, 'reference_problems_v2.jsonl')
+        _write_jsonl(queue, old)
+        with open(os.path.join(self.base.out, 'bank_candidates.json'), 'w', encoding='utf-8') as h:
+            json.dump({'meta': {}, 'candidates': {}}, h)
+        call_command('import_olympiad_reference', '--olympiad', eng.ENTR, '--queue', queue, '--digitized',
+                     self.base.dig, '--out-dir', self.base.out, '--no-katex', '--bundle-date', '20261029',
+                     '--overrides', ov, '--apply', '--yes-i-have-owner-approval', stdout=eng._quiet())
+        journal = os.path.join(self.base.out, sorted(f for f in os.listdir(self.base.out)
+                                                     if f.startswith('import_') and 'dryrun' not in f)[-1])
+        p = Problem.objects.get(source_references__problem_number=f'{eng.EV}:1')
+        self.assertEqual(p.statement, 'Текст, исправленный человеком.')
+        new = [eng._r(1, eng.LONG + ' Новое предложение эталона.', answer='43')]
+        self.update(journal, old_path, self.write('n.jsonl', new), '--overrides', ov)
+        p.refresh_from_db()
+        self.assertEqual(p.statement, 'Текст, исправленный человеком.')
+        self.assertEqual(p.answer, '43')
