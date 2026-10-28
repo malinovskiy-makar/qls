@@ -50,6 +50,8 @@ class Command(BaseCommand):
         parser.add_argument('--temperature', default='none')
         parser.add_argument('--judge', default='')
         parser.add_argument('--second-judge', default='')
+        # Прогоны решателей того же семейства, что судья: их оценки — в споры (предвзятость).
+        parser.add_argument('--self-judged', default='')
         parser.add_argument('--chat-max-tokens', type=int, default=0)
         parser.add_argument('--leak-tasks', type=int, default=40)
         parser.add_argument('--pressure', type=int, default=0)
@@ -187,12 +189,14 @@ class Command(BaseCommand):
         labels = [x for x in o['labels'].split(',') if x]
         runs = {label: v1run.load_run(directory, label, o['judge']) for label in labels}
         if action == 'disputes':
-            items = v1run.dispute_items(rows, runs, o['judge'])
+            self_labels = tuple(x for x in o['self_judged'].split(',') if x)
+            items = v1run.dispute_items(rows, runs, o['judge'], self_labels=self_labels)
             path = os.path.join(directory, 'disputes_v1.html')
             with open(path, 'w', encoding='utf-8') as handle:
                 handle.write(v1run.disputes_html(rows, items, o['judge']))
-            self.stdout.write('споров %d (эталон под сомнением %d) → %s' % (
-                len(items), sum(1 for i in items if i[0] != 'случайная проверка'), path))
+            self.stdout.write('споров %d (эталон под сомнением %d, Claude судит Claude %d) → %s' % (
+                len(items), sum(1 for i in items if i[0] == 'эталон под сомнением'),
+                sum(1 for i in items if i[0] == 'Claude судит Claude'), path))
             return
         out = {}
         for label, (solved, judged) in runs.items():

@@ -14,6 +14,7 @@ check_budget=False, check_limit=False, cache_seconds=0)`. Файлы прого�
 Деньги: `max_usd` — потолок на ВСЮ папку прогона (уже потраченное в файле +
 новое). Дошли — новые вызовы не начинаются.
 """
+import collections
 import json
 import os
 import random
@@ -499,8 +500,14 @@ def load_run(directory, label, judge_model=None):
 
 # ── Споры для человека ──────────────────────────────────────────────────
 
-def dispute_items(rows, runs, judge_model, share=0.10, seed=PILOT_SEED):
-    """Все `reference_suspect` + случайные `share` оценок блока B (не меньше одной)."""
+def dispute_items(rows, runs, judge_model, share=0.10, seed=PILOT_SEED, self_labels=(),
+                  self_gap=0.3):
+    """Все `reference_suspect` + случайные `share` оценок блока B (не меньше одной).
+
+    `self_labels` — прогоны решателей того же семейства, что судья (Claude судит
+    Claude): их оценка идёт в споры, если судья не уверен (confidence не high) или
+    доля балла выше медианы остальных моделей на той же задаче на `self_gap` и больше —
+    возможная предвзятость к «своим» решениям проверяется человеком."""
     by_key = {r['key']: r for r in rows}
     graded = []
     for label, (solved, judged) in sorted(runs.items()):
@@ -508,10 +515,24 @@ def dispute_items(rows, runs, judge_model, share=0.10, seed=PILOT_SEED):
             if 'share' in verdict and key in by_key and key in solved:
                 graded.append((label, key, verdict, solved[key]))
     suspects = [g for g in graded if g[2]['verdict'].get('reference_suspect')]
-    rest = [g for g in graded if not g[2]['verdict'].get('reference_suspect')]
+    others = collections.defaultdict(list)
+    for label, key, verdict, _rec in graded:
+        if label not in self_labels:
+            others[key].append(verdict['share'])
+    biased = []
+    for g in graded:
+        label, key, verdict, _rec = g
+        if label not in self_labels or g in suspects:
+            continue
+        peers = others.get(key)
+        high_gap = bool(peers) and verdict['share'] - statistics.median(peers) >= self_gap
+        if high_gap or verdict['verdict'].get('confidence') != 'high':
+            biased.append(g)
+    rest = [g for g in graded if g not in suspects and g not in biased]
     rng = random.Random(seed)
     sample = rng.sample(rest, min(len(rest), max(1, round(share * len(graded))))) if rest else []
     return ([('эталон под сомнением',) + g for g in suspects]
+            + [('Claude судит Claude',) + g for g in biased]
             + [('случайная проверка',) + g for g in sample])
 
 

@@ -88,8 +88,8 @@ class ExclusionTests(SimpleTestCase):
         statement = 'Какая часть добычи достанется капитану при таком дележе добычи?' + options
         self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='1/10')))
         self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='[2]')))
-        # Совпадает только значение («0,1» и «$1/10$» текстом разные) — тоже выбор.
-        self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='0,1')))
+        # Совпадает только значение («0.1» и «$1/10$» текстом разные) — тоже выбор.
+        self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='0.1')))
         rows = ('\n\n| | |\n|---|---|\n| 1 | Прав. |\n| 2 | Не прав, другое. |\n'
                 '| 3 | Нельзя сказать. |')
         self.assertTrue(reference.is_choice(ref_row(
@@ -300,6 +300,31 @@ class FakeBatches(object):
         message = _Obj(content=[_Obj(type='text', text=JUDGE_REPLY)], usage=usage)
         for req in self.created:
             yield _Obj(custom_id=req['custom_id'], result=_Obj(type='succeeded', message=message))
+
+
+class DisputeTests(SimpleTestCase):
+    def test_claude_judging_claude_goes_to_disputes(self):
+        rows = [reference.exam_row(ref_row(number=str(n), solution_md='Эталон.', max_score=10), 'B')
+                for n in range(3)]
+        key = rows[0]['key']
+
+        def verdict(share, confidence='high'):
+            return {'share': share, 'solved': share >= 0.8,
+                    'verdict': {'confidence': confidence, 'reference_suspect': False, 'parts': []}}
+        solved = {r['key']: {'key': r['key'], 'solution': 'x'} for r in rows}
+        runs = {
+            'glm': (solved, {key: verdict(0.2)}),
+            'gpt': (solved, {key: verdict(0.3)}),
+            # Claude-решатель: на 0,7 выше медианы остальных — в споры; уверенно и вровень — нет.
+            'claude': (solved, {key: verdict(0.95), rows[1]['key']: verdict(0.5)}),
+        }
+        items = v1run.dispute_items(rows, runs, 'claude-sonnet-5-5', share=0.0,
+                                    self_labels=('claude',))
+        biased = [(i[1], i[2]) for i in items if i[0] == 'Claude судит Claude']
+        self.assertEqual(biased, [('claude', key)])
+        # Без self_labels этой категории нет вовсе.
+        items = v1run.dispute_items(rows, runs, 'claude-sonnet-5-5', share=0.0)
+        self.assertFalse([i for i in items if i[0] == 'Claude судит Claude'])
 
 
 class JudgeBatchTests(SimpleTestCase):
