@@ -111,6 +111,13 @@ class ParseSourcesTests(SimpleTestCase):
                          ('ru', '9-11', 'essay'))
         self.assertEqual(final['url'], 'https://vos.olimpiada.ru/upload/files/a&b.pdf')
 
+    def test_olimpiada_school_without_region_is_moscow(self):
+        row = {'season_start': '2023', 'stage': 'school', 'region_id': '', 'region': '',
+               'label': 'Задания', 'class_pages': '7', 'url': 'https://x/s.pdf',
+               'http_status': '200', 'bytes': ''}
+        school = S.olimpiada_rows([row])[0]
+        self.assertEqual((school['region_code'], school['region_name']), ('77', 'Москва'))
+
 
 class MetadataTests(SimpleTestCase):
     def test_parse_grades(self):
@@ -225,6 +232,13 @@ class DedupTests(SimpleTestCase):
         self.assertEqual(rows[3]['dup_of'], 'olim1')
         self.assertNotIn('dup_of', rows[5])
 
+    def test_loose_file_beats_archive_member_of_same_source(self):
+        rows = [{'url': 'arch#x', 'source': 'cpm', 'status': 'ok', 'sha256': 'A',
+                 'from_archive': 'arch'},
+                {'url': 'cpm1', 'source': 'cpm', 'status': 'ok', 'sha256': 'A'}]
+        vsosh_manifest.mark_duplicates(rows)
+        self.assertEqual((rows[1]['dup_of'], rows[0]['dup_of']), ('', 'cpm1'))
+
     def test_invariant_links_balance(self):
         rows = [{'url': 'a', 'status': 'ok', 'sha256': 'A'},
                 {'url': 'b', 'status': 'not_downloaded'},
@@ -262,6 +276,21 @@ class PairsTests(SimpleTestCase):
             self.assertEqual([f['sha256'] for f in ev['solution_files']], ['fs'])
             self.assertIn('solutions_shared_across_tours', ev['flags'])
         self.assertEqual([o['sha256'] for o in orphans], ['x'])
+
+    def test_exact_grade_range_wins_over_single_grades_inside(self):
+        events, _ = vsosh_prepare.build_events(
+            [_t('a', 'tasks', '9-11'), _t('b', 'tasks', '9'), _t('s', 'solutions', '9-11')])
+        self.assertEqual([f['sha256'] for f in events['vseros-regional-2024-25-ru-9-11-all']
+                          ['solution_files']], ['s'])
+        self.assertEqual(events['vseros-regional-2024-25-ru-9-all']['solution_files'], [])
+
+    def test_solution_of_one_tour_goes_to_that_tour_only(self):
+        events, _ = vsosh_prepare.build_events(
+            [_t('t1', 'tasks', '9', '1', 'final'), _t('t2', 'tasks', '9', '2', 'final'),
+             _t('s2', 'solutions', '9', '2', 'final')])
+        self.assertEqual([f['sha256'] for f in events['vseros-final-2024-25-ru-9-2']
+                          ['solution_files']], ['s2'])
+        self.assertEqual(events['vseros-final-2024-25-ru-9-1']['solution_files'], [])
 
     def test_unknown_grade_solution_pairs_only_single_group(self):
         events, orphans = vsosh_prepare.build_events(
