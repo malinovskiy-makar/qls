@@ -37,3 +37,28 @@
 | Дефект | Покраснело |
 |---|---|
 | убрать И повторную проверку, И перехват `IntegrityError` | `test_email_verified_by_other_raises_and_changes_nothing`, `test_race_other_account_confirms_after_free_check` (ERROR: IntegrityError) |
+
+## Фаза 1. Модели и правило стены
+
+- `7b69be1a`. Миграция `vp/0005_wall` (`VPWall`, `VPTelegramLink`, `VPTelegramToken`) —
+  только `vp`; применена к копии (`migrate --settings=config.settings_check`).
+- Правило — `vp/wall.py` (`required`, `paths`, `step`, `pass_contact` атомарным
+  `UPDATE … WHERE contact_via=''`). Подтверждённая почта контактом не считается.
+- `vp.views.start`: гость → регистрация с `next=интро?wall=1` безусловно, выбор
+  режима — в `session['vp_wall_next']`; несданная попытка — до стены; стена →
+  `?wall=1` без попытки; нет путей → `?wall=closed` + предупреждение в лог. Тело
+  создания попытки — `_start_attempt`.
+- Настройки: `VP_WALL_ENABLED` (тесты 0, иначе 1, в боевых не переопределено),
+  `VP_WALL_TG_ENABLED`, `TELEGRAM_*` (в тестах пустые), `config.WALL_TOURS=(2,)`.
+- `vp.W001` (предупреждение), `ci.yml` джоб `deploy-check` — подставные `TELEGRAM_*`
+  и почта. Команда `vp_wall_status`.
+- `student_band`: анкета после `session['vp_band']`, до класса последней попытки.
+- `test_gate`: 4 ожидания адреса `next` (строки 28, 70, 71, 129) → `…%3Fwall%3D1`.
+- Новые тесты `vp/tests/test_wall_rule.py`: 15. Тесты сессии: 620 → **635**, OK.
+
+| Дефект | Покраснело |
+|---|---|
+| `start` не спрашивает стену | `test_no_contact_goes_to_wall_without_attempt`, `test_contact_without_survey_still_walls`, `test_verified_email_alone_is_not_a_contact`, `test_staff_meets_the_wall_on_tour2_but_not_on_tour1`, `test_no_paths_at_all_closes_the_entrance` |
+| `step` считает `has_verified_email` контактом | `test_verified_email_alone_is_not_a_contact` |
+| несданная попытка проверяется после стены | `test_unfinished_attempt_returns_without_wall` |
+| класс из анкеты выше сессии | `test_tab_choice_in_session_beats_survey` |
