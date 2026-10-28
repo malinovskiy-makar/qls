@@ -24,6 +24,7 @@ import json
 import logging
 import secrets
 from datetime import timedelta
+from decimal import Decimal
 
 from django.db.models import Q
 from django.db import transaction
@@ -967,8 +968,14 @@ def result(request, code):
             .order_by('-started_at', '-id')))
         place = board.place_of(attempt)
         band = '' if attempt.variant.tour == 1 else attempt.variant.grade_band
+        chain = review.chain_review(attempt)
         context.update(
-            chain=review.chain_review(attempt), tests=tests,
+            chain=chain, tests=tests,
+            # Шапка змейки: «50 / 60 · 25 слов из 30» — суммы баллов из `VPAnswer`, не пересчёт.
+            chain_score=sum((c['score'] for c in chain), Decimal('0')),
+            chain_max=sum((c['item'].points for c in chain), Decimal('0')),
+            chain_ok=sum(1 for c in chain if c['is_correct']),
+            visible_tours=config.VISIBLE_TOURS,
             practice_url=reverse('vp:practice', args=[code]),
             offer_signup=not request.user.is_authenticated,
             format_losses=review.format_losses(attempt),

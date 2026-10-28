@@ -240,3 +240,26 @@
   window.addEventListener('hashchange', fromHash);
   fromHash();
 })();
+
+/* ── Змейка 1 тура: чип открывает панель своего слова (без JS — все панели списком) ── */
+(function () {
+  'use strict';
+
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.vp-cw[data-word]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('[data-panel]'));
+  if (!chips.length || !panels.length) return;
+
+  function select(number) {
+    chips.forEach(function (chip) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('data-word') === number ? 'true' : 'false');
+    });
+    panels.forEach(function (panel) { panel.hidden = panel.getAttribute('data-panel') !== number; });
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () { select(chip.getAttribute('data-word')); });
+  });
+  // Сначала — первое неверное слово (там есть что разобрать), иначе первое.
+  var first = chips.filter(function (chip) { return chip.classList.contains('is-bad'); })[0] || chips[0];
+  select(first.getAttribute('data-word'));
+})();

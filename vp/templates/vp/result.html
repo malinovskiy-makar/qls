@@ -95,48 +95,60 @@
   <div class="vp-res-grid">
     <div class="vp-res-main">
     {% if chain %}
-    <div class="vp-card" id="vp-chain">
-      <div class="vp-card-head">
-        <h2 class="vp-h3">Змейка целиком</h2>
-        <span class="vp-mute">Каждый ответ начинается со второй буквы предыдущего. Красным отмечено, где цепь порвалась.</span>
+    {% comment %}
+    Змейка 1 тура (архив, макет 03): цепочка слов-чипов, под ней панель выбранного слова —
+    определение, ваш ответ, эталон (только отвеченному), буква-связка и где порвалось. Без JS
+    видны все панели списком; `result.js` оставляет одну, выбранную чипом. Классы `vp-crow`,
+    `vp-clink` и `id="vp-r-N"` у панелей держат проверки (`test_review`, `browser_take.mjs`).
+    {% endcomment %}
+    <section class="vp-card vp-snake" id="vp-chain" aria-labelledby="vp-chain-h">
+      <div class="vp-snake-top">
+        <h2 class="vp-h3" id="vp-chain-h">Змейка целиком</h2>
+        <span class="vp-mute">{{ variant|with_band }}{% if variant.tour not in visible_tours %} · архив{% endif %}</span>
+        <span class="vp-snake-sum"><b>{{ chain_score|num }}</b> / {{ chain_max|num }} · {{ chain_ok }} {{ chain_ok|plural_word:"слово,слова,слов" }} из {{ chain|length }}</span>
       </div>
-      <ol class="vp-chain">
+      <p class="vp-mute">Каждый ответ начинается со второй буквы предыдущего. Нажмите на слово – откроется определение, ваш ответ и связка.</p>
+      <ol class="vp-chips-w" aria-label="Цепочка слов">
         {% for c in chain %}
-        <li>
-          <div class="vp-crow {% if c.blank %}is-blank{% elif c.is_correct %}is-ok{% else %}is-bad{% endif %}" id="vp-r-{{ c.number }}">
-            <span class="vp-crow-n">{{ c.number }}</span>
-            <span class="vp-dot" aria-hidden="true"></span>
-            <span class="vp-crow-main">
-              {% if c.blank %}
-              <span class="vp-mute"><span class="vp-sr">Задание {{ c.number }}: </span>не отвечено</span>
-              {% else %}
-              <span class="vp-crow-mine"><span class="vp-sr">Задание {{ c.number }}, {% if c.is_correct %}верно{% else %}неверно{% endif %}: </span>{{ c.mine }}</span>
-              {% if not c.is_correct %}<span class="vp-crow-right">эталон: <b>{{ c.right }}</b></span>{% endif %}
-              {% endif %}
-            </span>
-            <span class="vp-crow-pts">{{ c.score|signed }}</span>
-            {% if c.blank %}
-            {% if c.statement %}<div class="vp-crow-text">{{ c.statement|nbsp_num|linebreaksbr }}</div>{% endif %}
-            {% include 'vp/_practice.html' with number=c.number kind='short_text' options=None prefix=c.prefix suffix=c.suffix %}
-            {% endif %}
-          </div>
-          {% if c.link_letter %}
-          <div class="vp-clink{% if c.broke_chain %} is-broken{% endif %}">
-            {% if c.broke_chain %}
-            здесь цепь порвалась: следующий ответ должен был начинаться на «{{ c.link_letter }}», а {% if c.my_letter %}у вас вторая буква «{{ c.my_letter }}»{% else %}в вашем ответе нет второй буквы{% endif %}
-            {% elif c.blank %}
-            следующий ответ на «{{ c.link_letter }}»
-            {% else %}
-            вторая буква «{{ c.link_letter }}» → следующий ответ на «{{ c.link_letter }}»
-            {% endif %}
-          </div>
-          {% endif %}
-        </li>
+        <li><button type="button" class="vp-cw {% if c.blank %}is-blank{% elif c.is_correct %}is-ok{% else %}is-bad{% endif %}" data-word="{{ c.number }}" aria-controls="vp-r-{{ c.number }}" aria-pressed="false"><span class="vp-cw-n">{{ c.number }}</span>{% if c.blank %}<i>без ответа</i>{% elif c.is_correct %}{{ c.mine }}{% else %}<s>{{ c.mine }}</s> {{ c.right }}{% endif %}</button>{% if c.broke_chain %}<span class="vp-cw-break" aria-label="здесь цепь порвалась">✕</span>{% elif not forloop.last %}<span class="vp-cw-arr" aria-hidden="true">→</span>{% endif %}</li>
         {% endfor %}
       </ol>
-    </div>
+      <div class="vp-snake-legend"><span><i class="is-ok"></i>верно</span><span><i class="is-bad"></i>неверно: зачёркнут ваш ответ, рядом верный</span><span class="is-x">✕ здесь цепь порвалась</span><span><i class="is-blank"></i>без ответа</span></div>
+      <div class="vp-snake-panels" data-snake-panels>
+        {% for c in chain %}
+        <div class="vp-crow vp-cpanel {% if c.blank %}is-blank{% elif c.is_correct %}is-ok{% else %}is-bad{% endif %}" id="vp-r-{{ c.number }}" data-panel="{{ c.number }}">
+          <div class="vp-cpanel-q">
+            <div class="vp-zmeta">Задание {{ c.number }} · змейка · {{ c.item.points|points_word }}</div>
+            <p class="vp-crow-text">{{ c.statement|nbsp_num|linebreaksbr }}</p>
+          </div>
+          <div class="vp-cpanel-a">
+            {% if c.blank %}
+            <div class="vp-numbox"><dt>Ваш ответ · 0</dt><dd class="vp-mute">не отвечено</dd></div>
+            {% include 'vp/_practice.html' with number=c.number kind='short_text' options=None prefix=c.prefix suffix=c.suffix %}
+            {% else %}
+            <dl class="vp-cpanel-nums">
+              <div class="vp-numbox{% if not c.is_correct %} is-bad{% else %} is-ok{% endif %}"><dt>Ваш ответ · {{ c.score|num }}</dt><dd class="vp-crow-mine"><span class="vp-sr">Задание {{ c.number }}, {% if c.is_correct %}верно{% else %}неверно{% endif %}: </span>{{ c.mine }}</dd></div>
+              {% if not c.is_correct %}<div class="vp-numbox is-ok"><dt>Верный ответ</dt><dd class="vp-crow-right">эталон: <b>{{ c.right }}</b></dd></div>{% endif %}
+            </dl>
+            {% endif %}
+            {% if c.link_letter %}
+            <div class="vp-clink{% if c.broke_chain %} is-broken{% endif %}">
+              <b>Связка</b>
+              {% if c.broke_chain %}
+              здесь цепь порвалась: следующий ответ должен был начинаться на «{{ c.link_letter }}», а {% if c.my_letter %}у вас вторая буква «{{ c.my_letter }}»{% else %}в вашем ответе нет второй буквы{% endif %}
+              {% elif c.blank %}
+              следующий ответ на «{{ c.link_letter }}»
+              {% else %}
+              вторая буква «{{ c.link_letter }}» → следующий ответ на «{{ c.link_letter }}»
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
     {% endif %}
-
 
       {# ─── Разбор по заданиям ───────────────────────────────────── #}
       <section class="vp-card vp-z" id="vp-tests" aria-labelledby="vp-z-h">
