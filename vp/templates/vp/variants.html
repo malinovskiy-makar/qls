@@ -48,14 +48,14 @@
         <span class="vp-vcard-src">{{ card.variant.year }}</span>
         {% endif %}
       </div>
-      <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant.title }}</a></h2>
-      <p class="vp-vcard-m">{{ card.variant.get_source_kind_display }}{% if card.variant.source_note %} · {{ card.variant.source_note }}{% endif %}{% if card.variant.author %} · {{ card.variant.author }}{% endif %}</p>
+      <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant|with_band }}</a></h2>
+      <p class="vp-vcard-m">{{ card.meta }}{% if card.variant.source_note %} · {{ card.variant.source_note }}{% endif %}{% if card.variant.author %} · {{ card.variant.author }}{% endif %}</p>
 
       <div class="vp-vcard-f">
         {% if not card.variant.is_published %}
         <span class="vp-st is-draft">Не опубликован</span>
-        {% elif not card.status %}
-        <span class="vp-st">{{ card.count|plural:"задание,задания,заданий" }} · {{ card.minutes|plural:"минута,минуты,минут" }}</span>
+        {% elif not card.status %}{# гостю строки статуса нет: состав варианта уже в строке меты #}
+        <span class="vp-st"></span>
         {% elif card.status.kind == 'live' %}
         <span class="vp-st is-live"><span class="vp-land-live"><i aria-hidden="true"></i></span>Начат · {{ card.status.answered }} из {{ card.status.count }}</span>
         {% elif card.status.kind == 'ranked' %}

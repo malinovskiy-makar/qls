@@ -69,7 +69,7 @@ class VariantsScreenTests(TestCase):
 
     def test_05_guest_sees_the_format_and_no_status(self):
         html = page(Client())
-        self.assertIn('44 задания · 30 минут', html)
+        self.assertIn('44 задания · 30 мин', html)       # строка меты (сессия R)
         for absent in ('Не решали', 'в таблице', 'Начат ·', 'Продолжить'):
             self.assertNotIn(absent, html, absent)
         self.assertIn('понадобится короткая бесплатная регистрация', html)

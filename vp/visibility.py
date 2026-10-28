@@ -15,6 +15,11 @@ def visible_variants():
     return VPVariant.objects.filter(is_published=True, tour__in=config.VISIBLE_TOURS)
 
 
+def tour_visible(tour):
+    """Виден ли тур в разделе (иначе его попытки — архив)."""
+    return tour in config.VISIBLE_TOURS
+
+
 def is_visible(variant):
     return variant.is_published and variant.tour in config.VISIBLE_TOURS
 

@@ -16,8 +16,8 @@
   <div class="vp-head">
     <div class="vp-head-main">
       <div class="vp-eyebrow">Отборочный этап · {{ variant.tour }} тур</div>
-      <h1 class="vp-h1">{{ variant.title }}</h1>
-      <div class="vp-sub">{{ variant.grade_band|grade_label }} · {{ variant.year }}{% if variant.author %} · {{ variant.author }}{% endif %}{% if variant.source_note %} · {{ variant.source_note }}{% endif %}</div>
+      <h1 class="vp-h1">{{ variant|with_band }}</h1>
+      <div class="vp-sub">{{ variant.year }}{% if variant.author %} · {{ variant.author }}{% endif %}{% if variant.source_note %} · {{ variant.source_note }}{% endif %}</div>
       {% if variant.source_label %}<div class="vp-source">Источник: <a class="vp-link" href="{{ variant.source_url }}" target="_blank" rel="noopener">{{ variant.source_label }}</a></div>{% endif %}
     </div>
     <div class="vp-head-clock">
@@ -47,10 +47,10 @@
       <div class="vp-stack">
         {% if whole_ranges %}<div>Задания {{ whole_ranges|join:" и " }} – или полный балл, или ноль.</div>{% endif %}
         {% if partial_ranges %}
-        <div>В заданиях {{ partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд – гарантированный ноль.</div>
+        <div>{{ partial_phrase }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд – гарантированный ноль.</div>
         {% if penalty_example %}<div class="vp-note">Если в задании 2 верных и 3 неверных, верный даёт +{{ penalty_example.0|num }}, лишний – −{{ penalty_example.1|num }}. Ниже нуля за одно задание не уходим.</div>{% endif %}
         {% endif %}
-        {% if share_ranges %}<div>В {% if share_ranges|length == 1 %}задании{% else %}заданиях{% endif %} {{ share_ranges|join:" и " }} балл делится по долям: каждый верный пропуск или строка приносит свою долю, штрафа нет.</div>{% endif %}
+        {% if share_ranges %}<div>{{ share_phrase }} балл делится по долям: каждый верный пропуск или строка приносит свою долю, штрафа нет.</div>{% endif %}
         {% if number_ranges %}<div class="vp-note"><b>Ответ-число в неверном формате – 0 баллов, как на туре.</b> {{ number_rule }}</div>{% endif %}
       </div>
     </div>

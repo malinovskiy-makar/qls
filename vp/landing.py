@@ -107,6 +107,8 @@ def _format_of(variant):
         'partial_ranges': blocks.merged_ranges(partial),
         'share_ranges': blocks.merged_ranges(shared),
         'number_ranges': blocks.merged_ranges([s for s in sections if s['block'] == 'number']),
+        'partial_phrase': blocks.in_tasks(partial),
+        'share_phrase': blocks.in_tasks(shared),
         'penalty_example': scoring.penalty_example(sample.points) if sample else None,
     }
     # Подпись — ровно то, что таблица и правила показывают. Баллы отдельных заданий внутри
@@ -289,6 +291,36 @@ def variant_status(user, variant):
         'seconds': board.spent_seconds(ranked) if ranked is not None else None,
         'started': bool(attempts),
     }
+
+
+def _plural(n, one, few, many):
+    n = abs(int(n)) % 100
+    if 11 <= n <= 14:
+        return many
+    n %= 10
+    return one if n == 1 else few if 2 <= n <= 4 else many
+
+
+def variant_meta(variant, parts=('count', 'minutes')):
+    """Строка меты варианта — ОДНА на раздел: «Демоверсия ВШЭ · 2026/27 · 18 заданий · 70 мин»
+    (карточка экрана вариантов) или с `parts=('count', 'points')` — «… · 18 заданий ·
+    100 баллов» (интро). Происхождение: демонстрационный — «Демоверсия ВШЭ», иначе
+    подпись вида; учебный год из `year`: 2026 → «2026/27». Числа — из заданий варианта."""
+    from vp.templatetags.vp_extras import points_word
+
+    items = list(variant.items.all())
+    bits = ['Демоверсия ВШЭ' if variant.source_kind == VPVariant.SourceKind.DEMO
+            else variant.get_source_kind_display()]
+    if variant.year:
+        bits.append(f'{variant.year}/{(int(variant.year) + 1) % 100:02d}')
+    for part in parts:
+        if part == 'count':
+            bits.append(f'{len(items)} {_plural(len(items), "задание", "задания", "заданий")}')
+        elif part == 'minutes':
+            bits.append(f'{variant.duration_seconds // 60} мин')
+        elif part == 'points':
+            bits.append(points_word(sum((i.points for i in items), _ZERO)))
+    return ' · '.join(bits)
 
 
 def _dots(user, published):

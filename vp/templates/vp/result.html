@@ -16,7 +16,7 @@
 
     <div class="vp-card vp-score-card">
       <div>
-        <div class="vp-mute">{% if not is_owner %}{{ author }} · {% endif %}{{ variant.title }} · {{ variant.grade_band|grade_label }}</div>
+        <div class="vp-mute">{% if not is_owner %}{{ author }} · {% endif %}{{ variant|with_band }}</div>
         <div class="vp-score-num"><b>{{ score|num }}</b><span>из {{ max|num }}</span></div>
         <div class="vp-mute vp-mt-sm">{{ time_text }}{% if auto %} · сдано по истечении времени{% endif %}</div>
       </div>

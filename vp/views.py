@@ -346,6 +346,7 @@ def variants(request):
             'variant': variant,
             'eyebrow': _variant_eyebrow(variant, published),
             'status': landing.variant_status(request.user, variant),
+            'meta': landing.variant_meta(variant),
             'count': variant.items.count(),
             'minutes': variant.duration_seconds // 60,
         })
@@ -428,9 +429,11 @@ def my_attempts(request):
             'answered': _answered_count(attempt),
             'count': attempt.variant.items.count(),
             'seconds': board.spent_seconds(attempt) if attempt.submitted_at else None,
-            # Попытка тура, которого нет в разделе (1 тур скрыт до архива): пометка в строке.
+            # Попытка тура, которого нет в разделе (1 тур скрыт до архива): пометка в строке,
+            # а вместо «в таблице · N-е» — «архив» (таблицы скрытого тура на сайте нет).
             'tour_label': ('' if attempt.variant.tour == config.CURRENT_TOUR
                            else f'{attempt.variant.tour} тур'),
+            'archived': not visibility.tour_visible(attempt.variant.tour),
             'place': (best_place if best_attempt is not None
                       and attempt.pk == best_attempt.pk else None),
         })
@@ -501,6 +504,8 @@ def intro(request, slug):
         'partial_ranges': blocks.merged_ranges(partial),
         'share_ranges': blocks.merged_ranges(shared),
         'number_ranges': blocks.merged_ranges([s for s in sections if s['block'] == 'number']),
+        'partial_phrase': blocks.in_tasks(partial),
+        'share_phrase': blocks.in_tasks(shared),
         'number_rule': blocks.NUMBER_RULE,
         'penalty_example': example,
         'attempt': attempt,

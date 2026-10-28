@@ -164,8 +164,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         Следующий вариант
       </p>
-      <p class="vp-land-cv">{{ mine.next_variant.title }}</p>
-      <p class="vp-land-cs">{{ mine.next_variant.grade_band|grade_label }} · ещё не открывали</p>
+      <p class="vp-land-cv">{{ mine.next_variant|with_band }}</p>
+      <p class="vp-land-cs">ещё не открывали</p>
       <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
       {% else %}
       <p class="vp-land-ct">

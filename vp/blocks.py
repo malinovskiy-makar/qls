@@ -115,12 +115,32 @@ def sections(items):
     return result
 
 
-def merged_ranges(sections_):
-    """Разделы → диапазоны номеров, где соседние склеены: 1–30 и 31–35 → «1–35»."""
+def _spans(sections_):
     spans = []
     for section in sorted(sections_, key=lambda s: s['first']):
         if spans and section['first'] == spans[-1][1] + 1:
             spans[-1][1] = section['last']
         else:
             spans.append([section['first'], section['last']])
-    return [number_range(first, last) for first, last in spans]
+    return spans
+
+
+def in_tasks(sections_):
+    """Фраза «В заданиях 3 и 4» / «В задании 4» / «В заданиях 1–3» / «В заданиях 1–35 и 43–44»
+    для интро и окна правил — ОДНА на раздел. Слово — по числу ЗАДАНИЙ, а не диапазонов
+    («В задании 3–4» было бы ошибкой); диапазон ровно из двух соседних номеров — «3 и 4».
+    Пустой список — пустая строка."""
+    spans = _spans(sections_)
+    if not spans:
+        return ''
+    count = sum(last - first + 1 for first, last in spans)
+    if len(spans) == 1 and spans[0][1] == spans[0][0] + 1:
+        numbers = f'{spans[0][0]} и {spans[0][1]}'
+    else:
+        numbers = ' и '.join(number_range(first, last) for first, last in spans)
+    return f'В {"задании" if count == 1 else "заданиях"} {numbers}'
+
+
+def merged_ranges(sections_):
+    """Разделы → диапазоны номеров, где соседние склеены: 1–30 и 31–35 → «1–35»."""
+    return [number_range(first, last) for first, last in _spans(sections_)]
