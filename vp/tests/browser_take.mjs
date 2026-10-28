@@ -168,9 +168,9 @@ const LANDING_SELECTORS = ['.vp-land-h1', '.vp-land-h1 small', '.vp-land-lead', 
   '.vp-land-bt', '.vp-land-bsub', '.vp-land-bfoot', '.vp-land-gtxt b', '.vp-land-gtxt span',
   '.vp-land-btn'];
 const RESULT_SELECTORS = ['.vp-score-num b', '.vp-score-num span', '.vp-mute', '.vp-h3', '.vp-brow-name',
-  '.vp-brow-score', '.vp-brow-pct', '.vp-btn', '.vp-cmp-head', '.vp-cmp-axis span', '.vp-cmp-label',
+  '.vp-brow-score', '.vp-btn', '.vp-cmp-head', '.vp-cmp-axis span', '.vp-cmp-label',
   '.vp-crow-n', '.vp-crow-mine', '.vp-crow-right', '.vp-crow-right b', '.vp-crow-pts', '.vp-clink',
-  '.vp-crow-text', '.vp-tcard-n', '.vp-tcard-title', '.vp-tcard-score', '.vp-tcard-text', '.vp-tcard-line',
+  '.vp-crow-text', '.vp-zn', '.vp-zlead', '.vp-zscore', '.vp-zgiven', '.vp-tcard-text', '.vp-tcard-line',
   '.vp-topt', '.vp-topt-n', '.vp-tag', '.vp-math', '.vp-solution summary', '.vp-cta-card h2', '.vp-cta-card p',
   '.vp-cta-btn', '.vp-cta-link', '.vp-practice-out'];
 
@@ -481,7 +481,7 @@ try {
   await page.click('#theme-toggle');
   // ---- разбор: змейка цепочкой, тесты, «дорешать вне зачёта»
   check('d.review_chain_30_rows', (await page.locator('#vp-chain .vp-crow').count()) === 30);
-  check('d.review_tests_14_cards', (await page.locator('#vp-tests .vp-tcard').count()) === 14);
+  check('d.review_tests_14_cards', (await page.locator('#vp-tests details.vp-zrow').count()) === 14);
   check('d.review_link_broken_named', await page.evaluate(() => {
     const broken = document.querySelector('.vp-clink.is-broken');
     return !!broken && /здесь цепь порвалась: следующий ответ должен был начинаться на «./.test(broken.textContent);
@@ -525,15 +525,15 @@ try {
     rightText = await page.textContent('#vp-r-17 [data-practice-out]');
   } catch (e) { rightText = (await page.textContent('#vp-r-17 [data-practice-out]')) || ''; }
   check('d.practice_right_says_right', rightText === 'Верно: ' + reference17, rightText);
-  await page.locator('#vp-r-35 [data-practice-open]').click();
-  await page.locator('#vp-r-35 input[name=raw]').first().check();
-  await page.click('#vp-r-35 [data-practice-form] button[type=submit]');
+  await page.locator('#z35 > summary').click();   // сессия R: строка-<details>, форма в ней открыта
+  await page.locator('#z35 input[name=raw]').first().check();
+  await page.click('#z35 [data-practice-form] button[type=submit]');
   let choiceText = '';
   try {
     await page.waitForFunction(() => /^(Верно|Неверно)/.test(
-      document.querySelector('#vp-r-35 [data-practice-out]').textContent), null, { timeout: 15000 });
-    choiceText = await page.textContent('#vp-r-35 [data-practice-out]');
-  } catch (e) { choiceText = (await page.textContent('#vp-r-35 [data-practice-out]')) || ''; }
+      document.querySelector('#z35 [data-practice-out]').textContent), null, { timeout: 15000 });
+    choiceText = await page.textContent('#z35 [data-practice-out]');
+  } catch (e) { choiceText = (await page.textContent('#z35 [data-practice-out]')) || ''; }
   check('d.practice_choice_is_checked', /^(Верно: |Неверно\. Верный ответ: )\d+\. /.test(choiceText), choiceText);
   check('d.practice_score_unchanged', (await page.textContent('.vp-score-num b')).trim() === scoreBefore, scoreBefore);
   check('d.practice_says_it_does_not_count', /На балл не влияет, он уже записан/.test(

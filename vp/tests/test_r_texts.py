@@ -84,5 +84,5 @@ class TextsTests(TestCase):
                          content_type='application/json')
         self.client.post(reverse('vp:finish', args=[attempt.public_code]))
         result = self.client.get(reverse('vp:result', args=[attempt.public_code])).content.decode()
-        head = result.split('class="vp-wrap"', 1)[1].split('class="vp-score-num"', 1)[0]
+        head = result.split('<h1', 1)[1].split('</h1>', 1)[0]
         self.assertEqual(head.count('10 класс'), 1)

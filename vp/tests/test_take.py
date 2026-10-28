@@ -864,13 +864,14 @@ class ResultTests(TimeAndFinishBase):
     def test_minimal_result_has_score_blocks_time_and_button(self):
         attempt = self.submitted()
         html = self.html(self.guest, attempt)
-        self.assertRegex(html, r'<b>2</b><span>из 100</span>')
-        for name in ('Змейка, 1–30', 'Пропущенные слова, 31–35', 'Все верные, 36–40',
-                     'Рисунок и таблица, 41–42', 'Расчётные, 43–44'):
+        self.assertRegex(html, r'<b>2</b><span>/ 100</span>')
+        # Сессия R: «Змейка · 1–30», балл блока «<b>2</b> / 60».
+        for name in ('Змейка · 1–30', 'Пропущенные слова · 31–35', 'Все верные · 36–40',
+                     'Рисунок и таблица · 41–42', 'Расчётные · 43–44'):
             self.assertIn(name, html)
-        self.assertIn('2 / 60', html)
-        self.assertIn('01:30 из 30:00', html)          # сдано на 90-й секунде
-        self.assertNotIn('сдано по истечении времени', html)
+        self.assertIn('<b>2</b> / 60', html)
+        self.assertIn('<b>01:30</b> / 30:00', html)    # сдано на 90-й секунде
+        self.assertNotIn('по истечении времени', html)
         self.assertIn('Пройти другой вариант', html)
         self.assertIn(reverse('vp:index'), html)
         self.assertIn('noindex', html)
@@ -880,8 +881,8 @@ class ResultTests(TimeAndFinishBase):
         with at(T0 + timedelta(hours=1)):
             self.guest.get(self.take_url(attempt))
         html = self.html(self.guest, attempt)
-        self.assertIn('сдано по истечении времени', html)
-        self.assertIn('30:00 из 30:00', html)
+        self.assertIn('по истечении времени', html)
+        self.assertIn('<b>30:00</b> / 30:00', html)
 
     def test_untimed_result_says_so(self):
         attempt = self.started(with_timer='0')
@@ -892,7 +893,7 @@ class ResultTests(TimeAndFinishBase):
         attempt = self.submitted()
         for client in (self.stranger, Client()):
             html = self.html(client, attempt)
-            self.assertRegex(html, r'<b>2</b><span>из 100</span>')
+            self.assertRegex(html, r'<b>2</b><span>/ 100</span>')
             for private in ('мой личный ответ', 'термин 1', 'термин 7', 'эталон'):
                 self.assertNotIn(private, html)
 
@@ -928,7 +929,7 @@ class ResultTests(TimeAndFinishBase):
             self.assertRedirects(first, self.take_url(attempt), fetch_redirect_response=False)
             second = self.guest.get(self.take_url(attempt))
             self.assertRedirects(second, self.result_url(attempt), fetch_redirect_response=False)
-            self.assertContains(self.guest.get(self.result_url(attempt)), 'сдано по истечении времени')
+            self.assertContains(self.guest.get(self.result_url(attempt)), 'по истечении времени')
 
     def test_block_totals_sum_to_the_score(self):
         attempt = self.started()

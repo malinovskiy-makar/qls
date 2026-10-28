@@ -1,4 +1,6 @@
-/* Экран результата ВП, владелец попытки: «Поделиться» и «Дорешать вне зачёта».
+/* Экран результата ВП, владелец попытки: «Поделиться», разбор по заданиям (фильтры,
+ * карта ответов, «Раскрыть все», адрес `#zN`) и «Дорешать вне зачёта» / «Показать ответ».
+ * Строки разбора — `<details>`: раскрываются и без скрипта.
  *
  * ⚠️ «Дорешать» НИЧЕГО не сохраняет: ответ уходит в `practice_check`, а тот ни в базу, ни в
  * балл не пишет. Всё, что приходит с сервера, вставляется как ТЕКСТ (`textContent`), не как
@@ -140,7 +142,7 @@
   Array.prototype.forEach.call(document.querySelectorAll('[data-practice]'), function (box) {
     var open = box.querySelector('[data-practice-open]');
     var form = box.querySelector('[data-practice-form]');
-    open.addEventListener('click', function () {
+    if (open) open.addEventListener('click', function () {
       var hidden = form.hidden;
       form.hidden = !hidden;
       open.setAttribute('aria-expanded', hidden ? 'true' : 'false');
@@ -156,4 +158,85 @@
     var revealButton = box.querySelector('[data-practice-reveal]');
     if (revealButton) revealButton.addEventListener('click', function () { reveal(box); });
   });
+})();
+
+/* ── Разбор по заданиям: фильтры, карта, «Раскрыть все», #zN ─────────────── */
+(function () {
+  'use strict';
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll('details.vp-zrow'));
+  if (!rows.length) return;
+  var filters = Array.prototype.slice.call(document.querySelectorAll('[data-filter]'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('[data-zgroup]'));
+  var expand = document.querySelector('[data-expand-all]');
+  var reduceMotion = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function matches(status, code) {
+    if (code === 'all') return true;
+    if (code === 'errors') return status === 'mid' || status === 'bad';
+    return status === code;
+  }
+
+  function setFilter(code) {
+    filters.forEach(function (button) {
+      button.setAttribute('aria-pressed', button.getAttribute('data-filter') === code ? 'true' : 'false');
+    });
+    rows.forEach(function (row) { row.hidden = !matches(row.getAttribute('data-status'), code); });
+    // Подпись «Задачи 17–18 · общее условие» — только при полном списке.
+    groups.forEach(function (group) { group.hidden = code !== 'all'; });
+  }
+
+  function reveal(row) {
+    setFilter('all');
+    row.open = true;
+    row.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+    var summary = row.querySelector('summary');
+    if (summary) summary.focus({ preventScroll: true });
+  }
+
+  filters.forEach(function (button) {
+    button.addEventListener('click', function () { setFilter(button.getAttribute('data-filter')); });
+  });
+
+  /* «Показать эти 5 задач» на плашке «Ф» — фильтр «Формат» и прокрутка к таблице. */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-filter-go]'), function (button) {
+    button.addEventListener('click', function () {
+      setFilter(button.getAttribute('data-filter-go'));
+      var table = document.getElementById('vp-tests');
+      if (table) table.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+  });
+
+  /* Квадрат карты и ссылки «9:» на плашке — фильтр «Все», строка раскрыта, прокрутка к ней. */
+  document.addEventListener('click', function (event) {
+    var link = event.target.closest ? event.target.closest('a[href^="#z"]') : null;
+    if (!link) return;
+    var row = document.getElementById(link.getAttribute('href').slice(1));
+    if (!row || !row.classList.contains('vp-zrow')) return;
+    event.preventDefault();
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', link.getAttribute('href'));
+    }
+    reveal(row);
+  });
+
+  if (expand) {
+    expand.addEventListener('click', function () {
+      var open = expand.getAttribute('aria-pressed') !== 'true';
+      rows.forEach(function (row) { if (!row.hidden) row.open = open; });
+      expand.setAttribute('aria-pressed', open ? 'true' : 'false');
+      expand.textContent = open ? 'Свернуть все' : 'Раскрыть все';
+    });
+  }
+
+  /* Адрес с #z13 при загрузке раскрывает и показывает 13-ю. */
+  function fromHash() {
+    var id = window.location.hash.slice(1);
+    if (!/^z\d+$/.test(id)) return;
+    var row = document.getElementById(id);
+    if (row && row.classList.contains('vp-zrow')) reveal(row);
+  }
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
 })();

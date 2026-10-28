@@ -93,7 +93,7 @@ class ResultDataTests(TestCase):
     def test_blank_item_has_no_solution_and_no_right_answer_in_html(self):
         html = self.owner.get(self.url).content.decode()
         self.assertNotIn('1000 = 2 · 1000 / P', html)
-        self.assertNotIn('Верный ответ', card(html, 16))
+        self.assertNotIn('class="vp-numbox', card(html, 16))     # блоков «Ваш / Верный ответ» нет
 
     def snapshot(self):
         return list(VPAnswer.objects.order_by('pk').values_list('pk', 'raw', 'score', 'updated_at'))

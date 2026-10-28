@@ -1,15 +1,16 @@
 {% load vp_extras %}{% comment %}
 «Дорешать вне зачёта» у неотвеченного задания. Ждёт `number`, `kind`, `options`
 (список `{n, text}`), при короткой строке — `prefix` и `suffix`, у сопоставления
-(2 тур) — `keys` (подписи ключей `{key, label}`, без ответов).
+(2 тур) — `keys` (подписи ключей `{key, label}`, без ответов), `open` — форма сразу открыта
+(внутри раскрытой строки разбора кнопка «Дорешать» лишняя).
 
 ⚠️ Ни эталона, ни верных вариантов тут нет и быть не может: страница их не знает,
 ответ проверяет `practice_check` (`static/vp/js/result.js`); «Показать ответ» просит у
 него же эталон и решение (`reveal`). Балл не пишется никуда.
 {% endcomment %}
 <div class="vp-practice" data-practice data-item="{{ number }}" data-kind="{{ kind }}">
-  <button type="button" class="vp-btn vp-btn--plain vp-btn--sm" data-practice-open aria-expanded="false">Дорешать вне зачёта</button>
-  <form class="vp-practice-form" data-practice-form hidden novalidate>
+  {% if open %}<div class="vp-practice-cap">Дорешать вне зачёта</div>{% else %}<button type="button" class="vp-btn vp-btn--plain vp-btn--sm" data-practice-open aria-expanded="false">Дорешать вне зачёта</button>{% endif %}
+  <form class="vp-practice-form" data-practice-form{% if not open %} hidden{% endif %} novalidate>
     {% if kind == 'number' %}
     <div class="vp-answer">
       <label class="vp-sr" for="vp-pr-{{ number }}">Ответ на задание {{ number }}, число</label>

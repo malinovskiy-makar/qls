@@ -156,6 +156,20 @@ def with_band(variant):
     return title if label.lower() in title.lower() else f'{title} · {label}'
 
 
+_PREP_WORDS = ('', 'одной', 'двух', 'трёх', 'четырёх', 'пяти', 'шести', 'семи', 'восьми',
+               'девяти', 'десяти', 'одиннадцати', 'двенадцати', 'тринадцати', 'четырнадцати')
+
+
+@register.filter
+def prep_words(value):
+    """Число словом в предложном падеже: 5 → «пяти» («в пяти задачах»). Больше 14 — цифрами."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return value
+    return _PREP_WORDS[number] if 0 < number < len(_PREP_WORDS) else str(number)
+
+
 @register.filter
 def grade_chip(value):
     """'9-10' → «9–10», '11' → «11»: класс в узкую колонку таблицы, без слова."""

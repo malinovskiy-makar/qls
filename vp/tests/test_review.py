@@ -378,7 +378,9 @@ class ResultViewTests(ReviewBase):
         self.assertIn('3 × 0/2 − 3 × 3/3 = 0,00 − 3,00 = −3,00 → 0,00', html)   # клэмп
         self.assertIn('Разбор-37', html)
         self.assertIn('Поделиться результатом', html)
-        self.assertEqual(html.count('Дорешать вне зачёта</button>'), 2)   # №9 и №44 пустые
+        # №9 и №44 пустые: у змейки кнопка, в строке таблицы форма сразу открыта (сессия R).
+        self.assertEqual(html.count('Дорешать вне зачёта</button>'), 1)
+        self.assertEqual(html.count('<div class="vp-practice-cap">Дорешать вне зачёта</div>'), 1)
         self.assertIn('На балл не влияет, он уже записан.', html)
 
     def test_blank_items_keep_their_answers_out_of_the_page(self):
@@ -388,7 +390,7 @@ class ResultViewTests(ReviewBase):
 
     def test_09_stranger_sees_the_score_but_not_a_single_answer(self):
         theirs = self.html(Client())
-        self.assertRegex(theirs, r'<b>%s</b><span>из 100</span>' % self.attempt.score.normalize())
+        self.assertRegex(theirs, r'<b>%s</b><span>/ 100</span>' % self.attempt.score.normalize())
         self.assertIn('Участник', theirs)
         for number, item in self.item.items():
             if item.kind == 'short_text':
@@ -449,14 +451,14 @@ class ResultViewTests(ReviewBase):
         signed_in.force_login(user)
         for html in (self.html(self.owner),
                      signed_in.get(reverse('vp:result', args=[attempt.public_code])).content.decode()):
-            self.assertIn('показывает балл без имени и без ваших ответов', html)
+            self.assertIn('по ссылке видно только балл, без ответов', html)   # текст сессии R
             self.assertNotIn('логин', html)
 
     def test_no_comparison_block_below_twenty_people(self):
         for i in range(10):
             cohort_attempt(self.variant, 10 + i)
         for client in (self.owner, Client()):
-            self.assertNotIn('прошедших этот вариант', self.html(client))
+            self.assertNotIn('Выше, чем у', self.html(client))
 
     def test_comparison_block_with_scale_median_and_size(self):
         for i in range(24):
@@ -464,10 +466,10 @@ class ResultViewTests(ReviewBase):
         html = self.html(self.owner)
         percent = review.percentile(self.attempt)
         self.assertGreater(percent, 0)
-        self.assertIn('Выше, чем у %d%% прошедших этот вариант' % percent, html)
+        self.assertIn('Выше, чем у <b>%d%%</b> из 25 человек' % percent, html)   # текст сессии R
         self.assertIn('vp-cmp-you', html)
         self.assertIn('медиана', html)
-        self.assertIn('По первым попыткам 25 человек', html)
+        self.assertIn('Среди первых попыток', html)
         self.assertIn('Выше, чем у', self.html(Client()))     # чужому — та же полоса, без «вы»
         self.assertNotIn('>вы<', self.html(Client()))
 

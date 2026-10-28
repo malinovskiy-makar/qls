@@ -43,7 +43,8 @@ class Tour2ReviewTests(TestCase):
         self.url = reverse('vp:result', args=[self.attempt.public_code])
 
     def card(self, html, number):
-        return html.split(f'id="vp-r-{number}"', 1)[1].split('</article>', 1)[0]
+        # Сессия R: строка разбора — `<details id="zN">` (до следующей строки).
+        return html.split(f'id="z{number}"', 1)[1].split('<details class="vp-zrow', 1)[0]
 
     def test_owner_sees_format_reason_and_true_number(self):
         html = self.owner.get(self.url).content.decode()
@@ -55,7 +56,7 @@ class Tour2ReviewTests(TestCase):
         nine = self.card(html, 9)
         self.assertIn('пробел внутри числа. Нужно «25000», а не «25 000».', nine)
         self.assertIn('Число тоже неверное.', nine)      # эталон 98
-        self.assertIn('5 из 5', self.card(html, 5))
+        self.assertIn('<b>5</b> / 5', self.card(html, 5))      # балл в строке таблицы (сессия R)
         self.assertNotIn('точка вместо', self.card(html, 5))
 
     def test_owner_sees_share_line_for_gaps_and_matching(self):
@@ -98,7 +99,7 @@ class Tour2ReviewTests(TestCase):
     def test_unanswered_item_has_no_answer_but_practice(self):
         html = self.owner.get(self.url).content.decode()
         ten = self.card(html, 10)
-        self.assertIn('Не отвечено', ten)
+        self.assertIn('Ответа нет – 0 из 5.', ten)          # текст сессии R
         self.assertIn('data-kind="number"', ten)
         self.assertNotIn('840', ten)
         self.assertNotIn('Верный ответ', ten)

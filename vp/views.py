@@ -724,13 +724,13 @@ def _mark_groups(rows):
         after = rows[index + 1]['group'] if index + 1 < len(rows) else None
         row['group_first'] = group is not None and group != before
         row['group_last'] = group is not None and group != after
-        row['group_label'] = ''
+        row['group_label'] = row['group_range'] = ''
         if row['group_first']:
             last = index
             while last + 1 < len(rows) and rows[last + 1]['group'] == group:
                 last += 1
-            row['group_label'] = (f'Задачи {blocks.number_range(row["number"], rows[last]["number"])}'
-                                  ' – общее условие')
+            row['group_range'] = blocks.number_range(row['number'], rows[last]['number'])
+            row['group_label'] = f'Задачи {row["group_range"]} – общее условие'
 
 
 # ------------------------------------------------------- автосохранение
@@ -940,6 +940,12 @@ def result(request, code):
         'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True,
         'score': attempt.score, 'max': top_score, 'score_percent': _percent(attempt.score, top_score),
         'time_text': _time_text(attempt), 'auto': attempt.is_auto_submitted,
+        'timed': attempt.with_timer and attempt.expires_at is not None,
+        'spent_seconds': _spent_seconds(attempt), 'limit_seconds': (
+            _limit_seconds(attempt) if attempt.with_timer and attempt.expires_at else None),
+        'band_label': grade_label(attempt.variant.grade_band),
+        'other_url': (reverse('vp:variants') + (f'?band={attempt.variant.grade_band}'
+                                                 if attempt.variant.tour != 1 else '')),
         'blocks': rows, 'is_owner': owner, 'vp_events': events,
     }
     comparison = review.comparison(attempt)
