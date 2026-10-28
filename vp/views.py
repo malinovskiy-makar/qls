@@ -22,6 +22,7 @@
 """
 import json
 import logging
+import re
 import secrets
 from datetime import timedelta
 
@@ -584,6 +585,22 @@ def _figure_url(path):
         return ''
 
 
+_LETTER_PREFIX = re.compile(r'^\s*([А-ЯЁA-Z])\s*[–—-]\s*(.+)$', re.S)
+_LETTERS = 'АБВГДЕЖЗИКЛМН'
+
+
+def match_letters(options):
+    """Варианты соотнесения → буквы для кнопок А/Б: «А – абсолютная бедность» → «А» и
+    «абсолютная бедность»; без такого префикса — буква по порядку, подпись — весь текст."""
+    result = []
+    for index, option in enumerate(options):
+        found = _LETTER_PREFIX.match(option['text'])
+        letter, label = (found.group(1), found.group(2).strip()) if found else (
+            _LETTERS[index] if index < len(_LETTERS) else str(index + 1), option['text'])
+        result.append({'n': option['n'], 'letter': letter, 'label': label})
+    return result
+
+
 def _row(item, raw):
     """Задание для страницы прохождения — ТОЛЬКО то, что участнику можно видеть.
 
@@ -603,18 +620,32 @@ def _row(item, raw):
     given = raw if isinstance(raw, dict) else {}
     if item.kind == VPItem.Kind.MATCH and isinstance(item.correct, dict):
         pairs = [{'key': key, 'value': given.get(key)} for key in item.correct]
+    words = {o['n']: o['text'] for o in options}
+    paras, letters = [], []
     if item.block == VPItem.Block.GAPTEXT:
-        # Текст с пропусками: [текст, ключ, текст, ключ, …, текст] → куски, у каждого
-        # (кроме последнего) свой выпадающий список. Ключ — метка `[[k]]` из текста.
-        chunks = GAP_MARK.split(item.statement)
-        for index in range(0, len(chunks), 2):
-            key = chunks[index + 1] if index + 1 < len(chunks) else None
-            gaps.append({'text': chunks[index], 'key': key,
-                         'value': given.get(key) if key else None})
+        # Текст с пропусками: абзацы (строки текста) → куски [текст, ключ, текст, …].
+        # В тексте на месте `[[k]]` — метка с номером и выбранным словом (`word`: без
+        # JS метка показывает слово, выбранное при отрисовке); под абзацем — списки его
+        # пропусков (`gaps`) по порядку.
+        for line in item.statement.splitlines():
+            if not line.strip():
+                continue
+            chunks = GAP_MARK.split(line)
+            para = {'chunks': [], 'gaps': []}
+            for index in range(0, len(chunks), 2):
+                key = chunks[index + 1] if index + 1 < len(chunks) else None
+                value = given.get(key) if key else None
+                para['chunks'].append({'text': chunks[index], 'key': key,
+                                       'word': words.get(value, '') if key else ''})
+                if key:
+                    para['gaps'].append({'key': key, 'value': value})
+            paras.append(para)
+            gaps.extend(para['gaps'])
     elif item.block == VPItem.Block.MATCHING:
         # Строка соотнесения №i — ключ «i» в ответе (так их проверяет загрузчик).
         rows = [{'key': str(i), 'text': text, 'value': given.get(str(i))}
                 for i, text in enumerate(item.rows or [], start=1)]
+        letters = match_letters(options)
     text = ''
     if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER) and isinstance(raw, str):
         text = raw
@@ -631,7 +662,9 @@ def _row(item, raw):
         'text': text,
         'pairs': pairs,
         'gaps': gaps,
+        'paras': paras,
         'rows': rows,
+        'letters': letters,
         'group': item.group,
         'figure_url': _figure_url(item.figure),
         'figure_caption': item.figure_caption,
@@ -667,12 +700,17 @@ def take(request, code):
         'textNumbers': [i.number for i in items if i.kind == VPItem.Kind.SHORT_TEXT],
         'timed': attempt.with_timer,
         'seconds': seconds_left,
+        'limit': (_limit_seconds(attempt) if attempt.with_timer and attempt.expires_at
+                  else None),
     }
+    limit = config['limit']
     return render(request, 'vp/take.html', {
         'attempt': attempt, 'variant': variant, 'sections': sections,
         'numbers': numbers, 'answered_numbers': answered,
         'answered_count': len(answered), 'total': len(numbers),
         'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
+        'limit_seconds': limit,
+        'time_percent': _percent(seconds_left, limit) if limit else 0,
         'finish_url': reverse('vp:finish', args=[code]),
         'number_rule': blocks.NUMBER_RULE,
         'vp_events': tracking.take_deferred(request),

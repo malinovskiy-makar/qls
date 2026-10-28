@@ -61,13 +61,14 @@ class LayoutTests(PageBase):
 
     def test_block_headings_and_points(self):
         html = self.html()
-        self.assertIn('Задания 1–30. Змейка', html)
-        self.assertIn('· по 2 балла', html)
-        self.assertIn('Задания 31–35. Пропущенные слова', html)
-        self.assertIn('Задания 36–40. Все верные утверждения', html)
-        self.assertIn('· по 3 балла · за лишние варианты балл уменьшается', html)
-        self.assertIn('Задания 43–44. Расчётные, один ответ', html)
-        self.assertIn('· от 4 до 5 баллов', html)         # 43 и 44 стоят по-разному
+        # Сессия R: «Задания 1–30 · Змейка», подпись баллов без ведущей точки.
+        self.assertIn('Задания 1–30 · Змейка', html)
+        self.assertIn('>по 2 балла<', html)
+        self.assertIn('Задания 31–35 · Пропущенные слова', html)
+        self.assertIn('Задания 36–40 · Все верные утверждения', html)
+        self.assertIn('>по 3 балла · за лишние варианты балл уменьшается<', html)
+        self.assertIn('Задания 43–44 · Расчётные, один ответ', html)
+        self.assertIn('>от 4 до 5 баллов<', html)         # 43 и 44 стоят по-разному
 
     def test_block_intro_is_the_first_items_intro_else_the_snake_default(self):
         first = self.variant.items.get(number=31)
@@ -85,7 +86,7 @@ class LayoutTests(PageBase):
         html = self.html()
         self.assertIn('Тестовый вариант', html)
         self.assertIn('9–10 классы', html)
-        self.assertRegex(html, r'отвечено <b id="vp-answered">0</b> из 44')
+        self.assertRegex(html, r'отвечено </span><b id="vp-answered">0</b> из 44')
         self.assertIn('id="vp-submit"', html)
         self.assertRegex(html, r'id="vp-timer"[^>]*data-seconds="\d+"')
 
@@ -237,7 +238,7 @@ class RestoreTests(PageBase):
         self.assertRegex(html, r'name="item-36" value="1" checked')
         self.assertRegex(html, r'name="item-36" value="4" checked')
         self.assertNotRegex(html, r'name="item-36" value="2" checked')
-        self.assertRegex(html, r'отвечено <b id="vp-answered">3</b> из 44')
+        self.assertRegex(html, r'отвечено </span><b id="vp-answered">3</b> из 44')
 
     def test_answered_tiles_are_marked_and_blank_ones_are_not(self):
         self.answer(1, 'мой ответ')
@@ -249,7 +250,7 @@ class RestoreTests(PageBase):
         self.assertNotIn('is-answered" href="#vp-item-2"', html)
         self.assertNotIn('is-answered" href="#vp-item-3"', html)
         self.assertNotIn('is-answered" href="#vp-item-36"', html)
-        self.assertRegex(html, r'отвечено <b id="vp-answered">1</b> из 44')
+        self.assertRegex(html, r'отвечено </span><b id="vp-answered">1</b> из 44')
 
     def test_saved_match_answer_is_selected(self):
         item = self.variant.items.get(number=44)

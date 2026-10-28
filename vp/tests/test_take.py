@@ -391,7 +391,7 @@ class SaveTests(ViewBase):
         self.assertIn('value="мой ответ"', html)
         self.assertRegex(html, r'name="item-31" value="3" checked')
         self.assertRegex(html, r'name="item-36" value="4" checked')
-        self.assertRegex(html, r'отвечено <b id="vp-answered">3</b> из 44')
+        self.assertRegex(html, r'отвечено </span><b id="vp-answered">3</b> из 44')
 
     def test_04b_foreign_code_is_404_on_save_and_saves_nothing(self):
         attempt, _ = self.start()

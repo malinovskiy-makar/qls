@@ -6,8 +6,9 @@
 по номерам. Раскладка — макеты Take / Tests / Mobile.
 
 ⚠️ РАЗМЕТКА ПОДЧИНЕНА `static/vp/js/take.js`: узлы `#vp-form`, `#vp-timer`,
-`#vp-clock`, `#vp-banner`, `#vp-answered`, `#vp-save-state`, `#vp-submit`,
-`#vp-dialog*`, `.vp-cell[data-n]`, `.vp-item[data-n]`. Менять имена нельзя, не
+`#vp-timer-cap`, `#vp-timebar`, `#vp-clock`, `#vp-banner`, `#vp-answered`,
+`#vp-save-state`, `#vp-submit`, `#vp-dialog*` (с `#vp-dialog-flags` и
+`#vp-dialog-flag-cap`), `#vp-grid`, `#vp-strip`, `.vp-cell[data-n]`, `.vp-item[data-n]`. Менять имена нельзя, не
 поправив скрипт. Часы — `platform/exam_timer.js` без копирования: монотонные,
 остаток не растёт.
 ⚠️ Ответов, эталонов и букв связки на странице НЕТ (тест `test_take_hides_answers`).
@@ -20,22 +21,24 @@
 <header class="vp-bar" id="vp-bar">
   <div class="vp-bar-row">
     <div class="vp-bar-title">
-      <div class="vp-bar-name">{{ variant.title }}</div>
-      <div class="vp-bar-sub">{{ variant.grade_band|grade_label }} · <span class="vp-save" id="vp-save-state">все ответы сохраняются сами</span></div>
+      <div class="vp-bar-name">{{ variant|with_band }}</div>
+      <div class="vp-bar-sub">{% if attempt.with_timer %}с таймером{% else %}без таймера{% endif %} · ответы сохраняются сами</div>
     </div>
     <div class="vp-clock" id="vp-clock">
       {% if attempt.with_timer %}
-      <span class="vp-timer" id="vp-timer" role="timer" data-seconds="{{ seconds_left }}">{{ seconds_left|mmss }}</span>
-      <span class="vp-timer-cap" id="vp-timer-cap">осталось</span>
-      {% else %}
-      <span class="vp-timer-cap">без таймера</span>
+      <div class="vp-clock-line">
+        <span class="vp-timer" id="vp-timer" role="timer" data-seconds="{{ seconds_left }}">{{ seconds_left|mmss }}</span>
+        <span class="vp-timer-cap"><span id="vp-timer-cap">осталось</span> из {{ limit_seconds|mmss }}</span>
+      </div>
+      {% if limit_seconds %}<div class="vp-timebar" aria-hidden="true"><i id="vp-timebar" style="width: {{ time_percent }}%"></i></div>{% endif %}
       {% endif %}
     </div>
     <div class="vp-bar-side">
-      <span class="vp-count">отвечено <b id="vp-answered">{{ answered_count }}</b> из {{ total }}</span>
+      <span class="vp-count"><span class="vp-count-w">отвечено </span><b id="vp-answered">{{ answered_count }}</b> из {{ total }}</span>
+      <span class="vp-save" id="vp-save-state" role="status">✓ сохранено</span>
       {# Шапка сайта на этом экране спрятана, а тему переключать надо: кнопка жмёт её скрытый переключатель (реализация одна на сайт). #}
       <button type="button" class="vp-icon-btn" id="vp-theme" aria-label="Сменить тему" title="Светлая / тёмная тема">☾</button>
-      <button type="button" class="vp-btn" id="vp-submit">Сдать</button>
+      <button type="button" class="vp-btn" id="vp-submit">Сдать<span class="vp-wide-only">&nbsp;работу</span></button>
     </div>
   </div>
   <div class="vp-banner" id="vp-banner" role="status" hidden></div>
@@ -45,12 +48,20 @@
 <div class="vp-layout">
   <aside class="vp-rail">
     <div class="vp-rail-card">
-      <div class="vp-rail-cap">Задания</div>
-      <nav class="vp-grid" id="vp-grid" aria-label="Задания">{% for n in numbers %}<a class="vp-cell{% if n in answered_numbers %} is-answered{% endif %}" href="#vp-item-{{ n }}" data-n="{{ n }}">{{ n }}</a>{% endfor %}</nav>
+      {# Номера сгруппированы по разделам: подпись — `blocks.TITLES[…]['nav']`, номера — из `blocks.sections`. #}
+      <nav class="vp-grid-nav" id="vp-grid" aria-label="Задания">
+        {% for s in sections %}
+        <div class="vp-grid-group">
+          <div class="vp-rail-cap">{{ s.titles.nav }} · {{ s.range }}</div>
+          <div class="vp-grid">{% for row in s.rows %}<a class="vp-cell{% if row.answered %} is-answered{% endif %}" href="#vp-item-{{ row.number }}" data-n="{{ row.number }}">{{ row.number }}</a>{% endfor %}</div>
+        </div>
+        {% endfor %}
+      </nav>
       <div class="vp-legend">
-        <span><i class="is-a"></i>отвечено</span>
+        <span><i class="is-a"></i>есть ответ</span>
         <span><i></i>пусто</span>
-        <span><i class="is-c"></i>сейчас здесь</span>
+        <span><i class="is-c"></i>вы здесь</span>
+        <span><i class="is-f"></i>вернуться позже</span>
       </div>
     </div>
   </aside>
@@ -61,10 +72,10 @@
     {% for s in sections %}
     <section class="vp-section" aria-labelledby="vp-sec-{{ s.first }}">
       <div class="vp-section-head">
-        <h2 class="vp-h2" id="vp-sec-{{ s.first }}">{% if s.first == s.last %}Задание{% else %}Задания{% endif %} {{ s.range }}. {{ s.titles.heading }}</h2>
-        <span class="vp-mute">· {% if s.uniform %}{{ s.uniform|points_each }}{% else %}от {{ s.points_min|num }} до {{ s.points_max|points_word }}{% endif %}{% if s.penalty %} · за лишние варианты балл уменьшается{% endif %}</span>
+        <h2 class="vp-h2" id="vp-sec-{{ s.first }}">{% if s.first == s.last %}Задание{% else %}Задания{% endif %} {{ s.range }} · {{ s.titles.heading }}</h2>
+        <span class="vp-mute">{% if s.first == s.last %}{{ s.total|points_word }}{% elif s.uniform %}{{ s.uniform|points_each }}{% else %}от {{ s.points_min|num }} до {{ s.points_max|points_word }}{% endif %}{% if s.block == 'number' %}: полный балл или ноль{% elif s.how %} · {{ s.how }}{% endif %}{% if s.penalty %} · за лишние варианты балл уменьшается{% endif %}</span>
       </div>
-      {% if s.block == 'number' %}<div class="vp-note vp-note--rule"><b>Правило ввода.</b> {{ number_rule }}</div>{% endif %}
+      {% if s.block == 'number' %}<div class="vp-note vp-note--rule"><b>Правило ввода ВШЭ.</b> {{ number_rule }}</div>{% endif %}
       {% if s.intro %}<div class="vp-note">{{ s.intro|linebreaksbr }}</div>{% endif %}
       <div class="vp-list">
         {% for row in s.rows %}{% if row.group_first %}<div class="vp-group" role="group" aria-label="{{ row.group_label }}"><div class="vp-group-cap">{{ row.group_label }}</div>{% endif %}{% include 'vp/_take_item.html' %}{% if row.group_last %}</div>{% endif %}{% endfor %}
@@ -78,6 +89,8 @@
   <h2 class="vp-h2" id="vp-dialog-title">Сдать работу?</h2>
   <p id="vp-dialog-text"></p>
   <div class="vp-chips" id="vp-dialog-chips"></div>
+  <p class="vp-dialog-cap" id="vp-dialog-flag-cap" hidden>Отмечены «вернуться позже»:</p>
+  <div class="vp-chips" id="vp-dialog-flags"></div>
   <div class="vp-dialog-row">
     <button type="button" class="vp-btn" id="vp-confirm">Сдать и посмотреть разбор</button>
     <button type="button" class="vp-btn vp-btn--plain" id="vp-back" autofocus>Вернуться к заданиям</button>

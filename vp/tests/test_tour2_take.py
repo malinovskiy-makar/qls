@@ -58,8 +58,9 @@ class Tour2PageTests(Tour2Base):
         self.assertEqual(sorted(re.findall(r'name="item-3\.(\d+)"', html), key=int),
                          [str(k) for k in range(1, 9)])
         self.assertNotIn('[[', self.payload(html))
-        # Соотнесение: 4 строки с текстами из `rows`.
-        self.assertEqual(re.findall(r'name="item-4\.(\d+)"', html), ['1', '2', '3', '4'])
+        # Соотнесение: 4 строки с текстами из `rows`, у каждой две радиокнопки-буквы (сессия R).
+        self.assertEqual(re.findall(r'type="radio" name="item-4\.(\d+)"', html),
+                         ['1', '1', '2', '2', '3', '3', '4', '4'])
         self.assertIn('Прожиточный минимум может использоваться', html)
         # Число: текстовое поле с десятичной клавиатурой и подписью.
         self.assertRegex(html, r'name="item-5" type="text"[^>]*inputmode="decimal"')

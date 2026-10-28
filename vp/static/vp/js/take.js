@@ -8,7 +8,9 @@
  *   4. шапка: высота, тема;
  *   5. автосохранение пачкой;
  *   6. время: часы, состояния шапки, опрос сервера;
- *   7. сдача: окно подтверждения, «время вышло».
+ *   7. сдача: окно подтверждения, «время вышло»;
+ *   8. 2 тур: метки пропусков, буквы соотнесения (повторное нажатие снимает выбор),
+ *      «±» у поля числа, «вернуться позже» (пометки только в браузере).
  *
  * ⚠️ КЛИЕНТ НЕ ИСТОЧНИК ПРАВДЫ О ВРЕМЕНИ. Он рисует обратный отсчёт (часы —
  * `platform/exam_timer.js`: монотонные, `Date.now()` не вызывается, серверная
@@ -16,7 +18,8 @@
  * СЕРВЕР. Здесь мы приходим к нему сдаваться.
  *
  * ⚠️ Имена узлов задаёт `templates/vp/take.html` и `_take_item.html`:
- * `#vp-item-<n>`, `.vp-cell[data-n]`, поля `name="item-<n>"`.
+ * `#vp-item-<n>`, `.vp-cell[data-n]`, поля `name="item-<n>"`, у 2 тура ещё
+ * `a.vp-gapmark[data-key]`, `.vp-abseg input[type=radio][data-key]`, `[data-pm]`, `[data-flag]`.
  */
 (function () {
   'use strict';
@@ -54,9 +57,13 @@
       return field ? field.value.trim() : '';
     }
     if (kind === 'match') {
+      // Пропуски и 1 тур — списки, соотнесение 2 тура — радиокнопки-буквы.
       var pairs = {};
       box.querySelectorAll('select[data-key]').forEach(function (select) {
         if (select.value !== '') { pairs[select.dataset.key] = parseInt(select.value, 10); }
+      });
+      box.querySelectorAll('input[type=radio][data-key]:checked').forEach(function (radio) {
+        pairs[radio.dataset.key] = parseInt(radio.value, 10);
       });
       return pairs;
     }
@@ -131,6 +138,7 @@
     var box = card(n);
     if (!box) { return; }
     var target = box.querySelector('input[type=text]')
+      || box.querySelector('.vp-abseg input[type=radio]')
       || box.querySelector('input[type=radio]:checked, input[type=checkbox]:checked')
       || box.querySelector('input[type=radio], input[type=checkbox], select');
     box.scrollIntoView({ block: block || 'nearest',
@@ -244,11 +252,11 @@
     if (!stateNode) { return; }
     stateNode.classList.toggle('is-offline', offline);
     if (offline) {
-      stateNode.textContent = 'нет связи, ответы сохранены на странице, пробуем отправить';
+      stateNode.textContent = 'нет связи, повторим';
     } else if (inFlight || anyDirty()) {
       stateNode.textContent = 'сохраняем…';
     } else {
-      stateNode.textContent = 'сохранено';
+      stateNode.textContent = '✓ сохранено';
     }
   }
 
@@ -368,6 +376,12 @@
         var chosen = value && value[select.dataset.key];
         select.value = chosen === undefined || chosen === null ? '' : String(chosen);
       });
+      box.querySelectorAll('input[type=radio][data-key]').forEach(function (radio) {
+        var chosen = value && value[radio.dataset.key];
+        radio.checked = chosen !== undefined && chosen !== null && String(chosen) === radio.value;
+      });
+      paintGapMarks(n);
+      rememberSegs(box);
     } else {
       var wanted = kind === 'single' ? (value === null ? [] : [value]) : (value || []);
       box.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(function (input) {
@@ -435,6 +449,7 @@
   var timerNode = $('vp-timer');
   var clockNode = $('vp-clock');
   var capNode = $('vp-timer-cap');
+  var barNode = $('vp-timebar');
 
   function plural(n, one, few, many) {
     var m = Math.abs(n) % 100;
@@ -473,12 +488,25 @@
     }
   }
 
+  /** «69:58»: минуты не переходят в часы — тур идёт 70 минут, и шапка пишет
+   * «осталось из 70:00» (серверный `mmss` считает так же). */
+  function clockText() {
+    var left = timer ? timer.remaining() : null;
+    if (left === null) { return ''; }
+    var minutes = Math.floor(left / 60);
+    var seconds = left % 60;
+    return (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+  }
+
   function paintTimer() {
     if (!timer || !timerNode) { return; }
     var left = timer.remaining();
     var danger = timeUp || left <= 60;
     var warn = !danger && left <= 300;
-    timerNode.textContent = timeUp ? '00:00' : timer.text();
+    timerNode.textContent = timeUp ? '00:00' : clockText();
+    if (barNode && cfg.limit) {
+      barNode.style.width = (timeUp ? 0 : Math.max(0, Math.min(100, left / cfg.limit * 100))) + '%';
+    }
     clockNode.classList.toggle('is-warn', warn);
     clockNode.classList.toggle('is-danger', danger);
     if (capNode) {
@@ -531,6 +559,7 @@
     var batch = wasDirty ? collect() : null;
     stopAll();
     forgetStash();
+    forgetFlags();
     var flag = $('vp-auto');
     if (flag) { flag.value = auto ? '1' : '0'; }
     if (!batch) { form.submit(); return; }
@@ -562,7 +591,7 @@
   function openDialog() {
     var missed = missedNumbers();
     var total = cfg.numbers.length;
-    var head = timer ? 'Осталось ' + timer.text() + ', и не отвечено ' : 'Не отвечено ';
+    var head = timer ? 'Осталось ' + clockText() + ', и не отвечено ' : 'Не отвечено ';
     var text = missed.length
       ? head + missed.length + ' ' + plural(missed.length, 'задание', 'задания', 'заданий')
         + '. Неотвеченное засчитывается как ноль.'
@@ -576,14 +605,22 @@
     $('vp-dialog-text').textContent = text;
     var chips = $('vp-dialog-chips');
     chips.textContent = '';
-    missed.forEach(function (n) {
+    function chip(box, n) {
       var link = document.createElement('a');
       link.className = 'vp-chip';
       link.href = '#vp-item-' + n;
       link.dataset.n = n;
       link.textContent = n;
-      chips.appendChild(link);
-    });
+      box.appendChild(link);
+    }
+    missed.forEach(function (n) { chip(chips, n); });
+    var flagged = readFlags();
+    var flagBox = $('vp-dialog-flags');
+    if (flagBox) {
+      flagBox.textContent = '';
+      flagged.forEach(function (n) { chip(flagBox, n); });
+      $('vp-dialog-flag-cap').hidden = !flagged.length;
+    }
     dialog.showModal();
   }
 
@@ -593,14 +630,131 @@
     dialog.close();
     submitNow(false);
   });
-  // Номер в окне: закрыть окно и прокрутить к заданию.
-  $('vp-dialog-chips').addEventListener('click', function (event) {
+  // Номер в окне (пустые и помеченные): закрыть окно и прокрутить к заданию.
+  dialog.addEventListener('click', function (event) {
     var chip = event.target.closest ? event.target.closest('.vp-chip') : null;
     if (!chip) { return; }
     event.preventDefault();
     dialog.close();
     focusItem(parseInt(chip.dataset.n, 10), 'center');
   });
+
+  // ========================================================== 8. 2 тур
+  // --- метки пропусков: слово в тексте повторяет выбор в списке под абзацем ------
+  function paintGapMarks(n) {
+    var box = card(n);
+    if (!box) { return; }
+    box.querySelectorAll('a.vp-gapmark[data-key]').forEach(function (mark) {
+      var select = box.querySelector('select[data-key="' + mark.dataset.key + '"]');
+      var word = mark.querySelector('[data-word]');
+      var text = select && select.value !== ''
+        ? select.options[select.selectedIndex].textContent : '';
+      if (word) { word.textContent = text; }        // текст, не разметка
+      mark.classList.toggle('is-filled', text !== '');
+    });
+  }
+
+  form.addEventListener('click', function (event) {
+    var mark = event.target.closest ? event.target.closest('a.vp-gapmark[data-key]') : null;
+    if (!mark) { return; }
+    var box = mark.closest('.vp-item');
+    var select = box && box.querySelector('select[data-key="' + mark.dataset.key + '"]');
+    if (!select) { return; }
+    event.preventDefault();
+    select.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    select.focus({ preventScroll: true });
+  });
+
+  form.addEventListener('change', function (event) {
+    var target = event.target;
+    if (target && target.tagName === 'SELECT' && target.dataset.key) {
+      var n = itemOf(target);
+      if (n !== null) { paintGapMarks(n); }
+    }
+  });
+
+  // --- соотнесение: повторное нажатие на выбранную букву снимает выбор ------------
+  // Радиокнопка сама себя не снимает: помним выбранное значение каждой строки и,
+  // если нажали на него же, снимаем и шлём `change` (его ловят счётчик и автосохранение).
+  var segValue = {};
+  function rememberSegs(root) {
+    root.querySelectorAll('.vp-abseg input[type=radio]').forEach(function (radio) {
+      if (radio.checked) { segValue[radio.name] = radio.value; }
+      else if (segValue[radio.name] === radio.value) { delete segValue[radio.name]; }
+    });
+  }
+  form.addEventListener('click', function (event) {
+    var radio = event.target;
+    if (!(radio && radio.type === 'radio' && radio.closest && radio.closest('.vp-abseg'))) {
+      return;
+    }
+    if (segValue[radio.name] === radio.value) {
+      radio.checked = false;
+      delete segValue[radio.name];
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      segValue[radio.name] = radio.value;
+    }
+  });
+  form.addEventListener('change', function (event) {
+    var radio = event.target;
+    if (radio && radio.type === 'radio' && radio.checked && radio.closest
+        && radio.closest('.vp-abseg')) {
+      segValue[radio.name] = radio.value;       // стрелки клавиатуры тоже меняют выбор
+    }
+  });
+  rememberSegs(form);
+
+  // --- «±» у поля числа (только на сенсорных экранах, показ — CSS) -----------------
+  var MINUS_LIKE = /^[-\u2212\u2012\u2013\u2014\ufe63\uff0d]/;
+  form.addEventListener('click', function (event) {
+    var button = event.target.closest ? event.target.closest('[data-pm]') : null;
+    if (!button) { return; }
+    event.preventDefault();
+    var field = $('vp-in-' + button.dataset.pm);
+    if (!field) { return; }
+    field.value = MINUS_LIKE.test(field.value) ? field.value.slice(1) : '-' + field.value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.focus();
+  });
+
+  // --- «вернуться позже»: пометки живут только в этом браузере ---------------------
+  var FLAGS_KEY = 'vp:flags:' + cfg.saveUrl;
+  function readFlags() {
+    var list = [];
+    try { list = JSON.parse(localStorage.getItem(FLAGS_KEY) || '[]'); }
+    catch (error) { list = []; }
+    if (!Array.isArray(list)) { return []; }
+    return list.filter(function (n) { return cfg.numbers.indexOf(n) !== -1; })
+      .sort(function (a, b) { return a - b; });
+  }
+  function writeFlags(list) {
+    try { localStorage.setItem(FLAGS_KEY, JSON.stringify(list)); }
+    catch (error) { /* хранилище недоступно — пометка живёт до перезагрузки */ }
+  }
+  function forgetFlags() {
+    try { localStorage.removeItem(FLAGS_KEY); } catch (error) { /* нет хранилища */ }
+  }
+  var flagsNow = readFlags();
+  function paintFlags() {
+    cfg.numbers.forEach(function (n) {
+      var on = flagsNow.indexOf(n) !== -1;
+      cells(n).forEach(function (cell) { cell.classList.toggle('is-flagged', on); });
+      var button = document.querySelector('[data-flag="' + n + '"]');
+      if (button) { button.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    });
+  }
+  form.addEventListener('click', function (event) {
+    var button = event.target.closest ? event.target.closest('[data-flag]') : null;
+    if (!button) { return; }
+    event.preventDefault();
+    var n = parseInt(button.dataset.flag, 10);
+    var at = flagsNow.indexOf(n);
+    if (at === -1) { flagsNow.push(n); } else { flagsNow.splice(at, 1); }
+    writeFlags(flagsNow);
+    paintFlags();
+  });
+  paintFlags();
 
   measureBar();
   restoreDirty();

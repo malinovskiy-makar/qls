@@ -149,6 +149,14 @@ def grade_label(value):
 
 
 @register.filter
+def with_band(variant):
+    """Название варианта с классом: «Тестовый вариант · 9–10 классы». Если подпись
+    класса уже есть в названии («Демоверсия 2 тура – 10 класс»), класс не повторяется."""
+    title, label = variant.title, grade_label(variant.grade_band)
+    return title if label.lower() in title.lower() else f'{title} · {label}'
+
+
+@register.filter
 def grade_chip(value):
     """'9-10' → «9–10», '11' → «11»: класс в узкую колонку таблицы, без слова."""
     return {'9-10': '9–10', '11': '11'}.get(value, str(value))
