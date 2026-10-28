@@ -452,3 +452,15 @@ class IlePrintTests(SimpleTestCase):
         self.assertEqual(rows[0].get('ile_title'), 'Товар Х')
         self.assertEqual(report[0]['verdict'], 'совпало')
         self.assertNotEqual(report[1]['verdict'], 'совпало')
+
+    def test_compare_only_same_region(self):
+        from problems.olympiad_audit import vsosh_ile
+        ile = [dict(t, stage='municipal', season='2013/14', url='u', region_code='77')
+               for t in vsosh_ile.parse_print_page(ILE_PRINT)]
+        text = 'Спрос на товар Х задан уравнением $Q=400-4P$, предложение $Q=4P-80$. Найдите цену.'
+        rows = [{'event_id': 'm66', 'number': '1', 'stage': 'municipal', 'academic_year': '2013/14',
+                 'region_code': '66', 'statement_md': text},
+                {'event_id': 'm77', 'number': '1', 'stage': 'municipal', 'academic_year': '2013/14',
+                 'region_code': '77', 'statement_md': text}]
+        report = vsosh_ile.compare(rows, ile)
+        self.assertEqual([x['event_id'] for x in report], ['m77'])

@@ -52,22 +52,25 @@ def load_ile_tasks(data_root, extras):
         with open(path, encoding='utf-8', errors='replace') as fh:
             for t in parse_print_page(fh.read()):
                 tasks.append(dict(t, stage=e['stage'], season=e['season'], url=e['url'],
+                                  region_code=e.get('region_code') or 'ru',
                                   subject=e.get('subject', 'econ')))
     return tasks
 
 
 def compare(rows, ile_tasks):
-    """Каждой строке v1 — лучшая задача ILE того же этапа и сезона.
+    """Каждой строке v1 — лучшая задача ILE того же этапа, сезона и региона
+    (муниципальный у ILE — только Москва: задачи других регионов не сверяются).
     Возвращает отчёт [{key, best, ile_url, ile_title, verdict}] и правит rows."""
     from rapidfuzz import fuzz
 
     from problems.olympiad_official import markup_free_key
     by = {}
     for t in ile_tasks:
-        by.setdefault((t['stage'], t['season']), []).append((t, markup_free_key(t['text'])))
+        by.setdefault((t['stage'], t['season'], t.get('region_code') or 'ru'), []).append(
+            (t, markup_free_key(t['text'])))
     report = []
     for r in rows:
-        cands = by.get((r.get('stage'), r.get('academic_year')))
+        cands = by.get((r.get('stage'), r.get('academic_year'), r.get('region_code') or 'ru'))
         if not cands:
             continue
         key = markup_free_key(r.get('statement_md') or '')
@@ -91,3 +94,23 @@ def compare(rows, ile_tasks):
                        'ile_url': bt['url'] if bt else '', 'ile_title': bt['title'] if bt else '',
                        'verdict': verdict})
     return report
+
+
+def run_ile(cmd, opts):
+    """Шаг `ile`: сверка `reference_problems_v1.jsonl` с печатными страницами ILE.
+    Правит строки (`ile_title`, флаг `расхождение_с_ILE`), отчёт — `ile_compare_v1.jsonl`."""
+    import json
+    from collections import Counter
+
+    from problems.olympiad_audit import digitize
+    dz = cmd.digitized
+    with open(os.path.join(cmd.root, 'work', 'ile_extras.json'), encoding='utf-8') as fh:
+        extras = json.load(fh)
+    tasks = load_ile_tasks(cmd.root, extras)
+    path = os.path.join(dz, 'reference_problems_v1.jsonl')
+    rows = digitize.read_jsonl(path)
+    report = compare(rows, tasks)
+    digitize.write_jsonl(path, rows)
+    digitize.write_jsonl(os.path.join(dz, 'ile_compare_v1.jsonl'), report)
+    cmd._say(f'ILE: задач {len(tasks)}; сверено строк v1 {len(report)}: '
+             f'{dict(Counter(x["verdict"] for x in report))}')

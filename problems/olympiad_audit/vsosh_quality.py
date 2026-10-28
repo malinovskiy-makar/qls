@@ -255,4 +255,7 @@ def _season(r):
 
 
 def run_step(cmd, step, opts):
+    if step == 'ile':
+        from problems.olympiad_audit import vsosh_ile
+        return vsosh_ile.run_ile(cmd, opts)
     return {'check': run_check, 'review': run_review, 'bank': run_bank}[step](cmd, opts)
