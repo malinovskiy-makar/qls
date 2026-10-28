@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Результат варианта — десктоп</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="scr">
+  <header class="nav">
+    <span class="nav-logo" aria-hidden="true">W</span>
+    <a class="nav-a" href="#">Занятия</a>
+    <a class="nav-a" href="#">Каталог</a>
+    <a class="nav-a" href="#">Учебник</a>
+    <a class="nav-a" href="#">Олимпиады</a>
+    <a class="nav-a is-on" href="#">Тренажёр ВП<span class="nav-new">NEW</span></a>
+    <a class="nav-a" href="#">Графики</a>
+    <a class="nav-a" href="#">Wecon Rush</a>
+    <span class="nav-sp"></span>
+    <button type="button" class="nav-btn">Проблема или предложение</button>
+    <span class="nav-ava" aria-label="Профиль">М</span>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs" aria-label="Навигация">
+      <a href="#">Тренажёр ВП</a><span aria-hidden="true">›</span><a href="#">Мои попытки</a><span aria-hidden="true">›</span><span>Результат</span>
+    </nav>
+
+    <div class="row wrapx" style="justify-content: space-between; align-items: flex-end; gap: 12px 24px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h1 class="h1">Демоверсия 2 тура · 10 класс</h1>
+        <div class="row wrapx" style="gap: 6px;">
+          <span class="k-chip k-chip--type">2 тур</span>
+          <span class="k-chip k-chip--type">с таймером</span>
+          <span class="k-chip k-chip--sol">первая попытка — в таблице</span>
+        </div>
+      </div>
+      <span class="small mute">сдано 25 октября в 15:04</span>
+    </div>
+
+    <section class="k-card sum" aria-label="Итог попытки">
+      <div class="k-stat">
+        <span class="k-stat__cap">Балл</span>
+        <span class="sum-score">60,5 <small>/ 100</small></span>
+      </div>
+      <div>
+        <span class="k-stat__cap">Среди первых попыток</span>
+        <div class="cmp" role="img" aria-label="Шкала от 0 до 100: ваш балл 60,5, медиана 47">
+          <span class="cmp-fill" style="width: 60.5%;"></span>
+          <span class="cmp-med" style="left: 47%;"></span>
+        </div>
+        <div class="cmp-axis"><span>0</span><span>медиана 47</span><span>100</span></div>
+        <p class="small" style="margin-top: 6px;">Выше, чем у <b>62%</b> из 37 человек</p>
+      </div>
+      <div class="k-stat">
+        <span class="k-stat__cap">Время</span>
+        <span class="sum-val">51:20 <small>/ 70:00</small></span>
+      </div>
+      <div class="k-stat">
+        <span class="k-stat__cap">Таблица · 10 класс</span>
+        <span class="sum-val">4-е <small>место</small></span>
+        <a class="small link" href="#" style="margin-top: 4px;">Открыть таблицу</a>
+      </div>
+      <div class="sum-acts">
+        <a class="k-btn k-btn--main" href="#">Пройти другой вариант</a>
+        <button type="button" class="k-btn k-btn--plain">Поделиться результатом</button>
+        <span class="tiny quiet" style="text-align: center;">по ссылке видно только балл, без ответов</span>
+      </div>
+    </section>
+
+    <section class="k-info fmt-call" aria-label="Потеряно на формате">
+      <span class="fmt-ico" aria-hidden="true">Ф</span>
+      <div>
+        <h2 class="h3">25 баллов потеряно на записи ответа</h2>
+        <p class="small" style="margin-top: 4px;">В пяти задачах число верное, но записано не по правилам ВШЭ — на туре за это тоже 0. С верной записью было бы <b>85,5 из 100</b>.</p>
+        <div class="fmt-list">
+          <span class="fmt-pair">9: <s>98.0</s> → <b>98,0</b></span>
+          <span class="fmt-pair">11: <s>-0.12</s> → <b>-0,12</b></span>
+          <span class="fmt-pair">13: <s>11 800</s> → <b>11800</b></span>
+          <span class="fmt-pair">14: <s>160 ед</s> → <b>160</b></span>
+          <span class="fmt-pair">17: <s>1,607</s> → <b>1,61</b></span>
+        </div>
+      </div>
+      <button type="button" class="k-btn k-btn--plain k-btn--sm" onClick="{{showFmt}}">Показать эти 5 задач</button>
+    </section>
+
+    <div class="cols">
+      <div class="main">
+        <section class="k-card" style="padding: 0; overflow: hidden;" aria-label="Разбор по заданиям">
+          <div style="padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 14px;">
+            <div class="row" style="justify-content: space-between; align-items: baseline;">
+              <div class="row" style="gap: 12px; align-items: baseline;">
+                <h2 class="h2">Разбор по заданиям</h2>
+                <span class="small quiet">нажмите на строку — откроется задание целиком</span>
+              </div>
+              <button type="button" class="k-btn k-btn--quiet k-btn--sm" onClick="{{toggleAll}}">{{allLabel}}</button>
+            </div>
+            <div class="map" aria-label="Карта ответов">
+              <sc-for list="{{map}}" as="q" hint-placeholder-count="18">
+                <button type="button" class="{{q.cls}}" aria-label="{{q.label}}" onClick="{{q.go}}">{{q.n}}<i aria-hidden="true">{{q.sym}}</i></button>
+              </sc-for>
+            </div>
+            <div class="legend" aria-hidden="true">
+              <span><b style="color: var(--green-ink);">✓</b> верно</span>
+              <span><b style="color: var(--amber-ink);">½</b> частично</span>
+              <span><b style="color: var(--error-ink);">✕</b> неверно</span>
+              <span><b style="color: var(--error-ink);">Ф</b> число верное, запись нет</span>
+              <span><b style="color: var(--text3);">—</b> без ответа</span>
+            </div>
+            <div class="fl" role="group" aria-label="Показать задания">
+              <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+                <button type="button" class="fl-b" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}">{{f.label}} <em>{{f.n}}</em></button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="tbl">
+            <div class="th" aria-hidden="true"><span>№</span><span>Задание</span><span>Ваш ответ</span><span>Верный</span><span style="text-align: right;">Балл</span><span></span></div>
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="18">
+              <sc-if value="{{r.showGroup}}" hint-placeholder-val="{{false}}">
+                <div class="grp">Задачи 17–18 · общее условие: таблица из задачи 17 нужна и для 18</div>
+              </sc-if>
+              <div class="{{r.itCls}}" id="z{{r.n}}">
+                <button type="button" class="tr" aria-expanded="{{r.ariaExp}}" onClick="{{r.toggle}}">
+                  <span class="tr-n">{{r.n}}</span>
+                  <span class="tr-t"><span class="tt">{{r.title}}</span><small>{{r.block}} · {{r.pts}}</small></span>
+                  <span class="{{r.aCls}}">{{r.mine}}<sc-if value="{{r.hasTag}}" hint-placeholder-val="{{false}}"><span class="tag tag--fmt">{{r.tag}}</span></sc-if></span>
+                  <span class="{{r.rCls}}">{{r.right}}</span>
+                  <span class="tr-s">{{r.score}} <small>/ {{r.max}}</small></span>
+                  <span class="tri" aria-hidden="true"></span>
+                </button>
+                <sc-if value="{{r.open}}" hint-placeholder-val="{{false}}">
+                  <div class="x">
+                    <div class="x-cond">
+                      <div class="x-meta"><span>Задание {{r.n}}</span><span aria-hidden="true">·</span><span>{{r.block}}</span><span aria-hidden="true">·</span><span>{{r.pts}}</span></div>
+                      <sc-if value="{{r.isGap}}" hint-placeholder-val="{{false}}">
+                        <p class="small mute" style="margin-bottom: 8px;">{{r.intro}}</p>
+                        <sc-for list="{{r.gparas}}" as="gp" hint-placeholder-count="3">
+                          <p><sc-for list="{{gp.segs}}" as="s" hint-placeholder-count="4"><sc-if value="{{s.isGap}}" hint-placeholder-val="{{false}}"><span class="{{s.cls}}">{{s.g}}</span></sc-if><sc-if value="{{s.isText}}" hint-placeholder-val="{{true}}">{{s.t}}</sc-if></sc-for></p>
+                        </sc-for>
+                      </sc-if>
+                      <sc-for list="{{r.paras}}" as="p" hint-placeholder-count="1">
+                        <p>{{p.t}}</p>
+                      </sc-for>
+                      <sc-if value="{{r.hasTable}}" hint-placeholder-val="{{false}}">
+                        <div style="overflow-x: auto; margin-top: 12px;">
+                          <div class="tg" role="table" aria-label="Данные к задаче">
+                            <sc-for list="{{r.table.head}}" as="h" hint-placeholder-count="4"><div class="tg-h" role="columnheader">{{h.t}}</div></sc-for>
+                            <sc-for list="{{r.table.rows}}" as="tr" hint-placeholder-count="2"><sc-for list="{{tr.cells}}" as="c" hint-placeholder-count="4"><div class="tg-c" role="cell">{{c.t}}</div></sc-for></sc-for>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </div>
+
+                    <sc-if value="{{r.isMulti}}" hint-placeholder-val="{{false}}">
+                      <ul class="opts" aria-label="Варианты ответа">
+                        <sc-for list="{{r.opts}}" as="o" hint-placeholder-count="5">
+                          <li class="{{o.cls}}"><b>{{o.k}}</b><span>{{o.text}}</span><span class="opt-tags"><sc-for list="{{o.tags}}" as="tg" hint-placeholder-count="1"><span class="{{tg.cls}}">{{tg.label}}</span></sc-for></span></li>
+                        </sc-for>
+                      </ul>
+                      <p class="calc">Балл: {{r.calc}}. Верный вариант даёт долю балла, лишний — отнимает.</p>
+                    </sc-if>
+
+                    <sc-if value="{{r.isGap}}" hint-placeholder-val="{{false}}">
+                      <ul class="opts" aria-label="Пропуски">
+                        <sc-for list="{{r.gaps}}" as="g" hint-placeholder-count="8">
+                          <li class="{{g.cls}}"><b>{{g.k}}</b><span>{{g.mine}}</span><span class="opt-tags"><span class="{{g.tagCls}}">{{g.tagLabel}}</span></span></li>
+                        </sc-for>
+                      </ul>
+                      <p class="calc">Балл: {{r.calc}}. Каждый пропуск — своя доля, штрафа нет.</p>
+                    </sc-if>
+
+                    <sc-if value="{{r.isMatch}}" hint-placeholder-val="{{false}}">
+                      <p class="small mute">{{r.legendAB}}</p>
+                      <ul class="opts" aria-label="Строки соотнесения">
+                        <sc-for list="{{r.mrows}}" as="m" hint-placeholder-count="4">
+                          <li class="{{m.cls}}"><b>{{m.k}}</b><span>{{m.text}}</span><span class="opt-tags"><span class="ot ot--mine">{{m.mineLabel}}</span><span class="{{m.tagCls}}">{{m.tagLabel}}</span></span></li>
+                        </sc-for>
+                      </ul>
+                      <p class="calc">Балл: {{r.calc}}. Каждая строка — своя доля, штрафа нет.</p>
+                    </sc-if>
+
+                    <sc-if value="{{r.numShow}}" hint-placeholder-val="{{false}}">
+                      <div class="x-ans">
+                        <div class="{{r.mineBox}}"><span class="cap">Ваш ответ</span><div class="v">{{r.mine}}</div></div>
+                        <div class="x-box is-ok"><span class="cap">Верный ответ</span><div class="v">{{r.right}}</div></div>
+                      </div>
+                      <sc-if value="{{r.hasNote}}" hint-placeholder-val="{{false}}">
+                        <div class="k-state k-state--bad">
+                          <span class="k-state__icon" aria-hidden="true">Ф</span>
+                          <div><div class="k-state__title">{{r.noteTitle}}</div><div class="k-state__note">{{r.noteText}}</div></div>
+                        </div>
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{r.blank}}" hint-placeholder-val="{{false}}">
+                      <div class="k-state">
+                        <span class="k-state__icon" aria-hidden="true">—</span>
+                        <div><div class="k-state__title">Ответа нет · 0 из {{r.max}}</div><div class="k-state__note">Верный ответ откроется, когда вы дорешаете задачу вне зачёта или нажмёте «Показать ответ». На балл это не влияет.</div></div>
+                      </div>
+                      <div class="numf">
+                        <label class="small mute" for="pr16">Ваш ответ</label>
+                        <input id="pr16" inputmode="decimal" placeholder="число">
+                        <button type="button" class="k-btn k-btn--plain">Проверить</button>
+                        <button type="button" class="k-btn k-btn--quiet">Показать ответ</button>
+                      </div>
+                    </sc-if>
+
+                    <div class="x-acts">
+                      <sc-if value="{{r.hasSol}}" hint-placeholder-val="{{false}}">
+                        <button type="button" class="{{r.discCls}}" aria-expanded="{{r.solExp}}" onClick="{{r.toggleSol}}"><span class="tri" aria-hidden="true"></span>Решение</button>
+                      </sc-if>
+                      <span class="grow"></span>
+                      <a class="small link" href="#z{{r.n}}">Ссылка на задание {{r.n}}</a>
+                    </div>
+                    <sc-if value="{{r.solOpen}}" hint-placeholder-val="{{false}}">
+                      <p class="sol">{{r.sol}}</p>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+              <p class="mute" style="padding: 20px;">В этой группе заданий нет.</p>
+            </sc-if>
+          </div>
+        </section>
+      </div>
+
+      <aside class="side">
+        <section class="k-card" aria-label="По блокам">
+          <h2 class="h3" style="margin-bottom: 12px;">По блокам</h2>
+          <div class="blk"><span class="small">Все верные · 1–2</span><span class="small num"><b>7</b> / 12</span><span class="track"><span class="fill-mid" style="width: 58%;"></span></span></div>
+          <div class="blk"><span class="small">Пропуски · 3</span><span class="small num"><b>6,75</b> / 9</span><span class="track"><span class="fill-ok" style="width: 75%;"></span></span></div>
+          <div class="blk"><span class="small">Соотнесение · 4</span><span class="small num"><b>6,75</b> / 9</span><span class="track"><span class="fill-ok" style="width: 75%;"></span></span></div>
+          <div class="blk"><span class="small">Задачи с числом · 5–18</span><span class="small num"><b>40</b> / 70</span><span class="track"><span class="fill-mid" style="width: 57%;"></span></span></div>
+          <p class="tiny quiet" style="margin-top: 12px;">Из 30 баллов, недобранных в задачах с числом, 25 — запись ответа.</p>
+        </section>
+
+        <section class="k-card" aria-label="Что дальше">
+          <h2 class="h3" style="margin-bottom: 4px;">Что дальше</h2>
+          <div class="next">
+            <span class="small" style="font-weight: 600;">Потренировать запись ответа</span>
+            <span class="small mute">12 готовых чисел, 2–3 минуты: запишите по правилу ВШЭ — сразу видно, засчитали бы или нет.</span>
+            <a class="k-btn k-btn--plain k-btn--sm" href="#" style="align-self: flex-start; margin-top: 4px;">Начать</a>
+          </div>
+          <div class="next">
+            <span class="small" style="font-weight: 600;">Закрытая консультация перед туром</span>
+            <span class="small mute">Пригласите друга в тренажёр — и получите место на разборе вариантов в Zoom.</span>
+            <a class="k-btn k-btn--plain k-btn--sm" href="#" style="align-self: flex-start; margin-top: 4px;">Пригласить друга</a>
+          </div>
+          <div class="next">
+            <span class="small" style="font-weight: 600;">Этот же вариант без таймера</span>
+            <span class="small mute">Без ограничения по времени. В таблицу не идёт.</span>
+            <a class="small link" href="#" style="margin-top: 2px;">Открыть</a>
+          </div>
+        </section>
+
+        <section class="k-card" aria-label="Мои попытки">
+          <div class="row" style="justify-content: space-between; margin-bottom: 8px;"><h2 class="h3">Мои попытки</h2><a class="small link" href="#">все</a></div>
+          <div class="row" style="justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border-soft);">
+            <div><div class="small" style="font-weight: 600;">Демоверсия · 10 класс</div><div class="tiny quiet">сегодня · с таймером · эта попытка</div></div>
+            <span class="sum-val" style="font-size: 18px;">60,5</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2520}}'>
+class Component extends DCLogic {
+  state = { filter: 'all', open: { 9: true }, sol: { 9: true }, all: false };
+
+  data() {
+    return [{"n": 1, "block": "Все верные утверждения", "pts": "6 баллов", "title": "К каким экономическим эффектам привёл нефтяной кризис 1973–1974 годов?", "score": "6", "max": "6", "st": "ok", "sym": "✓", "tag": "", "isMulti": true, "isGap": false, "isMatch": false, "isNum": false, "blank": false, "paras": [{"t": "К каким экономическим эффектам привёл нефтяной кризис 1973–1974 годов?"}], "opts": [{"k": "1", "text": "Снижение темпов экономического роста в развитых странах, сопровождающееся стагфляцией.", "cls": "opt", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--right", "label": "верный"}]}, {"k": "2", "text": "Резкое падение стоимости акций и облигаций у крупных корпораций, инвестирующих в развитие Интернета.", "cls": "opt", "tags": []}, {"k": "3", "text": "Банкротство банков и банковских институтов.", "cls": "opt", "tags": []}, {"k": "4", "text": "Рост инвестиций в возобновляемые источники энергии и ядерную энергетику.", "cls": "opt", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--right", "label": "верный"}]}, {"k": "5", "text": "Переход американских автовладельцев на менее габаритные и менее энергозатратные японские аналоги.", "cls": "opt", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--right", "label": "верный"}]}], "mine": "1, 4, 5", "right": "1, 4, 5", "calc": "6 × 3/3 = 6,00", "hasNote": false, "hasSol": false, "hasTable": false, "fix": "", "numBad": false, "numShow": false, "mineBox": "x-box is-ok", "numOk": false}, {"n": 2, "block": "Все верные утверждения", "pts": "6 баллов", "title": "Выделите отличительные черты глобализации в конце XX – начале XXI века.", "score": "1", "max": "6", "st": "mid", "sym": "½", "tag": "", "isMulti": true, "isGap": false, "isMatch": false, "isNum": false, "blank": false, "paras": [{"t": "Выделите отличительные черты глобализации в конце XX – начале XXI века."}], "opts": [{"k": "1", "text": "Либерализация международной торговли после 2008 года.", "cls": "opt is-wrong", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--wrong", "label": "неверный"}]}, {"k": "2", "text": "Переход от индустриальной модели международной торговли к офшорному производству, то есть перенос фабрик и заводов преимущественно в развивающиеся страны.", "cls": "opt", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--right", "label": "верный"}]}, {"k": "3", "text": "Увеличение доли сектора услуг в мировом экспорте.", "cls": "opt", "tags": [{"cls": "ot ot--mine", "label": "ваш выбор"}, {"cls": "ot ot--right", "label": "верный"}]}, {"k": "4", "text": "Внедрение фиксированных валютных курсов и привязка национальных валют к доллару США и золоту.", "cls": "opt", "tags": []}, {"k": "5", "text": "Создание крупных логистических хабов (центров) в системе международной торговли.", "cls": "opt is-miss", "tags": [{"cls": "ot ot--right", "label": "верный"}]}], "mine": "1, 2, 3", "right": "2, 3, 5", "calc": "6 × 2/3 − 6 × 1/2 = 4,00 − 3,00 = 1,00", "hasNote": false, "hasSol": false, "hasTable": false, "fix": "", "numBad": false, "numShow": false, "mineBox": "x-box", "numOk": false}, {"n": 3, "block": "Текст с пропусками", "pts": "9 баллов", "title": "Понятие «ловушка среднего дохода» описывает ситуацию, когда страна достигла уровня дохода выше низкого, но не может перейти в категорию [[1]] экономик.", "score": "6,75", "max": "9", "st": "mid", "sym": "½", "tag": "", "isMulti": false, "isGap": true, "isMatch": false, "isNum": false, "blank": false, "gparas": [{"segs": [{"t": "Понятие «ловушка среднего дохода» описывает ситуацию, когда страна достигла уровня дохода выше низкого, но не может перейти в категорию ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "1", "isGap": true, "isText": false, "cls": "gapm"}, {"t": " экономик. Чаще всего это связано с утратой конкурентоспособности в традиционных отраслях при отсутствии перехода к инновационной модели. Страны, оказавшиеся в ловушке, теряют преимущества дешёвой ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "2", "isGap": true, "isText": false, "cls": "gapm"}, {"t": ", но при этом ещё не обладают развитой системой образования и науки. В отличие от стран Восточной Азии, успешно перешедших к инновационной модели, многие латиноамериканские экономики десятилетиями остаются в ловушке среднего дохода. Одной из причин является высокая ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "3", "isGap": true, "isText": false, "cls": "gapm"}, {"t": " доходов, измеряемая с помощью коэффициента ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "4", "isGap": true, "isText": false, "cls": "gapm gapm--bad"}, {"t": ".", "g": "", "isGap": false, "isText": true, "cls": ""}]}, {"segs": [{"t": "Страны, оказавшиеся в ловушке, часто сталкиваются с феноменом «плохого равновесия», когда слабые ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "5", "isGap": true, "isText": false, "cls": "gapm"}, {"t": " препятствуют защите прав собственности. При этом государства продолжают полагаться на ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "6", "isGap": true, "isText": false, "cls": "gapm gapm--bad"}, {"t": " модель развития за счёт увеличения объёма использования ресурсов, а не повышения эффективности.", "g": "", "isGap": false, "isText": true, "cls": ""}]}, {"segs": [{"t": "Особенно много проблем у стран, развившихся благодаря экспорту природных ресурсов: с одной стороны, это позволяет государству получать ресурсную ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "7", "isGap": true, "isText": false, "cls": "gapm"}, {"t": " с минимальными издержками, из-за чего у него нет стимулов к институциональному развитию, а с другой – зависимость от мировых цен приводит к сильной волатильности ", "g": "", "isGap": false, "isText": true, "cls": ""}, {"t": "", "g": "8", "isGap": true, "isText": false, "cls": "gapm"}, {"t": ", что плохо сказывается на макроэкономической стабильности.", "g": "", "isGap": false, "isText": true, "cls": ""}]}], "gaps": [{"k": "1", "mine": "развитый", "right": "развитый", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "2", "mine": "рабочая сила", "right": "рабочая сила", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "3", "mine": "дифференциация", "right": "дифференциация", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "4", "mine": "Лоренц", "right": "Джини", "ok": false, "cls": "opt is-wrong", "tagCls": "ot ot--wrong", "tagLabel": "верно: Джини"}, {"k": "5", "mine": "институты", "right": "институты", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "6", "mine": "интенсивный", "right": "экстенсивный", "ok": false, "cls": "opt is-wrong", "tagCls": "ot ot--wrong", "tagLabel": "верно: экстенсивный"}, {"k": "7", "mine": "рента", "right": "рента", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "8", "mine": "валютный курс", "right": "валютный курс", "ok": true, "cls": "opt", "tagCls": "ot ot--right", "tagLabel": "верно"}], "mine": "6 из 8 пропусков", "right": "в разборе", "calc": "9 × 6/8 = 6,75", "intro": "Заполните пропуски в тексте. Форма слова из списка может не совпадать с формой, которую требуют правила русского языка.", "paras": [], "hasNote": false, "hasSol": false, "hasTable": false, "fix": "", "numBad": false, "numShow": false, "mineBox": "x-box", "numOk": false}, {"n": 4, "block": "Соотнесение", "pts": "9 баллов", "title": "Соотнесите утверждения, которые характеризуют абсолютную и относительную бедность.", "score": "6,75", "max": "9", "st": "mid", "sym": "½", "tag": "", "isMulti": false, "isGap": false, "isMatch": true, "isNum": false, "blank": false, "paras": [{"t": "Соотнесите утверждения, которые характеризуют абсолютную и относительную бедность."}], "mrows": [{"k": "1", "text": "Человек живёт хуже среднестатистического потребителя, хотя его доход позволяет удовлетворить базовые потребности.", "mine": "Б", "right": "Б", "ok": true, "cls": "opt", "mineLabel": "ваш: Б", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "2", "text": "Прожиточный минимум может использоваться как граница для оценки бедности.", "mine": "А", "right": "А", "ok": true, "cls": "opt", "mineLabel": "ваш: А", "tagCls": "ot ot--right", "tagLabel": "верно"}, {"k": "3", "text": "Характеризует социальное неравенство и разрыв между богатыми и бедными в одной стране.", "mine": "А", "right": "Б", "ok": false, "cls": "opt is-wrong", "mineLabel": "ваш: А", "tagCls": "ot ot--wrong", "tagLabel": "верно: Б"}, {"k": "4", "text": "При росте благосостояния общества критерии бедности меняются, и часть людей может перейти в категорию бедных, даже если их реальный уровень жизни не изменился.", "mine": "Б", "right": "Б", "ok": true, "cls": "opt", "mineLabel": "ваш: Б", "tagCls": "ot ot--right", "tagLabel": "верно"}], "legendAB": "А – абсолютная бедность · Б – относительная бедность", "mine": "3 из 4 строк", "right": "в разборе", "calc": "9 × 3/4 = 6,75", "hasNote": false, "hasSol": false, "hasTable": false, "fix": "", "numBad": false, "numShow": false, "mineBox": "x-box", "numOk": false}, {"n": 5, "block": "Задача с числом", "pts": "5 баллов", "title": "Андрей поставил автомат, в котором можно распечатать фотографии.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Андрей поставил автомат, в котором можно распечатать фотографии. Печать каждой фотографии стоит 100 рублей. В автомате в среднем распечатывается 500 фотографий в неделю. Каждый клиент печатает только одну фотографию. Прибыль Андрея составляет 20 000 рублей в неделю, а издержки на расходные материалы для печати каждой фотографии – 20 рублей, все остальные издержки считайте постоянными."}, {"t": "Андрей поменял оборудование, что увеличило качество печати. Поток клиентов увеличился на 50%. Новый автомат иногда выдаёт бракованные фотографии в 1 из 5 случаев. Если фото бракованное, то деньги возвращаются клиенту, также клиент разочаровывается в автомате, уходит и не пытается сделать повторную печать. Постоянные издержки и цена расходных материалов остались неизменными. Считайте, что Андрей поменялся техникой с другом, поэтому смог обменять свой старый автомат на новый без доплат. Чему будет равна прибыль Андрея в этом случае?"}], "mine": "25000", "right": "25000", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "Постоянные издержки: 100 · 500 − 20 · 500 − 20 000 = 20 000. Клиентов стало 750, деньги остаются у 4/5 из них: выручка 600 · 100 = 60 000. Материалы тратятся на все 750 снимков: 15 000. Прибыль 60 000 − 15 000 − 20 000 = 25 000.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 6, "block": "Задача с числом", "pts": "5 баллов", "title": "Молодая семья, Борис и Анна, решили стать фермерами.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Молодая семья, Борис и Анна, решили стать фермерами. На своём участке они выращивают картошку и крапиву, а затем продают экзотический «Крапивно-картофельный салат». Борис за месяц может собрать 20 кг картошки или 20 кг крапивы. Анна за месяц может собрать 10 кг картошки или 5 кг крапивы. Альтернативные издержки производства крапивы и картофеля для Анны и Бориса постоянны. Для приготовления 1 порции салата необходимо 40 г картошки и 80 г крапивы. Какое максимальное количество салатов удастся произвести молодой семье за месяц?"}], "mine": "250", "right": "250", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "У Анны картошка дешевле (0,5 кг крапивы за 1 кг против 1 кг у Бориса), поэтому Анна собирает только картошку – 10 кг. Крапивы нужно вдвое больше картошки: если Борис соберёт x кг картошки и 20 − x кг крапивы, то 20 − x = 2(10 + x), откуда x = 0. Картошки 10 кг, крапивы 20 кг – это 10 / 0,04 = 250 порций.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 7, "block": "Задача с числом", "pts": "5 баллов", "title": "На рынке авторских блокнотов действуют два потребителя, функции спроса которых заданы в виде Q_1(P) = 10 − 2P и Q_2(P) = 20 − P, где P – цена, а Q_1 и Q_2 – кол", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "На рынке авторских блокнотов действуют два потребителя, функции спроса которых заданы в виде Q_1(P) = 10 − 2P и Q_2(P) = 20 − P, где P – цена, а Q_1 и Q_2 – количество, которое хочет купить соответствующий потребитель. Предложение представлено в виде Q(P) = −2 + P, где Q – количество, которое готовы продать производители по соответствующей цене. Найдите равновесную цену."}], "mine": "11", "right": "11", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "При цене выше 5 первый потребитель ничего не покупает, спрос – только второго: 20 − P = P − 2, P = 11 > 5, условие выполнено.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 8, "block": "Задача с числом", "pts": "5 баллов", "title": "Компания «Альфа», действующая на конкурентном рынке, выпускает 10 ед.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Компания «Альфа», действующая на конкурентном рынке, выпускает 10 ед. товара в краткосрочном периоде. Её общие издержки описываются функцией TC(Q) = Q^2 + 10Q + 40, где Q – объём выпуска. Анализируя деятельность компании, экономист Александр пришёл к выводу, что её выпуск на 5 ед. меньше оптимального (то есть выпуска, при котором достигается максимальная прибыль). Какая цена установилась на рынке в краткосрочном периоде?"}], "mine": "40", "right": "40", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "Оптимальный выпуск 15, у конкурентной фирмы в оптимуме P = MC = 2Q + 10 = 40.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 9, "block": "Задача с числом", "pts": "5 баллов", "title": "Совершенно конкурентный рынок перца в стране В находится в равновесии.", "score": "0", "max": "5", "st": "fmt", "sym": "Ф", "tag": "точка", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Совершенно конкурентный рынок перца в стране В находится в равновесии. Предложение на данном рынке имеет вид q_s = −2 + 5p, а спрос – q_d = 238 − p, где p – цена (в условных рыночных единицах) тонны перца, q_s – количество, которое производители готовы продать, а q_d – количество тонн перца, которое потребители готовы купить, при цене p. Власти страны решили ограничить цену перца, установив её на уровне 50% от равновесной, и покрыть образовавшийся излишний спрос за счёт собственных резервов. Найдите, какое количество перца будут реализовывать производители в ситуации такого ценового ограничения."}], "mine": "98.0", "right": "98", "fix": "98,0", "noteTitle": "0 из 5: точка вместо запятой", "noteText": "Нужно писать «98,0», а не «98.0». Само число верное — на туре за такую запись тоже 0.", "hasNote": true, "sol": "Равновесие: −2 + 5p = 238 − p, p = 40. Потолок 20, производители продают q_s(20) = 98.", "hasSol": true, "group": null, "hasTable": false, "numBad": true, "numShow": true, "mineBox": "x-box is-bad", "numOk": false}, {"n": 10, "block": "Задача с числом", "pts": "5 баллов", "title": "Юный экономист Евгений решает, как распорядиться 4000 рублей, накопленными со школьных обедов, и хочет инвестировать эту сумму на два года.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Юный экономист Евгений решает, как распорядиться 4000 рублей, накопленными со школьных обедов, и хочет инвестировать эту сумму на два года. В приложении «Инвестиции для всех» он может выбрать акции или облигации. Поскольку Евгений – начинающий инвестор, ему доступен ограниченный функционал. Так, он может купить акции компании А стоимостью 100 рублей или облигации компании B номиналом 250 рублей и с датой погашения через 2 года. Облигации компании B сейчас торгуются по номиналу. Известно, что, согласно прогнозу, стоимость акций компании А будет расти каждый год на 10% относительно предыдущего года. Компания B, в свою очередь, обещает купонную выплату в размере 15% от номинала в дату погашения. Какую прибыль может получить Евгений, если вложит все накопления в акции компании А, а прогноз относительно их роста реализуется?"}], "mine": "840", "right": "840", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "40 акций по 100 рублей через два года стоят по 100 · 1,1² = 121: прибыль 40 · 21 = 840.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 11, "block": "Задача с числом", "pts": "5 баллов", "title": "На планете Джи население делится на 3 группы: рыцари, фермеры и ремесленники.", "score": "0", "max": "5", "st": "fmt", "sym": "Ф", "tag": "точка", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "На планете Джи население делится на 3 группы: рыцари, фермеры и ремесленники. Доля фермеров и ремесленников в населении планеты одинаковая и составляет 40% для каждой группы, при этом они получают 10% и 40% доходов соответственно, тогда как остальное принадлежит рыцарям. Считайте, что внутри групп доходы распределены равномерно. В ходе классовой борьбы рыцари были изгнаны с планеты Джи вместе с их богатством. Найдите, на сколько изменился индекс Джини."}], "mine": "-0.12", "right": "-0,12", "fix": "-0,12", "noteTitle": "0 из 5: точка вместо запятой", "noteText": "Нужно писать «-0,12», а не «-0.12». Само число верное — на туре за такую запись тоже 0.", "hasNote": true, "sol": "До изгнания кривая Лоренца проходит через (0,4; 0,1), (0,8; 0,5), (1; 1): площадь под ней 0,02 + 0,12 + 0,15 = 0,29, Джини 1 − 2 · 0,29 = 0,42. После: фермеры – половина населения и 20% дохода, точки (0,5; 0,2), (1; 1), площадь 0,05 + 0,3 = 0,35, Джини 0,3. Изменение 0,3 − 0,42 = −0,12.", "hasSol": true, "group": null, "hasTable": false, "numBad": true, "numShow": true, "mineBox": "x-box is-bad", "numOk": false}, {"n": 12, "block": "Задача с числом", "pts": "5 баллов", "title": "В деревне Зелёный Луг у единственного крестьянина Петра есть единственное поле, на котором он может выращивать пшеницу (W) и овощи (V).", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "В деревне Зелёный Луг у единственного крестьянина Петра есть единственное поле, на котором он может выращивать пшеницу (W) и овощи (V). Земли у него ограниченное количество: чем больше площади он отдаёт под пшеницу, тем меньше остаётся под овощи. Производственные возможности поля Петра описываются уравнением 2W + V = 100, где W – количество мешков пшеницы, а V – количество корзин овощей. На Агробирже, где деревни региона торгуют между собой пшеницей и овощами, два мешка пшеницы обмениваются на одну корзину овощей. С открытием Агробиржи Пётр получил возможность специализироваться только на одном виде продовольствия. Второй вид продовольствия Пётр может закупить на Агробирже, продав выращенное на своём поле. Определите максимальное количество единиц продовольствия, которое Пётр закупил на Агробирже, продав выращенное на своём поле. Считайте, что Пётр продаёт всё продовольствие, на котором он специализируется."}], "mine": "200", "right": "200", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "Специализация на пшенице даёт 50 мешков и 25 корзин на бирже; на овощах – 100 корзин и 200 мешков пшеницы. Максимум – 200 единиц.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 13, "block": "Задача с числом", "pts": "5 баллов", "title": "В посёлке Акив действует единственная фирма, которая производит и продаёт гранатовый сок.", "score": "0", "max": "5", "st": "fmt", "sym": "Ф", "tag": "пробел", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "В посёлке Акив действует единственная фирма, которая производит и продаёт гранатовый сок. Один работник может произвести 5 бутылок гранатового сока. Работа эта несложная, поэтому фирма может нанять любое количество работников с одинаковой производительностью. Других факторов производства помимо труда у фирмы нет. Стоимость оплаты труда одного работника составляет 100 денежных единиц. Спрос на гранатовый сок в посёлке Акив задаётся функцией P_d = 1220 − Q, где P – цена за бутылку сока, Q – количество бутылок гранатового сока в штуках. В целях пополнения бюджета государство вводит налог на заработную плату по ставке 50% (по типу НДФЛ). Бремя налогообложения ложится на фирму, так что зарплата работника после налогообложения по-прежнему составляет 100 денежных единиц. Фирма, как и ранее, максимизирует прибыль. Какова сумма налоговых сборов государства?"}], "mine": "11 800", "right": "11800", "fix": "11800", "noteTitle": "0 из 5: пробел внутри числа", "noteText": "Нужно писать «11800», а не «11 800». Само число верное — на туре за такую запись тоже 0.", "hasNote": true, "sol": "Начисленная зарплата W такова, что W · (1 − 0,5) = 100, W = 200, налог 100 с работника. Предельные издержки 200 / 5 = 40 на бутылку: 1220 − 2Q = 40, Q = 590, работников 118, налог 118 · 100 = 11 800.", "hasSol": true, "group": null, "hasTable": false, "numBad": true, "numShow": true, "mineBox": "x-box is-bad", "numOk": false}, {"n": 14, "block": "Задача с числом", "pts": "5 баллов", "title": "В некоторой экономике 12,5% от ВВП составляют инвестиционные расходы, при этом потребительские расходы в 5 раз больше инвестиционных расходов.", "score": "0", "max": "5", "st": "fmt", "sym": "Ф", "tag": "единицы", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "В некоторой экономике 12,5% от ВВП составляют инвестиционные расходы, при этом потребительские расходы в 5 раз больше инвестиционных расходов. Импорт превышает экспорт на 10 денежных единиц, а государственные закупки товаров и услуг на 60 денежных единиц больше чистого экспорта. Определите величину ВВП в данной экономике."}], "mine": "160 ед", "right": "160", "fix": "160", "noteTitle": "0 из 5: лишние знаки или единицы", "noteText": "В поле — только число: «160», без «ед». Само число верное — на туре за такую запись тоже 0.", "hasNote": true, "sol": "I = 0,125Y, C = 0,625Y, NX = −10, G = 50. Y = 0,75Y + 40, Y = 160.", "hasSol": true, "group": null, "hasTable": false, "numBad": true, "numShow": true, "mineBox": "x-box is-bad", "numOk": false}, {"n": 15, "block": "Задача с числом", "pts": "5 баллов", "title": "Пусть экономика страны Вышландия существует на конечном временном горизонте, равном 3 периодам.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Пусть экономика страны Вышландия существует на конечном временном горизонте, равном 3 периодам. Номинальный располагаемый доход домашних хозяйств Вышландии за первый период сократился на 15%, а за последующие два периода суммарно увеличился на 20%. Общий уровень цен в Вышландии за описываемый трёхлетний период увеличился на 2%. Рассчитайте темп прироста номинального располагаемого дохода домашних хозяйств Вышландии суммарно за три периода (в процентах)."}], "mine": "2", "right": "2", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "0,85 · 1,2 = 1,02: номинальный доход вырос на 2%. Рост цен на номинальный доход не влияет.", "hasSol": true, "group": null, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}, {"n": 16, "block": "Задача с числом", "pts": "5 баллов", "title": "Долгосрочное совокупное предложение в экономике фиксировано на уровне Y* = 1000.", "score": "0", "max": "5", "st": "none", "sym": "—", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": true, "paras": [{"t": "Долгосрочное совокупное предложение в экономике фиксировано на уровне Y* = 1000. Совокупный спрос задан уравнением Y = 2 · M/P, где M = 1000 – денежная масса в экономике. Пусть экономика изначально находится в состоянии долгосрочного равновесия. Определите равновесный общий уровень цен (P)."}], "mine": "—", "right": "после «Дорешать»", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "1000 = 2 · 1000 / P, P = 2.", "hasSol": false, "group": null, "hasTable": false, "numBad": false, "numShow": false, "mineBox": "x-box", "numOk": false}, {"n": 17, "block": "Задача с числом", "pts": "5 баллов", "title": "Компания «Крутые аналитики» изучает экспорт стран А и Б по двум товарам: автомобили и сельскохозяйственные продукты.", "score": "0", "max": "5", "st": "fmt", "sym": "Ф", "tag": "знаки", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Компания «Крутые аналитики» изучает экспорт стран А и Б по двум товарам: автомобили и сельскохозяйственные продукты. В таблице представлены данные за год в млрд долларов."}, {"t": "Рассчитайте показатель выявленных сравнительных преимуществ Баласса (RCA) для всех товаров каждой из стран. В ответе напишите наибольшее значение RCA. Для расчёта используйте формулу RCA = (Xij / Xwj) / (Xi / Xw), где X – экспорт, i – страна, j – товар, w – мир в целом."}], "mine": "1,607", "right": "1,61", "fix": "1,61", "noteTitle": "0 из 5: больше двух знаков после запятой", "noteText": "Ответ нужно округлить до сотых: «1,61», а не «1,607». Само число верное — на туре за такую запись тоже 0.", "hasNote": true, "sol": "Мировой экспорт 450, экспорт А 70, Б 60. RCA: А, автомобили (50/200)/(70/450) ≈ 1,607; А, сельхозпродукты ≈ 0,514; Б, автомобили 0,75; Б, сельхозпродукты 1,2. Наибольшее – 1,61.", "hasSol": true, "group": 1, "table": {"head": [{"t": "Товар"}, {"t": "Экспорт страны А"}, {"t": "Экспорт страны Б"}, {"t": "Мировой экспорт товара"}], "rows": [{"cells": [{"t": "Автомобили"}, {"t": "50"}, {"t": "20"}, {"t": "200"}]}, {"cells": [{"t": "Сельскохозяйственные продукты"}, {"t": "20"}, {"t": "40"}, {"t": "250"}]}]}, "hasTable": true, "numBad": true, "numShow": true, "mineBox": "x-box is-bad", "numOk": false}, {"n": 18, "block": "Задача с числом", "pts": "5 баллов", "title": "Страна имеет выявленное сравнительное преимущество в экспорте определённого товара, если показатель Баласса по этому товару превышает 1.", "score": "5", "max": "5", "st": "ok", "sym": "✓", "tag": "", "isMulti": false, "isGap": false, "isMatch": false, "isNum": true, "blank": false, "paras": [{"t": "Страна имеет выявленное сравнительное преимущество в экспорте определённого товара, если показатель Баласса по этому товару превышает 1. Насколько стране А нужно увеличить экспорт автомобилей, чтобы иметь выявленное сравнительное преимущество по их экспорту?"}], "mine": "0", "right": "0", "fix": "", "noteTitle": "", "noteText": "", "hasNote": false, "sol": "RCA страны А по автомобилям уже 1,61 > 1, увеличивать экспорт не нужно.", "hasSol": true, "group": 1, "hasTable": false, "numBad": false, "numShow": true, "mineBox": "x-box is-ok", "numOk": true}];
+  }
+
+  renderVals() {
+    const st = this.state;
+    const ROWS = this.data();
+    const f = st.filter;
+    const fits = (r) => f === 'all'
+      || (f === 'err' && (r.st === 'mid' || r.st === 'bad'))
+      || (f === 'fmt' && r.st === 'fmt')
+      || (f === 'none' && r.st === 'none')
+      || (f === 'ok' && r.st === 'ok');
+    const words = { ok: 'верно', mid: 'частично', bad: 'неверно', fmt: 'число верное, запись нет', none: 'без ответа' };
+    const rows = ROWS.filter(fits).map((r) => {
+      const open = st.all || !!st.open[r.n];
+      const solOpen = !!st.sol[r.n];
+      return Object.assign({}, r, {
+        open,
+        solOpen: open && solOpen && r.hasSol,
+        itCls: 'it it--' + r.st + (open ? ' is-open' : ''),
+        aCls: 'tr-a' + ((r.st === 'fmt' || r.st === 'bad') ? ' is-bad' : (r.st === 'none' ? ' is-none' : '')),
+        rCls: 'tr-r' + (r.st === 'none' ? ' is-hid' : ''),
+        hasTag: !!r.tag,
+        showGroup: r.n === 17,
+        ariaExp: open ? 'true' : 'false',
+        discCls: 'disc' + (solOpen ? ' is-open' : ''),
+        solExp: solOpen ? 'true' : 'false',
+        toggle: () => this.setState({ open: Object.assign({}, st.open, { [r.n]: !open }), all: false }),
+        toggleSol: () => this.setState({ sol: Object.assign({}, st.sol, { [r.n]: !solOpen }) }),
+      });
+    });
+    const defs = [
+      { id: 'all', label: 'Все', n: 18 },
+      { id: 'err', label: 'Ошибки', n: 3 },
+      { id: 'fmt', label: 'Формат', n: 5 },
+      { id: 'none', label: 'Без ответа', n: 1 },
+      { id: 'ok', label: 'Верно', n: 9 },
+    ];
+    const filters = defs.map((x) => Object.assign({}, x, {
+      pressed: f === x.id ? 'true' : 'false',
+      pick: () => this.setState({ filter: x.id }),
+    }));
+    const map = ROWS.map((r) => ({
+      n: r.n,
+      sym: r.sym,
+      cls: 'sq sq--' + r.st + ((st.all || st.open[r.n]) ? ' is-cur' : ''),
+      label: 'Задание ' + r.n + ': ' + words[r.st],
+      go: () => this.setState({ filter: 'all', all: false, open: Object.assign({}, st.open, { [r.n]: true }) }),
+    }));
+    return {
+      rows,
+      filters,
+      map,
+      empty: rows.length === 0,
+      allLabel: st.all ? 'Свернуть все' : 'Раскрыть все',
+      toggleAll: () => this.setState({ all: !st.all, open: {} }),
+      showFmt: () => this.setState({ filter: 'fmt' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

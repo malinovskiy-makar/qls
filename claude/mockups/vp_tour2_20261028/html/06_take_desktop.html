@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ru"><head><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Прохождение варианта — десктоп</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+<style data-dc-tpl="1">
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style><style>
+@font-face{font-family:"Montserrat";font-weight:400;font-style:normal;src:url(ds/weconomics/fonts/montserrat-400.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:400;font-style:italic;src:url(ds/weconomics/fonts/montserrat-400i.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:500;src:url(ds/weconomics/fonts/montserrat-500.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:600;src:url(ds/weconomics/fonts/montserrat-600.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:700;src:url(ds/weconomics/fonts/montserrat-700.woff2) format("woff2")}
+</style>
+<!-- Статичный снимок макета (без логики). Логика и данные — в ../source/*.dc.html -->
+</head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="Take"><div data-dc-tpl="2" class="scr" style="min-height: 1180px;">
+  <div data-dc-tpl="3" class="bar">
+    <div data-dc-tpl="4" style="display: flex; flex-direction: column; min-width: 0px;">
+      <span data-dc-tpl="5" class="h3">Демоверсия 2 тура · 10 класс</span>
+      <span data-dc-tpl="6" class="tiny quiet"><span class="sc-interp">с таймером · ответы сохраняются сами</span></span>
+    </div>
+    
+      <div data-dc-tpl="8" class="timer" role="timer" aria-label="Осталось 41 минута 27 секунд">
+        <div data-dc-tpl="9" class="row" style="gap: 8px; align-items: baseline;"><b data-dc-tpl="10">41:27</b><span data-dc-tpl="11" class="tiny quiet">осталось из 70:00</span></div>
+        <div data-dc-tpl="12" class="tbar" aria-hidden="true"><span data-dc-tpl="13" style="width: 59%;"></span></div>
+      </div>
+    
+    <span data-dc-tpl="14" class="small">отвечено <b data-dc-tpl="15" class="num"><span class="sc-interp">8</span></b> из 18</span>
+    <span data-dc-tpl="16" class="saved"><svg data-dc-tpl="17" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path data-dc-tpl="18" d="M5 12.5l4.5 4.5L19 7.5"></path></svg>сохранено</span>
+    <span data-dc-tpl="19" class="grow"></span>
+    <button data-dc-tpl="20" type="button" class="k-btn k-btn--main" style="padding: 10px 22px;">Сдать работу</button>
+  </div>
+
+  <div data-dc-tpl="21" class="cols" style="max-width: 1240px; margin: 0px auto; padding: 20px 32px 48px; gap: 20px;">
+    <aside data-dc-tpl="22" class="k-card" aria-label="Навигация по заданиям" style="flex: 0 0 248px; padding: 16px; position: sticky; top: 76px;">
+      <div data-dc-tpl="23" class="navq">
+        <div data-dc-tpl="24" class="navq-g">
+          <span data-dc-tpl="25" class="cap">Все верные · 1–2</span>
+          <div data-dc-tpl="26" class="qs"><button data-dc-tpl="27" type="button" class="q is-done">1</button><button data-dc-tpl="28" type="button" class="q is-done">2</button></div>
+        </div>
+        <div data-dc-tpl="29" class="navq-g">
+          <span data-dc-tpl="30" class="cap">Пропуски · 3</span>
+          <div data-dc-tpl="31" class="qs"><button data-dc-tpl="32" type="button" class="q is-done">3</button></div>
+        </div>
+        <div data-dc-tpl="33" class="navq-g">
+          <span data-dc-tpl="34" class="cap">Соотнесение · 4</span>
+          <div data-dc-tpl="35" class="qs"><button data-dc-tpl="36" type="button" class="q is-now" aria-current="true">4</button></div>
+        </div>
+        <div data-dc-tpl="37" class="navq-g">
+          <span data-dc-tpl="38" class="cap">Задачи с числом · 5–18</span>
+          <div data-dc-tpl="39" class="qs">
+            <button data-dc-tpl="40" type="button" class="q is-done">5</button><button data-dc-tpl="41" type="button" class="q is-done">6</button><button data-dc-tpl="42" type="button" class="q is-done is-flag">7</button><button data-dc-tpl="43" type="button" class="q is-done">8</button><button data-dc-tpl="44" type="button" class="q is-done">9</button><button data-dc-tpl="45" type="button" class="q">10</button>
+            <button data-dc-tpl="46" type="button" class="q">11</button><button data-dc-tpl="47" type="button" class="q">12</button><button data-dc-tpl="48" type="button" class="q">13</button><button data-dc-tpl="49" type="button" class="q">14</button><button data-dc-tpl="50" type="button" class="q">15</button><button data-dc-tpl="51" type="button" class="q">16</button>
+            <button data-dc-tpl="52" type="button" class="q">17</button><button data-dc-tpl="53" type="button" class="q">18</button>
+          </div>
+        </div>
+        <div data-dc-tpl="54" class="tiny mute" style="display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-soft); padding-top: 10px;">
+          <span data-dc-tpl="55" class="row" style="gap: 8px;"><span data-dc-tpl="56" class="q is-done" aria-hidden="true" style="width: 16px; height: 16px;"></span>есть ответ</span>
+          <span data-dc-tpl="57" class="row" style="gap: 8px;"><span data-dc-tpl="58" class="q" aria-hidden="true" style="width: 16px; height: 16px;"></span>пусто</span>
+          <span data-dc-tpl="59" class="row" style="gap: 8px;"><span data-dc-tpl="60" class="q is-now" aria-hidden="true" style="width: 16px; height: 16px;"></span>вы здесь</span>
+          <span data-dc-tpl="61" class="row" style="gap: 8px;"><span data-dc-tpl="62" class="q is-done is-flag" aria-hidden="true" style="width: 16px; height: 16px;"></span>вернуться позже</span>
+        </div>
+      </div>
+    </aside>
+
+    <main data-dc-tpl="63" style="flex: 999 1 600px; min-width: 0px; max-width: 880px; display: flex; flex-direction: column; gap: 14px;">
+      <div data-dc-tpl="64" class="blockh"><h2 data-dc-tpl="65" class="h2">Задание 4 · Соотнесение</h2><span data-dc-tpl="66" class="small mute">9 баллов · каждая строка — своя доля</span></div>
+      <section data-dc-tpl="67" class="task" aria-label="Задание 4">
+        <div data-dc-tpl="68" class="row" style="justify-content: space-between; align-items: flex-start;">
+          <p data-dc-tpl="69"><span data-dc-tpl="70" class="task-n">4</span>  Соотнесите утверждения, которые характеризуют абсолютную и относительную бедность.</p>
+          <button data-dc-tpl="71" type="button" class="k-btn k-btn--quiet k-btn--sm" style="flex: 0 0 auto;">⚑ Вернуться позже</button>
+        </div>
+        <div data-dc-tpl="72" class="row wrapx small" style="gap: 6px 18px;"><span data-dc-tpl="73"><b data-dc-tpl="74">А</b> — абсолютная бедность</span><span data-dc-tpl="75"><b data-dc-tpl="76">Б</b> — относительная бедность</span></div>
+        <div data-dc-tpl="77">
+          
+            <div data-dc-tpl="79" class="mrow">
+              <b data-dc-tpl="80" class="num quiet"><span class="sc-interp">1</span></b>
+              <span data-dc-tpl="81"><span class="sc-interp">Человек живёт хуже среднестатистического потребителя, хотя его доход позволяет удовлетворить базовые потребности.</span></span>
+              <span data-dc-tpl="82" class="ab" role="group" aria-label="Утверждение 1: А или Б">
+                <button data-dc-tpl="83" type="button" aria-pressed="false">А</button>
+                <button data-dc-tpl="84" type="button" aria-pressed="true">Б</button>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="79" class="mrow">
+              <b data-dc-tpl="80" class="num quiet"><span class="sc-interp">2</span></b>
+              <span data-dc-tpl="81"><span class="sc-interp">Прожиточный минимум может использоваться как граница для оценки бедности.</span></span>
+              <span data-dc-tpl="82" class="ab" role="group" aria-label="Утверждение 2: А или Б">
+                <button data-dc-tpl="83" type="button" aria-pressed="true">А</button>
+                <button data-dc-tpl="84" type="button" aria-pressed="false">Б</button>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="79" class="mrow">
+              <b data-dc-tpl="80" class="num quiet"><span class="sc-interp">3</span></b>
+              <span data-dc-tpl="81"><span class="sc-interp">Характеризует социальное неравенство и разрыв между богатыми и бедными в одной стране.</span></span>
+              <span data-dc-tpl="82" class="ab" role="group" aria-label="Утверждение 3: А или Б">
+                <button data-dc-tpl="83" type="button" aria-pressed="false">А</button>
+                <button data-dc-tpl="84" type="button" aria-pressed="false">Б</button>
+              </span>
+            </div>
+          
+            <div data-dc-tpl="79" class="mrow">
+              <b data-dc-tpl="80" class="num quiet"><span class="sc-interp">4</span></b>
+              <span data-dc-tpl="81"><span class="sc-interp">При росте благосостояния общества критерии бедности меняются, и часть людей может перейти в категорию бедных, даже если их реальный уровень жизни не изменился.</span></span>
+              <span data-dc-tpl="82" class="ab" role="group" aria-label="Утверждение 4: А или Б">
+                <button data-dc-tpl="83" type="button" aria-pressed="false">А</button>
+                <button data-dc-tpl="84" type="button" aria-pressed="false">Б</button>
+              </span>
+            </div>
+          
+        </div>
+      </section>
+
+      <div data-dc-tpl="85" class="blockh" style="margin-top: 8px;"><h2 data-dc-tpl="86" class="h2">Задания 5–18 · Задачи с вводом числа</h2><span data-dc-tpl="87" class="small mute">по 5 баллов: полный балл или ноль</span></div>
+      <div data-dc-tpl="88" class="k-info small" style="padding: 10px 14px;"><b data-dc-tpl="89">Правило ввода ВШЭ.</b> Число без пробелов, единиц и знаков; дробь — десятичная, через запятую, до сотых: «1,23».</div>
+
+      <section data-dc-tpl="90" class="task" aria-label="Задание 9">
+        <div data-dc-tpl="91" class="row" style="justify-content: space-between; align-items: flex-start;">
+          <span data-dc-tpl="92" class="task-n">9</span>
+          <button data-dc-tpl="93" type="button" class="k-btn k-btn--quiet k-btn--sm">⚑ Вернуться позже</button>
+        </div>
+        <p data-dc-tpl="94" style="line-height: 1.65;">Совершенно конкурентный рынок перца в стране В находится в равновесии. Предложение на данном рынке имеет вид <span data-dc-tpl="95" class="math">q<sub data-dc-tpl="96">s</sub> = −2 + 5p</span>, а спрос — <span data-dc-tpl="97" class="math">q<sub data-dc-tpl="98">d</sub> = 238 − p</span>, где <span data-dc-tpl="99" class="math">p</span> — цена тонны перца. Власти страны решили ограничить цену перца на уровне 50% от равновесной и покрыть излишний спрос из резервов. Найдите, какое количество перца будут реализовывать производители.</p>
+        <div data-dc-tpl="100" class="numf">
+          <label data-dc-tpl="101" class="small mute" for="a9">Ответ</label>
+          <input data-dc-tpl="102" id="a9" inputmode="decimal" autocomplete="off" value="98" style="">
+          <span data-dc-tpl="103" class="hint quiet" style="flex: 1 1 260px;">Только число: запятая, до сотых.</span>
+        </div>
+      </section>
+
+      <section data-dc-tpl="104" class="task" aria-label="Задание 10">
+        <div data-dc-tpl="105" class="row" style="justify-content: space-between; align-items: flex-start;">
+          <span data-dc-tpl="106" class="task-n">10</span>
+          <button data-dc-tpl="107" type="button" class="k-btn k-btn--quiet k-btn--sm">⚑ Вернуться позже</button>
+        </div>
+        <p data-dc-tpl="108" style="line-height: 1.65;">Юный экономист Евгений решает, как распорядиться 4000 рублей, накопленными со школьных обедов, и хочет инвестировать эту сумму на два года…</p>
+        <div data-dc-tpl="109" class="numf">
+          <label data-dc-tpl="110" class="small mute" for="a10">Ответ</label>
+          <input data-dc-tpl="111" id="a10" inputmode="decimal" autocomplete="off" placeholder="" style="">
+        </div>
+      </section>
+    </main>
+  </div></div></div></div>
+
+
+
+</body></html>

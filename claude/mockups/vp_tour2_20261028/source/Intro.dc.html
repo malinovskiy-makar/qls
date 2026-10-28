@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Интро варианта 2 тура</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="scr" style="min-height: 1000px;">
+  <header class="nav">
+    <span class="nav-logo" aria-hidden="true">W</span>
+    <a class="nav-a" href="#">Занятия</a>
+    <a class="nav-a" href="#">Каталог</a>
+    <a class="nav-a" href="#">Учебник</a>
+    <a class="nav-a" href="#">Олимпиады</a>
+    <a class="nav-a is-on" href="#">Тренажёр ВП<span class="nav-new">NEW</span></a>
+    <a class="nav-a" href="#">Графики</a>
+    <a class="nav-a" href="#">Wecon Rush</a>
+    <span class="nav-sp"></span>
+    <button type="button" class="nav-btn">Проблема или предложение</button>
+    <span class="nav-ava" aria-label="Профиль">М</span>
+  </header>
+
+  <main class="wrap" style="max-width: 924px; gap: 14px;">
+    <a class="ph-back" href="#"><span aria-hidden="true">‹</span> Все варианты</a>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span class="cap" style="color: var(--accent-ink);">Отборочный этап · 2 тур</span>
+      <div class="row" style="justify-content: space-between; align-items: flex-end;">
+        <h1 class="h1" style="font-size: 30px;">Демоверсия 2 тура · 10 класс</h1>
+        <span class="sum-val">70:00</span>
+      </div>
+      <p class="mute">Демоверсия ВШЭ · 2026/27 · 18 заданий · 100 баллов</p>
+    </div>
+
+    <section class="k-card" style="padding: 6px 20px 8px;" aria-label="Из чего состоит вариант">
+      <div class="th" style="grid-template-columns: 64px minmax(0, 1fr) 80px minmax(0, 1.3fr); padding: 12px 0 8px; border-bottom: 1px solid var(--border);"><span>№</span><span>Блок</span><span style="text-align: right;">Баллы</span><span>Как считается</span></div>
+      <div class="th" style="grid-template-columns: 64px minmax(0, 1fr) 80px minmax(0, 1.3fr); padding: 9px 0; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--text); border-bottom: 1px solid var(--border-soft);"><span class="num quiet">1–2</span><span style="font-weight: 600;">Все верные утверждения</span><span class="num" style="text-align: right; font-weight: 600;">12</span><span class="small mute">верный вариант — доля балла, лишний отнимает долю</span></div>
+      <div class="th" style="grid-template-columns: 64px minmax(0, 1fr) 80px minmax(0, 1.3fr); padding: 9px 0; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--text); border-bottom: 1px solid var(--border-soft);"><span class="num quiet">3</span><span style="font-weight: 600;">Текст с пропусками</span><span class="num" style="text-align: right; font-weight: 600;">9</span><span class="small mute">каждый пропуск — своя доля, штрафа нет</span></div>
+      <div class="th" style="grid-template-columns: 64px minmax(0, 1fr) 80px minmax(0, 1.3fr); padding: 9px 0; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--text); border-bottom: 1px solid var(--border-soft);"><span class="num quiet">4</span><span style="font-weight: 600;">Соотнесение</span><span class="num" style="text-align: right; font-weight: 600;">9</span><span class="small mute">каждая строка — своя доля, штрафа нет</span></div>
+      <div class="th" style="grid-template-columns: 64px minmax(0, 1fr) 80px minmax(0, 1.3fr); padding: 9px 0; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--text); border-bottom: 0;"><span class="num quiet">5–18</span><span style="font-weight: 600;">Задачи с вводом числа</span><span class="num" style="text-align: right; font-weight: 600;">70</span><span class="small mute">по 5 баллов: полный балл или ноль</span></div>
+    </section>
+
+    <section class="k-info" style="display: grid; grid-template-columns: 36px 1fr; gap: 14px;" aria-label="Правило ввода числа">
+      <span class="fmt-ico" aria-hidden="true">Ф</span>
+      <div>
+        <h2 class="h3">Ответ-число в неверной записи — 0 баллов, как на туре</h2>
+        <p class="small" style="margin-top: 4px;">Правило ВШЭ: «Ответ в виде числа запишите без пробелов, без единиц измерения и каких-либо знаков (если ответ является дробным числом, то его необходимо записать с помощью десятичной дроби, округлив до сотых, например, «1,23»)».</p>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span class="h3">Как проходить</span>
+      <div class="row" style="gap: 12px; align-items: stretch;">
+        <button type="button" class="k-tile" aria-pressed="true" style="flex: 1 1 0; align-items: flex-start;">
+          <span class="k-check"><input type="radio" name="mode" checked aria-label="С таймером"></span>
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span class="k-tile__name">С таймером — 70 минут</span><span class="k-tile__meta">Как на олимпиаде. Время вышло — работа сдаётся сама. Первая попытка идёт в таблицу 10 класса.</span></span>
+        </button>
+        <button type="button" class="k-tile" aria-pressed="false" style="flex: 1 1 0; align-items: flex-start;">
+          <span class="k-check"><input type="radio" name="mode" aria-label="Без таймера"></span>
+          <span style="display: flex; flex-direction: column; gap: 2px;"><span class="k-tile__name">Без таймера</span><span class="k-tile__meta">Без ограничения по времени. В таблицу не идёт.</span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="row wrapx" style="gap: 16px; margin-top: 4px;">
+      <a class="k-btn k-btn--hero" href="#">Начать вариант</a>
+      <span class="small mute" style="max-width: 420px;">Ответы сохраняются сами. Закрыли вкладку — продолжите с того же места, таймер при этом идёт.</span>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

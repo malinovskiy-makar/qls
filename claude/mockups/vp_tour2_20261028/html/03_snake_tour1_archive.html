@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru"><head><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Результат 1 тура — змейка с определениями</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+<style data-dc-tpl="1">
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style><style>
+@font-face{font-family:"Montserrat";font-weight:400;font-style:normal;src:url(ds/weconomics/fonts/montserrat-400.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:400;font-style:italic;src:url(ds/weconomics/fonts/montserrat-400i.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:500;src:url(ds/weconomics/fonts/montserrat-500.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:600;src:url(ds/weconomics/fonts/montserrat-600.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:700;src:url(ds/weconomics/fonts/montserrat-700.woff2) format("woff2")}
+</style>
+<!-- Статичный снимок макета (без логики). Логика и данные — в ../source/*.dc.html -->
+</head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="Snake1"><div data-dc-tpl="2" class="scr" style="width: 1100px; min-height: 760px; padding: 32px;">
+  <section data-dc-tpl="3" class="k-card" aria-label="Змейка целиком" style="display: flex; flex-direction: column; gap: 16px; padding: 22px 24px;">
+    <div data-dc-tpl="4" class="row" style="justify-content: space-between; align-items: baseline;">
+      <div data-dc-tpl="5" class="row" style="gap: 12px; align-items: baseline;">
+        <h2 data-dc-tpl="6" class="h2">Змейка целиком</h2>
+        <span data-dc-tpl="7" class="small mute">Демоверсия 1 тура · 9–10 классы · архив</span>
+      </div>
+      <span data-dc-tpl="8" class="small num"><b data-dc-tpl="9">50</b> / 60 · 25 слов из 30</span>
+    </div>
+    <p data-dc-tpl="10" class="small mute">Каждый ответ начинается со второй буквы предыдущего. Нажмите на слово — откроется определение, ваш ответ и связка.</p>
+    <div data-dc-tpl="11" class="chain" aria-label="Цепочка ответов">
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 1: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">1</span></b>
+          <span class="sc-interp">лаг</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 2: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">2</span></b>
+          <span class="sc-interp">автаркия</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 3: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">3</span></b>
+          <span class="sc-interp">валютный курс</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 4: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">4</span></b>
+          <span class="sc-interp">альтернативные издержки</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--bad" aria-pressed="false" aria-label="Слово 5: неверно">
+          <b data-dc-tpl="14"><span class="sc-interp">5</span></b>
+          
+          <s data-dc-tpl="17"><span class="sc-interp">ликвидация</span></s> <span class="sc-interp">ликвидность</span>
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 6: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">6</span></b>
+          <span class="sc-interp">импорт</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 7: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">7</span></b>
+          <span class="sc-interp">мультипликатор</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 8: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">8</span></b>
+          <span class="sc-interp">уровень безработицы</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 9: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">9</span></b>
+          <span class="sc-interp">рецессия</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--none" aria-pressed="false" aria-label="Слово 10: без ответа">
+          <b data-dc-tpl="14"><span class="sc-interp">10</span></b>
+          
+          
+          без ответа
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 11: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">11</span></b>
+          <span class="sc-interp">сбережения</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 12: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">12</span></b>
+          <span class="sc-interp">бартер</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 13: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">13</span></b>
+          <span class="sc-interp">актив</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 14: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">14</span></b>
+          <span class="sc-interp">квота</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 15: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">15</span></b>
+          <span class="sc-interp">внешний эффект</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 16: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">16</span></b>
+          <span class="sc-interp">налог</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 17: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">17</span></b>
+          <span class="sc-interp">амортизация</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 18: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">18</span></b>
+          <span class="sc-interp">макроэкономика</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--bad is-cur" aria-pressed="true" aria-label="Слово 19: неверно">
+          <b data-dc-tpl="14"><span class="sc-interp">19</span></b>
+          
+          <s data-dc-tpl="17"><span class="sc-interp">облигация</span></s> <span class="sc-interp">акция</span>
+          
+        </button>
+        <span data-dc-tpl="20" class="arr arr--bad" aria-hidden="true"><span class="sc-interp">✕</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 20: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">20</span></b>
+          <span class="sc-interp">капитал</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 21: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">21</span></b>
+          <span class="sc-interp">акциз</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--none" aria-pressed="false" aria-label="Слово 22: без ответа">
+          <b data-dc-tpl="14"><span class="sc-interp">22</span></b>
+          
+          
+          без ответа
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 23: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">23</span></b>
+          <span class="sc-interp">Лоренца</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 24: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">24</span></b>
+          <span class="sc-interp">ограниченность ресурсов</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 25: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">25</span></b>
+          <span class="sc-interp">глобализация</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 26: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">26</span></b>
+          <span class="sc-interp">либерализация</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 27: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">27</span></b>
+          <span class="sc-interp">избыточные</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--none" aria-pressed="false" aria-label="Слово 28: без ответа">
+          <b data-dc-tpl="14"><span class="sc-interp">28</span></b>
+          
+          
+          без ответа
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 29: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">29</span></b>
+          <span class="sc-interp">естественный</span>
+          
+          
+        </button>
+        <span data-dc-tpl="20" class="arr" aria-hidden="true"><span class="sc-interp">→</span></span>
+      
+        <button data-dc-tpl="13" type="button" class="cw cw--ok" aria-pressed="false" aria-label="Слово 30: верно">
+          <b data-dc-tpl="14"><span class="sc-interp">30</span></b>
+          <span class="sc-interp">санкции</span>
+          
+          
+        </button>
+        
+      
+    </div>
+    <div data-dc-tpl="21" class="legend" aria-hidden="true">
+      <span data-dc-tpl="22"><b data-dc-tpl="23" style="color: var(--green-ink);">●</b> верно, +2</span>
+      <span data-dc-tpl="24"><b data-dc-tpl="25" style="color: var(--error-ink);">●</b> неверно: зачёркнут ваш ответ, рядом верный</span>
+      <span data-dc-tpl="26"><b data-dc-tpl="27" style="color: var(--error-ink);">✕</b> здесь цепь порвалась</span>
+      <span data-dc-tpl="28"><b data-dc-tpl="29" style="color: var(--text3);">○</b> без ответа</span>
+    </div>
+
+    <div data-dc-tpl="30" class="cdet" aria-live="polite">
+      <div data-dc-tpl="31" style="display: flex; flex-direction: column; gap: 10px;">
+        <div data-dc-tpl="32" class="x-meta" style="margin: 0px;"><span data-dc-tpl="33">Задание <span class="sc-interp">19</span></span><span data-dc-tpl="34" aria-hidden="true">·</span><span data-dc-tpl="35">змейка · 2 балла</span></div>
+        <p data-dc-tpl="36" style="font-size: 16px; line-height: 1.6;"><span class="sc-interp">Ценная бумага, гарантирующая владельцу права на получение части прибыли компании в виде дивидендов</span></p>
+        
+        
+      </div>
+      <div data-dc-tpl="45" style="display: flex; flex-direction: column; gap: 10px;">
+        
+          <div data-dc-tpl="47" class="x-ans" style="grid-template-columns: 1fr;">
+            <div data-dc-tpl="48" class="x-box is-bad"><span data-dc-tpl="49" class="cap">Ваш ответ · <span class="sc-interp">0</span></span><div data-dc-tpl="50" class="v" style="font-size: 18px;"><span class="sc-interp">облигация</span></div></div>
+            <div data-dc-tpl="52" class="x-box is-ok"><span data-dc-tpl="53" class="cap">Верный ответ</span><div data-dc-tpl="54" class="v" style="font-size: 18px;"><span class="sc-interp">акция</span></div></div>
+          </div>
+        
+        <div data-dc-tpl="55" class="k-state k-state--bad">
+          <span data-dc-tpl="56" class="k-state__icon" aria-hidden="true"><span class="sc-interp">✕</span></span>
+          <div data-dc-tpl="57"><div data-dc-tpl="58" class="k-state__title">Связка</div><div data-dc-tpl="59" class="k-state__note"><span class="sc-interp">Вторая буква вашего ответа — «б», а следующее слово (20, «капитал») начинается на «к». Здесь цепь порвалась.</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section></div></div></div>
+
+
+
+</body></html>

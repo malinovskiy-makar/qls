@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru"><head><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Результат варианта — телефон</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+<style data-dc-tpl="1">
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style><style>
+@font-face{font-family:"Montserrat";font-weight:400;font-style:normal;src:url(ds/weconomics/fonts/montserrat-400.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:400;font-style:italic;src:url(ds/weconomics/fonts/montserrat-400i.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:500;src:url(ds/weconomics/fonts/montserrat-500.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:600;src:url(ds/weconomics/fonts/montserrat-600.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:700;src:url(ds/weconomics/fonts/montserrat-700.woff2) format("woff2")}
+</style>
+<!-- Статичный снимок макета (без логики). Логика и данные — в ../source/*.dc.html -->
+</head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="ResultPhone"><div data-dc-tpl="2" class="scr ph" style="min-height: 3520px;">
+  <header data-dc-tpl="3" class="ph-nav">
+    <span data-dc-tpl="4" class="nav-logo" aria-hidden="true">W</span>
+    <b data-dc-tpl="5">Тренажёр ВП</b>
+    <button data-dc-tpl="6" type="button" class="ph-burger" aria-label="Меню"><svg data-dc-tpl="7" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path data-dc-tpl="8" d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+  </header>
+  <main data-dc-tpl="9" class="wrap">
+    <a data-dc-tpl="10" class="ph-back" href="#"><span data-dc-tpl="11" aria-hidden="true">‹</span> Мои попытки</a>
+    <h1 data-dc-tpl="12" class="ph-h1">Демоверсия 2 тура · 10 класс</h1>
+
+    <section data-dc-tpl="13" class="k-card ph-sum" aria-label="Итог попытки">
+      <div data-dc-tpl="14" class="row" style="justify-content: space-between; align-items: flex-end;">
+        <span data-dc-tpl="15" class="sum-score" style="font-size: 44px;">60,5 <small data-dc-tpl="16">/ 100</small></span>
+        <span data-dc-tpl="17" class="k-chip k-chip--sol">в таблице</span>
+      </div>
+      <div data-dc-tpl="18" class="ph-facts">
+        <span data-dc-tpl="19">время <b data-dc-tpl="20">51:20</b> / 70:00</span>
+        <span data-dc-tpl="21"><b data-dc-tpl="22">4-е</b> место · 10 класс</span>
+        <span data-dc-tpl="23">выше, чем у <b data-dc-tpl="24">62%</b></span>
+      </div>
+      <a data-dc-tpl="25" class="k-btn k-btn--main k-btn--wide" href="#" style="min-height: 44px;">Пройти другой вариант</a>
+      <button data-dc-tpl="26" type="button" class="k-btn k-btn--plain k-btn--wide" style="min-height: 44px;">Поделиться результатом</button>
+    </section>
+
+    <section data-dc-tpl="27" class="k-info" aria-label="Потеряно на формате" style="display: flex; flex-direction: column; gap: 8px;">
+      <div data-dc-tpl="28" class="row" style="gap: 10px; align-items: flex-start;">
+        <span data-dc-tpl="29" class="fmt-ico" aria-hidden="true" style="flex: 0 0 32px; width: 32px; height: 32px;">Ф</span>
+        <div data-dc-tpl="30">
+          <h2 data-dc-tpl="31" class="h3">25 баллов потеряно на записи ответа</h2>
+          <p data-dc-tpl="32" class="small" style="margin-top: 2px;">Числа верные, запись нет. С верной записью — <b data-dc-tpl="33">85,5</b>.</p>
+        </div>
+      </div>
+      <div data-dc-tpl="34" class="fmt-list" style="margin-top: 0px;">
+        <span data-dc-tpl="35" class="fmt-pair">9: <s data-dc-tpl="36">98.0</s> → <b data-dc-tpl="37">98,0</b></span>
+        <span data-dc-tpl="38" class="fmt-pair">11: <s data-dc-tpl="39">-0.12</s> → <b data-dc-tpl="40">-0,12</b></span>
+        <span data-dc-tpl="41" class="fmt-pair">13: <s data-dc-tpl="42">11 800</s> → <b data-dc-tpl="43">11800</b></span>
+        <span data-dc-tpl="44" class="fmt-pair">14: <s data-dc-tpl="45">160 ед</s> → <b data-dc-tpl="46">160</b></span>
+        <span data-dc-tpl="47" class="fmt-pair">17: <s data-dc-tpl="48">1,607</s> → <b data-dc-tpl="49">1,61</b></span>
+      </div>
+    </section>
+
+    <section data-dc-tpl="50" class="k-card" aria-label="Разбор по заданиям" style="padding: 0px; overflow: hidden;">
+      <div data-dc-tpl="51" style="padding: 14px 12px 12px; display: flex; flex-direction: column; gap: 12px;">
+        <div data-dc-tpl="52" class="row" style="justify-content: space-between;">
+          <h2 data-dc-tpl="53" class="h2" style="font-size: 17px;">Разбор по заданиям</h2>
+          <button data-dc-tpl="54" type="button" class="k-btn k-btn--quiet k-btn--sm">Раскрыть все</button>
+        </div>
+        <div data-dc-tpl="55" class="map" aria-label="Карта ответов">
+          <button data-dc-tpl="56" type="button" class="sq sq--ok" aria-label="Задание 1: верно">1<i data-dc-tpl="57" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="58" type="button" class="sq sq--mid" aria-label="Задание 2: частично">2<i data-dc-tpl="59" aria-hidden="true">½</i></button>
+          <button data-dc-tpl="60" type="button" class="sq sq--mid" aria-label="Задание 3: частично">3<i data-dc-tpl="61" aria-hidden="true">½</i></button>
+          <button data-dc-tpl="62" type="button" class="sq sq--mid" aria-label="Задание 4: частично">4<i data-dc-tpl="63" aria-hidden="true">½</i></button>
+          <button data-dc-tpl="64" type="button" class="sq sq--ok" aria-label="Задание 5: верно">5<i data-dc-tpl="65" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="66" type="button" class="sq sq--ok" aria-label="Задание 6: верно">6<i data-dc-tpl="67" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="68" type="button" class="sq sq--ok" aria-label="Задание 7: верно">7<i data-dc-tpl="69" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="70" type="button" class="sq sq--ok" aria-label="Задание 8: верно">8<i data-dc-tpl="71" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="72" type="button" class="sq sq--fmt" aria-label="Задание 9: число верное, запись нет">9<i data-dc-tpl="73" aria-hidden="true">Ф</i></button>
+          <button data-dc-tpl="74" type="button" class="sq sq--ok" aria-label="Задание 10: верно">10<i data-dc-tpl="75" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="76" type="button" class="sq sq--fmt" aria-label="Задание 11: число верное, запись нет">11<i data-dc-tpl="77" aria-hidden="true">Ф</i></button>
+          <button data-dc-tpl="78" type="button" class="sq sq--ok" aria-label="Задание 12: верно">12<i data-dc-tpl="79" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="80" type="button" class="sq sq--fmt" aria-label="Задание 13: число верное, запись нет">13<i data-dc-tpl="81" aria-hidden="true">Ф</i></button>
+          <button data-dc-tpl="82" type="button" class="sq sq--fmt" aria-label="Задание 14: число верное, запись нет">14<i data-dc-tpl="83" aria-hidden="true">Ф</i></button>
+          <button data-dc-tpl="84" type="button" class="sq sq--ok" aria-label="Задание 15: верно">15<i data-dc-tpl="85" aria-hidden="true">✓</i></button>
+          <button data-dc-tpl="86" type="button" class="sq sq--none" aria-label="Задание 16: без ответа">16<i data-dc-tpl="87" aria-hidden="true">—</i></button>
+          <button data-dc-tpl="88" type="button" class="sq sq--fmt is-cur" aria-label="Задание 17: число верное, запись нет, открыто">17<i data-dc-tpl="89" aria-hidden="true">Ф</i></button>
+          <button data-dc-tpl="90" type="button" class="sq sq--ok" aria-label="Задание 18: верно">18<i data-dc-tpl="91" aria-hidden="true">✓</i></button>
+        </div>
+        <div data-dc-tpl="92" class="legend" aria-hidden="true">
+          <span data-dc-tpl="93"><b data-dc-tpl="94" style="color: var(--green-ink);">✓</b> верно</span>
+          <span data-dc-tpl="95"><b data-dc-tpl="96" style="color: var(--amber-ink);">½</b> частично</span>
+          <span data-dc-tpl="97"><b data-dc-tpl="98" style="color: var(--error-ink);">Ф</b> запись</span>
+          <span data-dc-tpl="99"><b data-dc-tpl="100" style="color: var(--text3);">—</b> пусто</span>
+        </div>
+        <div data-dc-tpl="101" class="ph-scroll" role="group" aria-label="Показать задания">
+          <button data-dc-tpl="102" type="button" class="fl-b" aria-pressed="true">Все <em data-dc-tpl="103">18</em></button>
+          <button data-dc-tpl="104" type="button" class="fl-b" aria-pressed="false">Ошибки <em data-dc-tpl="105">3</em></button>
+          <button data-dc-tpl="106" type="button" class="fl-b" aria-pressed="false">Формат <em data-dc-tpl="107">5</em></button>
+          <button data-dc-tpl="108" type="button" class="fl-b" aria-pressed="false">Без ответа <em data-dc-tpl="109">1</em></button>
+          <button data-dc-tpl="110" type="button" class="fl-b" aria-pressed="false">Верно <em data-dc-tpl="111">9</em></button>
+        </div>
+      </div>
+
+      <div data-dc-tpl="112" class="tbl">
+        <div data-dc-tpl="113" class="it it--ok"><button data-dc-tpl="114" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="115" class="tr-n">1</span><span data-dc-tpl="116" class="tr-t"><span data-dc-tpl="117" class="tt">К каким экономическим эффектам привёл нефтяной кризис 1973–1974 годов?</span><span data-dc-tpl="118" class="ph-ans">1, 4, 5</span></span><span data-dc-tpl="119" class="tr-s">6 <small data-dc-tpl="120">/ 6</small></span><span data-dc-tpl="121" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="122" class="it it--mid"><button data-dc-tpl="123" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="124" class="tr-n">2</span><span data-dc-tpl="125" class="tr-t"><span data-dc-tpl="126" class="tt">Выделите отличительные черты глобализации</span><span data-dc-tpl="127" class="ph-ans">1, 2, 3 <span data-dc-tpl="128" class="arrow">→ верно 2, 3, 5</span></span></span><span data-dc-tpl="129" class="tr-s">1 <small data-dc-tpl="130">/ 6</small></span><span data-dc-tpl="131" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="132" class="it it--mid"><button data-dc-tpl="133" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="134" class="tr-n">3</span><span data-dc-tpl="135" class="tr-t"><span data-dc-tpl="136" class="tt">Понятие «ловушка среднего дохода»…</span><span data-dc-tpl="137" class="ph-ans">6 из 8 пропусков</span></span><span data-dc-tpl="138" class="tr-s">6,75 <small data-dc-tpl="139">/ 9</small></span><span data-dc-tpl="140" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="141" class="it it--mid"><button data-dc-tpl="142" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="143" class="tr-n">4</span><span data-dc-tpl="144" class="tr-t"><span data-dc-tpl="145" class="tt">Соотнесите утверждения про бедность</span><span data-dc-tpl="146" class="ph-ans">3 из 4 строк</span></span><span data-dc-tpl="147" class="tr-s">6,75 <small data-dc-tpl="148">/ 9</small></span><span data-dc-tpl="149" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="150" class="it it--ok"><button data-dc-tpl="151" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="152" class="tr-n">5</span><span data-dc-tpl="153" class="tr-t"><span data-dc-tpl="154" class="tt">Андрей поставил автомат, в котором…</span><span data-dc-tpl="155" class="ph-ans">25000</span></span><span data-dc-tpl="156" class="tr-s">5 <small data-dc-tpl="157">/ 5</small></span><span data-dc-tpl="158" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="159" class="it it--ok"><button data-dc-tpl="160" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="161" class="tr-n">6</span><span data-dc-tpl="162" class="tr-t"><span data-dc-tpl="163" class="tt">Молодая семья, Борис и Анна…</span><span data-dc-tpl="164" class="ph-ans">250</span></span><span data-dc-tpl="165" class="tr-s">5 <small data-dc-tpl="166">/ 5</small></span><span data-dc-tpl="167" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="168" class="it it--ok"><button data-dc-tpl="169" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="170" class="tr-n">7</span><span data-dc-tpl="171" class="tr-t"><span data-dc-tpl="172" class="tt">На рынке авторских блокнотов…</span><span data-dc-tpl="173" class="ph-ans">11</span></span><span data-dc-tpl="174" class="tr-s">5 <small data-dc-tpl="175">/ 5</small></span><span data-dc-tpl="176" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="177" class="it it--ok"><button data-dc-tpl="178" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="179" class="tr-n">8</span><span data-dc-tpl="180" class="tr-t"><span data-dc-tpl="181" class="tt">Компания «Альфа», действующая на…</span><span data-dc-tpl="182" class="ph-ans">40</span></span><span data-dc-tpl="183" class="tr-s">5 <small data-dc-tpl="184">/ 5</small></span><span data-dc-tpl="185" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="186" class="it it--fmt"><button data-dc-tpl="187" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="188" class="tr-n">9</span><span data-dc-tpl="189" class="tr-t"><span data-dc-tpl="190" class="tt">Совершенно конкурентный рынок перца…</span><span data-dc-tpl="191" class="ph-ans"><span data-dc-tpl="192" class="is-bad">98.0</span> <span data-dc-tpl="193" class="arrow">→ 98</span><span data-dc-tpl="194" class="tag tag--fmt">точка</span></span></span><span data-dc-tpl="195" class="tr-s">0 <small data-dc-tpl="196">/ 5</small></span><span data-dc-tpl="197" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="198" class="it it--ok"><button data-dc-tpl="199" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="200" class="tr-n">10</span><span data-dc-tpl="201" class="tr-t"><span data-dc-tpl="202" class="tt">Юный экономист Евгений решает…</span><span data-dc-tpl="203" class="ph-ans">840</span></span><span data-dc-tpl="204" class="tr-s">5 <small data-dc-tpl="205">/ 5</small></span><span data-dc-tpl="206" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="207" class="it it--fmt"><button data-dc-tpl="208" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="209" class="tr-n">11</span><span data-dc-tpl="210" class="tr-t"><span data-dc-tpl="211" class="tt">На планете Джи население делится…</span><span data-dc-tpl="212" class="ph-ans"><span data-dc-tpl="213" class="is-bad">-0.12</span> <span data-dc-tpl="214" class="arrow">→ -0,12</span><span data-dc-tpl="215" class="tag tag--fmt">точка</span></span></span><span data-dc-tpl="216" class="tr-s">0 <small data-dc-tpl="217">/ 5</small></span><span data-dc-tpl="218" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="219" class="it it--ok"><button data-dc-tpl="220" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="221" class="tr-n">12</span><span data-dc-tpl="222" class="tr-t"><span data-dc-tpl="223" class="tt">В деревне Зелёный Луг…</span><span data-dc-tpl="224" class="ph-ans">200</span></span><span data-dc-tpl="225" class="tr-s">5 <small data-dc-tpl="226">/ 5</small></span><span data-dc-tpl="227" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="228" class="it it--fmt"><button data-dc-tpl="229" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="230" class="tr-n">13</span><span data-dc-tpl="231" class="tr-t"><span data-dc-tpl="232" class="tt">В посёлке Акив действует фирма…</span><span data-dc-tpl="233" class="ph-ans"><span data-dc-tpl="234" class="is-bad">11 800</span> <span data-dc-tpl="235" class="arrow">→ 11800</span><span data-dc-tpl="236" class="tag tag--fmt">пробел</span></span></span><span data-dc-tpl="237" class="tr-s">0 <small data-dc-tpl="238">/ 5</small></span><span data-dc-tpl="239" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="240" class="it it--fmt"><button data-dc-tpl="241" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="242" class="tr-n">14</span><span data-dc-tpl="243" class="tr-t"><span data-dc-tpl="244" class="tt">12,5% от ВВП — инвестиции…</span><span data-dc-tpl="245" class="ph-ans"><span data-dc-tpl="246" class="is-bad">160 ед</span> <span data-dc-tpl="247" class="arrow">→ 160</span><span data-dc-tpl="248" class="tag tag--fmt">единицы</span></span></span><span data-dc-tpl="249" class="tr-s">0 <small data-dc-tpl="250">/ 5</small></span><span data-dc-tpl="251" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="252" class="it it--ok"><button data-dc-tpl="253" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="254" class="tr-n">15</span><span data-dc-tpl="255" class="tr-t"><span data-dc-tpl="256" class="tt">Экономика страны Вышландия…</span><span data-dc-tpl="257" class="ph-ans">2</span></span><span data-dc-tpl="258" class="tr-s">5 <small data-dc-tpl="259">/ 5</small></span><span data-dc-tpl="260" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="261" class="it it--none"><button data-dc-tpl="262" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="263" class="tr-n">16</span><span data-dc-tpl="264" class="tr-t"><span data-dc-tpl="265" class="tt">Долгосрочное совокупное предложение…</span><span data-dc-tpl="266" class="ph-ans quiet" style="font-weight: 500;">нет ответа · дорешать</span></span><span data-dc-tpl="267" class="tr-s">0 <small data-dc-tpl="268">/ 5</small></span><span data-dc-tpl="269" class="tri" aria-hidden="true"></span></button></div>
+        <div data-dc-tpl="270" class="grp">Задачи 17–18 · общее условие</div>
+        <div data-dc-tpl="271" class="it it--fmt is-open">
+          <button data-dc-tpl="272" type="button" class="tr ph-tr" aria-expanded="true"><span data-dc-tpl="273" class="tr-n">17</span><span data-dc-tpl="274" class="tr-t"><span data-dc-tpl="275" class="tt">Компания «Крутые аналитики»…</span><span data-dc-tpl="276" class="ph-ans"><span data-dc-tpl="277" class="is-bad">1,607</span> <span data-dc-tpl="278" class="arrow">→ 1,61</span><span data-dc-tpl="279" class="tag tag--fmt">знаки</span></span></span><span data-dc-tpl="280" class="tr-s">0 <small data-dc-tpl="281">/ 5</small></span><span data-dc-tpl="282" class="tri" aria-hidden="true"></span></button>
+          <div data-dc-tpl="283" class="x">
+            <div data-dc-tpl="284" class="x-cond">
+              <div data-dc-tpl="285" class="x-meta"><span data-dc-tpl="286">Задание 17</span><span data-dc-tpl="287" aria-hidden="true">·</span><span data-dc-tpl="288">5 баллов</span></div>
+              <p data-dc-tpl="289">Компания «Крутые аналитики» изучает экспорт стран А и Б по двум товарам: автомобили и сельскохозяйственные продукты. В таблице — данные за год в млрд долларов.</p>
+              <p data-dc-tpl="290">Рассчитайте показатель выявленных сравнительных преимуществ Баласса (RCA) для всех товаров каждой из стран. В ответе напишите наибольшее значение RCA. Формула: RCA = (Xij / Xwj) / (Xi / Xw), где X — экспорт, i — страна, j — товар, w — мир в целом.</p>
+              <div data-dc-tpl="291" class="ph-tscroll">
+                <div data-dc-tpl="292" class="tg" role="table" aria-label="Данные к задаче">
+                  <div data-dc-tpl="293" class="tg-h" role="columnheader">Товар</div><div data-dc-tpl="294" class="tg-h" role="columnheader">Экспорт А</div><div data-dc-tpl="295" class="tg-h" role="columnheader">Экспорт Б</div><div data-dc-tpl="296" class="tg-h" role="columnheader">Мировой экспорт</div>
+                  <div data-dc-tpl="297" class="tg-c" role="cell">Автомобили</div><div data-dc-tpl="298" class="tg-c" role="cell">50</div><div data-dc-tpl="299" class="tg-c" role="cell">20</div><div data-dc-tpl="300" class="tg-c" role="cell">200</div>
+                  <div data-dc-tpl="301" class="tg-c" role="cell">Сельхозпродукты</div><div data-dc-tpl="302" class="tg-c" role="cell">20</div><div data-dc-tpl="303" class="tg-c" role="cell">40</div><div data-dc-tpl="304" class="tg-c" role="cell">250</div>
+                </div>
+              </div>
+              <p data-dc-tpl="305" class="ph-hint">таблица листается вбок →</p>
+            </div>
+            <div data-dc-tpl="306" class="x-ans">
+              <div data-dc-tpl="307" class="x-box is-bad"><span data-dc-tpl="308" class="cap">Ваш ответ</span><div data-dc-tpl="309" class="v">1,607</div></div>
+              <div data-dc-tpl="310" class="x-box is-ok"><span data-dc-tpl="311" class="cap">Верный</span><div data-dc-tpl="312" class="v">1,61</div></div>
+            </div>
+            <div data-dc-tpl="313" class="k-state k-state--bad">
+              <span data-dc-tpl="314" class="k-state__icon" aria-hidden="true">Ф</span>
+              <div data-dc-tpl="315"><div data-dc-tpl="316" class="k-state__title">0 из 5: больше двух знаков после запятой</div><div data-dc-tpl="317" class="k-state__note">Округлите до сотых: «1,61», а не «1,607». Само число верное — на туре за такую запись тоже 0.</div></div>
+            </div>
+            <div data-dc-tpl="318" class="x-acts">
+              <button data-dc-tpl="319" type="button" class="disc" aria-expanded="false"><span data-dc-tpl="320" class="tri" aria-hidden="true"></span>Решение</button>
+              <span data-dc-tpl="321" class="grow"></span>
+              <a data-dc-tpl="322" class="small link" href="#">Ссылка на задание</a>
+            </div>
+          </div>
+        </div>
+        <div data-dc-tpl="323" class="it it--ok"><button data-dc-tpl="324" type="button" class="tr ph-tr" aria-expanded="false"><span data-dc-tpl="325" class="tr-n">18</span><span data-dc-tpl="326" class="tr-t"><span data-dc-tpl="327" class="tt">Насколько стране А увеличить экспорт…</span><span data-dc-tpl="328" class="ph-ans">0</span></span><span data-dc-tpl="329" class="tr-s">5 <small data-dc-tpl="330">/ 5</small></span><span data-dc-tpl="331" class="tri" aria-hidden="true"></span></button></div>
+      </div>
+    </section>
+
+    <section data-dc-tpl="332" class="k-card" aria-label="По блокам">
+      <h2 data-dc-tpl="333" class="h3" style="margin-bottom: 12px;">По блокам</h2>
+      <div data-dc-tpl="334" class="blk"><span data-dc-tpl="335" class="small">Все верные · 1–2</span><span data-dc-tpl="336" class="small num"><b data-dc-tpl="337">7</b> / 12</span><span data-dc-tpl="338" class="track"><span data-dc-tpl="339" class="fill-mid" style="width: 58%;"></span></span></div>
+      <div data-dc-tpl="340" class="blk"><span data-dc-tpl="341" class="small">Пропуски · 3</span><span data-dc-tpl="342" class="small num"><b data-dc-tpl="343">6,75</b> / 9</span><span data-dc-tpl="344" class="track"><span data-dc-tpl="345" class="fill-ok" style="width: 75%;"></span></span></div>
+      <div data-dc-tpl="346" class="blk"><span data-dc-tpl="347" class="small">Соотнесение · 4</span><span data-dc-tpl="348" class="small num"><b data-dc-tpl="349">6,75</b> / 9</span><span data-dc-tpl="350" class="track"><span data-dc-tpl="351" class="fill-ok" style="width: 75%;"></span></span></div>
+      <div data-dc-tpl="352" class="blk"><span data-dc-tpl="353" class="small">Задачи с числом · 5–18</span><span data-dc-tpl="354" class="small num"><b data-dc-tpl="355">40</b> / 70</span><span data-dc-tpl="356" class="track"><span data-dc-tpl="357" class="fill-mid" style="width: 57%;"></span></span></div>
+    </section>
+
+    <section data-dc-tpl="358" class="k-card" aria-label="Что дальше">
+      <h2 data-dc-tpl="359" class="h3" style="margin-bottom: 4px;">Что дальше</h2>
+      <div data-dc-tpl="360" class="next">
+        <span data-dc-tpl="361" class="small" style="font-weight: 600;">Потренировать запись ответа</span>
+        <span data-dc-tpl="362" class="small mute">12 готовых чисел, 2–3 минуты — по правилу ВШЭ.</span>
+        <a data-dc-tpl="363" class="k-btn k-btn--plain" href="#" style="align-self: flex-start; margin-top: 4px; min-height: 44px;">Начать</a>
+      </div>
+      <div data-dc-tpl="364" class="next">
+        <span data-dc-tpl="365" class="small" style="font-weight: 600;">Закрытая консультация перед туром</span>
+        <span data-dc-tpl="366" class="small mute">Пригласите друга — и получите место на разборе в Zoom.</span>
+        <a data-dc-tpl="367" class="k-btn k-btn--plain" href="#" style="align-self: flex-start; margin-top: 4px; min-height: 44px;">Пригласить друга</a>
+      </div>
+    </section>
+  </main></div></div></div>
+
+
+
+</body></html>

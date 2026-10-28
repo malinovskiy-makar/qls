@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Тренировка записи ответа</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+.dr { display: grid; grid-template-columns: 36px minmax(0, 1fr) 170px minmax(0, 1.25fr); gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.dr:first-child { border-top: 0; }
+.dr-n { font-weight: 600; color: var(--text3); font-variant-numeric: tabular-nums; }
+.dr-v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.dr-c { display: block; font-size: 13px; color: var(--text3); margin-top: 2px; font-weight: 400; }
+.dr input { width: 170px; height: 44px; font: inherit; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+.dr input.is-bad { border-color: var(--error); border-bottom-width: 2px; background: var(--surface); }
+.dr input.is-ok { border-color: var(--green); border-bottom-width: 2px; background: var(--surface); }
+.dr-h { display: grid; grid-template-columns: 36px minmax(0, 1fr) 170px minmax(0, 1.25fr); gap: 14px; padding: 0 0 8px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); }
+.prog { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 180px; }
+.prog b { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.prog .track { width: 180px; }
+</style>
+</helmet>
+<div class="scr" style="min-height: 1460px;">
+  <header class="nav">
+    <span class="nav-logo" aria-hidden="true">W</span>
+    <a class="nav-a" href="#">Занятия</a>
+    <a class="nav-a" href="#">Каталог</a>
+    <a class="nav-a" href="#">Учебник</a>
+    <a class="nav-a" href="#">Олимпиады</a>
+    <a class="nav-a is-on" href="#">Тренажёр ВП<span class="nav-new">NEW</span></a>
+    <a class="nav-a" href="#">Графики</a>
+    <a class="nav-a" href="#">Wecon Rush</a>
+    <span class="nav-sp"></span>
+    <button type="button" class="nav-btn">Проблема или предложение</button>
+    <span class="nav-ava" aria-label="Профиль">М</span>
+  </header>
+
+  <main class="wrap" style="max-width: 980px; gap: 16px;">
+    <a class="ph-back" href="#"><span aria-hidden="true">‹</span> Тренажёр ВП</a>
+    <div class="row" style="justify-content: space-between; align-items: flex-end; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span class="cap" style="color: var(--accent-ink);">Тренажёр ВП · 2 тур</span>
+        <h1 class="h1" style="font-size: 30px;">Тренировка записи ответа</h1>
+        <p class="mute" style="max-width: 600px;">12 чисел, 2–3 минуты. Каждое уже посчитано – запишите его так, как примет система тура. Проверка – по Enter или при переходе к следующему полю.</p>
+      </div>
+      <div class="prog" aria-live="polite">
+        <span class="tiny quiet">записано верно</span>
+        <b>{{okCount}} <small class="small quiet" style="font-weight: 500;">из 12</small></b>
+        <span class="track"><span class="fill-ok" style="width: {{okPct}}%;"></span></span>
+      </div>
+    </div>
+
+    <section class="k-info" style="display: grid; grid-template-columns: 36px 1fr; gap: 14px;" aria-label="Правило ввода числа">
+      <span class="fmt-ico" aria-hidden="true">Ф</span>
+      <div>
+        <h2 class="h3">На туре неверная запись – 0 баллов, даже если число верное</h2>
+        <p class="small" style="margin-top: 4px;">Правило ВШЭ: «Ответ в виде числа запишите без пробелов, без единиц измерения и каких-либо знаков (если ответ является дробным числом, то его необходимо записать с помощью десятичной дроби, округлив до сотых, например, «1,23»)».</p>
+      </div>
+    </section>
+
+    <section class="k-card" style="padding: 16px 22px 8px;" aria-label="Числа для записи">
+      <div class="dr-h" aria-hidden="true"><span>№</span><span>Получилось в решении</span><span>Ваша запись</span><span>Проверка</span></div>
+      <div>
+        <sc-for list="{{rows}}" as="d" hint-placeholder-count="12">
+          <div class="dr">
+            <span class="dr-n">{{d.n}}</span>
+            <span class="dr-v">{{d.shown}}<span class="dr-c">{{d.ctx}}</span></span>
+            <input class="{{d.inCls}}" value="{{d.val}}" onChange="{{d.onVal}}" inputmode="decimal" autocomplete="off" aria-label="{{d.aria}}">
+            <span class="{{d.vCls}}">{{d.verdict}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section class="k-card" style="display: flex; align-items: center; gap: 18px; padding: 18px 22px;" aria-label="Итог тренировки">
+      <div class="grow">
+        <span class="cap">Итог · появляется, когда проверены все 12</span>
+        <div class="h2" style="margin-top: 4px;">Записано верно {{okCount}} из 12</div>
+        <p class="small mute" style="margin-top: 2px;">{{summary}}</p>
+      </div>
+      <button type="button" class="k-btn k-btn--plain" onClick="{{reset}}">Пройти ещё раз</button>
+      <a class="k-btn k-btn--main" href="#">Перейти к варианту</a>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1460}}'>
+class Component extends DCLogic {
+  state = { vals: { 1: '37,5', 2: '25 000', 3: '20', 4: '−0,12', 5: '1,61', 6: '0,66' } };
+
+  items() {
+    return [
+      { n: 1, shown: '37.5', ctx: 'калькулятор ставит точку', ans: '37,5' },
+      { n: 2, shown: '25 000', ctx: 'выручка, рублей', ans: '25000' },
+      { n: 3, shown: '20%', ctx: 'спрашивают, на сколько процентов', ans: '20' },
+      { n: 4, shown: '−0,12', ctx: 'минус как в учебнике', ans: '-0,12' },
+      { n: 5, shown: '1,607', ctx: '', ans: '1,61' },
+      { n: 6, shown: '2/3', ctx: 'обыкновенная дробь', ans: '0,67' },
+      { n: 7, shown: '3,125', ctx: 'ровно половина сотой', ans: '3,13' },
+      { n: 8, shown: '1 200,50 ₽', ctx: '', ans: '1200,5' },
+      { n: 9, shown: '37,50', ctx: 'лишний ноль после запятой', ans: '37,5' },
+      { n: 10, shown: '−1/8', ctx: '', ans: '-0,13' },
+      { n: 11, shown: '7¼ кг', ctx: '', ans: '7,25' },
+      { n: 12, shown: '-4,5', ctx: 'минус с клавиатуры', ans: '-4,5' },
+    ];
+  }
+
+  check(raw, ans) {
+    const v = (raw || '').trim();
+    if (!v) return null;
+    const fix = '«' + ans + '»';
+    if (/[−‒–—﹣－]/.test(v)) return { ok: false, t: 'Длинный минус «−». Наберите «-» с клавиатуры: ' + fix + '.' };
+    if (/[^0-9,.\s-]/.test(v)) return { ok: false, t: 'Лишние знаки или единицы. Верно: ' + fix + '.' };
+    if (/\s/.test(v)) return { ok: false, t: 'Пробел внутри числа. Верно: ' + fix + '.' };
+    if (v.indexOf('.') !== -1) return { ok: false, t: 'Точка вместо запятой. Верно: ' + fix + '.' };
+    const m = /^-?\d+(,(\d+))?$/.exec(v);
+    if (!m) return { ok: false, t: 'Не по правилам: цифры, одна запятая, минус в начале. Верно: ' + fix + '.' };
+    if (m[2] && m[2].length > 2) return { ok: false, t: 'Больше двух знаков после запятой. Округлите: ' + fix + '.' };
+    const a = parseFloat(v.replace(',', '.')), b = parseFloat(ans.replace(',', '.'));
+    if (Math.abs(a - b) > 1e-9) return { ok: false, t: 'Запись верная, но число другое. Верно: ' + fix + '.' };
+    return { ok: true, t: v === ans ? 'Засчитают.' : 'Засчитают: лишний ноль после запятой не мешает.' };
+  }
+
+  renderVals() {
+    const st = this.state;
+    let ok = 0, done = 0;
+    const kinds = {};
+    const rows = this.items().map((it) => {
+      const val = st.vals[it.n] || '';
+      const c = this.check(val, it.ans);
+      if (c) { done += 1; if (c.ok) ok += 1; else kinds[c.t.split('.')[0]] = true; }
+      return {
+        n: String(it.n), shown: it.shown, ctx: it.ctx, val,
+        aria: 'Запись числа ' + it.n,
+        inCls: c ? (c.ok ? 'is-ok' : 'is-bad') : '',
+        vCls: c ? (c.ok ? 'hint hint--ok' : 'hint hint--bad') : 'hint quiet',
+        verdict: c ? c.t : '–',
+        onVal: (e) => this.setState({ vals: Object.assign({}, st.vals, { [it.n]: e.target.value }) }),
+      };
+    });
+    const errs = Object.keys(kinds);
+    return {
+      rows,
+      okCount: String(ok),
+      okPct: String(Math.round(ok / 12 * 100)),
+      summary: done < 12
+        ? 'Проверено ' + done + ' из 12. Ошибки по типам: ' + (errs.length ? errs.join(', ').toLowerCase() : 'пока нет') + '.'
+        : (errs.length ? 'Ошибки: ' + errs.join(', ').toLowerCase() + '. Такие записи на туре дают 0.' : 'Все записи верные – на туре баллы за запись не потеряете.'),
+      reset: () => this.setState({ vals: {} }),
+    };
+  }
+}
+</script>
+</body>
+</html>

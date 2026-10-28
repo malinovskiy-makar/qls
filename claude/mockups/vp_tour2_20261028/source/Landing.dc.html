@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Тренажёр ВП — посадочная 2 тура</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="scr" style="min-height: 860px;">
+  <header class="nav">
+    <span class="nav-logo" aria-hidden="true">W</span>
+    <a class="nav-a" href="#">Занятия</a>
+    <a class="nav-a" href="#">Каталог</a>
+    <a class="nav-a" href="#">Учебник</a>
+    <a class="nav-a" href="#">Олимпиады</a>
+    <a class="nav-a is-on" href="#">Тренажёр ВП<span class="nav-new">NEW</span></a>
+    <a class="nav-a" href="#">Графики</a>
+    <a class="nav-a" href="#">Wecon Rush</a>
+    <span class="nav-sp"></span>
+    <button type="button" class="nav-btn">Проблема или предложение</button>
+    <span class="nav-ava" aria-label="Профиль">М</span>
+  </header>
+
+  <main class="wrap" style="max-width: 1400px; padding-top: 20px; gap: 16px;">
+    <div class="cols" style="align-items: stretch;">
+      <section class="k-card" style="flex: 999 1 640px; min-width: 0; padding: 24px 28px; display: flex; flex-direction: column; gap: 16px;" aria-label="Тренажёр второго тура">
+        <div class="row wrapx" style="gap: 10px;">
+          <span class="cap" style="color: var(--accent-ink);">Отборочный этап · 2 тур · 13–22 ноября 2026</span>
+          <span class="count">до тура 19 дней</span>
+        </div>
+        <div>
+          <h1 style="font-size: 34px; font-weight: 600; line-height: 1.15;">Высшая проба по экономике</h1>
+          <p style="font-size: 19px; color: var(--text2); margin-top: 2px;">тренажёр второго тура · вариант на время, проверка и разбор сразу после сдачи</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="row" style="justify-content: space-between; align-items: baseline;">
+            <span class="h3">Из чего состоит вариант</span>
+            <span class="small mute">10–11 класс: 18 заданий · 70 минут · 100 баллов</span>
+          </div>
+          <div class="mix" role="img" aria-label="Баллы по блокам: все верные 12, пропуски 9, соотнесение 9, задачи с числом 70">
+            <span class="m1" style="width: 12%;">1–2</span>
+            <span class="m2" style="width: 9%;">3</span>
+            <span class="m3" style="width: 9%;">4</span>
+            <span class="m4" style="width: 70%;">5–18 · задачи с числом · 70 баллов</span>
+          </div>
+          <div class="legend"><span>1–2 все верные утверждения · 12</span><span>3 текст с пропусками · 9</span><span>4 соотнесение · 9</span><span>9 класс: 17 заданий, числа по 6 баллов</span></div>
+        </div>
+
+        <div class="k-card k-card--flat" style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;">
+          <div class="row" style="justify-content: space-between; align-items: baseline;">
+            <span class="h3">Проверьте запись ответа</span>
+            <span class="small mute">70 баллов из 100 — ответ-число, неверная запись = 0</span>
+          </div>
+          <div class="try">
+            <label class="vp-sr" for="try-num" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Ответ-число</label>
+            <input id="try-num" class="{{inCls}}" value="{{val}}" onChange="{{onVal}}" inputmode="decimal" autocomplete="off">
+            <span class="{{verdictCls}}" style="flex: 1 1 260px; min-width: 0;">{{verdict}}</span>
+          </div>
+          <div class="row wrapx" style="gap: 6px;">
+            <span class="tiny quiet">примеры:</span>
+            <sc-for list="{{examples}}" as="e" hint-placeholder-count="6">
+              <button type="button" class="ex" onClick="{{e.pick}}">{{e.v}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div class="row wrapx" style="gap: 12px; margin-top: auto;">
+          <a class="k-btn k-btn--hero" href="#">Выбрать вариант</a>
+          <button type="button" class="k-btn k-btn--plain" style="height: 58px; padding: 0 22px; font-size: 15px;">Правила и формат</button>
+          <a class="link small" href="#" style="margin-left: 8px;">Материалы ВШЭ ↗</a>
+        </div>
+      </section>
+
+      <section class="k-card" style="flex: 1 1 360px; max-width: 460px; padding: 22px 22px 16px; display: flex; flex-direction: column; gap: 12px;" aria-label="Лучшие попытки">
+        <h2 class="h2">Лучшие попытки</h2>
+        <div>
+          <div class="k-seg" role="group" aria-label="Класс" style="white-space: nowrap;">
+            <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+              <button type="button" class="k-seg__item" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}">{{t.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div class="lbg" role="table" aria-label="Лучшие попытки класса">
+          <div class="lbg-h" role="columnheader">#</div><div class="lbg-h" role="columnheader">Игрок</div><div class="lbg-h r" role="columnheader">Балл</div><div class="lbg-h r" role="columnheader">Время</div>
+          <sc-for list="{{lead}}" as="p" hint-placeholder-count="6">
+            <div class="{{p.c1}}" role="cell"><span class="{{p.medal}}">{{p.place}}</span></div><div class="{{p.c2}}" role="cell">{{p.nick}}</div><div class="{{p.c3}}" role="cell">{{p.score}}</div><div class="{{p.c4}}" role="cell">{{p.time}}</div>
+          </sc-for>
+        </div>
+        <p class="tiny quiet" style="margin-top: auto;">{{leadNote}}</p>
+      </section>
+    </div>
+
+    <div class="row" style="gap: 16px; align-items: stretch;">
+      <section class="k-card" style="flex: 1 1 0; display: flex; align-items: center; gap: 16px; padding: 14px 18px;">
+        <div class="grow"><span class="cap">Моя лучшая попытка · 10 класс</span><div class="h3" style="margin-top: 2px;">60,5 из 100 · 4-е место</div><div class="tiny quiet">Демоверсия 2 тура · 25 октября · 51:20</div></div>
+        <a class="k-btn k-btn--plain" href="#">Разбор</a>
+      </section>
+      <section class="k-card" style="flex: 1 1 0; display: flex; align-items: center; gap: 16px; padding: 14px 18px;">
+        <div class="grow"><span class="cap">Что дальше</span><div class="h3" style="margin-top: 2px;">Потренировать запись ответа</div><div class="tiny quiet">в прошлой попытке на формате потеряно 25 баллов</div></div>
+        <a class="k-btn k-btn--main" href="#">Начать</a>
+      </section>
+      <section class="k-card" style="flex: 1 1 0; padding: 14px 18px;">
+        <span class="cap">Пройдено · 10 класс</span>
+        <div class="h3" style="margin-top: 2px;">1 из 1 <span class="tiny quiet" style="font-weight: 500;">· новые варианты — в «Вариантах»</span></div>
+        <div class="track" style="margin-top: 8px;"><span class="fill-ok" style="width: 100%;"></span></div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":860}}'>
+class Component extends DCLogic {
+  state = { val: '37.5', band: '10' };
+
+  check(raw) {
+    const v = (raw || '').trim();
+    if (!v) return { cls: 'hint mute', in: '', text: 'Впишите число — покажем, засчитают ли его на туре.' };
+    if (v.indexOf('−') !== -1) return { cls: 'hint hint--bad', in: 'is-bad', text: 'Это длинный минус «−» из копирования. Наберите обычный «-» с клавиатуры.' };
+    if (/[^0-9,.\s-]/.test(v)) return { cls: 'hint hint--bad', in: 'is-bad', text: '0 баллов: лишние знаки или единицы. В поле — только число: «' + v.replace(/[^0-9,.-]/g, '').replace('.', ',') + '».' };
+    if (/\s/.test(v)) return { cls: 'hint hint--bad', in: 'is-bad', text: '0 баллов: пробел внутри числа. Нужно «' + v.replace(/\s/g, '') + '».' };
+    if (v.indexOf('.') !== -1) return { cls: 'hint hint--bad', in: 'is-bad', text: '0 баллов: точка вместо запятой. Нужно «' + v.replace('.', ',') + '».' };
+    const m = /^-?\d+(,(\d+))?$/.exec(v);
+    if (!m) return { cls: 'hint hint--bad', in: 'is-bad', text: '0 баллов: число записано не по правилам. Цифры, одна запятая, минус в начале.' };
+    if (m[2] && m[2].length > 2) {
+      const r = (Math.round(parseFloat(v.replace(',', '.')) * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
+      return { cls: 'hint hint--bad', in: 'is-bad', text: '0 баллов: больше двух знаков после запятой. Округлите до сотых: «' + r + '».' };
+    }
+    return { cls: 'hint hint--ok', in: 'is-ok', text: 'Так засчитают: запятая, без пробелов и единиц.' };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const c = this.check(st.val);
+    const ex = ['37.5', '1 200', '15%', '3,125', '-4,5', '37,50'];
+    const boards = {
+      '9': [['olya_9', '71', '58:40'], ['k.sema', '64,5', '66:02'], ['fin_vika', '52', '61:15']],
+      '10': [['ani_k', '88,5', '61:20'], ['econ_lev', '81', '54:09'], ['vera.k', '74', '69:58'], ['masha_econ', '60,5', '51:20'], ['petya_10', '57', '68:11'], ['kate_10', '49,5', '63:40']],
+      '11': [['dima_11', '79', '59:30'], ['t.orlov', '72,5', '65:12'], ['sanya', '61', '70:00']],
+    };
+    const medals = ['k-medal k-medal--1', 'k-medal k-medal--2', 'k-medal k-medal--3'];
+    const lead = boards[st.band].map((r, i) => ({
+      place: i < 3 ? '●' : String(i + 1),
+      medal: i < 3 ? medals[i] : 'k-medal k-medal--n',
+      nick: r[0], score: r[1], time: r[2],
+      c1: 'lbg-c' + (r[0] === 'masha_econ' ? ' is-me is-me1' : ''),
+      c2: 'lbg-c lbg-nick' + (r[0] === 'masha_econ' ? ' is-me' : ''),
+      c3: 'lbg-c r lbg-score' + (r[0] === 'masha_econ' ? ' is-me' : ''),
+      c4: 'lbg-c r quiet' + (r[0] === 'masha_econ' ? ' is-me' : ''),
+    }));
+    const tabs = ['9', '10', '11'].map((b) => ({
+      label: b + ' класс',
+      pressed: st.band === b ? 'true' : 'false',
+      pick: () => this.setState({ band: b }),
+    }));
+    return {
+      val: st.val,
+      onVal: (e) => this.setState({ val: e.target.value }),
+      inCls: c.in,
+      verdict: c.text,
+      verdictCls: c.cls,
+      examples: ex.map((v) => ({ v, pick: () => this.setState({ val: v }) })),
+      tabs,
+      lead,
+      leadNote: st.band === '10'
+        ? 'Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее. Ваше место — 4-е.'
+        : 'Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.',
+    };
+  }
+}
+</script>
+</body>
+</html>

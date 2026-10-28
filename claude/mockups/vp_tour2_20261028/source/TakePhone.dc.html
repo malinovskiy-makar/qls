@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Прохождение варианта — телефон</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="scr ph" style="min-height: 1320px;">
+  <div class="bar" style="padding: 8px 14px; gap: 12px;">
+    <div class="timer" style="min-width: 0;">
+      <div class="row" style="gap: 6px; align-items: baseline;"><b style="font-size: 22px;">41:27</b><span class="tiny quiet">из 70:00</span></div>
+      <div class="tbar" aria-hidden="true"><span style="width: 59%;"></span></div>
+    </div>
+    <span class="small">отвечено <b class="num">8</b>/18</span>
+    <span class="grow"></span>
+    <button type="button" class="k-btn k-btn--main" style="min-height: 44px; padding: 0 16px;">Сдать</button>
+  </div>
+  <div class="ph-scroll" style="padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border);" aria-label="Задания">
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">1</button>
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">2</button>
+    <button type="button" class="q is-now" style="flex: 0 0 36px; width: 36px; height: 36px;" aria-current="true">3</button>
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">4</button>
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">5</button>
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">6</button>
+    <button type="button" class="q is-done is-flag" style="flex: 0 0 36px; width: 36px; height: 36px;">7</button>
+    <button type="button" class="q is-done" style="flex: 0 0 36px; width: 36px; height: 36px;">8</button>
+    <button type="button" class="q" style="flex: 0 0 36px; width: 36px; height: 36px;">9</button>
+    <button type="button" class="q" style="flex: 0 0 36px; width: 36px; height: 36px;">10</button>
+    <button type="button" class="q" style="flex: 0 0 36px; width: 36px; height: 36px;">11</button>
+  </div>
+
+  <main class="wrap">
+    <div class="blockh"><h2 class="h3" style="font-size: 16px;">Задание 3 · Текст с пропусками</h2><span class="tiny mute">9 баллов</span></div>
+    <section class="task" style="padding: 14px; gap: 12px;" aria-label="Задание 3">
+      <p class="small mute">Заполните пропуски словами из списка. Форма слова может не совпадать.</p>
+      <p style="line-height: 1.75; font-size: 15px;">Понятие «ловушка среднего дохода» описывает ситуацию, когда страна достигла уровня дохода выше низкого, но не может перейти в категорию <span class="gapm is-set">1 развитый</span> экономик. Страны, оказавшиеся в ловушке, теряют преимущества дешёвой <span class="gapm is-set">2 рабочая сила</span>, но ещё не обладают развитой системой образования и науки. Одной из причин является высокая <span class="gapm">3</span> доходов, измеряемая с помощью коэффициента <span class="gapm">4</span>.</p>
+      <p class="tiny quiet">Нажмите на номер в тексте — откроется его выбор ниже.</p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="gsel"><span class="gapm is-set" style="margin: 0;">1</span><button type="button" class="sel">развитый<span aria-hidden="true">▾</span></button></div>
+        <div class="gsel"><span class="gapm is-set" style="margin: 0;">2</span><button type="button" class="sel">рабочая сила<span aria-hidden="true">▾</span></button></div>
+        <div class="gsel"><span class="gapm" style="margin: 0;">3</span><button type="button" class="sel is-empty" style="border-color: var(--text); box-shadow: 0 0 0 3px var(--focus-ring);">выберите слово<span aria-hidden="true">▾</span></button></div>
+        <div class="gsel"><span class="gapm" style="margin: 0;">4</span><button type="button" class="sel is-empty">выберите слово<span aria-hidden="true">▾</span></button></div>
+      </div>
+      <p class="tiny quiet">ещё 4 пропуска во втором и третьем абзаце ↓</p>
+    </section>
+
+    <div class="blockh" style="margin-top: 6px;"><h2 class="h3" style="font-size: 16px;">Задание 11 · Задача с числом</h2><span class="tiny mute">5 баллов</span></div>
+    <section class="task" style="padding: 14px; gap: 12px;" aria-label="Задание 11">
+      <p style="line-height: 1.65; font-size: 15px;">На планете Джи население делится на 3 группы: рыцари, фермеры и ремесленники. Доля фермеров и ремесленников одинаковая и составляет 40% для каждой группы, при этом они получают 10% и 40% доходов соответственно… Найдите, на сколько изменился индекс Джини.</p>
+      <div class="numf" style="gap: 8px; flex-wrap: nowrap;">
+        <input aria-label="Ответ к заданию 11" value="-0,12" inputmode="decimal" style="flex: 1 1 0; width: 0; min-width: 0;">
+        <button type="button" class="pm" aria-label="Поменять знак">±</button>
+      </div>
+      <p class="hint quiet">На iPhone в цифровой клавиатуре нет минуса — нажмите «±». Только число: запятая, до сотых.</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

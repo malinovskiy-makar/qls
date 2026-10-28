@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru"><head><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Тренировка записи ответа</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+<style data-dc-tpl="1">
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+.dr { display: grid; grid-template-columns: 36px minmax(0, 1fr) 170px minmax(0, 1.25fr); gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.dr:first-child { border-top: 0; }
+.dr-n { font-weight: 600; color: var(--text3); font-variant-numeric: tabular-nums; }
+.dr-v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.dr-c { display: block; font-size: 13px; color: var(--text3); margin-top: 2px; font-weight: 400; }
+.dr input { width: 170px; height: 44px; font: inherit; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+.dr input.is-bad { border-color: var(--error); border-bottom-width: 2px; background: var(--surface); }
+.dr input.is-ok { border-color: var(--green); border-bottom-width: 2px; background: var(--surface); }
+.dr-h { display: grid; grid-template-columns: 36px minmax(0, 1fr) 170px minmax(0, 1.25fr); gap: 14px; padding: 0 0 8px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); }
+.prog { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 180px; }
+.prog b { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.prog .track { width: 180px; }
+</style><style>
+@font-face{font-family:"Montserrat";font-weight:400;font-style:normal;src:url(ds/weconomics/fonts/montserrat-400.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:400;font-style:italic;src:url(ds/weconomics/fonts/montserrat-400i.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:500;src:url(ds/weconomics/fonts/montserrat-500.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:600;src:url(ds/weconomics/fonts/montserrat-600.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:700;src:url(ds/weconomics/fonts/montserrat-700.woff2) format("woff2")}
+</style>
+<!-- Статичный снимок макета (без логики). Логика и данные — в ../source/*.dc.html -->
+</head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="Drill"><div data-dc-tpl="2" class="scr" style="min-height: 1460px;">
+  <header data-dc-tpl="3" class="nav">
+    <span data-dc-tpl="4" class="nav-logo" aria-hidden="true">W</span>
+    <a data-dc-tpl="5" class="nav-a" href="#">Занятия</a>
+    <a data-dc-tpl="6" class="nav-a" href="#">Каталог</a>
+    <a data-dc-tpl="7" class="nav-a" href="#">Учебник</a>
+    <a data-dc-tpl="8" class="nav-a" href="#">Олимпиады</a>
+    <a data-dc-tpl="9" class="nav-a is-on" href="#">Тренажёр ВП<span data-dc-tpl="10" class="nav-new">NEW</span></a>
+    <a data-dc-tpl="11" class="nav-a" href="#">Графики</a>
+    <a data-dc-tpl="12" class="nav-a" href="#">Wecon Rush</a>
+    <span data-dc-tpl="13" class="nav-sp"></span>
+    <button data-dc-tpl="14" type="button" class="nav-btn">Проблема или предложение</button>
+    <span data-dc-tpl="15" class="nav-ava" aria-label="Профиль">М</span>
+  </header>
+
+  <main data-dc-tpl="16" class="wrap" style="max-width: 980px; gap: 16px;">
+    <a data-dc-tpl="17" class="ph-back" href="#"><span data-dc-tpl="18" aria-hidden="true">‹</span> Тренажёр ВП</a>
+    <div data-dc-tpl="19" class="row" style="justify-content: space-between; align-items: flex-end; gap: 16px;">
+      <div data-dc-tpl="20" style="display: flex; flex-direction: column; gap: 6px;">
+        <span data-dc-tpl="21" class="cap" style="color: var(--accent-ink);">Тренажёр ВП · 2 тур</span>
+        <h1 data-dc-tpl="22" class="h1" style="font-size: 30px;">Тренировка записи ответа</h1>
+        <p data-dc-tpl="23" class="mute" style="max-width: 600px;">12 чисел, 2–3 минуты. Каждое уже посчитано – запишите его так, как примет система тура. Проверка – по Enter или при переходе к следующему полю.</p>
+      </div>
+      <div data-dc-tpl="24" class="prog" aria-live="polite">
+        <span data-dc-tpl="25" class="tiny quiet">записано верно</span>
+        <b data-dc-tpl="26"><span class="sc-interp">3</span> <small data-dc-tpl="27" class="small quiet" style="font-weight: 500;">из 12</small></b>
+        <span data-dc-tpl="28" class="track"><span data-dc-tpl="29" class="fill-ok" style="width: 25%;"></span></span>
+      </div>
+    </div>
+
+    <section data-dc-tpl="30" class="k-info" aria-label="Правило ввода числа" style="display: grid; grid-template-columns: 36px 1fr; gap: 14px;">
+      <span data-dc-tpl="31" class="fmt-ico" aria-hidden="true">Ф</span>
+      <div data-dc-tpl="32">
+        <h2 data-dc-tpl="33" class="h3">На туре неверная запись – 0 баллов, даже если число верное</h2>
+        <p data-dc-tpl="34" class="small" style="margin-top: 4px;">Правило ВШЭ: «Ответ в виде числа запишите без пробелов, без единиц измерения и каких-либо знаков (если ответ является дробным числом, то его необходимо записать с помощью десятичной дроби, округлив до сотых, например, «1,23»)».</p>
+      </div>
+    </section>
+
+    <section data-dc-tpl="35" class="k-card" aria-label="Числа для записи" style="padding: 16px 22px 8px;">
+      <div data-dc-tpl="36" class="dr-h" aria-hidden="true"><span data-dc-tpl="37">№</span><span data-dc-tpl="38">Получилось в решении</span><span data-dc-tpl="39">Ваша запись</span><span data-dc-tpl="40">Проверка</span></div>
+      <div data-dc-tpl="41">
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">1</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">37.5</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">калькулятор ставит точку</span></span></span>
+            <input data-dc-tpl="47" class="is-ok" inputmode="decimal" autocomplete="off" aria-label="Запись числа 1" value="37,5" style="">
+            <span data-dc-tpl="48" class="hint hint--ok"><span class="sc-interp">Засчитают.</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">2</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">25 000</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">выручка, рублей</span></span></span>
+            <input data-dc-tpl="47" class="is-bad" inputmode="decimal" autocomplete="off" aria-label="Запись числа 2" value="25 000" style="">
+            <span data-dc-tpl="48" class="hint hint--bad"><span class="sc-interp">Пробел внутри числа. Верно: «25000».</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">3</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">20%</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">спрашивают, на сколько процентов</span></span></span>
+            <input data-dc-tpl="47" class="is-ok" inputmode="decimal" autocomplete="off" aria-label="Запись числа 3" value="20" style="">
+            <span data-dc-tpl="48" class="hint hint--ok"><span class="sc-interp">Засчитают.</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">4</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">−0,12</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">минус как в учебнике</span></span></span>
+            <input data-dc-tpl="47" class="is-bad" inputmode="decimal" autocomplete="off" aria-label="Запись числа 4" value="−0,12" style="">
+            <span data-dc-tpl="48" class="hint hint--bad"><span class="sc-interp">Длинный минус «−». Наберите «-» с клавиатуры: «-0,12».</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">5</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">1,607</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp"></span></span></span>
+            <input data-dc-tpl="47" class="is-ok" inputmode="decimal" autocomplete="off" aria-label="Запись числа 5" value="1,61" style="">
+            <span data-dc-tpl="48" class="hint hint--ok"><span class="sc-interp">Засчитают.</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">6</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">2/3</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">обыкновенная дробь</span></span></span>
+            <input data-dc-tpl="47" class="is-bad" inputmode="decimal" autocomplete="off" aria-label="Запись числа 6" value="0,66" style="">
+            <span data-dc-tpl="48" class="hint hint--bad"><span class="sc-interp">Запись верная, но число другое. Верно: «0,67».</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">7</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">3,125</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">ровно половина сотой</span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 7" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">8</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">1 200,50 ₽</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp"></span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 8" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">9</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">37,50</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">лишний ноль после запятой</span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 9" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">10</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">−1/8</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp"></span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 10" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">11</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">7¼ кг</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp"></span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 11" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+          <div data-dc-tpl="43" class="dr">
+            <span data-dc-tpl="44" class="dr-n"><span class="sc-interp">12</span></span>
+            <span data-dc-tpl="45" class="dr-v"><span class="sc-interp">-4,5</span><span data-dc-tpl="46" class="dr-c"><span class="sc-interp">минус с клавиатуры</span></span></span>
+            <input data-dc-tpl="47" class="" inputmode="decimal" autocomplete="off" aria-label="Запись числа 12" value="" style="">
+            <span data-dc-tpl="48" class="hint quiet"><span class="sc-interp">–</span></span>
+          </div>
+        
+      </div>
+    </section>
+
+    <section data-dc-tpl="49" class="k-card" aria-label="Итог тренировки" style="display: flex; align-items: center; gap: 18px; padding: 18px 22px;">
+      <div data-dc-tpl="50" class="grow">
+        <span data-dc-tpl="51" class="cap">Итог · появляется, когда проверены все 12</span>
+        <div data-dc-tpl="52" class="h2" style="margin-top: 4px;">Записано верно <span class="sc-interp">3</span> из 12</div>
+        <p data-dc-tpl="53" class="small mute" style="margin-top: 2px;"><span class="sc-interp">Проверено 6 из 12. Ошибки по типам: пробел внутри числа, длинный минус «−», запись верная, но число другое.</span></p>
+      </div>
+      <button data-dc-tpl="54" type="button" class="k-btn k-btn--plain">Пройти ещё раз</button>
+      <a data-dc-tpl="55" class="k-btn k-btn--main" href="#">Перейти к варианту</a>
+    </section>
+  </main></div></div></div>
+
+
+
+</body></html>

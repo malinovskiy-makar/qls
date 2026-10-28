@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Прохождение варианта — десктоп</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vp.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="scr" style="min-height: 1180px;">
+  <div class="bar">
+    <div style="display: flex; flex-direction: column; min-width: 0;">
+      <span class="h3">Демоверсия 2 тура · 10 класс</span>
+      <span class="tiny quiet">{{modeLine}}</span>
+    </div>
+    <sc-if value="{{timed}}" hint-placeholder-val="{{true}}">
+      <div class="timer" role="timer" aria-label="Осталось 41 минута 27 секунд">
+        <div class="row" style="gap: 8px; align-items: baseline;"><b>41:27</b><span class="tiny quiet">осталось из 70:00</span></div>
+        <div class="tbar" aria-hidden="true"><span style="width: 59%;"></span></div>
+      </div>
+    </sc-if>
+    <span class="small">отвечено <b class="num">{{answered}}</b> из 18</span>
+    <span class="saved"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>сохранено</span>
+    <span class="grow"></span>
+    <button type="button" class="k-btn k-btn--main" style="padding: 10px 22px;">Сдать работу</button>
+  </div>
+
+  <div class="cols" style="max-width: 1240px; margin: 0 auto; padding: 20px 32px 48px; gap: 20px;">
+    <aside class="k-card" style="flex: 0 0 248px; padding: 16px; position: sticky; top: 76px;" aria-label="Навигация по заданиям">
+      <div class="navq">
+        <div class="navq-g">
+          <span class="cap">Все верные · 1–2</span>
+          <div class="qs"><button type="button" class="q is-done">1</button><button type="button" class="q is-done">2</button></div>
+        </div>
+        <div class="navq-g">
+          <span class="cap">Пропуски · 3</span>
+          <div class="qs"><button type="button" class="q is-done">3</button></div>
+        </div>
+        <div class="navq-g">
+          <span class="cap">Соотнесение · 4</span>
+          <div class="qs"><button type="button" class="q is-now" aria-current="true">4</button></div>
+        </div>
+        <div class="navq-g">
+          <span class="cap">Задачи с числом · 5–18</span>
+          <div class="qs">
+            <button type="button" class="q is-done">5</button><button type="button" class="q is-done">6</button><button type="button" class="q is-done is-flag">7</button><button type="button" class="q is-done">8</button><button type="button" class="q is-done">9</button><button type="button" class="q">10</button>
+            <button type="button" class="q">11</button><button type="button" class="q">12</button><button type="button" class="q">13</button><button type="button" class="q">14</button><button type="button" class="q">15</button><button type="button" class="q">16</button>
+            <button type="button" class="q">17</button><button type="button" class="q">18</button>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-soft); padding-top: 10px;" class="tiny mute">
+          <span class="row" style="gap: 8px;"><span class="q is-done" style="width: 16px; height: 16px;" aria-hidden="true"></span>есть ответ</span>
+          <span class="row" style="gap: 8px;"><span class="q" style="width: 16px; height: 16px;" aria-hidden="true"></span>пусто</span>
+          <span class="row" style="gap: 8px;"><span class="q is-now" style="width: 16px; height: 16px;" aria-hidden="true"></span>вы здесь</span>
+          <span class="row" style="gap: 8px;"><span class="q is-done is-flag" style="width: 16px; height: 16px;" aria-hidden="true"></span>вернуться позже</span>
+        </div>
+      </div>
+    </aside>
+
+    <main style="flex: 999 1 600px; min-width: 0; max-width: 880px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="blockh"><h2 class="h2">Задание 4 · Соотнесение</h2><span class="small mute">9 баллов · каждая строка — своя доля</span></div>
+      <section class="task" aria-label="Задание 4">
+        <div class="row" style="justify-content: space-between; align-items: flex-start;">
+          <p><span class="task-n">4</span>  Соотнесите утверждения, которые характеризуют абсолютную и относительную бедность.</p>
+          <button type="button" class="k-btn k-btn--quiet k-btn--sm" style="flex: 0 0 auto;">⚑ Вернуться позже</button>
+        </div>
+        <div class="row wrapx small" style="gap: 6px 18px;"><span><b>А</b> — абсолютная бедность</span><span><b>Б</b> — относительная бедность</span></div>
+        <div>
+          <sc-for list="{{mrows}}" as="m" hint-placeholder-count="4">
+            <div class="mrow">
+              <b class="num quiet">{{m.k}}</b>
+              <span>{{m.text}}</span>
+              <span class="ab" role="group" aria-label="{{m.aria}}">
+                <button type="button" aria-pressed="{{m.a}}" onClick="{{m.pickA}}">А</button>
+                <button type="button" aria-pressed="{{m.b}}" onClick="{{m.pickB}}">Б</button>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <div class="blockh" style="margin-top: 8px;"><h2 class="h2">Задания 5–18 · Задачи с вводом числа</h2><span class="small mute">по 5 баллов: полный балл или ноль</span></div>
+      <div class="k-info small" style="padding: 10px 14px;"><b>Правило ввода ВШЭ.</b> Число без пробелов, единиц и знаков; дробь — десятичная, через запятую, до сотых: «1,23».</div>
+
+      <section class="task" aria-label="Задание 9">
+        <div class="row" style="justify-content: space-between; align-items: flex-start;">
+          <span class="task-n">9</span>
+          <button type="button" class="k-btn k-btn--quiet k-btn--sm">⚑ Вернуться позже</button>
+        </div>
+        <p style="line-height: 1.65;">Совершенно конкурентный рынок перца в стране В находится в равновесии. Предложение на данном рынке имеет вид <span class="math">q<sub>s</sub> = −2 + 5p</span>, а спрос — <span class="math">q<sub>d</sub> = 238 − p</span>, где <span class="math">p</span> — цена тонны перца. Власти страны решили ограничить цену перца на уровне 50% от равновесной и покрыть излишний спрос из резервов. Найдите, какое количество перца будут реализовывать производители.</p>
+        <div class="numf">
+          <label class="small mute" for="a9">Ответ</label>
+          <input id="a9" value="98" inputmode="decimal" autocomplete="off">
+          <span class="hint quiet" style="flex: 1 1 260px;">Только число: запятая, до сотых.</span>
+        </div>
+      </section>
+
+      <section class="task" aria-label="Задание 10">
+        <div class="row" style="justify-content: space-between; align-items: flex-start;">
+          <span class="task-n">10</span>
+          <button type="button" class="k-btn k-btn--quiet k-btn--sm">⚑ Вернуться позже</button>
+        </div>
+        <p style="line-height: 1.65;">Юный экономист Евгений решает, как распорядиться 4000 рублей, накопленными со школьных обедов, и хочет инвестировать эту сумму на два года…</p>
+        <div class="numf">
+          <label class="small mute" for="a10">Ответ</label>
+          <input id="a10" inputmode="decimal" autocomplete="off" placeholder="">
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["с таймером","без таймера"],"default":"с таймером","section":"Макет"},"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  state = { ab: { 1: 'Б', 2: 'А', 3: '', 4: '' } };
+
+  renderVals() {
+    const st = this.state;
+    const timed = (this.props.mode ?? 'с таймером') === 'с таймером';
+    const texts = [
+      'Человек живёт хуже среднестатистического потребителя, хотя его доход позволяет удовлетворить базовые потребности.',
+      'Прожиточный минимум может использоваться как граница для оценки бедности.',
+      'Характеризует социальное неравенство и разрыв между богатыми и бедными в одной стране.',
+      'При росте благосостояния общества критерии бедности меняются, и часть людей может перейти в категорию бедных, даже если их реальный уровень жизни не изменился.',
+    ];
+    const mrows = texts.map((t, i) => {
+      const k = i + 1;
+      const v = st.ab[k];
+      const set = (x) => () => this.setState({ ab: Object.assign({}, st.ab, { [k]: v === x ? '' : x }) });
+      return { k: String(k), text: t, a: v === 'А' ? 'true' : 'false', b: v === 'Б' ? 'true' : 'false', aria: 'Утверждение ' + k + ': А или Б', pickA: set('А'), pickB: set('Б') };
+    });
+    const answeredAB = Object.values(st.ab).filter((x) => x).length;
+    return {
+      timed,
+      modeLine: timed ? 'с таймером · ответы сохраняются сами' : 'без таймера · ответы сохраняются сами',
+      answered: 8 + (answeredAB === 4 ? 1 : 0),
+      mrows,
+    };
+  }
+}
+</script>
+</body>
+</html>
