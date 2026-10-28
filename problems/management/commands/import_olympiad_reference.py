@@ -567,7 +567,9 @@ class Command(BaseCommand):
         actions = Counter(i['action'] for i in plan)
         refs_pairs = Counter()
         for i in plan:
-            if i['action'] == 'link':
+            # kit_add_* новой строки не создаёт: номер дописывается в kit_numbers уже
+            # заведённой (разметка судьи «та же задача» для пункта комплекта).
+            if i['action'] == 'link' and 'kit_add_ref' not in i:
                 refs_pairs[(i['pid'], i['row']['event_id'])] += 1
         figures = Counter(f['hash'] for i in plan if i['action'] == 'create'
                           for f in i['fields']['figures'])

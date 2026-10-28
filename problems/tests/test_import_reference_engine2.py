@@ -130,6 +130,18 @@ class EngineNight2810Tests(_EngineBase):
         ref.refresh_from_db()
         self.assertEqual(ref.raw_meta, {'origin': 'old'})
 
+    def test_two_decision_links_same_round_one_ref_and_kit(self):
+        """Судья: задания 2 и 3 одного тура — пункты одной задачи банка. Одна новая
+        OlympiadRef, второй номер — в её kit_numbers; инвариант плана не срабатывает."""
+        dec = [{'key': f'{EV}:2', 'decision': 'link', 'bank_id': self.bank.id, 'decided_by': 'claude:x'},
+               {'key': f'{EV}:3', 'decision': 'link', 'bank_id': self.bank.id, 'decided_by': 'claude:x'}]
+        journal = self.apply([_r(2, LONG), _r(3, LONG + ' Пункт б.')], decisions=dec)
+        ref = OlympiadRef.objects.get(problem=self.bank, event_id=EV)
+        self.assertEqual(ref.number, '2')
+        self.assertEqual(ref.raw_meta['kit_numbers'], ['3'])
+        self.rollback(journal)
+        self.assertFalse(OlympiadRef.objects.filter(problem=self.bank, event_id=EV).exists())
+
     def test_same_task_in_two_variants_is_one_problem(self):
         rows = [_r(1, LONG, task_variant='1'), _r(1, LONG, task_variant='2')]
         journal = self.apply(rows)
