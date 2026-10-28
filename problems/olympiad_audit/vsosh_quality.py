@@ -22,7 +22,14 @@ from collections import Counter, defaultdict
 from problems.olympiad_audit import digitize
 
 _LIST_MARK = re.compile(r'(?m)^\s*(?:[-*]\s*)?(?:\(?[а-еa-e]\)|\d{1,2}[.)])\s+\S')
-_OPTION = re.compile(r'(?m)^\s*(?:[-*]\s*)?(?:\(?[а-еa-eА-ЕA-E]\)|[1-6][.)]|[А-ЕA-E][.)])\s+\S')
+#: Вариант ответа теста: пункт Markdown-списка («- хлеб», «- a. …», «- 1) …»)
+#: или строка с меткой «а)», «A.», «1)». Простой список без букв — тоже
+#: варианты: так Claude переписывает тесты из веб-форм (28.10).
+_OPTION = re.compile(r'(?m)^\s*(?:[-*+]\s+|\(?[а-еa-eА-ЕA-E][.)]\s+|[1-9][.)]\s+)\S')
+
+#: Флаги-факты о источнике, не дефекты оцифровки: в счёт «с флагами» и в
+#: review_v1.html не идут.
+INFO_FLAGS = {'ключа_нет_в_источнике'}
 
 
 _NUM = re.compile(r'(?<![\w.,])\d{2,}(?:[.,]\d+)?')
@@ -36,16 +43,17 @@ def _nums(text):
     return {m.replace(',', '.') for m in _NUM.findall(_THOUSANDS.sub('', text or ''))}
 
 
-def numbers_not_on_page(statement, layers):
+def numbers_not_on_page(statement, layers, extra=()):
     """Числа (от двух знаков) из нашего условия, которых нет в текстовом слое
-    его страниц. Пустой слой (скан) — проверка не делается (None)."""
+    его страниц и в `extra` (остальные файлы комплекта). Пустой слой своих
+    страниц (скан) — проверка не делается (None)."""
     layer = '\n'.join(layers)
     if len(layer.strip()) < 80:
         return None
-    return sorted(_nums(statement) - _nums(layer))
+    return sorted(_nums(statement) - _nums(layer) - _nums('\n'.join(extra)))
 
 
-def task_flags(r, event_has_solutions, layers=None):
+def task_flags(r, event_has_solutions, layers=None, extra_layers=()):
     flags = list(r.get('flags') or [])
     st = r.get('statement_md') or ''
     if not st.strip():
@@ -59,7 +67,8 @@ def task_flags(r, event_has_solutions, layers=None):
         if len(_OPTION.findall(st)) < 2:
             flags.append('тест_без_вариантов')
         if not (r.get('answer') or '').strip() and not (r.get('solution_md') or '').strip():
-            flags.append('тест_без_ключа')
+            # Нет файла ответов в источнике — факт покрытия, не брак расшифровки.
+            flags.append('тест_без_ключа' if event_has_solutions else 'ключа_нет_в_источнике')
     elif event_has_solutions and not (r.get('solution_md') or '').strip() \
             and not (r.get('criteria_md') or '').strip():
         flags.append('нет_решения')
@@ -67,7 +76,7 @@ def task_flags(r, event_has_solutions, layers=None):
         if f.get('flag'):
             flags.append('рисунок_' + f['flag'])
     if layers is not None:
-        missing = numbers_not_on_page(st, layers)
+        missing = numbers_not_on_page(st, layers, extra_layers)
         if missing:
             flags.append('числа_не_со_страницы')
             r['numbers_not_on_page'] = missing[:20]
@@ -89,6 +98,21 @@ def page_layers(dz, index, refs):
     return out
 
 
+def event_layers(dz, ev):
+    """Текстовый слой всех страниц файлов комплекта: инструкция раздела
+    приходит в условие со страниц других файлов (файл ответов), её числа —
+    не выдумка модели."""
+    out = []
+    for key in ('task_files', 'solution_files', 'criteria_files'):
+        for f in ev.get(key) or []:
+            for p in range(1, int(f.get('pages') or 0) + 1):
+                path = os.path.join(dz, f['page_dir'], f'p{p}.txt')
+                if os.path.isfile(path):
+                    with open(path, encoding='utf-8') as fh:
+                        out.append(fh.read())
+    return out
+
+
 def run_check(cmd, opts):
     dz = cmd.digitized
     rows = digitize.read_jsonl(os.path.join(dz, 'reference_problems_v1.jsonl'))
@@ -103,7 +127,8 @@ def run_check(cmd, opts):
         ev = files.get(r['event_id'], {})
         has_sol = bool(ev.get('solution_files') or ev.get('criteria_files')) or any(
             f.get('source_kind') == 'tasks+solutions' for f in ev.get('task_files') or [])
-        flags = task_flags(r, has_sol, page_layers(dz, index, r.get('source_pages')))
+        flags = task_flags(r, has_sol, page_layers(dz, index, r.get('source_pages')),
+                           event_layers(dz, ev))
         key = f"{r['event_id']}|{r['number']}|{r.get('task_variant', '')}"
         if key in bad_katex:
             flags.append('katex')
@@ -112,7 +137,8 @@ def run_check(cmd, opts):
         out.append(r)
     keys = Counter((r['event_id'], r['number'], r.get('task_variant', '')) for r in out)
     digitize.write_jsonl(os.path.join(dz, 'reference_problems_v1.jsonl'), out)
-    res = {'tasks': len(out), 'with_flags': sum(1 for r in out if r['check_flags']),
+    res = {'tasks': len(out),
+           'with_flags': sum(1 for r in out if set(r['check_flags']) - INFO_FLAGS),
            'flags': dict(counts), 'keys_unique': all(v == 1 for v in keys.values()),
            'katex_errors': katex.get('errors'), 'katex_fields': katex.get('fields'),
            'by_stage_season': _by_stage_season(out)}
@@ -139,7 +165,7 @@ def _page_png(dz, ref):
 def run_review(cmd, opts):
     dz = cmd.digitized
     rows = [r for r in digitize.read_jsonl(os.path.join(dz, 'reference_problems_v1.jsonl'))
-            if r.get('check_flags')]
+            if set(r.get('check_flags') or []) - INFO_FLAGS]
     index = {r['pdf']: r['page_dir'] for r in digitize.read_jsonl(
         os.path.join(dz, 'render_index.jsonl'))}
     parts = ['<!doctype html><meta charset="utf-8"><title>ВсОШ v1 — на проверку</title>',

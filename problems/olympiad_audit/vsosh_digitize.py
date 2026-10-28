@@ -281,6 +281,44 @@ def ensure_stub(digitized, page_dir, page):
 EXTRA_KEYS = ('stage', 'region_code', 'region_name', 'tour', 'variant')
 
 
+def drop_repeated_paragraphs(text):
+    """Дословный повтор абзаца в условии — прочь (первое вхождение остаётся).
+    Правило сборки v5 приклеивает к каждому вопросу теста инструкцию раздела
+    со всех страниц, где она стоит, — «Тест №2. Выберите…» выходил трижды.
+    Правится форма, не смысл (ADR 0005). Возвращает (текст, число удалённых)."""
+    if not text:
+        return text, 0
+    seen, out, dropped = set(), [], 0
+    for para in re.split(r'\n\s*\n', text):
+        key = ' '.join(para.split())
+        if key and key in seen:
+            dropped += 1
+            continue
+        seen.add(key)
+        out.append(para)
+    return '\n\n'.join(out), dropped
+
+
+def page_models(digitized, pdf_dirs, refs):
+    """Какой моделью расшифрованы страницы задания («файл#pN»): заплатка Claude
+    или GLM. Порядок — по убыванию числа страниц."""
+    c = Counter()
+    for ref in refs or []:
+        pdf, _, page = ref.rpartition('#p')
+        pd = pdf_dirs.get(pdf)
+        if not pd:
+            continue
+        path = os.path.join(digitized, 'pages_claude', pd.split('/')[-1], f'p{page}.json')
+        model = FLASH_MODEL
+        if os.path.isfile(path):
+            with open(path, encoding='utf-8') as fh:
+                rec = json.load(fh)
+            if rec.get('status') == 'ok':
+                model = rec.get('model') or model
+        c[model] += 1
+    return '+'.join(m for m, _ in c.most_common()) or FLASH_MODEL
+
+
 def reference_events(meta):
     out = []
     for m in meta.values():
@@ -318,12 +356,18 @@ def run_assemble(cmd, opts):
                                 only_events=set(ready), crop=True, overlay=overlay,
                                 out_dir=digitized, suffix='v1asm', profile=assemble.ECON)
     rows = _read(os.path.join(digitized, 'reference_problems_v1asm.jsonl'))
+    pdf_dirs = {x['pdf']: x['page_dir'] for x in _read(os.path.join(digitized, 'render_index.jsonl'))}
     out, keys, dup = [], Counter(), 0
     for r in rows:
         m = meta.get(r['event_id'], {})
         for k in EXTRA_KEYS:
             r[k] = m.get(k, '') if k != 'stage' else (m.get('stage') or r.get('stage'))
         r['olympiad_slug'] = 'vseros'
+        r['statement_md'], dropped = drop_repeated_paragraphs(r.get('statement_md') or '')
+        if dropped:
+            r['repeated_paragraphs_dropped'] = dropped
+        r['digitized_by'] = dict(r.get('digitized_by') or {},
+                                 model=page_models(digitized, pdf_dirs, r.get('source_pages')))
         r['pages_ready'] = list(ready.get(r['event_id'], (0, 0)))
         r['event_partial'] = ready.get(r['event_id'], (0, 0))[0] < ready.get(r['event_id'], (0, 1))[1]
         r['title'] = official_title(r.get('title'))

@@ -478,3 +478,40 @@ class IlePrintTests(SimpleTestCase):
                  'region_code': '77', 'statement_md': text}]
         report = vsosh_ile.compare(rows, ile)
         self.assertEqual([x['event_id'] for x in report], ['m77'])
+
+
+class CheckRulesTests(SimpleTestCase):
+    def test_repeated_paragraphs_dropped_once(self):
+        text = 'Тест №2. Выберите ответ\n\nТест №2. Выберите ответ\n\nВопрос?\n\n- да\n- нет'
+        out, n = vsosh_digitize.drop_repeated_paragraphs(text)
+        self.assertEqual((out, n), ('Тест №2. Выберите ответ\n\nВопрос?\n\n- да\n- нет', 1))
+        self.assertEqual(vsosh_digitize.drop_repeated_paragraphs('А\n\nБ'), ('А\n\nБ', 0))
+
+    def test_page_models_from_claude_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'pages_claude', 'abc'))
+            with open(os.path.join(tmp, 'pages_claude', 'abc', 'p1.json'), 'w',
+                      encoding='utf-8') as fh:
+                json.dump({'status': 'ok', 'model': 'claude-sonnet-5-5'}, fh)
+            dirs = {'f.pdf': 'pages/abc'}
+            self.assertEqual(vsosh_digitize.page_models(tmp, dirs, ['f.pdf#p1']),
+                             'claude-sonnet-5-5')
+            self.assertEqual(vsosh_digitize.page_models(tmp, dirs, ['f.pdf#p2']),
+                             vsosh_digitize.FLASH_MODEL)
+
+    def test_test_flags_options_and_key_source(self):
+        from problems.olympiad_audit import vsosh_quality as Q
+        r = {'number': 'тест-1', 'statement_md': 'Вопрос?\n\n- хлеб\n- вода\n- a. гречка'}
+        self.assertEqual(Q.task_flags(dict(r), False), ['ключа_нет_в_источнике'])
+        self.assertEqual(Q.task_flags(dict(r), True), ['тест_без_ключа'])
+        bare = {'number': 'тест-2', 'statement_md': 'Выберите единственно правильный ответ.',
+                'answer': 'а'}
+        self.assertEqual(Q.task_flags(bare, True), ['тест_без_вариантов'])
+
+    def test_numbers_from_other_files_of_event_count(self):
+        from problems.olympiad_audit import vsosh_quality as Q
+        page = 'Вопрос про спрос и предложение на рынке товара. ' * 3
+        st = 'Вопросы с 6 по 15 оцениваются в 2 балла. Цена 40.'
+        self.assertEqual(Q.numbers_not_on_page(st, [page]), ['15', '40'])
+        self.assertEqual(Q.numbers_not_on_page(st, [page], ['с 6 по 15']), ['40'])
+        self.assertIsNone(Q.numbers_not_on_page(st, [''], ['с 6 по 15 и 40']))
