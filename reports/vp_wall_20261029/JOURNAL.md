@@ -135,3 +135,41 @@
 | `with_timer` теряется (всегда 1) | `test_complete_answers_start_the_attempt_with_chosen_mode`, `test_guest_without_timer_all_the_way` |
 | анкета не проверяет несданную попытку | `test_double_post_makes_one_attempt` |
 | на 03 включён опрос | `test_no_sub_is_screen_03_without_polling` |
+
+## Фаза 5. Данные, удаление, статистика, документация
+
+- `2e7dc689`. `erase_user`: строки стены уходят каскадом от `user.delete()` (тест).
+  `problems/retention.py`: коды привязки старше суток — в `plan()` и `purge()`.
+- Админка: `VPWall` (список, фильтры путь/класс/источник/2 тур), привязки и коды — только
+  чтение, отпечаток кода не показывается. Команда `vp_wall_stats [--days 7]`.
+- События: `vp_wall_shown`, `vp_wall_tg_click`, `vp_wall_tg_ok`, `vp_wall_tg_nosub`,
+  `vp_wall_email_sent`, `vp_wall_email_ok`, `vp_wall_survey_done` (описаны в `vp/tracking.py`).
+- Документы: `docs/VP.md` «Стена 2 тура», `docs/MAIL.md` (интерфейс), ADR **0168**,
+  `docs/SECURITY-MATRIX.md` (6 адресов), `docs/SECURITY.md`, строка в `CLAUDE.md`,
+  `scripts/legal/pd_inventory.py` (Telegram ID и ник; ответы анкеты — в docs/VP.md).
+- Новые тесты `vp/tests/test_wall_data.py`: 4. Тесты сессии: 697 → **701**, OK;
+  `problems.tests.test_security_headers` (обход маршрутов: GET ничего не пишет) — OK.
+
+| Дефект | Покраснело |
+|---|---|
+| `VPWall` без каскада (переживает удаление аккаунта) | `test_erase_user_leaves_no_wall_rows` |
+| `purge` не удаляет коды привязки | `test_tokens_older_than_a_day_go_fresh_stay` |
+| сухой прогон молчит о кодах привязки | `test_tokens_older_than_a_day_go_fresh_stay` |
+| привязку можно править в админке | `test_wall_pages_open_and_links_are_read_only` |
+| статистика не считает застрявших | `test_stats_show_paths_and_survey` |
+
+## Фаза 6. Инварианты
+
+| Проверка | Итог |
+|---|---|
+| тесты сессии | 532 (до слияния) → 616 (слияние) → **701**, OK (skipped=1) |
+| `manage.py check` | 0 |
+| `check --deploy --fail-level WARNING`, окружение джоба `deploy-check` | 0 |
+| то же с `TELEGRAM_BOT_TOKEN=` | ровно `vp.W001` |
+| `makemigrations --check --dry-run` | No changes detected |
+| `migrate` / `showmigrations problems vp` на копии | всё применено |
+| `scripts/check_em_dash.py` | 0 |
+| `ruff check` по 57 изменённым .py | чисто |
+| `bandit -r vp problems -ll` | Medium 0, High 0 |
+| общая база: `VPAttempt` / `VPAnswer` / пользователи | 2 / 88 / 16 — как в фазе −1; `vp/0005` к ней не применялась |
+| живой бот | пропущено: чтение `.env` закрыто правилами доступа сессии, токена я не видел |
