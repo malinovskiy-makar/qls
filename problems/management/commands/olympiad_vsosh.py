@@ -33,9 +33,10 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('step', choices=['manifest', 'convert', 'render', 'events', 'plan',
                                              'transcribe', 'batches', 'claude', 'assemble',
-                                             'ile', 'check', 'review', 'bank'])
-        parser.add_argument('--action', choices=['submit', 'collect'], default='collect',
-                            help='claude: отправить пакеты или забрать результаты')
+                                             'ile', 'check', 'review', 'bank', 'q2'])
+        parser.add_argument('--action', default='collect',
+                            help='claude: submit/collect; q2: шаг сессии Q2 (vsosh_q2)')
+        parser.add_argument('--models', default=None, help='q2: модели через запятую')
         parser.add_argument('--root', default=DEFAULT_ROOT)
         parser.add_argument('--groups', default='1,2,3,4,5', help='группы плана (transcribe)')
         parser.add_argument('--max-usd', type=float, default=None)
@@ -59,6 +60,9 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         self._paths(opts['root'])
         step = opts['step']
+        if step == 'q2':
+            from problems.olympiad_audit import vsosh_q2
+            return vsosh_q2.run(self, opts)
         if step in ('transcribe', 'batches', 'claude', 'assemble', 'ile', 'check', 'review',
                     'bank'):
             from problems.olympiad_audit import vsosh_digitize
