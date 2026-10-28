@@ -110,3 +110,32 @@ Notion прочитан: R1 `404b11c9…5224` (переведена в «В ра
 | сдача формой не читает `item-4.k` | `test_form_finish_with_radios_and_autosave_erase` |
 | буквы не разбираются из «А – …» | `test_demo_10…` |
 | нет флажка у пропусков | `test_demo_10…` (18 флажков) |
+
+## Фаза 3. Класс ученика — ЗАКРЫТА (коммит `0f524000`)
+
+* `vp/landing.py::student_band(request)` — единственный источник: `?band=` / `?board=` (известный код
+  → `session['vp_band']`) → [место под анкету] → `session['vp_band']` → класс последней попытки в
+  текущем туре → `None`.
+* `views._boards` и `views.variants` берут класс из неё (иначе первый). POST `/vp/band/`
+  (`vp:remember_band`, до `<slug>/`, CSRF; тело — код или поле `band`; известный → 204, иначе 400,
+  тело длиннее 64 байт — 400); `landing.js` шлёт его при нажатии вкладки, ответа не ждёт
+  (токен — `data-csrf` у списка вкладок).
+* `landing.my_block`: «следующий вариант» и «пройдено» по своему классу; `band`, `band_label` →
+  «Пройдено · 10 класс».
+* `board.panel(me, tour, band)` — вкладка целиком, с `my_place` (моё место в этой таблице, в топе
+  или нет); `board.top` теперь обёртка над ней (правило отбора одно).
+* Таблица: колонка «Класс» только при одной таблице (1 тур), сетка `.is-nocls`; своя строка в топе
+  подсвечена («Вы · логин»); подпись — «Вы на первом месте.» / «Ваше место – K-е; выше можно
+  подняться…» / «Попыток в таблице: N.».
+* Тесты `vp/tests/test_r_band.py` (5). `manage.py test vp`: 427 → 432, OK (`skipped=1`).
+  Изменённых старых тестов нет.
+
+| Дефект | Покраснело |
+|---|---|
+| явный выбор не запоминается | `test_explicit_choice_is_remembered` |
+| нет класса из последней попытки | `test_tenth_grader…`, `test_unknown_band_is_refused` |
+| `/vp/band/` принимает любой код | `test_unknown_band_is_refused` |
+| «моё» не по своему классу | `test_tenth_grader_sees_tenth_grade_everywhere` |
+| колонка «Класс» во 2 туре | `test_no_class_column_and_first_place_caption` |
+| подпись «первое место» не выбирается | `test_no_class_column_and_first_place_caption` |
+| экран вариантов по `?band=` без памяти | `test_explicit_choice…`, `test_tenth_grader…` |
