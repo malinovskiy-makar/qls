@@ -38,7 +38,7 @@ from problems.email_codes import Purpose
 from problems.models_legal import ConsentRecord
 from vp import bot, landing, telegram, tracking, wall
 from vp.models import VPTelegramLink, VPTelegramToken, VPWall
-from vp.views import _variant_or_404, _wall_url
+from vp.views import _current_attempt, _remember, _start_attempt, _variant_or_404, _wall_url
 
 hook_logger = logging.getLogger('vp.bot')
 
@@ -235,8 +235,15 @@ def wall_window(request, variant, attempt):
         'channel': channel,
         'channel_url': 'https://t.me/' + channel,
         'with_timer': with_timer,
-        'minutes': variant.duration_seconds // 60,
-        'grade': _survey_grade(user, variant) if screen == 'survey' else '',
+        'minutes_word': landing.duration_words(variant),
+        'survey': {
+            'grades': [(code, code) for code, _ in VPWall.GRADE_CHOICES],
+            'statuses': VPWall.TOUR2_CHOICES,
+            'sources': VPWall.SOURCE_CHOICES,
+            'grade': (note or {}).get('grade') or _survey_grade(user, variant),
+            'status': (note or {}).get('tour2_status', ''),
+            'source': (note or {}).get('source', ''),
+        } if screen == 'survey' else None,
         'urls': {
             'tg_screen': _wall_url(variant.slug),
             'email_screen': _wall_url(variant.slug, 'email'),
@@ -246,6 +253,7 @@ def wall_window(request, variant, attempt):
             'tg': reverse('vp:wall_tg', args=[variant.slug]),
             'check': reverse('vp:wall_check', args=[variant.slug]),
             'state': '%s?%s' % (reverse('vp:wall_state'), urlencode({'v': variant.slug})),
+            'survey': reverse('vp:wall_survey', args=[variant.slug]),
         },
     }
 
@@ -378,3 +386,57 @@ def tg_hook(request):
         hook_logger.warning('Бот: обновление %s (%s) — %s', update_id,
                             bot.update_kind(update), type(error).__name__)
     return JsonResponse({'ok': True})
+
+
+# ------------------------------------------------------------------ анкета
+
+SURVEY_REQUIRED = 'Ответьте на все три вопроса.'
+
+
+@require_POST
+def wall_survey(request, slug):
+    """Анкета (экран 06) — и сразу старт варианта.
+
+    Порядок: контакта нет → окно; несданная попытка → в неё (повтор или двойной
+    клик не создаёт второй попытки); анкеты не было → сохранить (уже была — НЕ
+    перезаписывать); класс в профиле пуст → записать (профиль не создавать);
+    затем попытка с режимом из `vp_wall_next` (если там этот вариант) или из формы.
+    """
+    if not request.user.is_authenticated:
+        return redirect_to_login(_wall_url(slug), '/login/')
+    variant = _wall_variant(request, slug)
+    if not variant.items.exists():
+        raise Http404
+    user = request.user
+    if wall.step(user) == 'contact':
+        return redirect(_wall_url(variant.slug))
+    attempt = _current_attempt(request, variant)
+    if attempt is None:
+        if not VPWall.objects.filter(user=user, survey_at__isnull=False).exists():
+            answers = {
+                'grade': request.POST.get('grade', ''),
+                'tour2_status': request.POST.get('tour2_status', ''),
+                'source': request.POST.get('source', ''),
+            }
+            allowed = {'grade': VPWall.GRADE_CHOICES, 'tour2_status': VPWall.TOUR2_CHOICES,
+                       'source': VPWall.SOURCE_CHOICES}
+            if any(value not in dict(allowed[key]) for key, value in answers.items()):
+                flash(request, SURVEY_REQUIRED, **answers)
+                return redirect(_wall_url(variant.slug))
+            VPWall.objects.filter(user=user, survey_at__isnull=True).update(
+                survey_at=timezone.now(), **answers)
+            profile = getattr(user, 'profile', None)
+            if profile is not None and not profile.grade:
+                profile.grade = answers['grade']
+                profile.save(update_fields=['grade'])
+            tracking.defer(request, 'vp_wall_survey_done', variant=variant.slug,
+                           grade=answers['grade'], tour2_status=answers['tour2_status'],
+                           source=answers['source'])
+        kept = request.session.pop(wall.SESSION_NEXT, None) or {}
+        if kept.get('slug') == variant.slug:
+            with_timer = bool(kept.get('with_timer', True))
+        else:
+            with_timer = request.POST.get('with_timer', '1') == '1'
+        attempt = _start_attempt(request, variant, with_timer)
+    _remember(request, attempt.public_code)
+    return redirect('vp:take', code=attempt.public_code)

@@ -28,6 +28,7 @@ urlpatterns = [
     path('wall/tg/<slug:slug>/', views_wall.wall_tg, name='wall_tg'),
     path('wall/check/<slug:slug>/', views_wall.wall_check, name='wall_check'),
     path('wall/state/', views_wall.wall_state, name='wall_state'),
+    path('wall/survey/<slug:slug>/', views_wall.wall_survey, name='wall_survey'),
     path('tg/hook/', views_wall.tg_hook, name='tg_hook'),
     path('a/<str:code>/', views.take, name='take'),
     path('a/<str:code>/save/', views.save, name='save'),

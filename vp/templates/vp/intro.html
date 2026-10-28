@@ -145,7 +145,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
     </div>
     <h2 id="vp-gate-h">Сначала короткая регистрация</h2>
-    <p>Пройти вариант можно только после регистрации. Она бесплатная и занимает минуту: логин и пароль, без почты. После неё вернём вас на этот вариант.</p>
+    <p>Пройти вариант можно только после регистрации. Она бесплатная и занимает минуту: {% if mail_on %}логин, почта и пароль – почту подтвердим кодом из письма{% else %}логин и пароль, без почты{% endif %}. После неё вернём вас на этот вариант.</p>
     <div class="vp-gate-a">
       <a class="vp-btn" href="{{ register_url }}">Зарегистрироваться</a>
       <a class="vp-btn vp-btn--plain" href="{{ login_url }}">Уже есть аккаунт – войти</a>
@@ -158,4 +158,5 @@
 
 {% block extra_js %}{{ block.super }}
 {% if register_url %}<script src="{% static 'vp/js/intro.js' %}" defer></script>{% endif %}
+{% if wall %}<script src="{% static 'vp/js/wall.js' %}" defer></script>{% endif %}
 {% endblock %}

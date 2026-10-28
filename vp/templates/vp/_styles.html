@@ -1053,6 +1053,133 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-gate-a .vp-btn { min-height: 46px; }
 .vp-gate-fine { font-size: 12.5px; color: var(--text3); }
 
+/* ── Стена 2 тура: окно на интро (макеты vp_wall_20261028) ─────────── */
+/* Экран выбирает сервер (`vp/views_wall.py`); без JS окно — блок на странице. */
+.vp-wall { gap: 12px; }
+.vp-wall:not([open]) { display: none; }
+.vp-wall[open] { display: flex; flex-direction: column; gap: 14px; }
+.vp-wall:not(:modal) { margin: 0 auto 24px; position: relative; }
+.vp-wall .vp-gate-x { text-decoration: none; }
+.vp-wall-screen { display: flex; flex-direction: column; gap: 14px; }
+.vp-wall-screen[hidden] { display: none; }
+.vp-wall-eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text2); padding-right: 40px;
+}
+.vp-wall-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.vp-wall-steps li {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text2);
+  padding: 4px 12px 4px 4px; border-radius: var(--r-pill); background: var(--chip-bg);
+}
+.vp-wall-steps li.is-now { background: var(--accent-tint); color: var(--accent-ink); }
+.vp-wall-steps li.is-done { background: var(--green-tint); color: var(--green-ink); }
+.vp-wall-n {
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; background: var(--surface); color: var(--text2);
+}
+.vp-wall-steps li.is-now .vp-wall-n { background: var(--accent); color: var(--on-btn); }
+.vp-wall-n.is-ok { background: var(--green); color: var(--surface); }
+.vp-wall-n svg { width: 12px; height: 12px; }
+.vp-wall h2 { font-size: 21px; }
+.vp-wall-how {
+  background: var(--surface-2); border: var(--line, 1px) solid var(--border);
+  border-radius: var(--r-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.vp-wall-how ol { margin: 0; padding: 0; list-style: none; counter-reset: wall; display: grid; gap: 10px; }
+.vp-wall-how li {
+  counter-increment: wall; display: flex; gap: 10px; align-items: baseline;
+  font-size: 14.5px; line-height: 1.45; color: var(--text);
+}
+.vp-wall-how li::before {
+  content: counter(wall); flex: 0 0 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  background: var(--surface); border: var(--line, 1px) solid var(--border); color: var(--text2);
+}
+.vp-wall-main { width: 100%; }
+.vp-wall-tg { gap: 10px; }
+.vp-wall-tg svg { width: 20px; height: 20px; }
+.vp-wall-form { display: flex; flex-direction: column; gap: 12px; }
+.vp-wall-label { font-size: 13.5px; font-weight: 500; color: var(--text2); }
+.vp-wall-input {
+  font: inherit; font-size: 16px; padding: 12px 14px; min-height: 48px; width: 100%;
+  border: var(--line, 1px) solid var(--border); border-radius: var(--r-card);
+  background: var(--surface-2); color: var(--text); box-sizing: border-box;
+}
+.vp-wall-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vp-wall-code { text-align: center; letter-spacing: .3em; font-variant-numeric: tabular-nums; }
+.vp-wall-check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: var(--text); }
+.vp-wall-check a { color: var(--accent-ink); }
+.vp-wall-check input { width: 18px; height: 18px; margin: 2px 0 0; flex: 0 0 18px; accent-color: var(--accent); }
+.vp-wall-alt { margin: 0; font-size: 14px; color: var(--text2); }
+.vp-wall-alt--split { display: flex; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.vp-wall-linkbtn {
+  font: inherit; color: var(--accent-ink); background: none; border: 0; padding: 0;
+  text-decoration: underline; cursor: pointer;
+}
+.vp-wall-linkbtn:disabled { color: var(--text3); text-decoration: none; cursor: default; }
+.vp-wall-sent { margin: 0; font-size: 14.5px; color: var(--text2); line-height: 1.55; }
+.vp-wall-quiet { margin: 0; font-size: 13.5px; color: var(--text2); }
+.vp-wall-ok, .vp-wall-warn, .vp-wall-wait, .vp-wall-alert {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 16px;
+  border-radius: var(--r); border-left: 3px solid var(--border); background: var(--surface-2);
+  font-size: 13.5px; line-height: 1.5; color: var(--text2);
+}
+.vp-wall-ok b, .vp-wall-warn b, .vp-wall-wait b { color: var(--text); font-size: 14.5px; }
+.vp-wall-ok { border-left-color: var(--green); }
+.vp-wall-warn { border-left-color: var(--amber); }
+.vp-wall-alert { border-left-color: var(--error); color: var(--error-ink); background: var(--error-tint); }
+.vp-wall-alert.is-info { border-left-color: var(--accent); color: var(--text); background: var(--accent-tint); }
+.vp-wall-wait { border-left-color: var(--accent); padding-left: 44px; position: relative; }
+.vp-wall-spin {
+  position: absolute; left: 16px; top: 15px; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--accent-ink);
+  animation: vp-wall-spin 1s linear infinite;
+}
+@keyframes vp-wall-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .vp-wall-spin { animation: none; } }
+.vp-wall-note {
+  padding: 12px 16px; border-radius: var(--r-card); font-size: 14px; line-height: 1.5;
+  background: var(--amber-tint); border: var(--line, 1px) solid var(--amber-border); color: var(--text);
+}
+/* Анкета (06): радиокнопки, оформленные плитками — без JS работают как есть. */
+.vp-wall-q { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vp-wall-q legend { padding: 0; margin-bottom: 10px; font-size: 14.5px; font-weight: 600; color: var(--text); }
+.vp-wall-choice { position: relative; }
+.vp-wall-choice input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.vp-wall-choice span {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 44px; padding: 8px 14px; border-radius: var(--r-card); font-size: 14.5px;
+  border: var(--line, 1px) solid var(--border); background: var(--surface); color: var(--text);
+}
+.vp-wall-choice input:checked + span { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.vp-wall-choice input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vp-wall-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; background: var(--chip-bg); border-radius: var(--r-pill); }
+.vp-wall-seg .vp-wall-choice span { border-color: transparent; background: transparent; border-radius: var(--r-pill); }
+.vp-wall-seg .vp-wall-choice input:checked + span { background: var(--accent); color: var(--on-btn); border-color: var(--accent); }
+.vp-wall-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.vp-wall-tiles .vp-wall-choice span { justify-content: flex-start; text-align: left; min-height: 48px; font-weight: 500; }
+.vp-wall-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.vp-wall-pills .vp-wall-choice span { border-radius: var(--r-pill); min-height: 38px; padding: 6px 14px; }
+.vp-wall-meta { font-size: 12.5px; color: var(--text3); text-align: center; margin: 0; }
+
+/* Телефон (макет 07): окно снизу на всю ширину, ручка сверху. */
+@media (max-width: 560px) {
+  .vp-wall:modal {
+    margin: auto 0 0; width: 100%; max-width: 100%; max-height: 92vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0; border-bottom: 0; padding: 26px 18px 22px;
+  }
+  .vp-wall:modal::before {
+    content: ''; position: absolute; top: 8px; left: 50%; width: 40px; height: 4px;
+    margin-left: -20px; border-radius: 2px; background: var(--border);
+  }
+  .vp-wall:not(:modal) { padding: 24px 16px 20px; }
+  .vp-wall-tiles { grid-template-columns: 1fr; }
+  .vp-wall h2 { font-size: 19px; }
+  .vp-wall-eyebrow { font-size: 11px; }
+  .vp-wall-steps { gap: 6px; flex-wrap: nowrap; }
+  .vp-wall-steps li { font-size: 12.5px; gap: 6px; padding: 3px 10px 3px 3px; white-space: nowrap; }
+}
+
 /* ── Результат (сессия R, макеты 01/01b/01c/02) ─────────────────────── */
 .vp-res { display: flex; flex-direction: column; gap: 16px; max-width: 1200px; }
 .vp-crumbs { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text2); }

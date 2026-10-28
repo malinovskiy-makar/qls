@@ -39,7 +39,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from catalog import seo
-from problems import exam_engine
+from problems import email_codes, exam_engine
 from vp import answers, blocks, board, config, landing, review, scoring, tracking, visibility
 from vp import wall
 from vp import drill as drill_rules
@@ -589,6 +589,7 @@ def intro(request, slug):
         'login_url': '' if request.user.is_authenticated else _login_url(slug),
         'vp_events': events,
         'wall': wall_ctx,
+        'mail_on': email_codes.mail_enabled(),
         **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year,
                               variant.tour),
     })

@@ -27,6 +27,42 @@
   <h2 id="vp-wall-h">Вход в варианты временно закрыт</h2>
   <p>Вход в варианты временно закрыт. Попробуйте через час.</p>
 
+  {% elif wall.screen == 'survey' %}
+  {# 06: анкета. Все три ответа обязательны; класс выбран заранее, два других — нет. #}
+  <h2 id="vp-wall-h">Три вопроса – и начинаем</h2>
+  {% if wall.note and wall.note.text %}<div class="vp-wall-alert" role="alert">{{ wall.note.text }}</div>{% endif %}
+  <form method="post" action="{{ wall.urls.survey }}" class="vp-wall-form">
+    {% csrf_token %}
+    <input type="hidden" name="with_timer" value="{% if wall.with_timer %}1{% else %}0{% endif %}">
+    <fieldset class="vp-wall-q">
+      <legend>В каком вы классе?</legend>
+      <div class="vp-wall-seg">
+        {% for code, label in wall.survey.grades %}
+        <label class="vp-wall-choice"><input type="radio" name="grade" value="{{ code }}" required{% if code == wall.survey.grade %} checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset class="vp-wall-q">
+      <legend>Вы прошли во 2 тур?</legend>
+      <div class="vp-wall-tiles">
+        {% for code, label in wall.survey.statuses %}
+        <label class="vp-wall-choice"><input type="radio" name="tour2_status" value="{{ code }}" required{% if code == wall.survey.status %} checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset class="vp-wall-q">
+      <legend>Откуда узнали о тренажёре?</legend>
+      <div class="vp-wall-pills">
+        {% for code, label in wall.survey.sources %}
+        <label class="vp-wall-choice"><input type="radio" name="source" value="{{ code }}" required{% if code == wall.survey.source %} checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <p class="vp-gate-fine">* Instagram принадлежит компании Meta, признанной экстремистской и запрещённой в России.</p>
+    <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Начать вариант</button>
+    <p class="vp-wall-meta">{% if wall.with_timer %}Таймер на {{ wall.minutes_word }} запустится сразу. {% endif %}Анкету спрашиваем один раз.</p>
+  </form>
+
   {% elif wall.screen == 'email' %}
   {# 04: почта и код — путь для тех, у кого Telegram не открывается. #}
   <h2 id="vp-wall-h">Подтвердите почту</h2>

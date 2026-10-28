@@ -400,9 +400,14 @@ def wall_eyebrow(variant):
     band = dict(config.bands(variant.tour)).get(variant.grade_band)
     if band:
         bits.append(band)
-    minutes = variant.duration_seconds // 60
-    bits.append(f'{minutes} {_plural(minutes, "минута", "минуты", "минут")}')
+    bits.append(duration_words(variant))
     return ' · '.join(bits)
+
+
+def duration_words(variant):
+    """«70 минут»: длительность варианта словами (окно стены, анкета)."""
+    minutes = variant.duration_seconds // 60
+    return f'{minutes} {_plural(minutes, "минута", "минуты", "минут")}'
 
 
 def _dots(user, published):
