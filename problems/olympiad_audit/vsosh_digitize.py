@@ -299,6 +299,84 @@ def drop_repeated_paragraphs(text):
     return '\n\n'.join(out), dropped
 
 
+#: Ответ-«ключ» теста: «Да», «неверно», «1)», «а, в», «2; 4», «Б».
+_KEY_TOKEN = re.compile(r'^(?:да|нет|верно|неверно|[а-еa-e]|\d{1,2})$', re.I)
+
+
+def answer_like(text):
+    """Короткая строка ключа теста (не решение и не критерий)."""
+    t = re.sub(r'[*_`]', '', str(text or '')).strip()
+    if not t or len(t) > 25 or '\n' in t:
+        return False
+    tokens = [x for x in re.split(r'[\s,;.)(]+|\bи\b', t) if x]
+    return bool(tokens) and all(_KEY_TOKEN.match(x) for x in tokens)
+
+
+def key_blocks(digitized, ev):
+    """Блоки ключа из файлов ответов комплекта по порядку страниц:
+    [(номер, ответ)] — `criteria`/`solution` с номером-числом и коротким
+    ответом. Страница — заплатка Claude, если удачна, иначе GLM."""
+    out = []
+    for key in ('solution_files', 'criteria_files'):
+        for f in ev.get(key) or []:
+            sha16 = f['page_dir'].split('/')[-1]
+            for p in range(1, int(f.get('pages') or 0) + 1):
+                rec = None
+                for path in (os.path.join(digitized, 'pages_claude', sha16, f'p{p}.json'),
+                             os.path.join(digitized, f['page_dir'], f'p{p}.json')):
+                    if os.path.isfile(path):
+                        with open(path, encoding='utf-8') as fh:
+                            rec = json.load(fh)
+                        if rec.get('status') == 'ok' and rec.get('blocks'):
+                            break
+                for b in (rec or {}).get('blocks') or []:
+                    num = str(b.get('number') or '').strip().rstrip('.')
+                    text = b.get('answer') or b.get('text') or ''
+                    if b.get('type') in ('criteria', 'solution') and num.isdigit() \
+                            and answer_like(text):
+                        out.append((num, re.sub(r'[*_`]', '', text).strip()))
+    return out
+
+
+def fill_test_keys(rows, keys):
+    """Ключ теста из файла ответов → `answer` вопросов «тест-N» комплекта.
+
+    Номера ключа уникальны — раздаются по номеру; нумерация начиналась
+    заново по разделам, но ключей ровно столько, сколько вопросов, — по
+    порядку. Иначе не трогаем. Ключ, который сборка приняла за критерии
+    задачи с тем же номером (первый абзац `criteria_md` равен ключу), с
+    задачи снимается. Возвращает число заполненных ответов."""
+    tests = sorted((r for r in rows if str(r.get('number', '')).startswith('тест-')),
+                   key=lambda r: int(str(r['number'])[5:] or 0)
+                   if str(r['number'])[5:].isdigit() else 0)
+    if not tests or not keys:
+        return 0
+    nums = [n for n, _ in keys]
+    if len(set(nums)) == len(nums):
+        by_num = dict(keys)
+        pairs = [(r, by_num.get(str(r['number'])[5:])) for r in tests]
+    elif len(keys) == len(tests):
+        pairs = list(zip(tests, [a for _, a in keys]))
+    else:
+        return 0
+    filled = 0
+    for r, ans in pairs:
+        if ans and not (r.get('answer') or '').strip():
+            r['answer'] = ans
+            r['answer_from_key_table'] = True
+            filled += 1
+    if filled and len(set(nums)) == len(nums):
+        by_num = dict(keys)
+        for r in rows:
+            num = str(r.get('number', ''))
+            crit = r.get('criteria_md') or ''
+            first, _, rest = crit.partition('\n\n')
+            if num in by_num and first.strip() == by_num[num]:
+                r['criteria_md'] = rest.strip()
+                r['key_removed_from_criteria'] = True
+    return filled
+
+
 def page_models(digitized, pdf_dirs, refs):
     """Какой моделью расшифрованы страницы задания («файл#pN»): заплатка Claude
     или GLM. Порядок — по убыванию числа страниц."""
@@ -387,7 +465,13 @@ def run_assemble(cmd, opts):
             r['task_variant'] = (r.get('task_variant') or '') + f'#dup{keys[key]}'
             r.setdefault('flags', []).append('повтор_ключа')
         out.append(r)
+    by_event = defaultdict(list)
+    for r in out:
+        by_event[r['event_id']].append(r)
+    keys_filled = sum(fill_test_keys(rs, key_blocks(digitized, files.get(eid, {})))
+                      for eid, rs in by_event.items())
     digitize.write_jsonl(os.path.join(digitized, 'reference_problems_v1.jsonl'), out)
+    cmd._say(f'ключ теста из таблицы ответов: {keys_filled} ответов')
     cmd._say(f'сборка: {dict(summary)}')
     cmd._say(f'заданий v1: {len(out)}; комплектов с заданиями: '
              f'{len({r["event_id"] for r in out})}; повторов ключа (переименованы): {dup}')

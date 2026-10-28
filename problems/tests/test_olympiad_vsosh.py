@@ -515,3 +515,26 @@ class CheckRulesTests(SimpleTestCase):
         self.assertEqual(Q.numbers_not_on_page(st, [page]), ['15', '40'])
         self.assertEqual(Q.numbers_not_on_page(st, [page], ['с 6 по 15']), ['40'])
         self.assertIsNone(Q.numbers_not_on_page(st, [''], ['с 6 по 15 и 40']))
+
+    def test_answer_like(self):
+        for good in ('Да', 'неверно', '1)', 'а, в', '2; 4', '**Б**', '3 и 5'):
+            self.assertTrue(vsosh_digitize.answer_like(good), good)
+        for bad in ('Всего 40 баллов.', 'Задача 4. При равновесии', '', 'а) 20%'):
+            self.assertFalse(vsosh_digitize.answer_like(bad), bad)
+
+    def test_fill_test_keys_by_number_and_unhook_from_problem(self):
+        rows = [{'number': 'тест-1'}, {'number': 'тест-2'}, {'number': 'тест-10'},
+                {'number': '1', 'criteria_md': 'Да\n\nКритерии задачи 1'}]
+        keys = [('1', 'Да'), ('2', 'Нет'), ('10', '1)')]
+        self.assertEqual(vsosh_digitize.fill_test_keys(rows, keys), 3)
+        self.assertEqual([r.get('answer') for r in rows[:3]], ['Да', 'Нет', '1)'])
+        self.assertEqual(rows[3]['criteria_md'], 'Критерии задачи 1')
+
+    def test_fill_test_keys_restarted_numbering_by_order_only_if_counts_match(self):
+        rows = [{'number': 'тест-1'}, {'number': 'тест-2'}, {'number': 'тест-3'}]
+        self.assertEqual(vsosh_digitize.fill_test_keys(
+            rows, [('1', 'Да'), ('1', 'а'), ('2', 'б')]), 3)
+        self.assertEqual([r['answer'] for r in rows], ['Да', 'а', 'б'])
+        rows = [{'number': 'тест-1'}, {'number': 'тест-2'}]
+        self.assertEqual(vsosh_digitize.fill_test_keys(
+            rows, [('1', 'Да'), ('1', 'а'), ('2', 'б')]), 0)
