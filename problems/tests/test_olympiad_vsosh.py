@@ -335,6 +335,13 @@ class AssembleWrapperTests(SimpleTestCase):
                  'failed': 2}, {'kind': 'submitted', 'model': 'claude-sonnet-5-5', 'cost_usd': 9}]
         self.assertAlmostEqual(vsosh_digitize.page_usd(many)['claude-sonnet-5-5'], 0.0055)
 
+    def test_pending_usd_skips_collected_batches(self):
+        ledger = [{'kind': 'submitted', 'batch_id': 'a', 'estimate_usd': 2.5},
+                  {'kind': 'result', 'batch_id': 'a', 'cost_usd': 2.8},
+                  {'kind': 'collected', 'batch_id': 'a'},
+                  {'kind': 'submitted', 'batch_id': 'b', 'estimate_usd': 3.0}]
+        self.assertEqual(vsosh_digitize.pending_usd(ledger), 3.0)
+
     def test_batch_request_downscales_and_turns_thinking_off(self):
         import base64
         import io

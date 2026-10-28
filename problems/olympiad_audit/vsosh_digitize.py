@@ -449,6 +449,15 @@ def page_usd(ledger):
     return out
 
 
+def pending_usd(ledger):
+    """Оценка отправленных, но ещё не забранных пакетов. Забранный пакет
+    уже сидит в `spent` настоящей ценой — второй раз его не считать
+    (28.10: двойной счёт остановил отправку на $28 вместо $47)."""
+    collected = {x['batch_id'] for x in ledger if x.get('kind') == 'collected'}
+    return sum(float(x.get('estimate_usd') or 0) for x in ledger
+               if x.get('kind') == 'submitted' and x['batch_id'] not in collected)
+
+
 def run_claude(cmd, opts):
     r"""submit — отправить пакеты по порядку, пока расход < 90 % потолка;
     collect — забрать готовые результаты в pages_claude\ и учесть расход."""
@@ -467,16 +476,15 @@ def run_claude(cmd, opts):
             return
         sent = {x['file'] for x in ledger if x.get('kind') == 'submitted'}
         for name in sorted(os.listdir(out_dir)):
-            if not name.startswith('batch_') or name in sent:
+            # Только дописанные файлы: `.jsonl.tmp` ещё пишется (28.10 — 400 «пустой список»).
+            if not (name.startswith('batch_') and name.endswith('.jsonl')) or name in sent:
                 continue
             model = 'claude-sonnet-5-5' if 'sonnet' in name else 'claude-haiku-5-5'
             reqs = _read(os.path.join(out_dir, name))
             if opts.get('thinking_off'):     # решение калибровки — при отправке
                 for req in reqs:
                     req['params']['thinking'] = THINKING_OFF[model]
-            projected = spent + len(reqs) * per_page[model] + sum(
-                x.get('estimate_usd', 0) for x in ledger
-                if x.get('kind') == 'submitted' and not x.get('collected'))
+            projected = spent + len(reqs) * per_page[model] + pending_usd(ledger)
             if projected > 0.9 * cap:
                 cmd._say(f'стоп: {name} поднял бы расход до ${projected:.2f} (> 90 % от ${cap})')
                 break
