@@ -294,5 +294,5 @@ def dest_name(url):
     name = re.sub(r'[<>:"\\|?*\x00-\x1f]', '_', path).replace('/', '__')
     if len(name) > 150:
         ext = name.rsplit('.', 1)[-1] if '.' in name[-6:] else ''
-        name = name[:110] + '_' + sha1(url.encode()).hexdigest()[:12] + (('.' + ext) if ext else '')
+        name = name[:110] + '_' + sha1(url.encode(), usedforsecurity=False).hexdigest()[:12] + (('.' + ext) if ext else '')
     return name
