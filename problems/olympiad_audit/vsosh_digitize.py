@@ -313,10 +313,12 @@ def answer_like(text):
 
 
 def key_blocks(digitized, ev):
-    """Блоки ключа из файлов ответов комплекта по порядку страниц:
-    [(номер, ответ)] — `criteria`/`solution` с номером-числом и коротким
-    ответом. Страница — заплатка Claude, если удачна, иначе GLM."""
-    out = []
+    """Ключ теста из файлов ответов комплекта по порядку страниц, по видам
+    источника (каждый раздаётся отдельно — у задач 1–5 тоже есть `answer`,
+    и в общей куче номера сталкиваются): `marked` — вопрос повторён с
+    «(отмечено)», `table` — таблица ответов, `short` — блок-ответ «Да», «1)».
+    Страница — заплатка Claude, если удачна, иначе GLM. → {вид: [(номер, ответ)]}"""
+    out = {'marked': [], 'table': [], 'short': []}
     for key in ('solution_files', 'criteria_files'):
         for f in ev.get(key) or []:
             sha16 = f['page_dir'].split('/')[-1]
@@ -333,21 +335,18 @@ def key_blocks(digitized, ev):
                     num = str(b.get('number') or '').strip().rstrip('.')
                     text = b.get('text') or ''
                     ans = re.sub(r'[*_`]', '', b.get('answer') or '').strip()
-                    if num.isdigit() and ans and len(ans) <= 60 and b.get('type') in (
-                            'task', 'task_continuation', 'solution', 'criteria'):
-                        out.append((num, ans))      # вопрос повторён с «(отмечено)»
+                    if num.isdigit() and ans and len(ans) <= 60 and '(отмечено)' in text:
+                        out['marked'].append((num, ans))
                     elif b.get('type') in ('criteria', 'solution') and num.isdigit() \
                             and answer_like(text):
-                        out.append((num, re.sub(r'[*_`]', '', text).strip()))
+                        out['short'].append((num, re.sub(r'[*_`]', '', text).strip()))
                     elif b.get('type') in ('criteria', 'solution', 'task') \
                             and re.search(r'ответ|ключ', text, re.I):
-                        out.extend(key_table_pairs(text))
-    seen, uniq = set(), []
-    for pair in out:                # один ключ мог прийти и вопросом, и таблицей
-        if pair not in seen:
-            seen.add(pair)
-            uniq.append(pair)
-    return uniq
+                        out['table'].extend(key_table_pairs(text))
+    for kind, pairs in out.items():   # тот же ключ на двух страницах — один раз
+        seen = set()
+        out[kind] = [x for x in pairs if not (x in seen or seen.add(x))]
+    return out
 
 
 def key_table_pairs(text):
@@ -489,6 +488,15 @@ def run_assemble(cmd, opts):
             fixed += k
         if fixed:
             r['currency_dollars_escaped'] = fixed
+        stars = 0
+        for field in ('statement_md', 'solution_md', 'criteria_md', 'answer'):
+            r[field], k = fix_math_star(r.get(field) or '')
+            stars += k
+        for part in r.get('parts') or []:
+            part['text'], k = fix_math_star(part.get('text') or '')
+            stars += k
+        if stars:
+            r['math_star_unescaped'] = stars
         key = (r['event_id'], r['number'], r.get('task_variant', ''))
         keys[key] += 1
         if keys[key] > 1:
@@ -499,13 +507,34 @@ def run_assemble(cmd, opts):
     by_event = defaultdict(list)
     for r in out:
         by_event[r['event_id']].append(r)
-    keys_filled = sum(fill_test_keys(rs, key_blocks(digitized, files.get(eid, {})))
-                      for eid, rs in by_event.items())
+    keys_filled = 0
+    for eid, rs in by_event.items():
+        keys = key_blocks(digitized, files.get(eid, {}))
+        for kind in ('marked', 'table', 'short'):     # следующий — только в пустые
+            keys_filled += fill_test_keys(rs, keys[kind])
     digitize.write_jsonl(os.path.join(digitized, 'reference_problems_v1.jsonl'), out)
     cmd._say(f'ключ теста из таблицы ответов: {keys_filled} ответов')
     cmd._say(f'сборка: {dict(summary)}')
     cmd._say(f'заданий v1: {len(out)}; комплектов с заданиями: '
              f'{len({r["event_id"] for r in out})}; повторов ключа (переименованы): {dup}')
+
+
+_MATH = re.compile(r'(?<!\\)\$(?:[^$\\]|\\.)+?(?<!\\)\$')
+
+
+def fix_math_star(text):
+    r"""`\*` внутри формулы → `*`: экранирование звёздочки Markdown попало в
+    TeX, и KaTeX не знает команды `\*` (28.10: 5 полей). Вне формул `\*` —
+    законная звёздочка Markdown, не трогаем. Возвращает (текст, число правок)."""
+    if not text or '\\*' not in text:
+        return text, 0
+    n = 0
+
+    def one(m):
+        nonlocal n
+        n += m.group(0).count('\\*')
+        return m.group(0).replace('\\*', '*')
+    return _MATH.sub(one, text), n
 
 
 _CYR_WORD = re.compile(r'[А-Яа-яЁё]{3,}')

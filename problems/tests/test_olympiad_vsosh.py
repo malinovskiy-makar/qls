@@ -548,3 +548,8 @@ class CheckRulesTests(SimpleTestCase):
                          [('1', 'Да'), ('2', 'Нет'), ('3', 'Да')])
         data = '| Год | ВВП |\n|---|---|\n| 2017 | 91,8 |\n| 2018 | 103,9 |'
         self.assertEqual(vsosh_digitize.key_table_pairs(data), [])
+
+    def test_math_star_only_inside_formula(self):
+        text = r'Итог $120\*100+20\*375$ и сноска \* вне формулы, цена \$5.'
+        out, n = vsosh_digitize.fix_math_star(text)
+        self.assertEqual((out, n), (r'Итог $120*100+20*375$ и сноска \* вне формулы, цена \$5.', 2))
