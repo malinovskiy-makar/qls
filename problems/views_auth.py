@@ -43,7 +43,7 @@ from django.views.generic.edit import FormView
 from legal import consent
 from problems.models_legal import ConsentRecord
 from problems import email_codes, ratelimit, signup_source
-from problems.email_codes import Purpose
+from problems.email_codes import Purpose, check_error, minutes, send_error
 from problems.forms_accounts import RegisterForm, RegisterWithEmailForm
 from problems.models import User
 from problems.models_platform import SignupSource, UserProfile
@@ -175,10 +175,6 @@ PENDING_TTL = 30 * 60
 DEFAULT_NEXT = '/profile/?welcome=1'
 
 
-def minutes(seconds):
-    return max(1, (seconds + 59) // 60)
-
-
 class RegisterView(FormView):
     """Регистрация. Роль выбирает сам человек.
 
@@ -296,29 +292,6 @@ class RegisterView(FormView):
             return response
         form.add_error(None, send_error(result))
         return self.form_invalid(form)
-
-
-def send_error(result):
-    """Текст для человека по отказу `send_code`."""
-    if result.reason == 'limit':
-        return ('Слишком много писем на этот адрес. Попробуйте через %d мин.'
-                % minutes(result.wait_seconds))
-    if result.reason == 'wait':
-        return ('Код на этот адрес уже отправлен. Новый можно запросить через %d с.'
-                % result.wait_seconds)
-    if result.reason == 'ip_locked':
-        return ('Слишком много писем с вашего адреса в сети. Попробуйте через %d мин.'
-                % minutes(result.wait_seconds))
-    return 'Не получилось отправить письмо. Проверьте адрес или попробуйте через минуту.'
-
-
-def check_error(check):
-    """Текст для человека по отказу `check_code`."""
-    if check.reason == 'wrong':
-        return 'Неверный код. Осталось попыток: %d.' % check.attempts_left
-    if check.reason == 'locked':
-        return 'Слишком много неверных попыток. Отправьте новый код.'
-    return 'Код устарел. Отправьте новый.'
 
 
 def finish_signup(request, user, profile_role, target):
@@ -620,18 +593,12 @@ def account_email(request):
         check = email_codes.check_code(email, Purpose.CONFIRM, request.POST.get('code', ''))
         if check.ok:
             try:
-                with transaction.atomic():
-                    other = email_codes.verified_user_for(email)
-                    if other is not None and other.pk != user.pk:
-                        raise _Taken('Эта почта уже привязана к другому аккаунту.')
-                    user.email = email
-                    user.email_verified_at = timezone.now()
-                    user.save(update_fields=['email', 'email_verified_at'])
-                    _apply_mail_consent(user, pending['mail_consent'], pending.get('src'))
-            except (_Taken, IntegrityError):
+                email_codes.attach_verified_email(user, email)
+            except email_codes.EmailTaken:
                 request.session.pop(EMAIL_CHANGE_KEY, None)
-                messages.error(request, 'Эта почта уже привязана к другому аккаунту.')
+                messages.error(request, email_codes.TAKEN_MESSAGE)
                 return redirect(here)
+            _apply_mail_consent(user, pending['mail_consent'], pending.get('src'))
             request.session.pop(EMAIL_CHANGE_KEY, None)
             messages.success(request, 'Почта подтверждена.')
             return redirect(pending.get('next') or ACCOUNT_EMAIL_DEFAULT_NEXT)

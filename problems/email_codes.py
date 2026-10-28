@@ -200,3 +200,67 @@ def verified_user_for(email):
         return None
     return (get_user_model().objects
             .filter(email__iexact=email, email_verified_at__isnull=False).first())
+
+
+# ── Тексты для человека и привязка почты ────────────────────────────────
+#
+# Здесь, а не в представлении: ими пользуются и страница «Почта», и окно стены
+# тренажёра ВП (`vp/views.py`). Две копии текстов разошлись бы при первой правке.
+
+def minutes(seconds):
+    return max(1, (seconds + 59) // 60)
+
+
+def send_error(result):
+    """Текст для человека по отказу `send_code`."""
+    if result.reason == 'limit':
+        return ('Слишком много писем на этот адрес. Попробуйте через %d мин.'
+                % minutes(result.wait_seconds))
+    if result.reason == 'wait':
+        return ('Код на этот адрес уже отправлен. Новый можно запросить через %d с.'
+                % result.wait_seconds)
+    if result.reason == 'ip_locked':
+        return ('Слишком много писем с вашего адреса в сети. Попробуйте через %d мин.'
+                % minutes(result.wait_seconds))
+    return 'Не получилось отправить письмо. Проверьте адрес или попробуйте через минуту.'
+
+
+def check_error(check):
+    """Текст для человека по отказу `check_code`."""
+    if check.reason == 'wrong':
+        return 'Неверный код. Осталось попыток: %d.' % check.attempts_left
+    if check.reason == 'locked':
+        return 'Слишком много неверных попыток. Отправьте новый код.'
+    return 'Код устарел. Отправьте новый.'
+
+
+#: Текст для человека, когда почту уже подтвердил другой аккаунт.
+TAKEN_MESSAGE = 'Эта почта уже привязана к другому аккаунту.'
+
+
+class EmailTaken(Exception):
+    """Почта уже подтверждена другим аккаунтом."""
+
+
+def attach_verified_email(user, email):
+    """Привязывает к аккаунту почту, подтверждённую кодом. В транзакции заново проверяет,
+    что почта не подтверждена другим аккаунтом (два человека могли ввести коды одновременно);
+    IntegrityError от ограничения user_verified_email_ci_unique — тоже EmailTaken.
+    Занята — EmailTaken, в базе ничего не меняется. Согласие на рассылку — НЕ здесь:
+    у страницы «Почта» и у стены свои правила галочки."""
+    from django.db import IntegrityError
+
+    email = normalize_email(email)
+    before = (user.email, user.email_verified_at)
+    try:
+        with transaction.atomic():
+            other = verified_user_for(email)
+            if other is not None and other.pk != user.pk:
+                raise EmailTaken()
+            user.email = email
+            user.email_verified_at = timezone.now()
+            user.save(update_fields=['email', 'email_verified_at'])
+    except (EmailTaken, IntegrityError):
+        # В базе откатилось само; объект в памяти возвращаем к прежнему.
+        user.email, user.email_verified_at = before
+        raise EmailTaken() from None
