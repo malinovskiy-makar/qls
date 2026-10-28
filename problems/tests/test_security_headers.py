@@ -85,6 +85,18 @@ class SecurityHeadersTests(TestCase):
             self.assertIn(directive, policy,
                           'В политике нет «%s»' % directive)
 
+    def test_form_action_lets_the_vp_wall_redirect_to_telegram_and_nowhere_else(self):
+        """Стена ВП: формы отвечают редиректом на t.me и tg:// (S2c).
+
+        Без этого боевой CSP останавливает кнопки Telegram, а в режиме отчёта это уже видно
+        в консоли. Других источников в `form-action` быть не должно: он держит форму
+        пароля от отправки на чужой сервер.
+        """
+        policy = Client().get('/').headers['Content-Security-Policy-Report-Only']
+        directives = [part.strip() for part in policy.split(';')]
+        form_action = [d for d in directives if d.startswith('form-action')]
+        self.assertEqual(form_action, ["form-action 'self' https://t.me tg:"])
+
     def test_report_endpoint_itself_has_no_policy(self):
         """Иначе нарушение на странице отчёта породит отчёт о ней самой."""
         response = Client().post(CSP_REPORT_PATH, data='{}',

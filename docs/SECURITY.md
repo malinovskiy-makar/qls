@@ -247,6 +247,11 @@ submission = get_object_or_404(visible_submissions(request.user), pk=pk)
 справка Метрики просит пустить её кабинеты во фрейм для Вебвизора и карт:
 это решение владельца. Держит `problems/tests/test_signup_source.py::CspTests`.
 
+**`form-action 'self' https://t.me tg:`** (S2c, 29.10.2026): формы стены ВП («Подключить Telegram»,
+«Открыть бота ещё раз», «Открыть в приложении») отвечают редиректом на `https://t.me/…` и `tg://…`, а
+браузер сверяет с `form-action` и цель редиректа. Других внешних адресов в директиве нет; держит
+`problems/tests/test_security_headers.py`.
+
 Приёмник отчётов ([config/csp_report.py](../config/csp_report.py)) —
 публичный адрес, который пишет в журнал, поэтому: тело обрезано 8 КБ, в
 запись уходят четыре поля по 300 символов, ответ всегда пустой 204, а
