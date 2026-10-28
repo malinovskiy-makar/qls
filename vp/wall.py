@@ -11,16 +11,21 @@
 
 ⚠️ КОНТАКТ ПОСТОЯННЫЙ: отписка от канала после прохода стены ничего не отбирает.
 """
+from datetime import timedelta
+
 from django.conf import settings
 from django.utils import timezone
 
 from problems import email_codes
 from vp import config, telegram
-from vp.models import VPWall
+from vp.models import VPTelegramLink, VPTelegramToken, VPWall
 
 #: Куда вернуть человека после стены: `{'slug': …, 'with_timer': …}`. Данные
 #: сессии переживают `login()`, поэтому гость доносит выбор режима до анкеты.
 SESSION_NEXT = 'vp_wall_next'
+
+#: Сколько живёт код привязки Telegram из ссылки `t.me/<бот>?start=<код>`.
+TOKEN_TTL = timedelta(minutes=30)
 
 
 def enabled():
@@ -61,3 +66,25 @@ def pass_contact(user, via):
 
 def remember_next(request, slug, with_timer):
     request.session[SESSION_NEXT] = {'slug': slug, 'with_timer': bool(with_timer)}
+
+
+def tg_state(user):
+    """Что известно о пути Telegram: 'none' | 'waiting' | 'no_sub' | 'ok' | 'error'.
+
+    'waiting' — есть непогашенный код моложе `TOKEN_TTL`, выданный позже последней
+    проверки подписки: человек ушёл в бота, а «Старт» ещё не нажал.
+    """
+    if VPWall.objects.filter(user=user, contact_via='tg').exists():
+        return 'ok'
+    link = VPTelegramLink.objects.filter(user=user).first()
+    fresh = VPTelegramToken.objects.filter(
+        user=user, used_at__isnull=True, created_at__gt=timezone.now() - TOKEN_TTL)
+    if link is not None and link.checked_at is not None:
+        fresh = fresh.filter(created_at__gt=link.checked_at)
+    if fresh.exists():
+        return 'waiting'
+    if link is not None and link.last_error:
+        return 'error'
+    if link is not None and not link.subscribed:
+        return 'no_sub'
+    return 'none'

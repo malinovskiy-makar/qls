@@ -543,6 +543,14 @@ def intro(request, slug):
         example = scoring.penalty_example(sample.points)
 
     attempt = _current_attempt(request, variant)
+    # Окно стены 2 тура (`vp/views_wall.py`). Импорт здесь: `views_wall` сам берёт
+    # из этого модуля `_variant_or_404` и `_wall_url`.
+    from vp.views_wall import wall_window
+    wall_ctx = wall_window(request, variant, attempt)
+    events = [tracking.event('vp_intro_open', variant=variant.slug)]
+    if wall_ctx and wall_ctx['open']:
+        events.append(tracking.event('vp_wall_shown', variant=variant.slug,
+                                     screen=wall_ctx['screen']))
 
     # Прошлые попытки по ЭТОМУ варианту: короткий список над выбором режима.
     # Порядок и содержание строк те же, что на `/vp/my/` – два разных вида
@@ -579,7 +587,8 @@ def intro(request, slug):
         # Гостю — адреса стены регистрации; вошедшему они не нужны и в HTML не идут.
         'register_url': '' if request.user.is_authenticated else _register_url(slug),
         'login_url': '' if request.user.is_authenticated else _login_url(slug),
-        'vp_events': [tracking.event('vp_intro_open', variant=variant.slug)],
+        'vp_events': events,
+        'wall': wall_ctx,
         **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year,
                               variant.tour),
     })

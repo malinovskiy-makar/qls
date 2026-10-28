@@ -1,6 +1,7 @@
 """Адреса тренажёра «Высшая проба, 1 тур».
 
-⚠️ ПОРЯДОК ВАЖЕН: `a/…`, `r/…`, `variants/`, `my/`, `band/` и `format/` объявлены ДО `<slug:slug>/…`.
+⚠️ ПОРЯДОК ВАЖЕН: `a/…`, `r/…`, `wall/…`, `tg/…`, `variants/`, `my/`, `band/` и `format/`
+объявлены ДО `<slug:slug>/…`.
 Маршрут со слагом жаднее любого фиксированного слова, а вариант со слагом
 «variants» или «my» тоже возможен – тогда он просто не откроется по своему
 адресу, зато экраны раздела останутся на месте.
@@ -12,7 +13,7 @@
 """
 from django.urls import path
 
-from vp import views
+from vp import views, views_wall
 
 app_name = 'vp'
 
@@ -23,6 +24,7 @@ urlpatterns = [
     path('band/', views.remember_band, name='remember_band'),
     path('format/', views.drill, name='drill'),
     path('format/check/', views.format_check, name='format_check'),
+    path('wall/email/<slug:slug>/', views_wall.wall_email, name='wall_email'),
     path('a/<str:code>/', views.take, name='take'),
     path('a/<str:code>/save/', views.save, name='save'),
     path('a/<str:code>/time/', views.time_left, name='time'),

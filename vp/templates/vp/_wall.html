@@ -1,0 +1,106 @@
+{% load static %}
+{% comment %}
+Окно стены 2 тура (docs/VP.md, «Стена 2 тура»; макеты claude/mockups/vp_wall_20261028/).
+
+⚠️ ЭКРАН ВЫБИРАЕТ СЕРВЕР (`vp.views_wall.wall_window`), окно работает и без JS:
+при `?wall=…` оно отрисовано открытым (`open`) и стоит блоком на странице; скрипт
+`vp/js/wall.js` только делает его модальным. Каждое действие — обычная форма POST.
+
+⚠️ `ym-hide-content` на почте и нике, `ym-disable-keys` на полях: Вебвизор Метрики
+не должен записывать ни того, ни другого (docs/SECURITY.md).
+{% endcomment %}
+<dialog class="vp-gate vp-wall" id="vp-wall" aria-labelledby="vp-wall-h"
+        data-screen="{{ wall.screen }}" data-variant="{{ variant.slug }}"{% if wall.open %} data-open open{% endif %}>
+  <a class="vp-gate-x" href="{% url 'vp:intro' variant.slug %}" data-close aria-label="Закрыть">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </a>
+  <div class="vp-wall-eyebrow">{{ wall.eyebrow }}</div>
+  <ol class="vp-wall-steps" aria-label="Шаги">
+    <li class="{% if wall.step == 'contact' %}is-now{% else %}is-done{% endif %}">
+      {% if wall.step == 'contact' %}<span class="vp-wall-n">1</span>{% else %}<span class="vp-wall-n is-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>{% endif %}Контакт
+    </li>
+    <li class="{% if wall.step == 'survey' %}is-now{% endif %}"><span class="vp-wall-n">2</span>Три вопроса</li>
+    <li><span class="vp-wall-n">3</span>Вариант</li>
+  </ol>
+
+  {% if wall.screen == 'closed' %}
+  <h2 id="vp-wall-h">Вход в варианты временно закрыт</h2>
+  <p>Вход в варианты временно закрыт. Попробуйте через час.</p>
+
+  {% elif wall.screen == 'email' %}
+  {# 04: почта и код — путь для тех, у кого Telegram не открывается. #}
+  <h2 id="vp-wall-h">Подтвердите почту</h2>
+  <p>Если Telegram не работает, вариант откроет почта. Пришлём на неё код из шести цифр.</p>
+  {% if wall.note and wall.note.text %}<div class="vp-wall-alert{% if wall.note.kind == 'info' %} is-info{% endif %}" role="alert">{{ wall.note.text }}</div>{% endif %}
+  <form method="post" action="{% url 'vp:wall_email' variant.slug %}" class="vp-wall-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="send">
+    <label class="vp-wall-label" for="vp-wall-email">Электронная почта</label>
+    <input class="vp-wall-input ym-disable-keys" type="email" name="email" id="vp-wall-email"
+           placeholder="name@example.ru" autocomplete="email" inputmode="email" required
+           value="{{ wall.prefill_email }}">
+    <label class="vp-wall-check">
+      <input type="checkbox" name="mail_consent"{% if wall.prefill_consent %} checked{% endif %}>
+      <span>{% include 'legal/_mail_label.html' %}</span>
+    </label>
+    <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Отправить код</button>
+  </form>
+  {% if wall.paths.tg %}<p class="vp-wall-alt">Telegram всё-таки работает? <a class="vp-link" href="{{ wall.urls.tg_screen }}">Подключить Telegram</a></p>{% endif %}
+  <p class="vp-gate-fine">Нажимая кнопку, вы соглашаетесь с <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политикой обработки персональных данных</a>. Галочка – по желанию: без неё на почту приходят только коды.</p>
+
+  {% elif wall.screen == 'known' %}
+  {# 04b: почта уже подтверждена — один клик, без кода. #}
+  <h2 id="vp-wall-h">Продолжить с почтой</h2>
+  {% if wall.note and wall.note.text %}<div class="vp-wall-alert{% if wall.note.kind == 'info' %} is-info{% endif %}" role="alert">{{ wall.note.text }}</div>{% endif %}
+  <div class="vp-wall-ok">
+    <b>Почта уже подтверждена</b>
+    <span><span class="ym-hide-content">{{ wall.email }}</span> – код вводить не нужно.</span>
+  </div>
+  <form method="post" action="{% url 'vp:wall_email' variant.slug %}" class="vp-wall-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="use">
+    {% if wall.wants_mail %}
+    <p class="vp-wall-quiet">Письма о тренажёрах уже приходят на эту почту.</p>
+    {% else %}
+    <label class="vp-wall-check">
+      <input type="checkbox" name="mail_consent">
+      <span>{% include 'legal/_mail_label.html' %}</span>
+    </label>
+    {% endif %}
+    <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Продолжить с этой почтой</button>
+  </form>
+  <p class="vp-wall-alt vp-wall-alt--split">
+    <a class="vp-link" href="{{ wall.urls.other_email }}">Другая почта</a>
+    {% if wall.paths.tg %}<span>Telegram работает? <a class="vp-link" href="{{ wall.urls.tg_screen }}">Подключить</a></span>{% endif %}
+  </p>
+  {% if not wall.wants_mail %}<p class="vp-gate-fine">Галочка – по желанию: без неё на почту приходят только коды.</p>{% endif %}
+
+  {% elif wall.screen == 'code' %}
+  {# 05: код из письма — одно поле; «123 456» = «123456» (check_code). #}
+  <h2 id="vp-wall-h">Введите код из письма</h2>
+  <form method="post" action="{% url 'vp:wall_email' variant.slug %}" class="vp-wall-sent">
+    {% csrf_token %}<input type="hidden" name="action" value="change">
+    Отправили код на <b class="ym-hide-content">{{ wall.pending_email }}</b>. <button type="submit" class="vp-wall-linkbtn">Изменить</button>
+  </form>
+  <form method="post" action="{% url 'vp:wall_email' variant.slug %}" class="vp-wall-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="confirm">
+    <label class="vp-wall-label" for="vp-wall-code">Код из письма</label>
+    <input class="vp-wall-input vp-wall-code ym-disable-keys" type="text" name="code" id="vp-wall-code"
+           inputmode="numeric" autocomplete="one-time-code" maxlength="12" required>
+    {% if wall.note and wall.note.text %}<div class="vp-wall-alert{% if wall.note.kind == 'info' %} is-info{% endif %}" role="alert">{{ wall.note.text }}</div>{% endif %}
+    <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Подтвердить</button>
+  </form>
+  <form method="post" action="{% url 'vp:wall_email' variant.slug %}" class="vp-wall-resend">
+    {% csrf_token %}
+    {% include 'registration/_resend_button.html' with wait=wall.resend_wait btn_class='vp-wall-linkbtn' %}
+  </form>
+  <p class="vp-gate-fine">Письма нет? Загляните в «Спам».</p>
+
+  {% else %}
+  {# 01: Telegram — главный путь. #}
+  <h2 id="vp-wall-h">Подключите Telegram, чтобы начать</h2>
+  <p>Тренажёр бесплатный. Взамен просим подписку на наш канал <a class="vp-link" href="{{ wall.channel_url }}" target="_blank" rel="noopener">@{{ wall.channel }}</a>: там разборы задач и всё про «Высшую пробу».</p>
+  {% if wall.mail_link %}<p class="vp-wall-alt">Telegram не открывается? <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердить почтой</a></p>{% endif %}
+  {% endif %}
+</dialog>
