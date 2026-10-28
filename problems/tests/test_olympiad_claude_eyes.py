@@ -275,6 +275,45 @@ class TailRulesTests(SimpleTestCase):
         self.assertIn('mosh-2011-final-10-v1|10|', removed)
 
 
+class FigureLayerTests(SimpleTestCase):
+    def setUp(self):
+        from PIL import Image
+        self.tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tmp, 'audit_claude'))
+        Image.new('RGB', (1000, 1000), 'white').save(os.path.join(self.tmp, 'x.png'))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def ds(self, figures=()):
+        ds = fake_ds([row('1', src=['f.pdf#p1'], figures=list(figures))])
+        ds.digitized = self.tmp
+        return ds
+
+    def resolved(self, bbox):
+        return {'figures': {'ev|1|#statement': [{'ok': True, 'page_ref': 'f.pdf#p1', 'bbox': bbox,
+                                                 'caption': 'график', 'model': 'm', 'unit': 'u'}]}}
+
+    def test_new_figure_cropped(self):
+        entries, bad = ce.figure_layer(self.ds(), self.resolved([0.1, 0.1, 0.5, 0.5]))
+        self.assertEqual(bad, [])
+        self.assertEqual(entries[0]['value']['path'], 'v7/figures_v7/ev_1_c1.png')
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, 'v7', 'figures_v7', 'ev_1_c1.png')))
+
+    def test_duplicate_of_existing_figure_skipped(self):
+        old = {'page': 1, 'page_dir': 'pages/0123456789abcdef', 'bbox_model': [100, 100, 520, 480]}
+        entries, bad = ce.figure_layer(self.ds([old]), self.resolved([0.1, 0.1, 0.5, 0.5]))
+        self.assertEqual(entries, [])
+        self.assertIn('уже есть', bad[0]['reason'])
+
+    def test_rejected_by_eyes(self):
+        with open(os.path.join(self.tmp, 'audit_claude', 'figures_rejected.txt'), 'w', encoding='utf-8') as h:
+            h.write('ev_1_c1.png  # логотип с заголовком\n')
+        entries, bad = ce.figure_layer(self.ds(), self.resolved([0.1, 0.1, 0.5, 0.5]))
+        self.assertEqual(entries, [])
+        self.assertIn('глазами', bad[0]['reason'])
+
+
 class AnswerEntriesTests(SimpleTestCase):
     def rows(self):
         parts = [{'label': str(i), 'text': 'вариант %d' % i} for i in range(1, 5)]

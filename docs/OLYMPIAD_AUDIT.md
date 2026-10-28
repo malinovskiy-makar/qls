@@ -561,6 +561,74 @@ v2–v5 не меняются. Итог — `digitized\v6\reference_problems_v6.
 ⚠️ **Опечатки оригинала не правим**: «максимизацмию» (mosh-2022-final-9) и «30»
 вместо 50 в таблице vp-2019-final-8 № 3 — так в PDF; эталон — точная расшифровка.
 
+## v7 / v3 — аудит Claude
+
+Ночь 28→29.10.2026, сессия P2, ветка `feat/olympiad-v7`. Claude сверяет
+оцифровку с картинкой каждой страницы PDF и чинит пропуски. Выход — новые
+версии рядом со старыми: экономика ВП и МОШ v6 → **v7**
+(`digitized\v7\reference_problems_v7.jsonl`), финграм / бизнес /
+предпринимательство v2 → **v3** (`digitized\v3\reference_problems_v3.jsonl`).
+Входные версии не трогаются, в базу ничего не пишется.
+
+**Единица аудита — страница** (`problems/olympiad_audit/claude_eyes.py`).
+У задания три группы полей: условие (`title`, `statement_md`, `parts`,
+рисунки) на `source_pages`, решение (`solution_md`, `answer`) на
+`solution_pages`, критерии на `criteria_pages`. Группа проверяется один раз —
+в единице своей первой страницы; следующие страницы группы кладутся в ту же
+единицу (не больше 4). Не влезла — группа только проверяется
+(`editable=false`), правка запрещена. Модели уходит картинка страниц,
+фрагменты JSON и список заданий комплекта (чтобы «есть на странице, нет в
+эталоне» не шумело соседними заданиями).
+
+**Ответ — строго JSON**: по фрагменту `verdict`, `defects` (15 классов,
+`DEFECT_CLASSES`, с дословной цитатой), `fixes` — ПОЛНЫЙ текст исправленных
+полей, `figure_bboxes` (доли страницы), `confidence`.
+
+**Правка принимается только после детерминированных проверок** (`check_unit`):
+каждое число правки есть в слое PDF, в цитатах или в прежнем тексте единицы;
+формулы разбираются KaTeX (node + `static/vendor/katex-0.16.9`); нет «Ответ:»,
+которого нет на странице; поле не урезано вдвое без объясняющего дефекта;
+`confidence ≥ 0,6`; группа редактируема. Иначе — на утро
+(`digitized\vN\review_vN.html`). Слой правок — `claude_vN.json`; правка
+применяется, только если поле не менялось после аудита (sha1 прежнего значения).
+
+**Сведение моделей** (`resolve`): мнение Sonnet сильнее Haiku; правки Haiku без
+второго мнения Sonnet не применяются.
+
+**Хвосты v6** (`tail_rules_econ`, только МОШ): вопрос теста 2012–2014 из
+`title` → в условие перед вариантами (если условие не правил Claude);
+mosh-2011-final-10 «10» — пункт 5 задачи 3: задание убирается, его решение
+становится решением задачи 3, прежнее — в `solution_md_v6`. Ответы к тестам МОШ
+из ключа (`answer_entries`): только для пустого `answer`, вариант обязан
+существовать среди пунктов, цитата — в слое страниц ключа.
+
+**Команды** (настройки — через `DJANGO_SETTINGS_MODULE`, флаг `--settings`
+после подкоманды argparse не пропускает):
+
+```bash
+olympiad_digitize audit-claude --olympiad vp --step units            # единицы → audit_claude\units.jsonl
+olympiad_digitize audit-claude --olympiad vp --step submit --model sonnet --max-usd 55        # план
+olympiad_digitize audit-claude --olympiad vp --step submit --model sonnet --max-usd 55 --yes  # пакеты Batches
+olympiad_digitize audit-claude --olympiad vp --step collect          # забрать, расход → audit_claude_cost.jsonl
+olympiad_digitize audit-claude --olympiad vp --step jobs             # задания для агентов Claude Code
+olympiad_digitize audit-claude --olympiad vp --step check --model sonnet [--import-dir DIR]
+olympiad_digitize audit-claude --olympiad mosh --step build [--answers-dir DIR]
+```
+
+Повторный `submit` не платит за единицы с сырым ответом
+(`audit_claude\raw\<модель>\<единица>.json`); на 90 % `--max-usd` новые пакеты
+не отправляются.
+
+⚠️ **Ключ Anthropic не привязан к рабочему пространству**: без заголовка
+`anthropic-workspace-id` любой вызов — 400, `/v1/organizations/workspaces` —
+403. `make_client()` берёт заголовок из `ANTHROPIC_WORKSPACE_ID` (строку
+`ANTHROPIC_WORKSPACE_ID=wrkspc_…` дописать в `C:\Users\shipu\qls\.env`). В ночь
+28→29.10 из-за этого аудит шёл агентами Claude Code по подписке, а не пакетами.
+⚠️ **Принятая разметка эталона — не дефект**: пункты стоят и в условии, и в
+`parts`; вступление своего раздела в начале условия теста; «(отмечено)» в
+ответах; повтор вопроса пункта в решении. Без этих правил в промпте модель
+«чинила» их и выкидывала вступления разделов (калибровка, промпт v1).
+
 ## Следующая олимпиада
 
 Переиспользуется как есть: `apply_olympiad_audit` целиком (режимы, защиты,

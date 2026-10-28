@@ -1063,8 +1063,7 @@ class Command(BaseCommand):
                             txt = Path(ds.digitized) / f['page_dir'] / f'p{n}.txt'
                             if txt.is_file():
                                 parts.append(txt.read_text(encoding='utf-8', errors='replace'))
-                    key_texts[rep.get('event_id')] = '
-'.join(parts)
+                    key_texts[rep.get('event_id')] = '\n'.join(parts)
                 answers, answer_rejected = claude_eyes.answer_entries(ds.rows, replies, key_texts)
                 self._say(f'Ответы к тестам: принято {len(answers)}, отклонено {len(answer_rejected)}')
                 for ev, num, why in answer_rejected:

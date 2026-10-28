@@ -954,11 +954,37 @@ def answer_entries(rows, replies, key_texts, min_confidence=MIN_CONFIDENCE):
 
 # ── Сборка версии ────────────────────────────────────────────────────────
 
+def _same_figure(old, page_item, bbox, min_iou=0.3):
+    """Уже вырезанный рисунок той же страницы с заметным пересечением рамок.
+    У прежних рисунков рамка `bbox_model` — в тысячных долях страницы."""
+    if not isinstance(old, dict) or old.get('page') != page_item['page'] \
+            or old.get('page_dir') != page_item['page_dir'] or not old.get('bbox_model'):
+        return False
+    try:
+        a = [float(v) / 1000 for v in old['bbox_model']]
+        b = [float(v) for v in bbox]
+    except (TypeError, ValueError):
+        return False
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return union > 0 and inter / union >= min_iou
+
+
 def figure_layer(ds, resolved):
     """Принятые рамки рисунков → вырезки `<vN>/figures_<vN>/` и записи слоя.
     Возвращает (записи слоя, плохие рамки для утра)."""
     entries, bad = [], []
     version = ds.out_version
+    # Вырезки, забракованные при просмотре контактного листа глазами (имя файла в строке).
+    rejected_path = os.path.join(ds.audit_dir, 'figures_rejected.txt')
+    eyes_bad = set()
+    if os.path.exists(rejected_path):
+        with open(rejected_path, encoding='utf-8') as handle:
+            eyes_bad = {line.split('#')[0].strip() for line in handle if line.split('#')[0].strip()}
+    existing = {task_key(r): (r.get('figures') or []) + (r.get('solution_figures') or [])
+                for r in ds.rows}
     for fid, figs in sorted(resolved['figures'].items()):
         key, group = fid.split('#')
         n = 0
@@ -971,6 +997,13 @@ def figure_layer(ds, resolved):
             name = '%s_%s%s_c%d%s.png' % (ev, re.sub(r'[^\w-]', '_', num), ('_' + var) if var else '',
                                           n, 's' if group == 'solution' else '')
             rel = '%s/figures_%s/%s' % (version, version, name)
+            if name in eyes_bad:
+                bad.append(dict(fig, fid=fid, reason='вырезка забракована при просмотре глазами'))
+                continue
+            item = ds.manifest[fig['page_ref']]
+            if any(_same_figure(old, item, fig['bbox']) for old in existing.get(key, [])):
+                bad.append(dict(fig, fid=fid, reason='такой рисунок уже есть в эталоне'))
+                continue
             size = crop_figure(ds.png(fig['page_ref']), fig['bbox'], os.path.join(ds.digitized, rel))
             if size is None:
                 bad.append(dict(fig, fid=fid, reason='вырезка не удалась'))
