@@ -375,6 +375,22 @@ def parse_reply(text):
         if isinstance(data, dict) and isinstance(data.get('tasks'), list):
             data.setdefault('unlisted', [])
             return data
+    # Несколько объектов подряд (модель поправила себя вторым JSON) или рассуждение
+    # с фигурными скобками перед ответом: берём ПОСЛЕДНИЙ целый объект со списком tasks.
+    decoder, found = json.JSONDecoder(), None
+    pos = body.find('{')
+    while pos != -1:
+        try:
+            data, end = decoder.raw_decode(body, pos)
+        except ValueError:
+            pos = body.find('{', pos + 1)
+            continue
+        if isinstance(data, dict) and isinstance(data.get('tasks'), list):
+            found = data
+        pos = body.find('{', end)
+    if found is not None:
+        found.setdefault('unlisted', [])
+        return found
     return {'tasks': [], 'unlisted': [], '_parse_error': 'не JSON со списком tasks'}
 
 

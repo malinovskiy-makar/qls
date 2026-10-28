@@ -43,6 +43,15 @@ class ParseReplyTests(SimpleTestCase):
         self.assertEqual(data['tasks'], [])
         self.assertNotIn('_parse_error', data)
 
+    def test_last_object_wins_and_braces_in_prose(self):
+        data = ce.parse_reply('{"tasks": [{"fid": "a", "verdict": "needs_fix"}], "unlisted": []}\n\n'
+                              'Постойте, я ошибся. Исправленный ответ:\n\n'
+                              '{"tasks": [{"fid": "a", "verdict": "ok"}], "unlisted": []}')
+        self.assertEqual(data['tasks'][0]['verdict'], 'ok')
+        data = ce.parse_reply('Формула {x} верна.\n{"tasks": [{"fid": "b"}]}')
+        self.assertEqual(data['tasks'][0]['fid'], 'b')
+        self.assertNotIn('_parse_error', data)
+
     def test_garbage_and_wrong_shape(self):
         self.assertIn('_parse_error', ce.parse_reply('не json'))
         self.assertIn('_parse_error', ce.parse_reply('{"blocks": []}'))
@@ -153,9 +162,14 @@ class CropTests(SimpleTestCase):
         size = ce.crop_figure(self.png, [0.0, 0.0, 0.5, 0.5], os.path.join(self.tmp, 'c2.png'),
                               margin=0.05)
         self.assertEqual(size, (550, 1100))
+        # У правого нижнего края поле тоже прижимается к странице.
+        size = ce.crop_figure(self.png, [0.5, 0.5, 1.0, 1.0], os.path.join(self.tmp, 'c4.png'),
+                              margin=0.05)
+        self.assertEqual(size, (550, 1100))
 
     def test_bad_bbox(self):
-        for bbox in ([0.5, 0.2, 0.4, 0.4], [0, 0, 1, 1], [0.1, 0.1, 0.11, 0.11], 'x', [1, 2]):
+        for bbox in ([0.5, 0.2, 0.4, 0.4], [0, 0, 1, 1], [0.1, 0.1, 0.11, 0.11], 'x', [1, 2],
+                     [-0.1, 0.2, 0.3, 0.5], [0.8, 0.2, 1.2, 0.5]):
             self.assertIsNone(ce.crop_figure(self.png, bbox, os.path.join(self.tmp, 'c3.png')))
 
     def test_contact_sheet(self):
@@ -364,7 +378,9 @@ class JobAndRawTests(SimpleTestCase):
         self.assertIn('ev|1|#statement', open(path, encoding='utf-8').read())
         self.assertIsNone(ce.load_raw(ds, 'claude-sonnet-5-5', unit['unit']))
         ce.save_raw(ds, 'claude-sonnet-5-5', unit['unit'], json.dumps({'tasks': []}), 'agent')
-        self.assertEqual(ce.load_raw(ds, 'claude-sonnet-5-5', unit['unit'])['source'], 'agent')
+        raw = ce.load_raw(ds, 'claude-sonnet-5-5', unit['unit'])
+        self.assertEqual(raw['source'], 'agent')
+        self.assertEqual(raw['text'], json.dumps({'tasks': []}))
 
     def test_custom_id_safe(self):
         self.assertEqual(ce.custom_id('vp_abc_p1'), 'vp_abc_p1')
