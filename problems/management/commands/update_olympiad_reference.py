@@ -16,6 +16,11 @@
 привязаны подсказки). Перед изменением — снимок в `ProblemVersion`. Журнал;
 откат возвращает поле, если его с тех пор не меняли.
 
+Решения людей (`reference_overrides.jsonl` олимпиады, `olympiad_review apply`)
+накладываются на ОБЕ сборки — старую и новую: задача, заведённая с правкой
+человека, не считается «изменённой руками», а правка не затирается новой
+версией эталона (`--overrides`, `--no-overrides`).
+
 Заголовок: заглушку импорта к этому времени мог заменить `import_reference_titles`
 — тогда заголовок не трогается (это не «равно старой сборке»).
 """
@@ -34,6 +39,8 @@ from problems.models import Problem, ProblemFigure, ProblemPart, ProblemVersion,
 from problems.olympiad_audit import bank_match, registry
 from problems.olympiad_audit import reference_import as ri
 from problems.olympiad_official import read_jsonl
+from problems.olympiad_review import overrides as ov_rules
+from problems.olympiad_review.common import overrides_path
 
 APPROVAL_FLAG = '--yes-i-have-owner-approval'
 FIELDS = ('title', 'statement', 'answer', 'solution', 'problem_type')
@@ -54,6 +61,8 @@ class Command(BaseCommand):
         parser.add_argument('--old-digitized')
         parser.add_argument('--new-digitized')
         parser.add_argument('--out-dir')
+        parser.add_argument('--overrides', metavar='JSONL')
+        parser.add_argument('--no-overrides', action='store_true')
         parser.add_argument('--rollback', metavar='JOURNAL')
         parser.add_argument('--apply', action='store_true')
         parser.add_argument(APPROVAL_FLAG, dest='approved', action='store_true')
@@ -69,6 +78,8 @@ class Command(BaseCommand):
         short = registry.short_name(entry.slug)
         old_dig = o['old_digitized'] or os.path.dirname(os.path.abspath(o['old']))
         new_dig = o['new_digitized'] or os.path.dirname(os.path.abspath(o['new']))
+        ov_path = '' if o['no_overrides'] else (o['overrides'] or str(overrides_path(entry.slug)))
+        overrides = ov_rules.load(ov_path) if ov_path else {}
         old_rows = {bank_match.row_key(r): r for r in read_jsonl(o['old'])}
         new_rows = {bank_match.row_key(r): r for r in read_jsonl(o['new'])}
         ids = set()
@@ -89,6 +100,9 @@ class Command(BaseCommand):
                 continue
             of = ri.build_fields(old_rows[key], digitized_dir=old_dig, url_map=ri.UrlMap(), olympiad_short=short)
             nf = ri.build_fields(new_rows[key], digitized_dir=new_dig, url_map=ri.UrlMap(), olympiad_short=short)
+            if overrides.get(key, {}).get('fields'):
+                ov_rules.apply_fields(of, overrides[key])
+                ov_rules.apply_fields(nf, overrides[key])
             problem = Problem.objects.get(pk=pid)
             change = {'id': pid, 'key': key, 'fields': {}, 'parts': None, 'new_fields': nf}
             for field in FIELDS:
@@ -126,6 +140,7 @@ class Command(BaseCommand):
         journal = {'command': 'update_olympiad_reference', 'olympiad': entry.slug,
                    'applied': bool(o['apply']), 'old': o['old'], 'new': o['new'],
                    'at': datetime.now().isoformat(timespec='seconds'), 'conflicts': conflicts,
+                   'overrides': ov_path if overrides else '', 'overrides_keys': len(overrides),
                    'changes': []}
         if o['apply']:
             for c in plan:

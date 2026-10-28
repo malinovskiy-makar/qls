@@ -73,6 +73,7 @@ from problems.models import (
 )
 from problems.olympiad_audit import bank_match, registry
 from problems.olympiad_audit import reference_import as ri
+from problems.olympiad_review import overrides as ov_rules
 from problems.olympiad_grades import parse_grades
 from problems.olympiad_official import (
     OLYMPIAD_NAMES, bank_academic_year, markup_free_key, read_jsonl, variant_of,
@@ -139,6 +140,11 @@ class Command(BaseCommand):
                             help='не запускать KaTeX-проверку (только тесты/отладка)')
         parser.add_argument('--decisions', metavar='JSON',
                             help='разметка пар (link_review_decisions.json): link/new/skip')
+        parser.add_argument('--overrides', metavar='JSONL',
+                            help='решения людей по строкам эталона (reference_overrides.jsonl); '
+                                 'по умолчанию — файл в папке аудита олимпиады, если он есть')
+        parser.add_argument('--no-overrides', action='store_true',
+                            help='не учитывать reference_overrides.jsonl')
         parser.add_argument('--as-slug', metavar='SLUG', choices=sorted(registry.REGISTRY),
                             help='писать строки OlympiadRef под этим слагом (исходная '
                                  'олимпиада — в raw_meta.original_olympiad)')
@@ -158,6 +164,11 @@ class Command(BaseCommand):
         #: Слаг строк OlympiadRef: свой или `--as-slug` (решение 14.10 про МОШ-предпринимательство).
         self.write_slug = options.get('as_slug') or self.slug
         self.decisions = self._load_decisions(options.get('decisions'))
+        self.overrides_path, self.overrides = self._load_overrides(options)
+        for key, ov in self.overrides.items():
+            decision = ov_rules.as_import_decision(ov)
+            if decision:
+                self.decisions[key] = decision      # решение человека сильнее судьи
         if self.apply and not options['approved']:
             raise CommandError(f'--apply требует {APPROVAL_FLAG}. Ничего не записано.')
         if options['rollback']:
@@ -197,7 +208,8 @@ class Command(BaseCommand):
                        'reference': os.path.abspath(ref_path) if self.reference else '',
                        'bundle': self._bundle(), 'database': str(settings.DATABASES['default']['NAME']),
                        'write_slug': self.write_slug,
-                       'decisions': os.path.abspath(options['decisions']) if options.get('decisions') else ''}
+                       'decisions': os.path.abspath(options['decisions']) if options.get('decisions') else '',
+                       'overrides': self.overrides_path, 'overrides_keys': len(self.overrides)}
 
         plan = self._plan(rows)
         if not options['no_katex']:
@@ -216,6 +228,29 @@ class Command(BaseCommand):
 
     def _bundle(self):
         return f'auto_import_{self.slug}_{self.options["bundle_date"]}'
+
+    def _load_overrides(self, options):
+        """reference_overrides.jsonl олимпиады (решения людей, `olympiad_review apply`)."""
+        if options.get('no_overrides'):
+            return '', {}
+        path = options.get('overrides')
+        if not path:
+            from problems.olympiad_review.common import overrides_path
+            path = str(overrides_path(self.slug))
+            if not os.path.isfile(path):
+                return '', {}
+        elif not os.path.isfile(path):
+            raise CommandError(f'Нет файла --overrides: {path}')
+        return os.path.abspath(path), ov_rules.load(path)
+
+    def _build(self, row):
+        """Поля новой задачи из строки эталона + правка человека, если она есть."""
+        fields = ri.build_fields(row, digitized_dir=self.digitized, url_map=self.url_map,
+                                 olympiad_short=registry.short_name(self.slug))
+        ov = self.overrides.get(bank_match.row_key(row))
+        if ov and ov.get('fields'):
+            ov_rules.apply_fields(fields, ov)
+        return fields
 
     @staticmethod
     def _load_decisions(path):
@@ -318,7 +353,7 @@ class Command(BaseCommand):
             if any('служебн' in f for f in row.get('auto_publish_fail') or []):
                 self._set(item, 'skip', 'служебный блок')
                 continue
-            if row.get('needs_eyes'):
+            if row.get('needs_eyes') and not ov_rules.reviewed(self.overrides.get(key)):
                 self._set(item, 'skip', 'needs_eyes — страница на глаза, не пишется')
                 continue
             owner = taken.get((row['event_id'], str(row['number']), variant))
@@ -338,8 +373,7 @@ class Command(BaseCommand):
             elif score >= ri.DOUBT_THRESHOLD:
                 self._set(item, 'review', f'сомнительное сходство {score:.2f} (0,80–0,90)')
             else:
-                item['fields'] = ri.build_fields(row, digitized_dir=self.digitized,
-                                                 url_map=self.url_map, olympiad_short=short)
+                item['fields'] = self._build(row)
                 twin = self._twin_of(row, creates)
                 if twin:
                     self._set(item, 'twin', f'близнец задания {twin["key"]} (тот же текст '
@@ -438,8 +472,7 @@ class Command(BaseCommand):
             self._set(item, 'skip', f'разметка ({who}): не заводить')
             return
         if decision['decision'] == 'new':
-            item['fields'] = ri.build_fields(row, digitized_dir=self.digitized,
-                                             url_map=self.url_map, olympiad_short=short)
+            item['fields'] = self._build(row)
             twin = self._twin_of(row, creates)
             if twin:
                 self._set(item, 'twin', f'разметка ({who}): другая задача; близнец {twin["key"]}')
@@ -467,8 +500,7 @@ class Command(BaseCommand):
             self._set(item, 'link', f'разметка ({who}): та же задача; задача уже привязана '
                                     'к этому туру — номер в kit_numbers')
             item['fill'], item['fill_skipped'] = {}, ['пара (задача, тур) уже есть — не дописываю']
-            item['fields'] = ri.build_fields(row, digitized_dir=self.digitized,
-                                             url_map=self.url_map, olympiad_short=short)
+            item['fields'] = self._build(row)
             return
         linked_pairs[(pid, event_id)] = item
         self._set(item, 'link', f'разметка ({who}): та же задача')
@@ -481,8 +513,7 @@ class Command(BaseCommand):
         задача банка — комплект или кусок, и ответ одного задания ей чужой.
         Только у markdown-задач: plain покажет разметку эталона буквально."""
         fills, skipped = {}, []
-        fields = ri.build_fields(row, digitized_dir=self.digitized, url_map=self.url_map,
-                                 olympiad_short=registry.short_name(self.slug))
+        fields = self._build(row)
         item['fields'] = fields
         new = {'answer': (row.get('answer') and ri.adapt_markup(row['answer'])[0].strip()) or '',
                'solution': fields['solution']}
@@ -555,6 +586,13 @@ class Command(BaseCommand):
                 continue
             row = item['row']
             ok, why = ri.auto_publish_of(row)
+            ov = self.overrides.get(item['key'])
+            if ov_rules.reviewed(ov):
+                # Страницу посмотрел человек: «на глаза» больше не причина скрывать.
+                why = [w for w in why if not w.startswith('needs_eyes')]
+                ok = not why
+            if ov and ov.get('action') == 'hide':
+                why.append(f'люди ({ov.get("reviewer") or "?"}): скрыть до доработки текста')
             if item.get('katex_errors'):
                 why.append(f'KaTeX новых текстов: {item["katex_errors"]} пол. с ошибкой')
             for fig in item['fields']['figures']:
