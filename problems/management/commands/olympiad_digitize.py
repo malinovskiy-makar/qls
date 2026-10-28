@@ -63,6 +63,15 @@
         (страницы заданий к импорту ниже автопроверки) к судье; judge
         --only-control — сначала только выборка контроля B/C.
 
+    audit-claude --olympiad X --step units|jobs|submit|collect|check|build [--model sonnet|haiku] …
+        аудит «глазами Claude» (problems/olympiad_audit/claude_eyes.py): единица —
+        страница PDF + фрагменты заданий с неё; ответы — Message Batches API
+        (submit/collect: без --yes только план, --max-usd обязателен, заголовок
+        пространства из ANTHROPIC_WORKSPACE_ID; готовое повторно не оплачивается)
+        или файлы агентов (jobs, check --import-dir); check — детерминированные
+        проверки ответов; build — эталон v7 (экономика) / v3 (финграм, бизнес,
+        предпринимательство) в digitized\\vN\\, вход не трогается.
+
 Корень данных: `--data-root`, иначе переменная `OLYMPIAD_DATA_ROOT`,
 иначе `<родитель BASE_DIR>\\weconomics-data\\olympiads`.
 
@@ -84,8 +93,9 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from problems.olympiad_audit import (assemble, digitize, fixes, judge, max_score, registry,
-                                     reread_queue, review_pack, sweeps, transcribe, triage)
+from problems.olympiad_audit import (assemble, claude_eyes, digitize, fixes, judge, max_score,
+                                     registry, reread_queue, review_pack, sweeps, transcribe,
+                                     triage)
 
 #: Подкоманда → метод. `transcribe` и `assemble` допишутся сюда же.
 _SUBCOMMANDS = {
@@ -104,6 +114,7 @@ _SUBCOMMANDS = {
     'sweeps': '_sweeps',
     'reread-queue': '_reread_queue',
     'max-score': '_max_score',
+    'audit-claude': '_audit_claude',
 }
 
 PROGRESS_EVERY_PAGES = 100
@@ -262,6 +273,23 @@ class Command(BaseCommand):
         rq.add_argument('--cap-usd', type=float, default=5.0,
                         help='Бюджет приоритетов 1+2 по $0,006 за страницу.')
         rq.add_argument('--out', dest='out_file', metavar='F')
+        ac = common(sub.add_parser('audit-claude', help='Аудит страниц «глазами Claude» → v7 / v3.'))
+        ac.add_argument('--step', required=True,
+                        choices=('units', 'jobs', 'submit', 'collect', 'check', 'build'))
+        ac.add_argument('--model', default='sonnet', choices=sorted(claude_eyes.MODEL_ALIASES))
+        ac.add_argument('--units-file', metavar='F',
+                        help='Только эти единицы (id по строке; по умолчанию — все).')
+        ac.add_argument('--jobs-dir', metavar='DIR', help='Куда писать задания для агентов (jobs).')
+        ac.add_argument('--import-dir', metavar='DIR',
+                        help='check: сначала принять ответы агентов из DIR\\<модель>\\<единица>.json.')
+        ac.add_argument('--max-usd', type=float,
+                        help='Потолок денег (submit); на 90 %% новые пакеты не отправляются.')
+        ac.add_argument('--ledger', metavar='F',
+                        help='Журнал расхода (по умолчанию <корень>\\audit_claude_cost.jsonl).')
+        ac.add_argument('--review', metavar='F', help='build: куда писать страницу нерешённого.')
+        ac.add_argument('--answers-dir', metavar='DIR',
+                        help='build: ответы к тестам из ключа (<комплект>.json), только для пустых answer.')
+        ac.add_argument('--yes', action='store_true', help='submit: действительно отправить (деньги).')
 
     # ── Вход ────────────────────────────────────────────────────────────
 
@@ -949,3 +977,109 @@ class Command(BaseCommand):
         by = Counter((r['set'], r['priority']) for r in rows)
         self._say(f'Очередь перечитывания {version} → {out}: строк {len(rows)}; '
                   + '; '.join(f'{s} p{p}: {n}' for (s, p), n in sorted(by.items())))
+
+    # ── audit-claude ────────────────────────────────────────────────────
+
+    def _audit_claude(self, options):
+        set_of_slug = {v[0]: k for k, v in claude_eyes.SETS.items()}
+        name = set_of_slug.get(self.olympiad.slug)
+        if name is None:
+            raise CommandError(f'audit-claude не знает олимпиаду {self.olympiad.slug}.')
+        dirs = {v[0]: registry.get(v[0]).audit_dir for v in claude_eyes.SETS.values()}
+        ds = claude_eyes.load_set(name, str(self.root), dirs)
+        all_units, skipped = claude_eyes.build_units(ds)
+        units = all_units
+        if options.get('units_file'):
+            with open(options['units_file'], encoding='utf-8') as handle:
+                wanted = {line.strip() for line in handle if line.strip()}
+            units = {k: v for k, v in all_units.items() if k in wanted}
+        model = claude_eyes.MODEL_ALIASES[options['model']]
+        ledger = options.get('ledger') or str(self.root / 'audit_claude_cost.jsonl')
+        step = options['step']
+        audit_dir = Path(ds.audit_dir)
+        if step == 'units':
+            claude_eyes.write_jsonl(str(audit_dir / 'units.jsonl'), list(units.values()))
+            pages = Counter(len(u['pages']) for u in units.values())
+            self._say(f'{name}: единиц {len(units)}, фрагментов '
+                      f'{sum(len(u["fragments"]) for u in units.values())}, страниц в единице '
+                      f'{dict(sorted(pages.items()))}, пропущено групп {len(skipped)} '
+                      f'→ {audit_dir / "units.jsonl"}')
+        elif step == 'jobs':
+            out = options.get('jobs_dir') or str(audit_dir / 'jobs')
+            for unit in units.values():
+                claude_eyes.write_job(unit, ds, out)
+            self._say(f'{name}: заданий для агентов {len(units)} → {out}')
+        elif step == 'submit':
+            cap = options.get('max_usd')
+            if cap is None:
+                raise CommandError('--max-usd обязателен для submit. Ничего не отправлено.')
+            todo = [u for u in units.values() if claude_eyes.load_raw(ds, model, u['unit']) is None]
+            spent = claude_eyes.spent(ledger)
+            self._say(f'{name}: к отправке {len(todo)} единиц на {model}; потрачено '
+                      f'${spent:.2f} из ${cap:.2f}.')
+            if not options.get('yes'):
+                self._say('Без --yes — только план. Ничего не отправлено.')
+                return
+            if spent >= 0.9 * cap:
+                raise CommandError('Потрачено 90 % потолка — новые пакеты не отправляются.')
+            sent = claude_eyes.submit_batches(claude_eyes.make_client(), ds, todo, model)
+            self._say(f'Отправлено пакетов: {len(sent)}: {", ".join(sent)}')
+        elif step == 'collect':
+            done, waiting = claude_eyes.collect_batches(claude_eyes.make_client(), ds, ledger)
+            self._say(f'{name}: собрано ответов {done}, пакетов в работе {waiting}; '
+                      f'потрачено всего ${claude_eyes.spent(ledger):.2f}')
+        elif step == 'check':
+            if options.get('import_dir'):
+                src = Path(options['import_dir']) / model
+                got = 0
+                for uid in units:
+                    path = src / f'{uid}.json'
+                    if path.is_file() and claude_eyes.load_raw(ds, model, uid) is None:
+                        claude_eyes.save_raw(ds, model, uid, path.read_text(encoding='utf-8'), 'agent')
+                        got += 1
+                self._say(f'Принято ответов агентов: {got}')
+            recs = claude_eyes.check_set(ds, model, all_units)
+            acc = sum(len(r['accepted']) for r in recs)
+            rej = sum(len(r['rejected']) for r in recs)
+            nfix = sum(1 for r in recs for v in r['verdicts'].values() if v.get('verdict') == 'needs_fix')
+            self._say(f'{name} · {model}: единиц с ответом {len(recs)}, needs_fix {nfix}, '
+                      f'правок принято {acc}, отклонено {rej}')
+        elif step == 'build':
+            checked = {m: claude_eyes.load_checked(ds, m) for m in claude_eyes.BATCH_PRICES}
+            resolved = claude_eyes.resolve(checked)
+            audited = len({r['unit'] for recs in checked.values() for r in recs})
+            answers, answer_rejected = [], []
+            if options.get('answers_dir'):
+                replies = [json.loads(p.read_text(encoding='utf-8'))
+                           for p in sorted(Path(options['answers_dir']).glob('*.json'))]
+                events = {json.loads(line)['event_id']: json.loads(line)
+                          for line in open(Path(ds.digitized) / 'events_files.jsonl', encoding='utf-8')}
+                key_texts = {}
+                for rep in replies:
+                    ev = events.get(rep.get('event_id'), {})
+                    parts = []
+                    for f in ev.get('solution_files', []) + ev.get('task_files', []):
+                        for n in range(1, f.get('pages', 0) + 1):
+                            txt = Path(ds.digitized) / f['page_dir'] / f'p{n}.txt'
+                            if txt.is_file():
+                                parts.append(txt.read_text(encoding='utf-8', errors='replace'))
+                    key_texts[rep.get('event_id')] = '
+'.join(parts)
+                answers, answer_rejected = claude_eyes.answer_entries(ds.rows, replies, key_texts)
+                self._say(f'Ответы к тестам: принято {len(answers)}, отклонено {len(answer_rejected)}')
+                for ev, num, why in answer_rejected:
+                    self._say(f'  отказ {ev} {num}: {why}')
+            result = claude_eyes.build_version(ds, resolved, audited, answers=answers)
+            claude_eyes.changes_md(ds, result, resolved,
+                                   f'{name}: {ds.in_version} → {ds.out_version}, аудит Claude')
+            items = claude_eyes.morning_items(ds, resolved, result, all_units)
+            review = options.get('review') or str(Path(result['path']).parent /
+                                                  f'review_{ds.out_version}.html')
+            claude_eyes.review_html(items, review, f'{name} {ds.out_version}: на утро')
+            inv = result['invariants']
+            self._say(f'{name}: {inv["tasks_in"]} → {inv["tasks_out"]} заданий, правок '
+                      f'{len(result["texts"])}, рисунков {len(result["figures"])}, на утро '
+                      f'{len(items)}; инварианты {"сошлись" if inv["ok"] else "НЕ СОШЛИСЬ"} '
+                      f'→ {result["path"]}')
+            if not inv['ok']:
+                raise CommandError(f'Инварианты не сошлись: {Path(result["path"]).parent}')
