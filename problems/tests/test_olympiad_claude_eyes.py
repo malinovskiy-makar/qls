@@ -64,6 +64,10 @@ class ParseReplyTests(SimpleTestCase):
 
 
 class NumbersTests(SimpleTestCase):
+    def test_option_label_not_glued_to_value(self):
+        parts = [{'label': '2', 'text': '500;'}, {'label': '3', 'text': '700;'}]
+        self.assertEqual(ce.numbers(ce.field_text(parts)), {'2', '500', '3', '700'})
+
     def test_thousands_and_decimal(self):
         self.assertEqual(ce.numbers('выручка 1 000 000 руб.'), {'1000000'})
         self.assertEqual(ce.numbers('$1\\,500$'), {'1500'})

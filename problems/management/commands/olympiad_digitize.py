@@ -71,6 +71,10 @@
         или файлы агентов (jobs, check --import-dir); check — детерминированные
         проверки ответов; build — эталон v7 (экономика) / v3 (финграм, бизнес,
         предпринимательство) в digitized\\vN\\, вход не трогается.
+        recheck-submit|recheck-collect|recheck-build — второй проход очереди
+        «на утро» в Claude Opus 5.5 (problems/olympiad_audit/claude_recheck.py):
+        решение только при уверенности ≥ 0,9 и с цитатой со страницы; выход —
+        v7.1 / v3.1 рядом с v7 / v3 (они не перезаписываются).
 
 Корень данных: `--data-root`, иначе переменная `OLYMPIAD_DATA_ROOT`,
 иначе `<родитель BASE_DIR>\\weconomics-data\\olympiads`.
@@ -93,9 +97,9 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from problems.olympiad_audit import (assemble, claude_eyes, digitize, fixes, judge, max_score,
-                                     registry, reread_queue, review_pack, sweeps, transcribe,
-                                     triage)
+from problems.olympiad_audit import (assemble, claude_eyes, claude_recheck, digitize, fixes, judge,
+                                     max_score, registry, reread_queue, review_pack, sweeps,
+                                     transcribe, triage)
 
 #: Подкоманда → метод. `transcribe` и `assemble` допишутся сюда же.
 _SUBCOMMANDS = {
@@ -275,7 +279,8 @@ class Command(BaseCommand):
         rq.add_argument('--out', dest='out_file', metavar='F')
         ac = common(sub.add_parser('audit-claude', help='Аудит страниц «глазами Claude» → v7 / v3.'))
         ac.add_argument('--step', required=True,
-                        choices=('units', 'jobs', 'submit', 'collect', 'check', 'build'))
+                        choices=('units', 'jobs', 'submit', 'collect', 'check', 'build',
+                                 'recheck-submit', 'recheck-collect', 'recheck-build'))
         ac.add_argument('--model', default='sonnet', choices=sorted(claude_eyes.MODEL_ALIASES))
         ac.add_argument('--units-file', metavar='F',
                         help='Только эти единицы (id по строке; по умолчанию — все).')
@@ -290,6 +295,9 @@ class Command(BaseCommand):
         ac.add_argument('--answers-dir', metavar='DIR',
                         help='build: ответы к тестам из ключа (<комплект>.json), только для пустых answer.')
         ac.add_argument('--yes', action='store_true', help='submit: действительно отправить (деньги).')
+        ac.add_argument('--limit', type=int, help='recheck-submit: не больше N единиц (проба).')
+        ac.add_argument('--effort', default='medium', choices=('low', 'medium', 'high'),
+                        help='recheck-submit: effort Opus (по умолчанию medium).')
 
     # ── Вход ────────────────────────────────────────────────────────────
 
@@ -986,6 +994,8 @@ class Command(BaseCommand):
         if name is None:
             raise CommandError(f'audit-claude не знает олимпиаду {self.olympiad.slug}.')
         dirs = {v[0]: registry.get(v[0]).audit_dir for v in claude_eyes.SETS.values()}
+        if options['step'].startswith('recheck-'):
+            return self._audit_recheck(name, dirs, options)
         ds = claude_eyes.load_set(name, str(self.root), dirs)
         all_units, skipped = claude_eyes.build_units(ds)
         units = all_units
@@ -1080,6 +1090,61 @@ class Command(BaseCommand):
             self._say(f'{name}: {inv["tasks_in"]} → {inv["tasks_out"]} заданий, правок '
                       f'{len(result["texts"])}, рисунков {len(result["figures"])}, на утро '
                       f'{len(items)}; инварианты {"сошлись" if inv["ok"] else "НЕ СОШЛИСЬ"} '
+                      f'→ {result["path"]}')
+            if not inv['ok']:
+                raise CommandError(f'Инварианты не сошлись: {Path(result["path"]).parent}')
+
+    def _audit_recheck(self, name, dirs, options):
+        """Второй проход очереди «на утро» (Opus): vN → vN.1, см. claude_recheck."""
+        ds, items = claude_recheck.load_version(name, str(self.root), dirs)
+        sonnet_units = {r['unit'] for r in claude_eyes.load_checked(ds, 'claude-sonnet-5-5')}
+        plan = claude_recheck.Plan(ds, items, sonnet_units)
+        model = claude_recheck.MODEL
+        ledger = options.get('ledger') or str(self.root / 'audit_claude_recheck_cost.jsonl')
+        step = options['step']
+        if step == 'recheck-submit':
+            cap = options.get('max_usd')
+            if cap is None:
+                raise CommandError('--max-usd обязателен для recheck-submit. Ничего не отправлено.')
+            todo = [uid for uid in plan.by_unit
+                    if uid in plan.units and claude_eyes.load_raw(ds, model, uid) is None]
+            if options.get('limit'):
+                todo = todo[:options['limit']]
+            spent = claude_eyes.spent(ledger)
+            self._say(f'{name} {ds.in_version}: в очереди {len(items)}, закрыто без модели '
+                      f'{len(plan.closed)}, к модели {len(plan.todo)} позиций в {len(plan.by_unit)} '
+                      f'единицах; к отправке {len(todo)} единиц на {model} (effort '
+                      f'{options["effort"]}); потрачено ${spent:.2f} из ${cap:.2f}.')
+            if not options.get('yes'):
+                self._say('Без --yes — только план. Ничего не отправлено.')
+                return
+            if spent >= 0.9 * cap:
+                raise CommandError('Потрачено 90 % потолка — новые пакеты не отправляются.')
+            effort = options['effort']
+            sent = claude_eyes.submit_batches(
+                claude_eyes.make_client(), ds, [{'unit': uid} for uid in todo], model,
+                params=lambda u: plan.params(u['unit'], effort))
+            self._say(f'Отправлено пакетов: {len(sent)}: {", ".join(sent)}')
+        elif step == 'recheck-collect':
+            done, waiting = claude_eyes.collect_batches(claude_eyes.make_client(), ds, ledger)
+            self._say(f'{name}: собрано ответов {done}, пакетов в работе {waiting}; '
+                      f'потрачено на второй проход ${claude_eyes.spent(ledger):.2f}')
+        elif step == 'recheck-build':
+            results = []
+            for uid in plan.by_unit:
+                raw = claude_eyes.load_raw(ds, model, uid) if uid in plan.units else None
+                if raw is None:
+                    results += [(item, {'resolution': 'queue', 'reasons': ['второй проход не дошёл']})
+                                for item in plan.by_unit[uid]]
+                else:
+                    results += claude_recheck.check_unit_reply(plan, uid, raw.get('text'))
+            result = claude_recheck.build(ds, results, plan.closed)
+            inv = result['invariants']
+            got = Counter(d['resolution'] for d in result['done'])
+            self._say(f'{name}: {ds.in_version} → {ds.out_version}: очередь {inv["queue_in"]} → '
+                      f'{inv["queue_out"]} (исправлено {got["fixed"]}, рисунков {got["figure"]}, '
+                      f'закрыто {got["closed"]}); правок полей {len(result["texts"])}, рисунков '
+                      f'{len(result["figures"])}; инварианты {"сошлись" if inv["ok"] else "НЕ СОШЛИСЬ"} '
                       f'→ {result["path"]}')
             if not inv['ok']:
                 raise CommandError(f'Инварианты не сошлись: {Path(result["path"]).parent}')

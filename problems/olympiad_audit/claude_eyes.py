@@ -87,6 +87,8 @@ FIX_FIELDS = {name: fields for name, (_, fields) in GROUPS.items()}
 BATCH_PRICES = {
     'claude-sonnet-5-5': (1.00, 1.25, 0.05, 5.00),
     'claude-haiku-5-5': (0.05, 0.0625, 0.005, 0.25),
+    # второй проход очереди «на утро» (claude_recheck)
+    'claude-opus-5-5': (2.00, 2.50, 0.10, 10.00),
 }
 MODEL_ALIASES = {'sonnet': 'claude-sonnet-5-5', 'haiku': 'claude-haiku-5-5'}
 
@@ -412,8 +414,10 @@ def numbers(text):
 
 
 def field_text(value):
+    # Метка пункта и текст — через табуляцию: через пробел `numbers` склеил бы
+    # «2» + «500» в «2 500» → чужое число 2500.
     if isinstance(value, list):
-        return '\n'.join('%s %s' % (p.get('label', ''), p.get('text', ''))
+        return '\n'.join('%s\t%s' % (p.get('label', ''), p.get('text', ''))
                          for p in value if isinstance(p, dict))
     return value if isinstance(value, str) else ''
 
@@ -641,9 +645,10 @@ def custom_id(uid):
     return clean
 
 
-def submit_batches(client, ds, units, model, chunk=200):
+def submit_batches(client, ds, units, model, chunk=200, params=None):
     """Отправить пакеты по единицам без сырого ответа. Состояние —
-    audit_claude/batches.jsonl ({batch_id, model, ids: {custom_id: unit}})."""
+    audit_claude/batches.jsonl ({batch_id, model, ids: {custom_id: unit}}).
+    `params(unit)` — своя сборка запроса (второй проход); по умолчанию `request_params`."""
     todo = [u for u in units if load_raw(ds, model, u['unit']) is None]
     state = os.path.join(ds.audit_dir, 'batches.jsonl')
     pending = set()
@@ -657,7 +662,7 @@ def submit_batches(client, ds, units, model, chunk=200):
         part = todo[i:i + chunk]
         ids = {custom_id(u['unit']): u['unit'] for u in part}
         batch = client.messages.batches.create(requests=[
-            {'custom_id': cid, 'params': request_params(u, ds, model)}
+            {'custom_id': cid, 'params': params(u) if params else request_params(u, ds, model)}
             for cid, u in zip(ids, part)])
         record = {'batch_id': batch.id, 'model': model, 'ids': ids, 'collected': False,
                   'created': datetime.datetime.now().isoformat(timespec='seconds')}
