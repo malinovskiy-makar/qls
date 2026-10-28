@@ -819,6 +819,10 @@ class Command(BaseCommand):
         problem.save(update_fields=['content_format', 'problem_type', 'status',
                                     'hidden_pending_review', 'human_review'])
         for fig in f['figures']:
+            # Файла вырезки нет — задача уже скрыта (_finalize: «нет файла рисунка»);
+            # маркер в тексте остаётся до починки эталона, запись не падает.
+            if not os.path.isfile(fig['path']):
+                continue
             with open(fig['path'], 'rb') as handle:
                 data = handle.read()
             figure = ProblemFigure.objects.create(

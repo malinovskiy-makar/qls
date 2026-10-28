@@ -142,6 +142,13 @@ class EngineNight2810Tests(_EngineBase):
         self.rollback(journal)
         self.assertFalse(OlympiadRef.objects.filter(problem=self.bank, event_id=EV).exists())
 
+    def test_missing_figure_file_hidden_not_crash(self):
+        fig = {'path': 'figures_v2/нет_такого.png', 'caption': '', 'flag': '', 'page': 1}
+        self.apply([_r(1, LONG, figures=[fig])])
+        problem = OlympiadRef.objects.get(event_id=EV).problem
+        self.assertFalse(base_queryset('catalog').filter(pk=problem.pk).exists())
+        self.assertFalse(problem.figures.exists())
+
     def test_same_task_in_two_variants_is_one_problem(self):
         rows = [_r(1, LONG, task_variant='1'), _r(1, LONG, task_variant='2')]
         journal = self.apply(rows)
