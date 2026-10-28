@@ -93,6 +93,24 @@ def mmss(value):
     return f'{seconds // 60:02d}:{seconds % 60:02d}'
 
 
+# Формулы KaTeX внутри текста: их не трогаем (пробел там значим для набора).
+_MATH = re.compile(r'(\$\$.+?\$\$|\$.+?\$|\\\(.+?\\\)|\\\[.+?\\\])', re.S)
+_DIGIT_GROUP_SPACE = re.compile(r'(?<=\d) (?=\d{3}(?!\d))')
+
+
+@register.filter
+def nbsp_num(text):
+    """Пробел между группами цифр («20 000», «1 000 000») → неразрывный (U+00A0), чтобы
+    число не рвалось переносом. Только вне формул `$…$`, `$$…$$`, `\\(…\\)`, `\\[…\\]`.
+    Только показ: в базу ничего не пишется, экранирует шаблон сам.
+    """
+    if not text:
+        return text
+    parts = _MATH.split(str(text))
+    return ''.join(part if i % 2 else _DIGIT_GROUP_SPACE.sub('\u00a0', part)
+                   for i, part in enumerate(parts))
+
+
 @register.filter
 def gap_parts(text):
     """Текст условия → куски между пропусками («______»).

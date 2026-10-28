@@ -174,13 +174,24 @@ def _number_value(text):
     return value if value.is_finite() else None
 
 
+#: Знаки, похожие на минус, но не «-» с клавиатуры: длинный минус «−» (U+2212),
+#: цифровое тире «‒» (U+2012), «–» (U+2013), «—» (U+2014), малый «﹣» (U+FE63),
+#: полноширинный «－» (U+FF0D). Бывают при копировании из условия или учебника.
+_LONG_MINUS = '\u2212\u2012\u2013\u2014\ufe63\uff0d'
+_LONG_MINUS_MAP = str.maketrans({ch: '-' for ch in _LONG_MINUS})
+_ROUGH_DECIMALS = re.compile(r'-?\d+,\d{3,}', re.ASCII)
+
+
 def _format_error(text):
     """Почему строка не прошла строгий формат — первая подходящая причина.
 
-    `units` — буквы и знаки («25000 руб», «20%»), `space` — пробел внутри
-    («25 000»), `dot` — точка вместо запятой, `decimals` — больше двух знаков после
-    запятой, `other` — всё остальное («,5», «5,», «--5»).
+    `minus` — длинный минус или тире вместо «-» (`_LONG_MINUS`, проверяется ПЕРВЫМ:
+    иначе «−318» ушёл бы в `units`), `units` — буквы и знаки («25000 руб», «20%»),
+    `space` — пробел внутри («25 000»), `dot` — точка вместо запятой, `decimals` —
+    больше двух знаков после запятой, `other` — всё остальное («,5», «5,», «--5»).
     """
+    if any(ch in _LONG_MINUS for ch in text):
+        return 'minus'
     if _NOT_NUMBER_CHAR.search(text):
         return 'units'
     if _SPACE.search(text):
@@ -192,22 +203,48 @@ def _format_error(text):
     return 'other'
 
 
+def _soft_number(text):
+    """Мягкая починка записи числа — ЕДИНСТВЕННОЕ место этого правила.
+
+    Края срезать; пробелы, буквы, «%» и «₽» убрать (прочие знаки вроде «/» или «¼»
+    не трогать — такая строка не число); точку заменить на запятую, знаки
+    `_LONG_MINUS` — на «-». Без округления.
+    """
+    soft = ''.join(ch for ch in str(text).strip()
+                   if not (ch.isspace() or ch.isalpha() or ch in '%₽'))
+    return soft.replace('.', ',').translate(_LONG_MINUS_MAP)
+
+
+def canonical_number(text):
+    """Как правильно записать это число по правилу ВШЭ, или `None`, если это не число.
+
+    Мягкая починка (`_soft_number`), затем, если знаков после запятой больше двух, —
+    округление до сотых «половина от нуля» (`ROUND_HALF_UP`); лишние нули справа не
+    убираются и не добавляются. «37.5» → «37,5», «−0,125» → «-0,13», «1 200,50 ₽» →
+    «1200,50». Не прошло `NUMBER_FORMAT` («,5», «5,», «7¼») — `None`. На балл не влияет.
+    """
+    soft = _soft_number(text)
+    if _ROUGH_DECIMALS.fullmatch(soft):
+        rounded = Decimal(soft.replace(',', '.')).quantize(_CENT, rounding=ROUND_HALF_UP)
+        soft = str(rounded).replace('.', ',')
+    return soft if NUMBER_FORMAT.fullmatch(soft) else None
+
+
 def _would_be_correct(item, text):
     """Верно ли само число, если забыть про формат: для строки разбора.
 
-    Мягкая починка: убрать пробелы, буквы, «%» и «₽», точку заменить на запятую,
-    типографский минус — на обычный. Верно, если совпало с `accepted`, или значение
-    равно эталону, или округление до сотых (половина — от нуля) даёт эталон.
-    На балл НЕ влияет: на туре такой ответ получает 0.
+    Мягкая починка — `_soft_number` / `canonical_number`. Верно, если починенное
+    совпало с `accepted` (до округления или после), или значение записи по правилам
+    равно эталону. На балл НЕ влияет: на туре такой ответ получает 0.
     """
-    soft = ''.join(ch for ch in text if not (ch.isspace() or ch.isalpha() or ch in '%₽'))
-    soft = soft.replace('.', ',').replace('\u2212', '-')
-    if soft in {a.strip() for a in (item.accepted or [])}:
+    accepted = {a.strip() for a in (item.accepted or [])}
+    canon = canonical_number(text)
+    if _soft_number(text) in accepted or canon in accepted:
         return True
-    value, truth = _number_value(soft), _number_value(item.answer or '')
+    value, truth = _number_value(canon or ''), _number_value(item.answer or '')
     if value is None or truth is None:
         return False
-    return value == truth or value.quantize(_CENT, rounding=ROUND_HALF_UP) == truth
+    return value == truth
 
 
 def _number_parts(item, raw):
@@ -283,8 +320,8 @@ def explain_item(item, raw) -> dict:
       задания штраф вообще;
     * `binary` — короткий ответ и «один верный»: `score` и `is_correct`;
     * `number` — ответ-число 2 тура: `given` (что введено, без пробелов по краям),
-      `accepted_match`, `format_error` (`units` / `space` / `dot` / `decimals` /
-      `other` или `None`), `would_be_correct` (при ошибке формата: верно ли само число),
+      `accepted_match`, `format_error` (`minus` / `units` / `space` / `dot` /
+      `decimals` / `other` или `None`), `would_be_correct` (при ошибке формата: верно ли само число),
       `points`, `score`, `is_correct`. ⚠️ Эталона в структуре НЕТ: его кладёт только
       экран владельца попытки;
     * `match` — сопоставление (пропуски, соотнесение): `pairs` по ключам

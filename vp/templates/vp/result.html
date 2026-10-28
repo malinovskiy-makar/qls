@@ -75,7 +75,7 @@
             </span>
             <span class="vp-crow-pts">{{ c.score|signed }}</span>
             {% if c.blank %}
-            {% if c.statement %}<div class="vp-crow-text">{{ c.statement|linebreaksbr }}</div>{% endif %}
+            {% if c.statement %}<div class="vp-crow-text">{{ c.statement|nbsp_num|linebreaksbr }}</div>{% endif %}
             {% include 'vp/_practice.html' with number=c.number kind='short_text' options=None prefix=c.prefix suffix=c.suffix %}
             {% endif %}
           </div>
@@ -108,9 +108,9 @@
             <span class="vp-tcard-score">{{ t.score|num }} из {{ t.max|num }}</span>
           </header>
           {% if t.block == 'gaptext' %}
-          <div class="vp-tcard-text">{% for g in t.gap_chunks %}{{ g.text|linebreaksbr }}{% if g.key %}<span class="vp-gapmark" aria-label="пропуск {{ g.key }}">{{ g.key }}</span>{% endif %}{% endfor %}</div>
+          <div class="vp-tcard-text">{% for g in t.gap_chunks %}{{ g.text|nbsp_num|linebreaksbr }}{% if g.key %}<span class="vp-gapmark" aria-label="пропуск {{ g.key }}">{{ g.key }}</span>{% endif %}{% endfor %}</div>
           {% else %}
-          <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+          <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|nbsp_num|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
           {% endif %}
           {% if t.match_text_rows and t.blank %}
           <ol class="vp-mrows">{% for r in t.match_text_rows %}<li>{{ r }}</li>{% endfor %}</ol>
@@ -133,21 +133,21 @@
             <div><dt>Верный ответ</dt><dd class="vp-numval">{{ t.right }}</dd></div>
           </dl>
           {% if e.format_error %}
-          <p class="vp-tcard-line vp-numwhy">{{ e.score|num }} из {{ e.points|num }}: {% if e.format_error == 'dot' %}точка вместо запятой. Нужно писать «{{ t.number_fix }}», а не «{{ e.given }}».{% elif e.format_error == 'space' %}пробел внутри числа. Нужно «{{ t.number_fix }}», а не «{{ e.given }}».{% elif e.format_error == 'units' %}лишние знаки или единицы. В поле – только число.{% elif e.format_error == 'decimals' %}больше двух знаков после запятой. Ответ нужно округлить до сотых.{% else %}число записано не по правилам ввода.{% endif %}
+          <p class="vp-tcard-line vp-numwhy">{{ e.score|num }} из {{ e.points|num }}: {% if e.format_error == 'minus' %}длинный минус «−» или тире вместо обычного «-».{% if t.number_fix %} Нужно «{{ t.number_fix }}», а не «{{ e.given }}».{% else %} Минус набирайте с клавиатуры.{% endif %}{% elif e.format_error == 'dot' %}точка вместо запятой.{% if t.number_fix %} Нужно писать «{{ t.number_fix }}», а не «{{ e.given }}».{% endif %}{% elif e.format_error == 'space' %}пробел внутри числа.{% if t.number_fix %} Нужно «{{ t.number_fix }}», а не «{{ e.given }}».{% endif %}{% elif e.format_error == 'units' %}лишние знаки или единицы. В поле – только число.{% elif e.format_error == 'decimals' %}больше двух знаков после запятой. Ответ нужно округлить до сотых.{% else %}число записано не по правилам ввода.{% endif %}
             {% if e.would_be_correct %}Само число верное: на туре этот ответ тоже получил бы 0 из-за формата.{% else %}Число тоже неверное.{% endif %}</p>
           {% elif e.accepted_match %}
           <p class="vp-tcard-line">Засчитано: такой ответ дан в ключе ВШЭ.</p>
           {% endif %}
           {% endwith %}
           {% if t.solution %}
-          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|nbsp_num|linebreaksbr }}</div></details>
           {% endif %}
           {% elif t.kind == 'match' %}
           {% with e=t.explain %}
           <ul class="vp-mres">
             {% for m in t.match_rows %}
             <li class="vp-mres-row{% if not m.ok %} is-wrong{% endif %}">
-              <span class="vp-mres-label">{% if t.block == 'gaptext' %}<span class="vp-gapmark">{{ m.key }}</span>{% else %}<span class="vp-topt-n">{{ m.key }}</span> {{ m.label }}{% endif %}</span>
+              <span class="vp-mres-label">{% if t.block == 'gaptext' %}<span class="vp-gapmark">{{ m.key }}</span>{% else %}<span class="vp-topt-n">{{ m.key }}</span> {{ m.label|nbsp_num }}{% endif %}</span>
               <span class="vp-mres-pick">{% if m.chosen %}{{ m.chosen }}{% else %}<span class="vp-mute">не выбрано</span>{% endif %}{% if m.ok %} <span class="vp-tag vp-tag--right">верно</span>{% else %} <span class="vp-tag vp-tag--wrong">верно: {{ m.right }}</span>{% endif %}</span>
             </li>
             {% endfor %}
@@ -156,14 +156,14 @@
           <div class="vp-math">{{ e.points|num }} × {{ e.hit }}/{{ e.total }} = {{ e.score|dec2 }}</div>
           {% endwith %}
           {% if t.solution %}
-          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|nbsp_num|linebreaksbr }}</div></details>
           {% endif %}
           {% else %}
           <ul class="vp-topts">
             {% for o in t.options %}
             <li class="vp-topt{% if o.chosen and not o.right %} is-wrong{% endif %}">
               <span class="vp-topt-n">{{ o.n }}</span>
-              <span>{{ o.text }}</span>
+              <span>{{ o.text|nbsp_num }}</span>
               <span class="vp-topt-tags">
                 {% if o.chosen %}<span class="vp-tag vp-tag--mine">ваш выбор</span>{% endif %}
                 {% if o.right %}<span class="vp-tag vp-tag--right">верный</span>{% elif o.chosen %}<span class="vp-tag vp-tag--wrong">неверный</span>{% endif %}
@@ -178,7 +178,7 @@
           {% endif %}
           {% endwith %}
           {% if t.solution %}
-          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|nbsp_num|linebreaksbr }}</div></details>
           {% endif %}
           {% endif %}
         </article>

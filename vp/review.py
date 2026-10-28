@@ -129,14 +129,20 @@ def right_answer(item):
 
 
 def _number_fix(explain):
-    """Как надо было записать СВОЙ ответ при ошибке «точка» или «пробел» — для строки
-    «Нужно «37,5», а не «37.5»». Только оформление строки, балла не касается."""
-    given = explain['given']
-    if explain['format_error'] == 'dot':
-        return given.replace('.', ',')
-    if explain['format_error'] == 'space':
-        return re.sub(r'\s', '', given)
-    return ''
+    """Как надо было записать СВОЙ ответ при ошибке «длинный минус», «точка» или
+    «пробел» — для строки «Нужно «37,5», а не «37.5»». Только если исправленная
+    строка проходит строгий формат: для «−25 000» совет «-25 000» был бы неверен.
+    Только оформление строки, балла не касается."""
+    given, error = explain['given'], explain['format_error']
+    if error == 'minus':
+        fixed = given.translate(scoring._LONG_MINUS_MAP)
+    elif error == 'dot':
+        fixed = given.replace('.', ',')
+    elif error == 'space':
+        fixed = re.sub(r'\s', '', given)
+    else:
+        return ''
+    return fixed if scoring.NUMBER_FORMAT.fullmatch(fixed) else ''
 
 
 def _match_rows(item, explain):

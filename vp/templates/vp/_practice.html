@@ -1,4 +1,4 @@
-{% comment %}
+{% load vp_extras %}{% comment %}
 «Дорешать вне зачёта» у неотвеченного задания. Ждёт `number`, `kind`, `options`
 (список `{n, text}`), при короткой строке — `prefix` и `suffix`, у сопоставления
 (2 тур) — `keys` (подписи ключей `{key, label}`, без ответов).
@@ -20,10 +20,10 @@
     <div class="vp-match">
       {% for k in keys %}
       <div class="vp-match-row">
-        <label class="vp-match-text" for="vp-pr-{{ number }}-{{ k.key }}">{{ k.label }}</label>
+        <label class="vp-match-text" for="vp-pr-{{ number }}-{{ k.key }}">{{ k.label|nbsp_num }}</label>
         <span class="vp-select-wrap"><select class="vp-select" id="vp-pr-{{ number }}-{{ k.key }}" data-key="{{ k.key }}">
           <option value="">–</option>
-          {% for o in options %}<option value="{{ o.n }}">{{ o.text }}</option>{% endfor %}
+          {% for o in options %}<option value="{{ o.n }}">{{ o.text|nbsp_num }}</option>{% endfor %}
         </select></span>
       </div>
       {% endfor %}
@@ -40,7 +40,7 @@
     <fieldset class="vp-options">
       <legend class="vp-sr">Варианты ответа на задание {{ number }}{% if kind == 'multi' %}, можно выбрать несколько{% endif %}</legend>
       {% for o in options %}
-      <label class="vp-opt"><input type="{% if kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="raw" value="{{ o.n }}"><span>{{ o.text }}</span></label>
+      <label class="vp-opt"><input type="{% if kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="raw" value="{{ o.n }}"><span>{{ o.text|nbsp_num }}</span></label>
       {% endfor %}
     </fieldset>
     {% endif %}
