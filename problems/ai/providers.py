@@ -161,6 +161,20 @@ class BaseProvider(object):
 class AnthropicProvider(BaseProvider):
     name = 'anthropic'
     key_env = 'ANTHROPIC_API_KEY'
+    #: Ключ без привязки к рабочему пространству требует заголовок
+    #: `anthropic-workspace-id` (так с сентября 2026). ID — из окружения.
+    workspace_env = 'ANTHROPIC_WORKSPACE_ID'
+    #: Температура на вызов: None — не передаётся (умолчание модели). Судья
+    #: экзамена ставит 0 на своём экземпляре поставщика (`ai_exam/judge.py`).
+    temperature = None
+
+    def client(self):
+        import anthropic
+
+        workspace = os.environ.get(self.workspace_env, '').strip()
+        headers = {'anthropic-workspace-id': workspace} if workspace else None
+        return anthropic.Anthropic(api_key=self.api_key(), max_retries=0,
+                                   default_headers=headers)
 
     def is_available(self):
         if not self.api_key():
@@ -216,7 +230,9 @@ class AnthropicProvider(BaseProvider):
         # Без схемы — ответ текстом (чат): `output_config` не передаётся.
         extra = ({'output_config': {'format': {'type': 'json_schema', 'schema': schema}}}
                  if schema is not None else {})
-        client = anthropic.Anthropic(api_key=self.api_key(), max_retries=0)
+        if self.temperature is not None:
+            extra['temperature'] = self.temperature
+        client = self.client()
         try:
             response = client.messages.create(
                 model=model,
@@ -837,6 +853,8 @@ class OpenRouterProvider(BaseProvider):
     name = 'openrouter'
     key_env = 'OPENROUTER_API_KEY'
     BASE_URL = 'https://openrouter.ai/api/v1'
+    #: Температура на вызов, как у `AnthropicProvider`: None — не передаётся.
+    temperature = None
 
     def is_available(self):
         if not self.api_key():
@@ -881,6 +899,8 @@ class OpenRouterProvider(BaseProvider):
         if schema is not None:
             instructions += self._schema_instruction(schema)
             extra['response_format'] = {'type': 'json_object'}
+        if self.temperature is not None:
+            extra['temperature'] = self.temperature
         client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL,
                                max_retries=0)
         try:
