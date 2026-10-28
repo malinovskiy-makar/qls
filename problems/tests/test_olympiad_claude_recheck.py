@@ -43,7 +43,8 @@ FRAG = {'fid': 'ev|1|#statement', 'group': 'statement', 'refs': ['f.pdf#p2'], 'e
         'fields': {'title': '', 'statement_md': 'Цена товара 120 рублей, спрос Q = 40 - P.',
                    'parts': [], 'figures': 0}}
 PAGES = [('f.pdf#p2', 'проверяемая')]
-LAYER = ['Цена товара 120 рублей, спрос Q = 40 - P. Найдите равновесие при налоге 10 рублей.']
+LAYER = ['Цена товара 120 рублей, спрос Q = 40 - P. Найдите равновесие при налоге 10 рублей. '
+         + 'Ответы записывайте в бланк разборчиво. ' * 5]
 
 
 def answer(decision='fix', confidence=0.95, evidence='Найдите равновесие при налоге 10 рублей', **kw):
@@ -98,7 +99,14 @@ class EvidenceTests(SimpleTestCase):
 
     def test_scan_without_layer_needs_some_quote(self):
         self.assertTrue(cr.evidence_on_page('Найдите равновесие', ''))
+        self.assertTrue(cr.evidence_on_page('X2 = K*(1+i)^2/3 (+1 балл)', 'стр. 3 \x0c'))  # слой-огрызок = скан
         self.assertFalse(cr.evidence_on_page('—', ''))
+
+    def test_hyphen_and_letters_only_words(self):
+        layer = LAYER[0] + ' Вершины лежат на ребрах доде-\nкаэдра. Издержки TC = 120 ln(100).' * 3
+        self.assertTrue(cr.evidence_on_page('на ребрах додекаэдра', layer))
+        self.assertTrue(cr.evidence_on_page('TC = 120ln(100)', layer))
+        self.assertFalse(cr.evidence_on_page('на гранях икосаэдра', layer))
 
 
 class CheckItemTests(SimpleTestCase):
@@ -144,6 +152,35 @@ class CheckItemTests(SimpleTestCase):
         crit = self.check(answer(decision='figure', figure_bboxes=[{'page': 1, 'bbox': [0.1, 0.1, 0.5, 0.5]}]),
                           frag=dict(FRAG, group='criteria'))
         self.assertEqual(crit['resolution'], 'queue')
+
+
+class RoundsTests(SimpleTestCase):
+    def test_retry_only_near_threshold_decisions(self):
+        near = {'resolution': 'queue', 'decision': 'fix', 'confidence': 0.85}
+        self.assertTrue(cr.needs_retry([(item(cr.KIND_FIX), near)]))
+        self.assertFalse(cr.needs_retry([(item(cr.KIND_FIX), dict(near, confidence=0.5))]))
+        self.assertFalse(cr.needs_retry([(item(cr.KIND_FIX), dict(near, decision='human'))]))
+        self.assertFalse(cr.needs_retry([(item(cr.KIND_FIX), dict(near, resolution='fixed'))]))
+
+    def test_merge_keeps_first_and_fills_queue_only(self):
+        a, b = item(cr.KIND_FIX), item(cr.KIND_DEFECT)
+        first = [(a, {'resolution': 'fixed'}), (b, {'resolution': 'queue'})]
+        second = [(a, {'resolution': 'queue'}), (b, {'resolution': 'closed'})]
+        self.assertEqual([r['resolution'] for _, r in cr.merge_rounds(first, second)], ['fixed', 'closed'])
+        second = [(a, {'resolution': 'closed'}), (b, {'resolution': 'queue'})]
+        self.assertEqual([r['resolution'] for _, r in cr.merge_rounds(first, second)], ['fixed', 'queue'])
+
+
+class DedupeTests(SimpleTestCase):
+    def test_same_field_and_same_finding_merged(self):
+        queue = [item(cr.KIND_FIX), item(cr.KIND_FIX, unit='u2'), item(cr.KIND_FIX, field='parts'),
+                 item(cr.KIND_UNLISTED, fid='', text='Задача 4. Фирма «Альфа»'),
+                 item(cr.KIND_UNLISTED, fid='', text='Задача 4. Фирма «Альфа»', unit='u3'),
+                 item(cr.KIND_UNLISTED, fid='', text='Задача 5. Банк «Бета»')]
+        out = cr.dedupe_queue(queue)
+        self.assertEqual(len(out), 4)
+        self.assertIn('повторялась 2 раза', out[0]['why'])
+        self.assertNotIn('повторялась', out[1]['why'])
 
 
 class BuildTests(SimpleTestCase):
@@ -192,6 +229,20 @@ class BuildTests(SimpleTestCase):
         self.assertEqual([d['resolution'] for d in res['done']], ['figure', 'closed'])
         layer = json.load(open(os.path.join(self.tmp, 'v7.1', 'claude_recheck_v7.1.json'), encoding='utf-8'))
         self.assertEqual(len(layer['resolved']), 2)
+
+    def test_second_frame_of_same_figure_and_eyes_rejection(self):
+        os.makedirs(os.path.join(self.tmp, 'audit_claude'))
+        with open(os.path.join(self.tmp, 'audit_claude', 'figures_rejected.txt'), 'w', encoding='utf-8') as h:
+            h.write('ev_2_r1.png  # срезаны подписи осей\n')
+        ds = fake_ds([row('1', src=['f.pdf#p2']), row('2', src=['f.pdf#p2'])], digitized=self.tmp)
+        twice = {'resolution': 'figure', 'note': '', 'figures': [
+            {'page_ref': 'f.pdf#p2', 'bbox': [0.1, 0.1, 0.5, 0.5], 'caption': 'КПВ'},
+            {'page_ref': 'f.pdf#p2', 'bbox': [0.11, 0.1, 0.5, 0.51], 'caption': 'КПВ'}]}
+        res = cr.build(ds, [(item(cr.KIND_FIGURE), twice),
+                            (item(cr.KIND_FIGURE, fid='ev|2|#statement'), twice)], [], katex=no_katex)
+        self.assertEqual([f['value']['path'] for f in res['figures']], ['v7.1/figures_v7.1/ev_1_r1.png'])
+        self.assertEqual(len(res['queue']), 1)
+        self.assertIn('забракована при просмотре глазами', res['queue'][0]['why'])
 
     def test_stale_field_not_applied_breaks_invariants(self):
         rows = [row('1', src=['f.pdf#p2'])]

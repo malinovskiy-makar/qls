@@ -298,6 +298,9 @@ class Command(BaseCommand):
         ac.add_argument('--limit', type=int, help='recheck-submit: не больше N единиц (проба).')
         ac.add_argument('--effort', default='medium', choices=('low', 'medium', 'high'),
                         help='recheck-submit: effort Opus (по умолчанию medium).')
+        ac.add_argument('--round', type=int, default=1, choices=(1, 2),
+                        help='recheck-submit: 2 — повторный запрос единиц, где Opus решил fix/keep/figure '
+                             'с уверенностью 0,75–0,9 (обычно с --effort high).')
 
     # ── Вход ────────────────────────────────────────────────────────────
 
@@ -1108,6 +1111,13 @@ class Command(BaseCommand):
                 raise CommandError('--max-usd обязателен для recheck-submit. Ничего не отправлено.')
             todo = [uid for uid in plan.by_unit
                     if uid in plan.units and claude_eyes.load_raw(ds, model, uid) is None]
+            suffix = ''
+            if options['round'] == 2:
+                suffix = claude_recheck.ROUND2
+                todo = [uid for uid in plan.by_unit
+                        if uid in plan.units and claude_eyes.load_raw(ds, model, uid) is not None
+                        and claude_eyes.load_raw(ds, model, uid + suffix) is None
+                        and claude_recheck.needs_retry(plan.results(uid))]
             if options.get('limit'):
                 todo = todo[:options['limit']]
             spent = claude_eyes.spent(ledger)
@@ -1122,22 +1132,15 @@ class Command(BaseCommand):
                 raise CommandError('Потрачено 90 % потолка — новые пакеты не отправляются.')
             effort = options['effort']
             sent = claude_eyes.submit_batches(
-                claude_eyes.make_client(), ds, [{'unit': uid} for uid in todo], model,
-                params=lambda u: plan.params(u['unit'], effort))
+                claude_eyes.make_client(), ds, [{'unit': uid + suffix} for uid in todo], model,
+                params=lambda u: plan.params(u['unit'][:len(u['unit']) - len(suffix)], effort))
             self._say(f'Отправлено пакетов: {len(sent)}: {", ".join(sent)}')
         elif step == 'recheck-collect':
             done, waiting = claude_eyes.collect_batches(claude_eyes.make_client(), ds, ledger)
             self._say(f'{name}: собрано ответов {done}, пакетов в работе {waiting}; '
                       f'потрачено на второй проход ${claude_eyes.spent(ledger):.2f}')
         elif step == 'recheck-build':
-            results = []
-            for uid in plan.by_unit:
-                raw = claude_eyes.load_raw(ds, model, uid) if uid in plan.units else None
-                if raw is None:
-                    results += [(item, {'resolution': 'queue', 'reasons': ['второй проход не дошёл']})
-                                for item in plan.by_unit[uid]]
-                else:
-                    results += claude_recheck.check_unit_reply(plan, uid, raw.get('text'))
+            results = [pair for uid in plan.by_unit for pair in plan.results(uid)]
             result = claude_recheck.build(ds, results, plan.closed)
             inv = result['invariants']
             got = Counter(d['resolution'] for d in result['done'])

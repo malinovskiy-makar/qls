@@ -37,6 +37,7 @@ import io
 import json
 import os
 import re
+import shutil
 
 from . import claude_eyes as ce
 
@@ -245,19 +246,55 @@ class Plan:
         return request_params(self.units[uid], self.by_unit[uid], self.frags(uid, pages), pages,
                               self.ds, effort=effort)
 
+    def results(self, uid, katex=None):
+        """Итоги позиций единицы: первый запрос, а если был повторный — `merge_rounds`."""
+        katex = katex or ce.katex_errors
+        raw = ce.load_raw(self.ds, MODEL, uid) if uid in self.units else None
+        if raw is None:
+            return [(item, {'resolution': 'queue', 'reasons': ['второй проход не дошёл']})
+                    for item in self.by_unit[uid]]
+        first = check_unit_reply(self, uid, raw.get('text'), katex=katex)
+        again = ce.load_raw(self.ds, MODEL, uid + ROUND2)
+        if again is None:
+            return first
+        return merge_rounds(first, check_unit_reply(self, uid, again.get('text'), katex=katex))
+
+
+#: Сырой ответ повторного запроса (effort выше) лежит рядом: `<единица>__r2.json`.
+ROUND2 = '__r2'
+#: Повторяется единица, где модель решила fix / keep / figure, но с уверенностью в этом окне.
+RETRY_CONFIDENCE = (0.75, MIN_CONFIDENCE)
+
+
+def needs_retry(pairs):
+    return any(res['resolution'] == 'queue' and res.get('decision') in ('fix', 'keep', 'figure')
+               and RETRY_CONFIDENCE[0] <= res.get('confidence', 0) < RETRY_CONFIDENCE[1]
+               for _, res in pairs)
+
+
+def merge_rounds(first, second):
+    """Решённое первым запросом остаётся; нерешённое берётся из повторного, если тот решил."""
+    return [(item, r2 if r1['resolution'] == 'queue' and r2['resolution'] != 'queue' else r1)
+            for (item, r1), (_, r2) in zip(first, second)]
+
 
 # ── Проверка ответа ──────────────────────────────────────────────────────
 
-_WORD = re.compile(r'\w{3,}')
+#: Слово — только буквы: «120ln» даёт «ln», а не чужое слово «120ln».
+_WORD = re.compile(r'[^\W\d_]{3,}')
+#: Слой короче — по сути скан (несколько случайных знаков), цитату по нему не сверить.
+MIN_LAYER = 200
 
 
 def evidence_on_page(evidence, layer, share=EVIDENCE_SHARE):
     """Цитата со страницы: у скана без слоя — непустая; со слоем — ≥ `share`
-    слов цитаты есть в слое и все числа цитаты тоже."""
+    слов цитаты есть в слое и все числа цитаты тоже. Перенос слова в слое
+    («доде-\\nкаэдра») склеивается."""
     evidence = (evidence or '').strip()
     if len(evidence) < 8:
         return False
-    if not layer.strip():
+    layer = re.sub(r'-\s*\n\s*', '', layer or '')
+    if len(layer.strip()) < MIN_LAYER:
         return True
     words = [w.lower() for w in _WORD.findall(evidence)]
     have = {w.lower() for w in _WORD.findall(layer)}
@@ -364,6 +401,29 @@ def _same_as_existing(existing, item, bbox):
     return False
 
 
+def _queue_key(item):
+    if item.get('fid'):
+        return (item['kind'], item['fid'], item.get('field') or '')
+    # «на странице есть, в эталоне нет» с соседних страниц — одна и та же находка
+    return (item['kind'], ' '.join(_WORD.findall((item.get('text') or item.get('why') or '').lower()))[:120])
+
+
+def dedupe_queue(queue):
+    """Одна позиция на одно действие человека: повторы склеиваются, у первой — пометка."""
+    out, seen = [], {}
+    for item in queue:
+        key = _queue_key(item)
+        if key in seen:
+            seen[key]['repeats'] = seen[key].get('repeats', 1) + 1
+            continue
+        seen[key] = dict(item)
+        out.append(seen[key])
+    for item in out:
+        if item.get('repeats'):
+            item['why'] = '%s (позиция повторялась %d раза)' % (item['why'], item['repeats'])
+    return out
+
+
 def build(ds, results, closed, out_dir=None, katex=ce.katex_errors):
     """Текущая версия + принятые решения второго прохода → vN.1 рядом с vN.
 
@@ -372,8 +432,21 @@ def build(ds, results, closed, out_dir=None, katex=ce.katex_errors):
     version = ds.out_version
     out_dir = out_dir or os.path.join(ds.digitized, version)
     rows_by_key = {ce.task_key(r): r for r in ds.rows}
+    if version == ds.in_version:
+        raise ValueError('выход совпал со входом — отказ')
+    # Папка вырезок — выход этой сборки целиком: старые вырезки прошлой сборки не остаются.
+    shutil.rmtree(os.path.join(out_dir, 'figures_%s' % version), ignore_errors=True)
     texts, figs, queue, done = {}, [], [], list(closed)
     fig_count = collections.Counter()
+    # Рамки, уже занятые в этой сборке (вырезанные или забракованные глазами), по заданию:
+    # две позиции очереди или две рамки одного ответа на один рисунок дают одну вырезку.
+    taken = collections.defaultdict(list)
+    # Вырезки, забракованные при просмотре контактного листа глазами (имя файла в строке).
+    eyes_bad = set()
+    rejected_path = os.path.join(ds.audit_dir, 'figures_rejected.txt')
+    if os.path.exists(rejected_path):
+        with open(rejected_path, encoding='utf-8') as handle:
+            eyes_bad = {line.split('#')[0].strip() for line in handle if line.split('#')[0].strip()}
     for item, res in results:
         if res['resolution'] == 'fixed':
             for chk in res['fixes']:
@@ -386,34 +459,45 @@ def build(ds, results, closed, out_dir=None, katex=ce.katex_errors):
             key, group = item['fid'].split('#')
             row = rows_by_key[key]
             existing = (row.get('figures') or []) + (row.get('solution_figures') or [])
-            added = 0
+            added = by_eyes = 0
             for fig in res['figures']:
                 page_item = ds.manifest[fig['page_ref']]
-                if _same_as_existing(existing, page_item, fig['bbox']):
+                if _same_as_existing(existing + taken[key], page_item, fig['bbox']):
                     continue
+                taken[key].append({'page': page_item['page'], 'page_dir': page_item['page_dir'],
+                                   'bbox_norm': fig['bbox']})
                 fig_count[key] += 1
                 ev, num, var = key.split('|')
                 name = '%s_%s%s_r%d%s.png' % (ev, re.sub(r'[^\w-]', '_', num), ('_' + var) if var else '',
                                               fig_count[key], 's' if group == 'solution' else '')
+                if name in eyes_bad:
+                    by_eyes += 1
+                    continue
                 rel = '%s/figures_%s/%s' % (version, version, name)
                 size = ce.crop_figure(ds.png(fig['page_ref']), fig['bbox'], os.path.join(ds.digitized, rel))
                 if size is None:
                     continue
+                value = {'path': rel, 'caption': fig['caption'], 'flag': 'claude_recheck',
+                         'page': page_item['page'], 'page_dir': page_item['page_dir'],
+                         'bbox_norm': fig['bbox'], 'size': list(size), 'model': MODEL}
                 figs.append({'key': key, 'field': 'figure',
                              'target': 'figures' if group == 'statement' else 'solution_figures',
-                             'value': {'path': rel, 'caption': fig['caption'], 'flag': 'claude_recheck',
-                                       'page': page_item['page'], 'page_dir': page_item['page_dir'],
-                                       'bbox_norm': fig['bbox'], 'size': list(size), 'model': MODEL},
-                             'unit': item['unit'], 'model': MODEL})
+                             'value': value, 'unit': item['unit'], 'model': MODEL})
                 added += 1
-            note = res.get('note', '') if added else 'рисунок уже есть в эталоне'
-            done.append(dict(item, resolution='figure' if added else 'closed', note=note))
+            if added:
+                done.append(dict(item, resolution='figure', note=res.get('note', '')))
+            elif by_eyes:
+                queue.append(dict(item, why=('%s · второй проход: вырезка забракована при просмотре '
+                                             'глазами' % item.get('why', ''))[:900]))
+            else:
+                done.append(dict(item, resolution='closed', note='рисунок уже есть в эталоне'))
         elif res['resolution'] == 'closed':
             done.append(dict(item, resolution='closed', note=res.get('note', '')))
         else:
             why = '; '.join(res.get('reasons') or [])
             queue.append(dict(item, why=('%s · второй проход: %s%s' % (
                 item.get('why', ''), why, (' — ' + res['note']) if res.get('note') else ''))[:900]))
+    queue = dedupe_queue(queue)
     layer = list(texts.values()) + figs
     new_rows, log = ce.apply_layer(ds.rows, layer)
     for row in new_rows:
