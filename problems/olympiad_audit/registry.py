@@ -198,6 +198,34 @@ REGISTRY = {
         journal_dir='journal',
         compare='markup_free',
     ),
+    #: Ночь P3 (28.10.2026): ВсОШ по экономике, все этапы. Название — как у
+    #: 1 793 уже записанных строк `vseros` (SolveHub/ILE, сверено по базе).
+    #: Архив ILE — официальный (архив ЦПМК, решение Notion 14.10). `event_id`
+    #: эталона — `vseros-{stage}-{2024-25}-{region|ru}-{grades}-{tour}`: другой
+    #: вид, чем у ВП/МОШ, `parse_event_id` его НЕ разбирает (см. vsosh_prepare).
+    'vseros': OlympiadAudit(
+        slug='vseros',
+        olympiad_name='Всероссийская олимпиада школьников по экономике',
+        official_source_name='Всероссийская олимпиада школьников по экономике: официальный архив',
+        official_source_defaults={
+            'author': 'Центральная предметно-методическая комиссия ВсОШ по экономике',
+            'kind': 'олимпиада',
+            'note': ('Официальные задания, решения и критерии всех этапов Всероссийской '
+                     'олимпиады школьников по экономике: архив ЦПМК (iloveeconomics.ru), '
+                     'ЦПМ (vos.olimpiada.ru), olimpiada.ru, vserosolimp.edsoo.ru и сайты '
+                     'региональных координаторов. У каждой задачи — ссылка на файл.'),
+        },
+        official_site='https://vos.olimpiada.ru/',
+        official_hosts=('iloveeconomics.ru', 'olimpiada.ru', 'edsoo.ru', 'rosolymp.ru'),
+        stages=('final', 'regional', 'municipal', 'school', 'invitational'),
+        event_prefix='vseros-',
+        audit_dir='vsosh_20261028',
+        family=('vseros',),
+        session='vsosh1',
+        reviewed_by='',
+        journal_dir='journal',
+        compare='markup_free',
+    ),
 }
 
 #: Слаги ВП — для мест, где порядок «семья ВП» нужен по старому имени.
