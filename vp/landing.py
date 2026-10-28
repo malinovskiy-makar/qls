@@ -84,6 +84,22 @@ def tour_dates(tour=None):
     return dates_text(days), dates_short(days)
 
 
+def countdown(today=None, tour=None):
+    """Отсчёт до тура по местной дате: «до тура 19 дней», во время тура — «тур идёт», после
+    (и без дат) — `None`. Даты — только `config.TOUR_DATES`."""
+    _, days = config.TOUR_DATES.get(config.CURRENT_TOUR if tour is None else tour, ('days', ()))
+    if not days:
+        return None
+    today = today or timezone.localdate()
+    start, end = min(days), max(days)
+    if today < start:
+        left = (start - today).days
+        return f'до тура {left} {_plural(left, "день", "дня", "дней")}'
+    if today <= end:
+        return 'тур идёт'
+    return None
+
+
 # ---------------------------------------------------------------- формат
 
 def _format_of(variant):
@@ -160,6 +176,53 @@ def facts(groups):
     counts = sorted({g['count'] for g in groups})
     return {'count': counts[-1], 'count_text': blocks.number_range(counts[0], counts[-1]),
             'minutes': next(iter(minutes)), 'total': next(iter(totals))}
+
+
+def _bands_short(bands):
+    """['10', '11'] → «10–11 класс», ['9'] → «9 класс»; не числа — подписи через «и»."""
+    labels = config.all_band_labels()
+    if bands and all(b.isdigit() for b in bands):
+        numbers = sorted(int(b) for b in bands)
+        if len(numbers) == 1:
+            return f'{numbers[0]} класс'
+        if numbers == list(range(numbers[0], numbers[-1] + 1)):
+            return f'{numbers[0]}–{numbers[-1]} класс'
+    return ' и '.join(labels.get(b, f'{b} кл.') for b in bands)
+
+
+def composition(groups, band=None):
+    """Полоса «Из чего состоит вариант» посадочной: блоки ОДНОЙ группы формата (своего класса,
+    иначе той, где больше классов) с долями по баллам; отличие остальных групп — строкой.
+
+    Возвращает `None` без групп или `{label, count, minutes, total, rows, others}`; строка —
+    `block`, `range`, `title`, `count`, `total`, `percent` (доля ширины, из баллов).
+    Все числа — из заданий опубликованных вариантов (`format_groups`).
+    """
+    if not groups:
+        return None
+    main = next((g for g in groups if band in g['bands']), None) or max(
+        groups, key=lambda g: len(g['bands']))
+    whole = main['total'] or 1
+    rows = [dict(r, percent=round(float(r['total']) / float(whole) * 100, 2)) for r in main['rows']]
+    others = []
+    for group in groups:
+        if group is main:
+            continue
+        text = f'{_bands_short(group["bands"])}: {group["count"]} {_plural(group["count"], "задание", "задания", "заданий")}'
+        if group['total'] != main['total']:
+            text += f', {group["total"].normalize():f}'.replace('.', ',') + ' ' + _plural(
+                int(group['total']), 'балл', 'балла', 'баллов')
+        number = next((r for r in group['rows'] if r['block'] == 'number'), None)
+        if number and number['count']:
+            per = number['total'] / number['count']
+            text += f', числа по {per.normalize():f}'.replace('.', ',') + f' {_plural(int(per), "балл", "балла", "баллов")}'
+        others.append(text)
+    # Длительность — только если она у всех вариантов группы одна: «70 минут» иначе была бы
+    # правдой не про все.
+    minutes = main['minutes'] if len(main.get('minutes_all') or {main['minutes']}) == 1 else None
+    return {'label': _bands_short(main['bands']), 'count': main['count'],
+            'minutes': minutes, 'total': main['total'], 'rows': rows, 'others': others,
+            'number_total': next((r['total'] for r in rows if r['block'] == 'number'), None)}
 
 
 # ---------------------------------------------------------------- змейка
@@ -406,6 +469,22 @@ def my_block(request, published):
     untouched = [v for v, dot in zip(ordered, dots) if dot == '']
     best_attempt, place = board.my_best(user)
 
+    # «Что дальше» по приоритету: начатая работа → в прошлой сданной попытке текущего тура
+    # потеряно на записи → следующий нетронутый вариант своего класса → тренировка записи.
+    from vp import review
+    last = (VPAttempt.objects.filter(user=user, variant__tour=config.CURRENT_TOUR,
+                                     submitted_at__isnull=False)
+            .order_by('-submitted_at', '-id').select_related('variant').first())
+    lost = review.format_losses(last)['points'] if last is not None else _ZERO
+    if current is not None:
+        step = 'continue'
+    elif lost > 0:
+        step = 'drill_loss'
+    elif untouched:
+        step = 'next'
+    else:
+        step = 'drill'
+
     return {
         'current': current,
         'current_answered': answered_count(current) if current is not None else 0,
@@ -425,4 +504,9 @@ def my_block(request, published):
         'all_done': not untouched,
         'band': band,
         'band_label': dict(config.bands()).get(band, ''),
+        'best_band_label': (dict(config.bands()).get(best_attempt.variant.grade_band, '')
+                            if best_attempt is not None else ''),
+        'done_percent': round(done / len(ordered) * 100) if ordered else 0,
+        'step': step,
+        'lost': lost,
     }

@@ -115,23 +115,21 @@ class LandingTests(LandingBase):
         # ⚠️ ПЛИТКИ ФАКТОВ ТОЖЕ ОБЯЗАНЫ ПОСЛЕДОВАТЬ ЗА ДАННЫМИ. Проверять только
         # фразу в окне правил мало: вбитое в плитку число «44» она не ловит —
         # проверка зубастости 22.09.2026 показала это прямо.
+        # Сессия R: плитки заменены строкой состава над полосой долей — те же числа из данных.
         tiles = hero(html)
-        self.assertIn('<b>43</b>', tiles)
-        self.assertIn('<b>25</b>', tiles)
-        self.assertIn('<b>96</b>', tiles)
-        self.assertNotIn('<b>44</b>', tiles)
-        self.assertNotIn('<b>30</b>', tiles)
-        self.assertNotIn('<b>100</b>', tiles)
+        self.assertIn('43 задания · 25 минут · 96 баллов', tiles)
+        self.assertNotIn('44 задания', tiles)
+        self.assertNotIn('30 минут', tiles)
+        self.assertNotIn('100 баллов', tiles)
         self.assertNotIn('44 задания', html)
         self.assertNotIn('100 баллов', html)
 
     def test_facts_tiles_are_computed_from_the_data(self):
         """Плитки зоны «тур»: число, минуты, баллы и дни — из данных, не из шаблона."""
         block = hero(page(self.guest))
-        self.assertIn('<b>44</b><span>задания</span>', block)
-        self.assertIn('<b>30</b><span>минут</span>', block)
-        self.assertIn('<b>100</b><span>баллов</span>', block)
-        self.assertIn('<b>26 и 30 сент.</b><span>дни тура</span>', block)
+        # Сессия R: строка состава над полосой долей и даты в надзаголовке.
+        self.assertIn('44 задания · 30 минут · 100 баллов', block)
+        self.assertIn('26 и 30 сентября 2026', block)
 
     def test_three_zones_are_on_the_page(self):
         """Тур, таблица лучших попыток и полоса «моё» — три зоны экрана."""
@@ -225,8 +223,7 @@ class TourDatesTests(LandingBase):
         self.assertIn('26 и 30 сентября 2026', page(self.guest))
         with mock.patch.dict(config.TOUR_DATES, {1: ('days', (date(2027, 10, 3), date(2027, 10, 10)))}):
             html = page(self.guest)
-        self.assertIn('3 и 10 октября 2027', html)
-        self.assertIn('3 и 10 окт.', html)
+        self.assertIn('3 и 10 октября 2027', html)          # краткой плитки дат больше нет (сессия R)
         self.assertNotIn('сентября', html)
 
     def test_no_dates_no_phrase_and_no_tile(self):
@@ -234,8 +231,8 @@ class TourDatesTests(LandingBase):
             html = page(self.guest)
         self.assertNotIn('дни тура', html)
         self.assertIn('1 тур появился в отборочном этапе впервые.', rules(html))
-        # Остальные три плитки на месте: дат нет, формат есть.
-        self.assertIn('<b>44</b>', hero(html))
+        # Дат нет, состав варианта на месте.
+        self.assertIn('44 задания', hero(html))
 
     def test_dates_short(self):
         self.assertEqual(landing.dates_short([date(2026, 9, 30), date(2026, 9, 26)]), '26 и 30 сент.')
@@ -287,8 +284,10 @@ class ClassesTests(LandingBase):
         self.assertEqual([r[4] for r in table_rows(block) if r[0] == 'snake'], ['60', '61'])
         scoring = section(rules(html), 'vp-r-score', 'vp-r-snake')
         self.assertEqual(scoring.count('или полный балл, или ноль'), 2)
-        # Когда формата два, плиток фактов и общего «44 задания» на странице нет.
-        self.assertNotIn(FACTS, html)
+        # Сессия R: формата два — полоса показывает один класс, его строка подписана им, а
+        # отличие другого — строкой легенды; общего «на всех» числа нет.
+        self.assertIn('9–10 классы: 44 задания · 30 минут · 100 баллов', hero(html))
+        self.assertIn('11 класс: 44 задания, 101 балл', hero(html))
         self.assertIn('Формат различается по классам', rules(html))
 
 
@@ -301,8 +300,7 @@ class DurationTests(LandingBase):
         VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1500)
         html = page(self.guest)
         self.assertEqual(rules(html).count('class="vp-table vp-table--blocks"'), 1)
-        self.assertNotIn(FACTS, html)
-        self.assertNotRegex(hero(html), r'\d+ минут')
+        self.assertNotRegex(hero(html), r'\d+ минут')     # длительность разная — минут нет
         VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1800)
         self.assertIn('44 задания, 30 минут, 100 баллов', page(self.guest))
 

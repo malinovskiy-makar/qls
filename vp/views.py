@@ -273,6 +273,7 @@ def index(request):
     current_board = next((b for b in boards if b['active']), None)
     has_demo = any(v.source_kind == VPVariant.SourceKind.DEMO for v in published)
     tour_dates, tour_dates_short = landing.tour_dates()
+    band = landing.student_band(request)
 
     # Диапазон номеров змейки — из таблицы блоков, а не из головы.
     snake_row = next((r for g in groups for r in g['rows'] if r['block'] == 'snake'), None)
@@ -292,6 +293,10 @@ def index(request):
         'snake_range': snake_row['range'] if snake_row else '',
         'snake': snake,
         'snake_total': snake_total,
+        'countdown': landing.countdown(),
+        # Примеры пробника — образцы ЗАПИСИ (что ученик мог бы ввести), а не данные варианта.
+        'probe_examples': ('37.5', '1 200', '15%', '3,125', '-4,5', '37,50'),
+        'composition': landing.composition(groups, band),
         'boards': boards,
         'board_attempts': current_board['attempts'] if current_board else 0,
         'mine': landing.my_block(request, published),

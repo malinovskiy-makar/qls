@@ -27,16 +27,36 @@
     <div class="vp-land-eyebrow">
       <span>Отборочный этап · {{ tour }} тур</span>
       {% if tour_dates %}<span class="vp-land-dot" aria-hidden="true"></span><span class="vp-land-dates">{{ tour_dates }}</span>{% endif %}
+      {% if countdown %}<span class="vp-land-count">{{ countdown }}</span>{% endif %}
     </div>
-    <h1 class="vp-land-h1">Высшая проба по экономике<small>{% if tour == 2 %}тренажёр второго тура{% else %}тренажёр нового первого тура{% endif %}</small></h1>
+    {% if tour == 2 %}
+    <h1 class="vp-land-h1">Высшая проба по экономике<small>тренажёр второго тура · вариант на время, проверка и разбор сразу после сдачи</small></h1>
+    {% else %}
+    <h1 class="vp-land-h1">Высшая проба по экономике<small>тренажёр нового первого тура</small></h1>
     <p class="vp-land-lead">Вариант на время, как на олимпиаде, автоматическая проверка и разбор после сдачи.</p>
+    {% endif %}
 
-    {% if facts %}
-    <div class="vp-land-facts" aria-label="Формат варианта">
-      <div class="vp-land-fact"><b>{{ facts.count_text }}</b><span>{{ facts.count|plural_word:"задание,задания,заданий" }}</span></div>
-      <div class="vp-land-fact"><b>{{ facts.minutes }}</b><span>минут</span></div>
-      <div class="vp-land-fact"><b>{{ facts.total|num }}</b><span>баллов</span></div>
-      {% if tour_dates_short %}<div class="vp-land-fact is-date"><b>{{ tour_dates_short }}</b><span>дни тура</span></div>{% endif %}
+    {% if composition %}
+    {# Полоса долей по баллам — только из данных опубликованных вариантов (`landing.composition`). #}
+    <div class="vp-land-comp" aria-label="Формат варианта">
+      <div class="vp-land-comp-h"><b>Из чего состоит вариант</b><span>{{ composition.label }}: {{ composition.count|plural:"задание,задания,заданий" }}{% if composition.minutes %} · {{ composition.minutes|plural:"минута,минуты,минут" }}{% endif %} · {{ composition.total|points_word }}</span></div>
+      <div class="vp-land-bar" role="img" aria-label="{% for r in composition.rows %}{{ r.range }} – {{ r.title|lower }}, {{ r.total|points_word }}{% if not forloop.last %}; {% endif %}{% endfor %}">
+        {% for r in composition.rows %}<span class="vp-land-seg is-{{ r.block }}" style="width: {{ r.percent|stringformat:'.2f' }}%" data-points="{{ r.total|num }}">{{ r.range }}{% if r.percent >= 40 %} · {{ r.title|lower }} · {{ r.total|points_word }}{% endif %}</span>{% endfor %}
+      </div>
+      <div class="vp-land-legend">{% for r in composition.rows %}<span>{{ r.range }} {{ r.title|lower }} · {{ r.total|num }}</span>{% endfor %}{% for o in composition.others %}<span>{{ o }}</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    {% if tour == 2 and composition.number_total %}
+    {# Пробник записи числа: проверка ВНЕ варианта (`format/check/`). Без JS его нет. #}
+    <div class="vp-land-probe" id="vp-probe" data-check-url="{% url 'vp:format_check' %}" data-csrf="{{ csrf_token }}" hidden>
+      <div class="vp-land-comp-h"><b>Проверьте запись ответа</b><span>{{ composition.number_total|num }} {{ composition.number_total|plural_word:"балл,балла,баллов" }} из {{ composition.total|num }} – ответ-число, неверная запись = 0</span></div>
+      <div class="vp-land-probe-row">
+        <label class="vp-sr" for="vp-probe-in">Запись числа</label>
+        <input class="vp-input vp-input--number" id="vp-probe-in" type="text" maxlength="40" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="37,5">
+        <span class="vp-land-probe-out" id="vp-probe-out" role="status" aria-live="polite">Впишите число – покажем, засчитают ли его на туре.</span>
+      </div>
+      <div class="vp-land-probe-ex"><span>примеры:</span>{% for ex in probe_examples %}<button type="button" data-probe="{{ ex }}">{{ ex }}</button>{% endfor %}</div>
     </div>
     {% endif %}
 
@@ -148,49 +168,13 @@
     </div>
     {% else %}
 
-    {# Ячейка 1: начатая работа или следующий вариант #}
-    <div class="vp-land-card vp-land-cell{% if mine.current %} is-live{% endif %}">
-      {% if mine.current %}
-      <p class="vp-land-ct">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        Начатая работа
-        {% if mine.current.with_timer %}<span class="vp-land-live"><i aria-hidden="true"></i>время идёт</span>{% endif %}
-      </p>
-      <p class="vp-land-cv">{{ mine.current.variant.title }}</p>
-      <p class="vp-land-cs">Отвечено {{ mine.current_answered }} из {{ mine.current_count }} · {% if mine.current.with_timer %}осталось {{ mine.current_left|mmss }}{% else %}без таймера{% endif %}</p>
-      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:take' mine.current.public_code %}">Продолжить</a></div>
-      {% elif mine.next_variant %}
-      <p class="vp-land-ct">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        Следующий вариант
-      </p>
-      <p class="vp-land-cv">{{ mine.next_variant|with_band }}</p>
-      <p class="vp-land-cs">ещё не открывали</p>
-      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
-      {% else %}
-      <p class="vp-land-ct">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
-        Следующий вариант
-      </p>
-      <p class="vp-land-cv">Все варианты пройдены</p>
-      <p class="vp-land-cs">Можно перерешать любой: повторные идут тренировкой</p>
-      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:variants' %}">Все варианты</a></div>
-      {% endif %}
-    </div>
-
-    {# Ячейка 2: моя лучшая попытка #}
+    {# Ячейка 1: моя лучшая попытка #}
     <div class="vp-land-card vp-land-cell">
-      <p class="vp-land-ct">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
-        Моя лучшая попытка
-      </p>
+      <p class="vp-land-ct">Моя лучшая попытка{% if mine.best_band_label %} · {{ mine.best_band_label }}{% endif %}</p>
       {% if mine.best %}
-      <p class="vp-land-cv"><b>{{ mine.best.score|num }}</b> из {{ mine.best.max_score|num }} · {{ mine.best_seconds|mmss }}</p>
-      <p class="vp-land-cs">{{ mine.best.variant.title }} · {{ mine.best_place }}-е место</p>
-      <div class="vp-land-ca">
-        <a class="vp-land-btn" href="{% url 'vp:result' mine.best.public_code %}">Разбор</a>
-        <a class="vp-land-more" href="{% url 'vp:my' %}">Все попытки</a>
-      </div>
+      <p class="vp-land-cv"><b>{{ mine.best.score|num }}</b> из {{ mine.best.max_score|num }} · {{ mine.best_place }}-е место</p>
+      <p class="vp-land-cs">{{ mine.best.variant|with_band }} · {{ mine.best.submitted_at|date:"j E" }} · {{ mine.best_seconds|mmss }}</p>
+      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:result' mine.best.public_code %}">Разбор</a></div>
       {% else %}
       <p class="vp-land-cv">Пока нет</p>
       <p class="vp-land-cs">Первая попытка с таймером по любому варианту попадёт в таблицу</p>
@@ -198,22 +182,33 @@
       {% endif %}
     </div>
 
-    {# Ячейка 3: пройдено вариантов #}
-    <div class="vp-land-card vp-land-cell">
-      <p class="vp-land-ct">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-        Пройдено{% if mine.band_label %} · {{ mine.band_label }}{% else %} вариантов{% endif %}
-      </p>
-      <p class="vp-land-cv"><b>{{ mine.done }}</b> из {{ mine.total }}
-        <span class="vp-land-dots" aria-hidden="true">{% for dot in mine.dots %}<i class="{{ dot }}"></i>{% endfor %}</span>
-      </p>
-      {% if mine.next_variant %}
-      <p class="vp-land-cs">Ещё не решали: {{ mine.next_variant.title }}</p>
-      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
+    {# Ячейка 2: что дальше — по приоритету (`landing.my_block`, ключ `step`) #}
+    <div class="vp-land-card vp-land-cell{% if mine.step == 'continue' %} is-live{% endif %}">
+      <p class="vp-land-ct">Что дальше{% if mine.step == 'continue' and mine.current.with_timer %} <span class="vp-land-live"><i aria-hidden="true"></i>время идёт</span>{% endif %}</p>
+      {% if mine.step == 'continue' %}
+      <p class="vp-land-cv">Продолжить: {{ mine.current.variant|with_band }}</p>
+      <p class="vp-land-cs">Отвечено {{ mine.current_answered }} из {{ mine.current_count }} · {% if mine.current.with_timer %}осталось {{ mine.current_left|mmss }}{% else %}без таймера{% endif %}</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:take' mine.current.public_code %}">Продолжить</a></div>
+      {% elif mine.step == 'drill_loss' %}
+      <p class="vp-land-cv">Потренировать запись ответа</p>
+      <p class="vp-land-cs">в прошлой попытке на записи потеряно {{ mine.lost|points_word }}</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:drill' %}">Начать</a></div>
+      {% elif mine.step == 'next' %}
+      <p class="vp-land-cv">Следующий вариант: {{ mine.next_variant|with_band }}</p>
+      <p class="vp-land-cs">ещё не открывали</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
       {% else %}
-      <p class="vp-land-cs">Все варианты пройдены</p>
-      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:variants' %}">Все варианты</a></div>
+      <p class="vp-land-cv">Потренировать запись ответа</p>
+      <p class="vp-land-cs">12 готовых чисел, 2–3 минуты</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:drill' %}">Начать</a></div>
       {% endif %}
+    </div>
+
+    {# Ячейка 3: пройдено вариантов своего класса #}
+    <div class="vp-land-card vp-land-cell">
+      <p class="vp-land-ct">Пройдено{% if mine.band_label %} · {{ mine.band_label }}{% else %} вариантов{% endif %}</p>
+      <p class="vp-land-cv"><b>{{ mine.done }}</b> из {{ mine.total }}{% if mine.all_done %} · новые варианты – в <a class="vp-link" href="{% url 'vp:variants' %}">«Вариантах»</a>{% endif %}</p>
+      <span class="vp-land-pbar" aria-hidden="true"><i style="width: {{ mine.done_percent }}%"></i></span>
     </div>
     {% endif %}
   </div>

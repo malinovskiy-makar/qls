@@ -67,10 +67,9 @@ class LandingTour2Tests(SectionBase):
         self.assertIn('тренажёр второго тура', html)
         self.assertIn('с 13 по 22 ноября 2026', html)
         hero = html.split('aria-label="Формат варианта"', 1)[1].split('class="vp-land-cta"', 1)[0]
-        self.assertIn('<b>17–18</b><span>заданий</span>', hero)
-        self.assertIn('<b>70</b><span>минут</span>', hero)
-        self.assertIn('<b>100</b><span>баллов</span>', hero)
-        self.assertIn('<b>13–22 нояб.</b><span>дни тура</span>', hero)
+        # Сессия R: плитки заменены строкой состава и полосой долей (числа из данных).
+        self.assertIn('10–11 класс: 18 заданий · 70 минут · 100 баллов', hero)
+        self.assertIn('9 класс: 17 заданий, числа по 6 баллов', hero)
         self.assertNotIn(self.tour1.title, html)
         self.assertNotIn('1 тур', body(html))
 

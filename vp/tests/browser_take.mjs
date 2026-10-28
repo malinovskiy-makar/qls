@@ -163,7 +163,7 @@ const TAKE_SELECTORS = ['.vp-item-text', '.vp-input', '.vp-opt span', '.vp-timer
 const INTRO_SELECTORS = ['.vp-h1', '.vp-h2', '.vp-sub', '.vp-table td', '.vp-stack', '.vp-note', '.vp-mode b',
   '.vp-mode span span', '.vp-btn', '.vp-mute', '.vp-eyebrow', '.vp-big'];
 const LANDING_SELECTORS = ['.vp-land-h1', '.vp-land-h1 small', '.vp-land-lead', '.vp-land-eyebrow',
-  '.vp-land-dates', '.vp-land-fact b', '.vp-land-fact span', '.vp-land-snake p', '.vp-land-snake-t',
+  '.vp-land-dates', '.vp-land-comp-h span', '.vp-land-legend span', '.vp-land-count', '.vp-land-snake p', '.vp-land-snake-t',
   '.vp-land-snake-t em', '.vp-land-chain span', '.vp-land-chain-more', '.vp-play', '.vp-ext',
   '.vp-land-bt', '.vp-land-bsub', '.vp-land-bfoot', '.vp-land-gtxt b', '.vp-land-gtxt span',
   '.vp-land-btn'];
