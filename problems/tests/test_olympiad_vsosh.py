@@ -553,3 +553,13 @@ class CheckRulesTests(SimpleTestCase):
         text = r'Итог $120\*100+20\*375$ и сноска \* вне формулы, цена \$5.'
         out, n = vsosh_digitize.fix_math_star(text)
         self.assertEqual((out, n), (r'Итог $120*100+20*375$ и сноска \* вне формулы, цена \$5.', 2))
+
+    def test_ile_mid_similarity_needs_shared_numbers(self):
+        from problems.olympiad_audit import vsosh_ile
+        ile = [{'stage': 'final', 'season': '2013/14', 'url': 'u', 'title': 'T', 'grades': '',
+                'number': '1', 'text': 'Фирма стремится получить наибольшую прибыль, издержки '
+                                       'TC = q^2/200 + 8, лицензия 50 денежных единиц, цена?'}]
+        other = {'event_id': 'e', 'number': '1', 'stage': 'final', 'academic_year': '2013/14',
+                 'statement_md': 'Фирма стремится получить наибольшую прибыль, спрос Q = 12 - 0,2P, '
+                                 'курс евро, выпуск равен трем, издержки 1 тысяча евро.'}
+        self.assertEqual(vsosh_ile.compare([other], ile)[0]['verdict'], 'нет_пары')

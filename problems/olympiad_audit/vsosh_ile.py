@@ -18,6 +18,7 @@ from problems.olympiad_audit import vsosh_sources as S
 #: Сходство (token_set_ratio) «та же задача» и «расходится сильно».
 SAME = 0.80
 STRONG_DIFF = 0.60
+_NUMS = re.compile(r'\d+(?:[.,]\d+)?')
 
 
 def parse_print_page(html_text):
@@ -84,6 +85,13 @@ def compare(rows, ile_tasks):
             if s > best:
                 best, bt = s, t
         verdict = 'совпало' if best >= SAME else 'сильно_расходится' if best >= STRONG_DIFF else 'нет_пары'
+        # Сходство 0,6–0,8 даёт и общая лексика разных задач (28.10: «Сигма»
+        # против «ABC»). Та же задача — если совпала хотя бы половина чисел ILE.
+        if verdict == 'сильно_расходится':
+            ile_nums = set(_NUMS.findall(bt['text']))
+            if not ile_nums or len(ile_nums & set(_NUMS.findall(r.get('statement_md') or ''))) \
+                    < len(ile_nums) / 2:
+                verdict = 'нет_пары'
         if verdict == 'совпало' and bt.get('title'):
             r['ile_title'] = bt['title']
         if verdict == 'сильно_расходится':
