@@ -50,8 +50,9 @@ class LandingTests(TestCase):
         rows = response.context['composition']['rows']
         self.assertEqual([r['total'] for r in rows],
                          [Decimal('12'), Decimal('9'), Decimal('9'), Decimal('70')])
+        self.assertEqual([r['percent'] for r in rows], [12, 9, 9, 70])       # ширины — доли баллов
         html = response.content.decode()
-        self.assertIn('data-points="70"', html)
+        self.assertIn('style="width: 70.00%" data-points="70"', html)
         self.assertIn('10–11 класс: 18 заданий · 70 минут · 100 баллов', html)
         self.assertIn('id="vp-probe"', html)
         self.assertIn('data-probe="37.5"', html)
