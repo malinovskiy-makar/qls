@@ -1194,6 +1194,33 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-cpanel .vp-clink { display: block; margin: 0; padding: 10px 14px; border-radius: var(--r-card); background: var(--surface); border-left: 3px solid var(--border); font-size: 13px; line-height: 1.5; }
 .vp-cpanel .vp-clink b { display: block; color: var(--text); }
 .vp-cpanel .vp-clink.is-broken { border-left-color: var(--error); }
+/* Тренировка записи ответа (макет 08). */
+.vp-drill { max-width: 960px; display: flex; flex-direction: column; gap: 16px; }
+.vp-drill-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 32px; flex-wrap: wrap; }
+.vp-drill-head .vp-lead { max-width: 620px; margin-top: 8px; }
+.vp-drill-count { text-align: right; min-width: 180px; }
+.vp-drill-count b { font-size: 32px; }
+.vp-drill-count div { color: var(--text2); }
+.vp-drill-bar { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.vp-drill-bar i { display: block; height: 100%; background: var(--green); }
+.vp-drill-table { padding: 8px 20px; }
+.vp-drill-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 200px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-bottom: var(--line, 1px) solid var(--border-soft); }
+.vp-drill-row.is-head { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text2); }
+.vp-drill-n { color: var(--text2); font-weight: 600; }
+.vp-drill-shown { display: flex; flex-direction: column; }
+.vp-drill-shown b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.vp-drill-shown small { font-size: 12.5px; color: var(--text2); }
+.vp-drill-row .vp-input--number { width: 100%; }
+.vp-drill-row.is-ok .vp-input { border-color: var(--green); }
+.vp-drill-row.is-bad .vp-input { border-color: var(--error); }
+.vp-drill-out { font-size: 13px; color: var(--text3); }
+.vp-drill-row.is-ok .vp-drill-out { color: var(--green-ink); }
+.vp-drill-row.is-bad .vp-drill-out { color: var(--error-ink); }
+.vp-drill-nojs { padding: 12px 0 4px; }
+.vp-drill-table.is-js .vp-drill-nojs { display: none; }
+.vp-drill-final { display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap; }
+.vp-drill-final[hidden] { display: none; }
+.vp-drill-final-act { display: flex; gap: 10px; flex-wrap: wrap; }
 /* ── Телефон ─────────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .vp-wrap { padding: 20px 16px 40px; }
@@ -1281,6 +1308,10 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-zbody { padding: 4px 12px 14px; }
   .vp-nums { grid-template-columns: minmax(0, 1fr); }
   .vp-cpanel { grid-template-columns: minmax(0, 1fr); }
+  .vp-drill-row { grid-template-columns: 28px minmax(0, 1fr); }
+  .vp-drill-row.is-head { display: none; }
+  .vp-drill-row .vp-numrow, .vp-drill-out { grid-column: 2; }
+  .vp-drill-count { text-align: left; }
   .vp-snake-sum { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {

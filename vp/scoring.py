@@ -203,6 +203,13 @@ def _format_error(text):
     return 'other'
 
 
+def format_error(text):
+    """Почему запись не по правилу ВШЭ (`minus` / `units` / `space` / `dot` / `decimals` /
+    `other`) или `None`, если запись верная. Для тренировки записи и пробника вне варианта."""
+    text = str(text).strip()
+    return None if NUMBER_FORMAT.fullmatch(text) else _format_error(text)
+
+
 def _soft_number(text):
     """Мягкая починка записи числа — ЕДИНСТВЕННОЕ место этого правила.
 

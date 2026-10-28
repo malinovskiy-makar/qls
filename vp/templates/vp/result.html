@@ -281,6 +281,13 @@
       </section>
       <section class="vp-card vp-side-card">
         <h2 class="vp-h3">Что дальше</h2>
+        {% if variant.tour != 1 %}
+        <div class="vp-next">
+          <b>Потренировать запись ответа</b>
+          <p>12 готовых чисел, 2–3 минуты: запишите по правилу ВШЭ – сразу видно, засчитали бы их или нет.</p>
+          <a class="vp-btn vp-btn--plain vp-btn--sm" href="{% url 'vp:drill' %}">Начать</a>
+        </div>
+        {% endif %}
         {% if invite_url %}
         <div class="vp-next">
           <b>Закрытая консультация перед туром</b>

@@ -1,0 +1,74 @@
+{% extends 'vp/base_vp.html' %}
+{% load static vp_extras %}
+{% comment %}
+«Тренировка записи ответа» `/vp/format/` (макет 08). Открыта всем, без входа и без стены.
+
+12 готовых чисел: ученик записывает их так, как примет система тура. С JS (`drill.js`)
+запись проверяется по Enter или при уходе из поля — запросом `format/check/` к тому же коду,
+что считает баллы (`vp/drill.py` → `vp/scoring.py`); ответ сервера вставляется как текст.
+Без JS форма уходит POST-ом сюда же («Проверить все»), вердикты рисует сервер.
+⚠️ Внутри варианта таких подсказок нет ни в одном режиме — только здесь и в пробнике посадочной.
+{% endcomment %}
+{% block title %}Тренировка записи ответа · Высшая проба, 2 тур{% endblock %}
+{% block content %}
+<div class="vp-wrap vp-drill">
+  <a class="vp-back" href="{% url 'vp:index' %}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    Тренажёр ВП
+  </a>
+  <div class="vp-drill-head">
+    <div>
+      <div class="vp-eyebrow">Тренажёр ВП · 2 тур</div>
+      <h1 class="vp-h1">Тренировка записи ответа</h1>
+      <p class="vp-lead">12 чисел, 2–3 минуты. Каждое уже посчитано – запишите его так, как примет система тура. Проверка – по Enter или при переходе к следующему полю.</p>
+    </div>
+    <div class="vp-drill-count" aria-live="polite">
+      <span class="vp-res-cap">записано верно</span>
+      <div><b id="vp-drill-ok">{{ ok_count }}</b> из {{ total }}</div>
+      <span class="vp-drill-bar" aria-hidden="true"><i id="vp-drill-bar" style="width: {% widthratio ok_count total 100 %}%"></i></span>
+    </div>
+  </div>
+
+  <div class="vp-res-loss vp-drill-rule">
+    <span class="vp-res-loss-ico" aria-hidden="true">Ф</span>
+    <div class="vp-res-loss-main">
+      <h2>На туре неверная запись – 0 баллов, даже если число верное</h2>
+      <p>Правило ВШЭ: «{{ number_rule }}»</p>
+    </div>
+  </div>
+
+  <form class="vp-card vp-drill-table" id="vp-drill" method="post" action="{% url 'vp:drill' %}" data-check-url="{{ check_url }}" novalidate>
+    {% csrf_token %}
+    <div class="vp-drill-row is-head" aria-hidden="true"><span>№</span><span>Получилось в решении</span><span>Ваша запись</span><span>Проверка</span></div>
+    {% for r in rows %}
+    <div class="vp-drill-row{% if r.verdict %}{% if r.verdict.ok %} is-ok{% else %} is-bad{% endif %}{% endif %}" data-i="{{ r.i }}">
+      <span class="vp-drill-n">{{ r.i }}</span>
+      <span class="vp-drill-shown"><b>{{ r.shown }}</b>{% if r.caption %}<small>{{ r.caption }}</small>{% endif %}</span>
+      <span class="vp-numrow">
+        <label class="vp-sr" for="vp-drill-{{ r.i }}">Запись числа {{ r.shown }}</label>
+        <input class="vp-input vp-input--number" id="vp-drill-{{ r.i }}" name="raw-{{ r.i }}" type="text" value="{{ r.value }}"
+               maxlength="40" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
+        <button type="button" class="vp-pm" aria-label="Поменять знак" data-pm-drill="{{ r.i }}">±</button>
+      </span>
+      <span class="vp-drill-out" id="vp-drill-out-{{ r.i }}" role="status">{% if r.verdict %}{{ r.verdict.text }}{% else %}–{% endif %}</span>
+    </div>
+    {% endfor %}
+    <div class="vp-drill-nojs"><button type="submit" class="vp-btn vp-btn--plain">Проверить все</button></div>
+  </form>
+
+  <section class="vp-card vp-drill-final" id="vp-drill-final"{% if not checked %} hidden{% endif %} aria-live="polite">
+    <div>
+      <div class="vp-res-cap">Итог</div>
+      <h2 class="vp-h3">Записано верно <span id="vp-drill-final-ok">{{ ok_count }}</span> из {{ total }}</h2>
+      <p class="vp-mute" id="vp-drill-final-why"></p>
+    </div>
+    <div class="vp-drill-final-act">
+      <a class="vp-btn vp-btn--plain" href="{% url 'vp:drill' %}">Пройти ещё раз</a>
+      <a class="vp-btn" href="{{ variants_url }}">Перейти к варианту</a>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block extra_js %}{{ block.super }}
+<script src="{% static 'vp/js/drill.js' %}" defer></script>
+{% endblock %}

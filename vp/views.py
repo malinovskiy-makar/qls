@@ -41,6 +41,7 @@ from django.views.decorators.http import require_GET, require_POST
 from catalog import seo
 from problems import exam_engine
 from vp import answers, blocks, board, config, landing, review, scoring, tracking, visibility
+from vp import drill as drill_rules
 from vp.loader import GAP_MARK
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 from vp.templatetags.vp_extras import grade_label
@@ -373,6 +374,56 @@ def remember_band(request):
     return HttpResponse(status=204)
 
 
+# ------------------------------------------------- тренировка записи ответа
+
+#: Тело проверки записи — одно короткое число; больше — мусор.
+MAX_FORMAT_BYTES = 2000
+
+
+def drill(request):
+    """«Тренировка записи ответа» `/vp/format/`: 12 готовых чисел, открыта всем без входа.
+
+    С JS каждая запись проверяется на лету (`format_check`); без JS форма уходит сюда POST-ом
+    («Проверить все»), и сервер рисует вердикты той же `drill.check`.
+    """
+    given = None
+    if request.method == 'POST':
+        given = {i: request.POST.get(f'raw-{i}', '')[:40] for i in range(1, len(drill_rules.DRILL) + 1)}
+    rows = drill_rules.rows(given)
+    band = landing.student_band(request)
+    return render(request, 'vp/drill.html', {
+        'rows': rows, 'total': len(rows),
+        'ok_count': sum(1 for r in rows if r['verdict'] and r['verdict']['ok']),
+        'checked': given is not None,
+        'number_rule': blocks.NUMBER_RULE,
+        'variants_url': reverse('vp:variants') + (f'?band={band}' if band else ''),
+        'check_url': reverse('vp:format_check'),
+        'vp_events': [tracking.event('vp_drill_open')],
+    })
+
+
+@require_POST
+def format_check(request):
+    """Проверка записи на лету, POST JSON: `{"i": 3, "raw": "20"}` — задание тренировки,
+    `{"raw": "37.5"}` — пробник посадочной. Открыта всем, CSRF обязателен, ничего не пишет."""
+    if len(request.body) > MAX_FORMAT_BYTES:
+        return _json({'error': 'too_large'}, status=400)
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return _json({'error': 'bad_json'}, status=400)
+    if not isinstance(body, dict) or not isinstance(body.get('raw', ''), str):
+        return _json({'error': 'bad_body'}, status=400)
+    raw = body.get('raw', '')[:40]
+    number = body.get('i')
+    if number is None:
+        return _json(drill_rules.probe(raw))
+    if isinstance(number, bool) or not isinstance(number, int) \
+            or not 1 <= number <= len(drill_rules.DRILL):
+        return _json({'error': 'bad_item'}, status=400)
+    return _json(drill_rules.check(number, raw))
+
+
 ATTEMPT_FILTERS = (
     ('all', 'Все'),
     ('ranked', 'В таблице'),
@@ -507,6 +558,7 @@ def intro(request, slug):
         'partial_phrase': blocks.in_tasks(partial),
         'share_phrase': blocks.in_tasks(shared),
         'number_rule': blocks.NUMBER_RULE,
+        'drill_url': reverse('vp:drill'),
         'penalty_example': example,
         'attempt': attempt,
         'attempt_answered': _answered_count(attempt) if attempt else 0,
