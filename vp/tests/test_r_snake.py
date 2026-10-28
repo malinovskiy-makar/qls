@@ -54,6 +54,7 @@ class SnakeArchiveTests(TestCase):
     def test_stranger_gets_no_definition_and_no_answer(self):
         response = Client().get(self.url)
         self.assertEqual(response.status_code, 200)
+        self.assertNotIn('chain', response.context)          # защита — в данных, не в шаблоне
         html = response.content.decode()
         for private in (DEFINITION, self.right_two, 'не то слово', 'class="vp-cw ', 'data-panel="'):
             self.assertNotIn(private, html, private)
