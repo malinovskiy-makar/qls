@@ -1075,6 +1075,7 @@ class Command(BaseCommand):
             review = options.get('review') or str(Path(result['path']).parent /
                                                   f'review_{ds.out_version}.html')
             claude_eyes.review_html(items, review, f'{name} {ds.out_version}: на утро')
+            claude_eyes.write_jsonl(str(Path(result['path']).parent / f'morning_{ds.out_version}.jsonl'), items)
             inv = result['invariants']
             self._say(f'{name}: {inv["tasks_in"]} → {inv["tasks_out"]} заданий, правок '
                       f'{len(result["texts"])}, рисунков {len(result["figures"])}, на утро '
