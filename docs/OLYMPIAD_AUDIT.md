@@ -637,7 +637,7 @@ Batches: Sonnet 5.5, $0,010 за единицу (вход ≈10 тыс. токе
 (`review_vN.html` / `morning_vN.jsonl` в каждой `digitized\vN\`). Вырезки,
 забракованные при просмотре контактного листа, перечислены в
 `audit_claude\figures_rejected.txt`, сами файлы — в
-`audit_claude\figures_rejected_png\`. Зубастость тестов — 40 из 41 мутации
+`audit_claude\figures_rejected_png\`. Зубастость тестов — 40 из 42 мутаций
 красные (`night_20261028\P2_mutations.md`).
 ⚠️ **Модель иногда «поправляет себя» вторым JSON** («Постойте, я ошибся…») или
 рассуждает с фигурными скобками до ответа: `parse_reply` берёт ПОСЛЕДНИЙ целый
