@@ -492,10 +492,12 @@ def run_assemble(cmd, opts):
         stars = 0
         for field in ('statement_md', 'solution_md', 'criteria_md', 'answer'):
             r[field], k = fix_math_star(r.get(field) or '')
-            stars += k
+            r[field], k2 = fix_unbalanced_delims(r[field])
+            stars += k + k2
         for part in r.get('parts') or []:
             part['text'], k = fix_math_star(part.get('text') or '')
-            stars += k
+            part['text'], k2 = fix_unbalanced_delims(part['text'])
+            stars += k + k2
         if stars:
             r['math_star_unescaped'] = stars
         key = (r['event_id'], r['number'], r.get('task_variant', ''))
@@ -538,6 +540,46 @@ def fix_math_star(text):
     return _MATH.sub(one, text), n
 
 
+_LEFT_RIGHT = re.compile(r'\\(left|right)\b\s*(\\[{}|]|\\[a-zA-Z]+|[()\[\]|./])')
+
+
+def fix_unbalanced_delims(text):
+    r"""Непарный `\right)` (или `\left(`) в формуле → просто `)` (`(`): KaTeX
+    не разбирает формулу с лишним `\right` (28.10: решение ЗЭ 2021/22 № 3).
+    Скобка остаётся, как написала модель; правится только парность команд.
+    Возвращает (текст, число правок)."""
+    if not text or '\\right' not in text and '\\left' not in text:
+        return text, 0
+    n = 0
+
+    def seg(m):
+        nonlocal n
+        s = m.group(0)
+        toks = list(_LEFT_RIGHT.finditer(s))
+        stack, bad = [], set()
+        for t in toks:
+            if t.group(1) == 'left':
+                stack.append(t)
+            elif stack:
+                stack.pop()
+            else:
+                bad.add(t.start())
+        bad |= {t.start() for t in stack}
+        if not bad:
+            return s
+        out, last = [], 0
+        for t in toks:
+            if t.start() in bad:
+                out.append(s[last:t.start()])
+                d = t.group(2)
+                out.append('' if d == '.' else d)
+                last = t.end()
+                n += 1
+        out.append(s[last:])
+        return ''.join(out)
+    return _MATH.sub(seg, text), n
+
+
 _CYR_WORD = re.compile(r'[А-Яа-яЁё]{3,}')
 _TEXT_CMD = re.compile(r'\\(?:text|mathrm|textit|textbf|operatorname)\{[^{}]*\}')
 #: Обратная косая — именем: правки этого файла уже дважды съедали её в литералах.
@@ -569,7 +611,9 @@ def fix_currency_dollars(text):
             while j < len(text) and not (text[j] == '$' and text[j - 1] != _BSL):
                 j += 1
             seg = text[i + 1:j]
-            if text[i + 1:i + 2].isdigit() and (
+            # «$700» и «10 $ в час»: за `$` цифра или пробел, а «формула» до
+            # следующего `$` — с русским словом (или `$` не закрыт).
+            if (text[i + 1:i + 2].isdigit() or text[i + 1:i + 2].isspace()) and (
                     j >= len(text) or _CYR_WORD.search(_TEXT_CMD.sub('', seg))):
                 out.append(_BSL + '$')
                 n += 1

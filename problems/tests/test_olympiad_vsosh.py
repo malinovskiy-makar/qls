@@ -576,3 +576,15 @@ class CheckRulesTests(SimpleTestCase):
                 fh.write('# комментарий\nfigures/a.png\tплохая_вырезка\te|1\n')
             self.assertEqual(Q.figure_eyes(path), {'figures/a.png': 'плохая_вырезка'})
             self.assertEqual(Q.figure_eyes(os.path.join(tmp, 'нет.tsv')), {})
+
+    def test_unbalanced_right_becomes_plain_bracket(self):
+        text = r'$SW = \left(a - PQ\right) + PQ - 15Q\right) = b$ и $\left(x\right)$'
+        out, n = vsosh_digitize.fix_unbalanced_delims(text)
+        self.assertEqual((out, n), (r'$SW = \left(a - PQ\right) + PQ - 15Q) = b$ и $\left(x\right)$', 1))
+
+    def test_dollar_with_space_before_russian_is_money(self):
+        out, n = vsosh_digitize.fix_currency_dollars('Зарплата 10 $ в час. MC(100) = ____')
+        self.assertEqual(n, 1)
+        self.assertIn(r'10 \$ в час', out)
+        same, k = vsosh_digitize.fix_currency_dollars('Формула $ x + y$ и всё.')
+        self.assertEqual(k, 0)
