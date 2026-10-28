@@ -184,6 +184,27 @@ class ArchiveAndFormatTests(SimpleTestCase):
             with open(html_, 'wb') as fh:
                 fh.write(b'<!DOCTYPE html><html>')
             self.assertEqual(vsosh_manifest.detect_format(html_), 'html')
+            stub = os.path.join(tmp, 'yd')
+            with open(stub, 'wb') as fh:
+                fh.write(b'{"href": "https://downloader.disk.yandex.ru/x", "method": "GET"}')
+            self.assertEqual(vsosh_manifest.detect_format(stub), 'json')
+
+    def test_api_stub_counts_as_not_downloaded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = os.path.join(tmp, 'work')
+            os.makedirs(os.path.join(tmp, 'raw'))
+            os.makedirs(work)
+            with open(os.path.join(tmp, 'raw', 'a.pdf'), 'wb') as fh:
+                fh.write(b'{"href": "x"}')
+            job = {'url': 'https://cloud-api.yandex.net/x', 'dest': 'raw/a.pdf', 'source': 'region:x',
+                   'stage': 'school', 'kind': 'tasks'}
+            with open(os.path.join(work, 'jobs_t.jsonl'), 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps(job) + chr(10))
+            with open(os.path.join(work, 'results_t.jsonl'), 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps(dict(job, status='ok', sha256='s', size=13)) + chr(10))
+            rows = vsosh_manifest.build(tmp, work, ['t'], unpack=False)
+            self.assertEqual(rows[0]['status'], 'not_downloaded')
+            self.assertTrue(vsosh_manifest.invariants(rows)['balanced'])
 
 
 class DedupTests(SimpleTestCase):
@@ -305,3 +326,26 @@ class AssembleWrapperTests(SimpleTestCase):
         usage = {'input_tokens': 1000, 'output_tokens': 1000, 'cache_read_input_tokens': 2000}
         # (1000 + 0,1·2000)·2 + 1000·10 = 12 400 → ×0,5 / 1e6
         self.assertAlmostEqual(vsosh_digitize.batch_cost(usage, 'claude-sonnet-5-5'), 0.0062)
+
+
+class CurrencyDollarTests(SimpleTestCase):
+    BS = chr(92)
+
+    def test_money_escaped_math_kept(self):
+        text = ('если билет стоит не более $700, а туристы – если не более $300. '
+                'При $P = 10$ спрос $Q = 400$, цена $100$ и $$W = 2q$$.')
+        fixed, n = vsosh_digitize.fix_currency_dollars(text)
+        self.assertEqual(n, 2)
+        self.assertIn('не более ' + self.BS + '$700, а туристы', fixed)
+        self.assertIn('не более ' + self.BS + '$300. При $P = 10$', fixed)
+        self.assertIn('$100$', fixed)
+        self.assertIn('$$W = 2q$$', fixed)
+
+    def test_text_command_inside_math_is_not_money(self):
+        text = '$5' + self.BS + 'text{ рублей}$ и всё'
+        self.assertEqual(vsosh_digitize.fix_currency_dollars(text), (text, 0))
+
+    def test_idempotent(self):
+        once, _ = vsosh_digitize.fix_currency_dollars('стоит $700, а потом $300.')
+        twice, n = vsosh_digitize.fix_currency_dollars(once)
+        self.assertEqual((twice, n), (once, 0))

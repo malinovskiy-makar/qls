@@ -284,6 +284,15 @@ def run_assemble(cmd, opts):
         r['pages_ready'] = list(ready.get(r['event_id'], (0, 0)))
         r['event_partial'] = ready.get(r['event_id'], (0, 0))[0] < ready.get(r['event_id'], (0, 1))[1]
         r['title'] = official_title(r.get('title'))
+        fixed = 0
+        for field in ('statement_md', 'solution_md', 'criteria_md', 'answer'):
+            r[field], k = fix_currency_dollars(r.get(field) or '')
+            fixed += k
+        for part in r.get('parts') or []:
+            part['text'], k = fix_currency_dollars(part.get('text') or '')
+            fixed += k
+        if fixed:
+            r['currency_dollars_escaped'] = fixed
         key = (r['event_id'], r['number'], r.get('task_variant', ''))
         keys[key] += 1
         if keys[key] > 1:
@@ -295,6 +304,51 @@ def run_assemble(cmd, opts):
     cmd._say(f'сборка: {dict(summary)}')
     cmd._say(f'заданий v1: {len(out)}; комплектов с заданиями: '
              f'{len({r["event_id"] for r in out})}; повторов ключа (переименованы): {dup}')
+
+
+_CYR_WORD = re.compile(r'[А-Яа-яЁё]{3,}')
+_TEXT_CMD = re.compile(r'\\(?:text|mathrm|textit|textbf|operatorname)\{[^{}]*\}')
+#: Обратная косая — именем: правки этого файла уже дважды съедали её в литералах.
+_BSL = chr(92)
+
+
+def fix_currency_dollars(text):
+    r"""Валютный «$700» → «\$700»: модель пишет доллары как в оригинале, а на
+    сайте `$` открывает формулу, и KaTeX склеивает текст до следующего `$`.
+
+    Правило (детерминированное, ADR 0005 — правится форма, не смысл): `$` без
+    обратной косой перед ним, сразу за ним цифра; если «формула» до
+    следующего `$` содержит русское слово (вне `\text{}`) или закрывающего
+    `$` нет — это деньги, `$` экранируется. `$$` не трогается.
+    Возвращает (текст, число правок)."""
+    if not text or '$' not in text:
+        return text, 0
+    out, i, n = [], 0, 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '$' and (i == 0 or text[i - 1] != _BSL):
+            if text.startswith('$$', i):
+                j = text.find('$$', i + 2)
+                j = len(text) - 2 if j < 0 else j
+                out.append(text[i:j + 2])
+                i = j + 2
+                continue
+            j = i + 1
+            while j < len(text) and not (text[j] == '$' and text[j - 1] != _BSL):
+                j += 1
+            seg = text[i + 1:j]
+            if text[i + 1:i + 2].isdigit() and (
+                    j >= len(text) or _CYR_WORD.search(_TEXT_CMD.sub('', seg))):
+                out.append(_BSL + '$')
+                n += 1
+                i += 1
+                continue
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out), n
 
 
 _SERVICE_TITLE = re.compile(r'^\s*(задача|задание|вопрос|тест|раздел|часть|эссе|блиц)\b[\s№.]*'
@@ -310,7 +364,104 @@ def official_title(title):
     return t
 
 
+def run_batches(cmd, opts):
+    """Пакеты Claude к утру: группы 1–3 — Sonnet, 4–5 — Haiku (по `--groups`)."""
+    out_dir = os.path.join(cmd.digitized, 'claude_batches')
+    groups = {int(g) for g in str(opts['groups']).split(',') if g.strip()}
+    total = {}
+    for model, gs in (('claude-sonnet-5-5', groups & {1, 2, 3}),
+                      ('claude-haiku-5-5', groups & {4, 5})):
+        if not gs:
+            continue
+        paths, n = write_batches(cmd.digitized, gs, model, out_dir)
+        total[model] = {'pages': n, 'files': len(paths),
+                        'estimate_usd': round(n * CLAUDE_PAGE_USD[model], 2)}
+    with open(os.path.join(out_dir, 'batches_plan.json'), 'w', encoding='utf-8') as fh:
+        json.dump(total, fh, ensure_ascii=False, indent=1)
+    cmd._say(json.dumps(total, ensure_ascii=False))
+
+
+def _ledger(digitized):
+    path = os.path.join(digitized, 'claude_batches', 'ledger.jsonl')
+    return path, _read(path)
+
+
+def run_claude(cmd, opts):
+    """submit — отправить пакеты по порядку, пока расход < 90 % потолка;
+    collect — забрать готовые результаты в pages_claude\ и учесть расход."""
+    import time
+    digitized = cmd.digitized
+    out_dir = os.path.join(digitized, 'claude_batches')
+    ledger_path, ledger = _ledger(digitized)
+    spent = sum(float(x.get('cost_usd') or 0) for x in ledger if x.get('kind') == 'result')
+    cap = opts.get('max_usd') or 0
+    action = opts.get('action') or 'collect'
+    client = claude_client()
+    if action == 'submit':
+        if not opts.get('yes') or not cap:
+            cmd._say('Без --yes и --max-usd пакеты не отправляются.')
+            return
+        sent = {x['file'] for x in ledger if x.get('kind') == 'submitted'}
+        for name in sorted(os.listdir(out_dir)):
+            if not name.startswith('batch_') or name in sent:
+                continue
+            model = 'claude-sonnet-5-5' if 'sonnet' in name else 'claude-haiku-5-5'
+            reqs = _read(os.path.join(out_dir, name))
+            projected = spent + len(reqs) * CLAUDE_PAGE_USD[model] + sum(
+                x.get('estimate_usd', 0) for x in ledger
+                if x.get('kind') == 'submitted' and not x.get('collected'))
+            if projected > 0.9 * cap:
+                cmd._say(f'стоп: {name} поднял бы расход до ${projected:.2f} (> 90 % от ${cap})')
+                break
+            for attempt in range(6):
+                try:
+                    batch = client.messages.batches.create(requests=reqs)
+                    break
+                except Exception as exc:   # 429/5xx — подождать и повторить
+                    if attempt == 5:
+                        raise
+                    cmd._say(f'  повтор отправки {name}: {exc}')
+                    time.sleep(30 * (attempt + 1))
+            rec = {'kind': 'submitted', 'file': name, 'batch_id': batch.id, 'model': model,
+                   'requests': len(reqs), 'estimate_usd': round(len(reqs) * CLAUDE_PAGE_USD[model], 3)}
+            with open(ledger_path, 'a', encoding='utf-8') as fh:
+                fh.write(json.dumps(rec, ensure_ascii=False) + '\n')
+            ledger.append(rec)
+            cmd._say(f'отправлен {name}: {batch.id}')
+        return
+    done = {x['batch_id'] for x in ledger if x.get('kind') == 'collected'}
+    for sub in [x for x in ledger if x.get('kind') == 'submitted' and x['batch_id'] not in done]:
+        b = client.messages.batches.retrieve(sub['batch_id'])
+        if b.processing_status != 'ended':
+            cmd._say(f'{sub["file"]}: {b.processing_status} {b.request_counts}')
+            continue
+        cost, ok, bad = 0.0, 0, 0
+        for res in client.messages.batches.results(sub['batch_id']):
+            key = res.custom_id.replace('__', '/')
+            if res.result.type != 'succeeded':
+                bad += 1
+                continue
+            msg = res.result.message
+            text = ''.join(getattr(b_, 'text', '') for b_ in msg.content if b_.type == 'text')
+            usage = msg.usage.model_dump() if hasattr(msg.usage, 'model_dump') else dict(msg.usage)
+            rec = claude_record(key, text, usage, sub['model'])
+            cost += rec['cost_usd']
+            ok += rec['status'] == 'ok'
+            sha16 = key.split('/')[1]
+            transcribe.Transcriber._write(
+                os.path.join(digitized, 'pages_claude', sha16, f'p{rec["page"]}.json'), rec)
+        with open(ledger_path, 'a', encoding='utf-8') as fh:
+            fh.write(json.dumps({'kind': 'result', 'batch_id': sub['batch_id'], 'cost_usd': round(cost, 4),
+                                 'ok': ok, 'failed': bad}, ensure_ascii=False) + '\n')
+            fh.write(json.dumps({'kind': 'collected', 'batch_id': sub['batch_id']}) + '\n')
+        cmd._say(f'{sub["file"]}: ok {ok}, сбоев {bad}, ${cost:.3f}')
+
+
 def run_step(cmd, step, opts):
+    if step == 'batches':
+        return run_batches(cmd, opts)
+    if step == 'claude':
+        return run_claude(cmd, opts)
     if step == 'transcribe':
         return run_transcribe(cmd, opts)
     if step == 'assemble':

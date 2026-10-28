@@ -72,6 +72,8 @@ def detect_format(path):
     low = head[:500].lstrip().lower()
     if low.startswith(b'<!doctype html') or low.startswith(b'<html'):
         return 'html'
+    if low.startswith(b'{') or low.startswith(b'['):
+        return 'json'
     return 'bin'
 
 
@@ -289,9 +291,20 @@ def build(data_root, work_dir, run_names, unpack=True, log=print):
             out.append(row)
             continue
         path = os.path.join(data_root, row['dest'])
+        if not os.path.isfile(path):
+            row['status'], row['reason'] = 'not_downloaded', 'файла нет на диске'
+            out.append(row)
+            continue
         fmt = detect_format(path)
         row['format'] = fmt
         row['path'] = row['dest']
+        if fmt in ('html', 'json'):
+            # Я.Диск/Drive через API отдают JSON-ответ вместо файла, сайты —
+            # страницу ошибки; загрузчик такое считал «ok» (отчёт агента регионов).
+            row['status'] = 'not_downloaded'
+            row['reason'] = f'вместо файла {fmt} (ответ API / страница), не файл заданий'
+            out.append(row)
+            continue
         if fmt in ARCHIVES:
             row['status'] = 'archive'
             out.append(row)

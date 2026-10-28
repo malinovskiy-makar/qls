@@ -32,7 +32,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('step', choices=['manifest', 'convert', 'render', 'events', 'plan',
-                                             'transcribe', 'assemble', 'check', 'review', 'bank'])
+                                             'transcribe', 'batches', 'claude', 'assemble',
+                                             'check', 'review', 'bank'])
+        parser.add_argument('--action', choices=['submit', 'collect'], default='collect',
+                            help='claude: отправить пакеты или забрать результаты')
         parser.add_argument('--root', default=DEFAULT_ROOT)
         parser.add_argument('--groups', default='1,2,3,4,5', help='группы плана (transcribe)')
         parser.add_argument('--max-usd', type=float, default=None)
@@ -54,7 +57,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         self._paths(opts['root'])
         step = opts['step']
-        if step in ('transcribe', 'assemble', 'check', 'review', 'bank'):
+        if step in ('transcribe', 'batches', 'claude', 'assemble', 'check', 'review', 'bank'):
             from problems.olympiad_audit import vsosh_digitize
             return vsosh_digitize.run_step(self, step, opts)
         getattr(self, '_' + step)(opts)

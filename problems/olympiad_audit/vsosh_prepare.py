@@ -250,7 +250,7 @@ def _render_one(args):
 
 
 def render_all(data_root, targets, digitized, log=print, workers=8):
-    """PDF целей → pages\<sha16>\p<N>.png/.txt (готовое не перерисовывается).
+    r"""PDF целей → pages\<sha16>\p<N>.png/.txt (готовое не перерисовывается).
 
     Процессами (fitz не потокобезопасен). Возвращает {sha256: страниц};
     не открывшиеся PDF — со значением 0."""
