@@ -563,3 +563,7 @@ class CheckRulesTests(SimpleTestCase):
                  'statement_md': 'Фирма стремится получить наибольшую прибыль, спрос Q = 12 - 0,2P, '
                                  'курс евро, выпуск равен трем, издержки 1 тысяча евро.'}
         self.assertEqual(vsosh_ile.compare([other], ile)[0]['verdict'], 'нет_пары')
+
+    def test_key_table_true_false_letters(self):
+        hor = '| № теста | 1 | 2 | 3 |\n|---|---|---|---|\n| Ответы | Н | Н | В |'
+        self.assertEqual(vsosh_digitize.key_table_pairs(hor), [('1', 'Н'), ('2', 'Н'), ('3', 'В')])
