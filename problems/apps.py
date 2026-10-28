@@ -8,3 +8,5 @@ class ProblemsConfig(AppConfig):
     def ready(self):
         # Подключаем сигналы (автосоздание профиля пользователя).
         from . import signals  # noqa: F401
+        # Регистрирует проверку канала почты (`mail.E001`).
+        from . import checks  # noqa: F401

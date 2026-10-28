@@ -235,3 +235,12 @@ SMART_SEARCH_CORPUS_DISK_CACHE = (
     os.environ.get('SMART_SEARCH_CORPUS_DISK_CACHE', '1').strip().lower()
     not in ('0', 'false', 'no', 'off', '')
 )
+
+# ─── Почта: на бою выключена, пока её не включат явно (docs/MAIL.md) ────────
+# Базовые настройки ставят MAIL_ENABLED=1 вне тестов, чтобы при разработке
+# коды печатались в окно runserver. Здесь значение читается заново и по
+# умолчанию '0': почту включают отдельным шагом, после send_test_email на
+# этом сервере и выкатки новых правовых текстов. Включённая почта без
+# EMAIL_HOST и ключа не пустит сайт подняться (проверка mail.E001).
+MAIL_ENABLED = (os.environ.get('MAIL_ENABLED', '0').strip().lower()
+                in ('1', 'true', 'yes', 'on'))

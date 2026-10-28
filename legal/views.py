@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Страницы документов, экран согласия и согласие на помощника."""
+from urllib.parse import quote
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
@@ -110,6 +112,37 @@ def ai_revoke(request):
     erasure.erase_chat(request.user)
     if _wants_json(request):
         return JsonResponse({'ok': True})
+    return redirect(PROFILE_URL)
+
+
+def _mail_or_404():
+    from problems.email_codes import mail_enabled
+    if not mail_enabled():
+        raise Http404
+
+
+@login_required
+@require_POST
+def mail_grant(request):
+    """Согласие на рассылку переключателем в профиле (docs/MAIL.md).
+
+    Без подтверждённой почты включить нельзя: писать некуда. Такого человека
+    ведём на страницу «Почта», откуда он вернётся в профиль.
+    """
+    from problems.email_codes import has_verified_email
+    _mail_or_404()
+    if not has_verified_email(request.user):
+        return redirect('/account/email/?next=' + quote(PROFILE_URL, safe=''))
+    consent.grant(request.user, ConsentRecord.Kind.MAIL, ConsentRecord.Source.PROFILE)
+    return redirect(PROFILE_URL)
+
+
+@login_required
+@require_POST
+def mail_revoke(request):
+    """Отзыв согласия на рассылку. Ничего не удаляет: строка помечается отозванной."""
+    _mail_or_404()
+    consent.revoke(request.user, ConsentRecord.Kind.MAIL)
     return redirect(PROFILE_URL)
 
 

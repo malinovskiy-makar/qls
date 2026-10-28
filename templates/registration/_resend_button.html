@@ -1,0 +1,28 @@
+{% comment %}
+Кнопка «Отправить код ещё раз» (docs/MAIL.md). Сколько ждать, считает СЕРВЕР
+(`email_codes.resend_wait`) — скрипт только отсчитывает секунды и включает
+кнопку. Без скрипта кнопка включится после перезагрузки страницы; нажатие
+раньше срока сервер всё равно отклонит с тем же ожиданием.
+Параметры: `wait` — секунды, `btn_class` — класс кнопки.
+{% endcomment %}
+<button type="submit" name="action" value="resend" class="{{ btn_class|default:'btn-quiet-auth' }}"
+        data-resend-wait="{{ wait|default:0 }}"{% if wait %} disabled{% endif %}>
+  Отправить код ещё раз{% if wait %} через {{ wait }} с{% endif %}
+</button>
+<script>
+(function () {
+  var btn = document.currentScript.previousElementSibling;
+  var left = parseInt(btn.getAttribute('data-resend-wait'), 10) || 0;
+  if (left <= 0) return;
+  var timer = setInterval(function () {
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = 'Отправить код ещё раз';
+    } else {
+      btn.textContent = 'Отправить код ещё раз через ' + left + ' с';
+    }
+  }, 1000);
+})();
+</script>

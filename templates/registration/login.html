@@ -8,7 +8,8 @@
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
   {% include '_metrika.html' %}
-  {% include 'registration/_auth_style.html' %}
+  {% include 'registration/_auth_style.html' %}{% if mail_enabled %}
+  {% include 'registration/_mail_style.html' %}{% endif %}
 </head>
 <body>
 {% include '_metrika_noscript.html' %}
@@ -43,7 +44,7 @@
     {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
   </div>
   <h1>Войти</h1>
-  <p class="login-sub">Введите логин и пароль</p>
+  <p class="login-sub">{% if mail_enabled %}Введите логин или почту и пароль{% else %}Введите логин и пароль{% endif %}</p>
 
   {% comment %}
   ⚠️ Текст ошибки НЕ берётся из формы, и это осознанно: Django различает
@@ -59,7 +60,8 @@
   <div class="error-list">
     Неверный логин или пароль. Попробуйте ещё раз.
   </div>
-  {% endif %}
+  {% endif %}{% if mail_enabled %}{% for message in messages %}
+  <div class="error-list{% if message.level_tag == 'success' %} error-list--ok{% endif %}">{{ message }}</div>{% endfor %}{% endif %}
 
   <form method="post">
     {% csrf_token %}
@@ -67,7 +69,7 @@
     <input type="hidden" name="next" value="{{ next }}">
     {% endif %}
     <div class="form-group">
-      <label for="id_username">Логин</label>
+      <label for="id_username">{% if mail_enabled %}Логин или почта{% else %}Логин{% endif %}</label>
       {% comment %}Вебвизор пишет ввод звёздочками (ADR 0133), как на регистрации.{% endcomment %}
       <input type="text" id="id_username" name="username" class="ym-disable-keys"
              value="{{ form.username.value|default:'' }}"
@@ -90,7 +92,9 @@
   <div class="auth-foot">
     Нет аккаунта? <a href="{% url 'register' %}">Создать аккаунт</a><br>
     Забыли пароль?
-    <a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
+    {% if mail_enabled %}<a href="/password/forgot/">Восстановить по почте</a><br>
+    Нет почты в аккаунте?
+    {% endif %}<a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
   </div>
 
   <a class="back-link" href="/">← На главную</a>

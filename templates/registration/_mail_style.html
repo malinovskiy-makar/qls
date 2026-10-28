@@ -1,0 +1,38 @@
+{% comment %}
+Добавка к `_auth_style.html` для экранов почты (docs/MAIL.md): код, повтор
+письма, сообщения «готово». Отдельным файлом, а не правкой общего стиля:
+при MAIL_ENABLED=0 экраны входа и регистрации остаются прежними байт в байт.
+Цвета — только токены `_tokens.html`.
+{% endcomment %}
+<style>
+.error-list--ok {
+  background: var(--accent-tint);
+  border-color: var(--accent-ring);
+  color: var(--text);
+}
+.mail-lead { font-size: 14px; color: var(--text2); line-height: 1.5; margin: -8px 0 20px; }
+.mail-lead b { color: var(--text); font-weight: 600; word-break: break-all; }
+.code-input {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 22px !important;
+  letter-spacing: 6px;
+  text-align: center;
+}
+.mail-resend { margin-top: 12px; }
+.btn-quiet-auth {
+  width: 100%;
+  height: 44px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-quiet-auth:hover { background: var(--surface-2); }
+.btn-quiet-auth:disabled { color: var(--text3); cursor: not-allowed; background: transparent; }
+.mail-links { margin-top: 14px; font-size: 13px; text-align: center; }
+.mail-links a { color: var(--accent-ink); text-decoration: none; }
+.mail-links a:hover { text-decoration: underline; }
+</style>

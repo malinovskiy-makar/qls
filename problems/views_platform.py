@@ -227,6 +227,14 @@ def profile(request):
         'facts': _profile_facts(request.user, profile_obj),
         'ai_consent': _ai_consent_record(request.user),
     }
+    from .email_codes import has_verified_email, mail_enabled
+    if mail_enabled():
+        # Строка почты, плашка «добавьте почту» и переключатель рассылки
+        # (docs/MAIL.md). При выключенной почте контекст прежний.
+        from legal.consent import wants_mail
+        context.update(mail_enabled=True,
+                       email_verified=has_verified_email(request.user),
+                       wants_mail=wants_mail(request.user))
     if profile_obj.is_tutor:
         from .models import User as UserModel
         context['tutor_groups'] = request.user.teaching_groups.count()

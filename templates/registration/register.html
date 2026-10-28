@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Регистрация · Weconomics</title>
+  <title>{% block title %}Регистрация · Weconomics{% endblock %}</title>
   {% include '_seo_meta.html' %}
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
   {% include '_metrika.html' %}
-  {% include 'registration/_auth_style.html' %}
+  {% include 'registration/_auth_style.html' %}{% block extra_head %}{% endblock %}
 </head>
 <body>
 {% include '_metrika_noscript.html' %}
@@ -29,12 +29,19 @@
   {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
 </div>
 
-<div class="login-card">
+{% block card %}{% comment %}
+Блоки title, extra_head и card — для экранов почты (docs/MAIL.md): шаг кода
+регистрации и сброс пароля наследуют эту страницу целиком, меняя только
+карточку. Своих корневых шаблонов у них нет намеренно: сторожа
+`legal/tests/test_cookie_bar.py` и `problems/tests/test_signup_source.py`
+считают каждый шаблон с doctype страницей сайта со счётчиком. Сами теги
+блоков в разметку ничего не выводят.
+{% endcomment %}<div class="login-card">
   <div class="login-logo">
     {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
   </div>
   <h1>Создать аккаунт</h1>
-  <p class="login-sub">Логин и пароль: больше ничего не нужно</p>
+  <p class="login-sub">{% if mail_enabled %}Логин, почта и пароль{% else %}Логин и пароль: больше ничего не нужно{% endif %}</p>
 
   {% if rate_limited %}
   <div class="error-list">
@@ -42,7 +49,8 @@
   </div>
   {% elif form.non_field_errors %}
   <div class="error-list">{{ form.non_field_errors|join:' ' }}</div>
-  {% endif %}
+  {% endif %}{% if mail_enabled %}{% for message in messages %}
+  <div class="error-list">{{ message }}</div>{% endfor %}{% endif %}
 
   {% comment %}
   ⚠️ `ym-disable-keys` на КАЖДОМ поле ввода — Вебвизор Метрики пишет ввод
@@ -71,7 +79,24 @@
       {% for error in form.username.errors %}
       <div class="field-error">{{ error }}</div>
       {% endfor %}
-    </div>
+    </div>{% if mail_enabled %}
+
+    {% comment %}
+    Почта (docs/MAIL.md): на неё придёт код, аккаунт появится только после
+    кода. Занятую подтверждённую почту форма называет честно и ведёт на вход
+    и на сброс пароля — ссылки собирает сервер (`RegisterWithEmailForm`).
+    {% endcomment %}
+    <div class="form-group">
+      <label for="{{ form.email.id_for_label }}">Почта</label>
+      <input type="email" name="email" id="{{ form.email.id_for_label }}"
+             class="ym-disable-keys" inputmode="email"
+             value="{{ form.email.value|default:'' }}"
+             autocomplete="email">
+      <div class="field-hint">{{ form.email.help_text }}</div>
+      {% for error in form.email.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>{% endif %}
 
     <div class="form-group">
       <label for="{{ form.password1.id_for_label }}">Пароль</label>
@@ -120,7 +145,19 @@
       {% for error in form.consent.errors %}
       <div class="field-error">{{ error }}</div>
       {% endfor %}
-    </div>
+    </div>{% if mail_enabled %}
+
+    {% comment %}
+    ⚠️ Галочка рассылки НИКОГДА не отмечена заранее (ст. 18 закона «О рекламе»):
+    `checked` ставится, только если человек сам её отметил и форма вернулась.
+    {% endcomment %}
+    <div class="form-group">
+      <label class="consent">
+        <input type="checkbox" name="mail_consent"
+               {% if form.mail_consent.value %}checked{% endif %}>
+        <span>{% include 'legal/_mail_label.html' %}</span>
+      </label>
+    </div>{% endif %}
 
     <button type="submit" class="btn-login">Создать аккаунт</button>
   </form>
@@ -128,11 +165,11 @@
   <div class="auth-foot">
     Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a><br>
     Забыли пароль?
-    <a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
+    {% if mail_enabled %}<a href="/password/forgot/">Восстановить по почте</a>{% else %}<a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>{% endif %}
   </div>
 
   <a class="back-link" href="/">← На главную</a>
-</div>
+</div>{% endblock %}
 
 {% comment %}
 Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и

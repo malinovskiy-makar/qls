@@ -1,0 +1,2 @@
+{% autoescape off %}Это проверочное письмо Weconomics: канал отправки работает. Окружение: {{ site_env }}, время отправки: {{ sent_at }}.
+{% endautoescape %}

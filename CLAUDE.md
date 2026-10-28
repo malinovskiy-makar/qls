@@ -438,6 +438,7 @@ noscript и `weco_src` только при `all`, сервер решает пр
 | **Боевой сервер: что где лежит, как перезапустить, что если лёг** | [docs/SERVER.md](docs/SERVER.md) |
 | Что проверить/настроить при выборе нового хостинга | [docs/MIGRATION-CHECKLIST.md](docs/MIGRATION-CHECKLIST.md) |
 | Кто что видит, секреты, известные дыры | [docs/SECURITY.md](docs/SECURITY.md) |
+| Почта: отправка, коды, флаг MAIL_ENABLED | [docs/MAIL.md](docs/MAIL.md) |
 | Как выкатить, залить данные, восстановиться | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
 | Поиск, эмбеддинги, почему промахивается | [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md) |
 | Слои проверок и их ловушки | [docs/TESTING.md](docs/TESTING.md) |

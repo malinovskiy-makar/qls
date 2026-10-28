@@ -21,6 +21,8 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from .review_categories import CATEGORY_CHOICES
@@ -46,10 +48,23 @@ class User(AbstractUser):
         'Роль', max_length=20,
         choices=Role.choices, default=Role.STUDENT,
     )
+    # Когда почта подтверждена кодом из письма (docs/MAIL.md). Пусто — почта
+    # не подтверждена: так у всех адресов, введённых в профиле до 26.10.2026.
+    # Входить почтой и восстанавливать по ней пароль можно ТОЛЬКО с
+    # подтверждённой (`problems/email_codes.py`).
+    email_verified_at = models.DateTimeField(
+        'Почта подтверждена', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+        # ⚠️ Подтверждённая почта — ключ входа, поэтому она уникальна без
+        # учёта регистра. Неподтверждённые адреса могут совпадать: старые
+        # почты профиля никто не проверял, и чужой адрес не должен мешать
+        # настоящему владельцу его подтвердить.
+        constraints = [models.UniqueConstraint(
+            Lower('email'), condition=Q(email_verified_at__isnull=False),
+            name='user_verified_email_ci_unique')]
 
 
 # ---------------------------------------------------------------------------
@@ -2296,3 +2311,6 @@ from .models_platform import (  # noqa: E402,F401
 
 # Согласия на обработку данных и на помощника с ИИ (Правовой контур, часть А).
 from .models_legal import ConsentRecord, ErasureLog  # noqa: E402,F401
+
+# Коды подтверждения почты (docs/MAIL.md, 26.10.2026).
+from .models_mail import EmailCode  # noqa: E402,F401
