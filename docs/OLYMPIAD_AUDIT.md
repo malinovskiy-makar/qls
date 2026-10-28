@@ -561,6 +561,46 @@ v2–v5 не меняются. Итог — `digitized\v6\reference_problems_v6.
 ⚠️ **Опечатки оригинала не правим**: «максимизацмию» (mosh-2022-final-9) и «30»
 вместо 50 в таблице vp-2019-final-8 № 3 — так в PDF; эталон — точная расшифровка.
 
+## ВсОШ по экономике (ночь P3, 28.10.2026)
+
+Всё — командой `olympiad_vsosh` (модули `problems/olympiad_audit/vsosh_*.py`),
+в базу не пишет (банк только читается шагом `bank`). Данные —
+`weconomics-data\olympiads\vsosh_20261028\` (`raw\`, `work\`, `digitized\v1\`).
+Карта источников — `night_20261028\VSOSH_SOURCES_20261028.md`.
+
+| шаг | что делает | выход |
+|---|---|---|
+| `manifest` | `work\jobs_*`/`results_*` загрузчика (`python -m problems.olympiad_audit.vsosh_fetch`) → строка на файл, архивы раскрыты, дубли по sha256 | `manifest.jsonl`, `coverage.md`, `manifest_invariants.json` |
+| `convert`, `render` | .doc/.docx → PDF через Word (`p3_tools\word2pdf.ps1`), страницы → PNG + слой | `digitized\v1\pages\<sha16>\pN.png/.txt` |
+| `events`, `plan` | пары «задания ↔ решения» по этапу, сезону, региону, классу, туру; 5 групп плана | `events_files.jsonl`, `events_meta.jsonl`, `PLAN.md` |
+| `transcribe` | GLM-5.3-Flash (библиотека `transcribe`), `--max-usd` — потолок всего журнала | `pages\…\pN.json`, `transcribe_cost.jsonl` |
+| `batches`, `claude` | Claude Message Batches: пакеты по 250 стр. (≤150 МБ), `--action submit` до 90 % `--max-usd`, `collect` | `claude_batches\`, `ledger.jsonl`, `pages_claude\<sha16>\pN.json` |
+| `assemble` | `assemble(profile=ECON)` поверх GLM + заплатка Claude | `reference_problems_v1.jsonl` (схема v6 + `stage`, `region_code`, `region_name`, `tour`, `variant`) |
+| `ile`, `check`, `review`, `bank` | сверка с печатными страницами ILE, флаги качества, страница «на глаза», сухой план импорта | `ile_compare_v1.jsonl`, `check_v1.json`, `review_v1.html`, `BANK_v1.md` |
+
+- **Метаданные — из источника, не из имени файла**: ЦПМ — поля API
+  (`sid`, `yname`, `span.class`, `span.format`), ILE — раздел и год страницы,
+  olimpiada.ru — атрибуты страницы и `?class=N`. ЗЭ и РЭ — регион `ru`; ШЭ и
+  пригласительный без региона — Москва.
+- **Дубли**: главная копия — по старшинству источника, затем файл вне архива
+  старше члена архива. `dup_of` у остальных.
+- **Группы плана**: 1 — ЗЭ, 2 — РЭ, 3 — Москва (МЭ, ШЭ, пригласительный),
+  4 — МЭ регионов, 5 — ШЭ регионов.
+- **Модели**: группы 1–3 — Claude Sonnet 5.5 (effort low), группы 4–5 — GLM
+  с Haiku 5.5 вторым мнением и на страницы, до которых GLM не дошёл. Модели
+  уходят картинка и слой PDF подсказкой; правда — картинка.
+
+⚠️ **Калибровка Claude занижает цену страницы ЗЭ/РЭ**: 30 разных страниц —
+$0,0089/стр. Sonnet, настоящие пакеты ЗЭ/РЭ — $0,0114. Счётчик `page_usd`
+после 50 забранных страниц берёт среднюю по журналу ×1,1.
+⚠️ **Уменьшенный PNG тяжелее исходного** (сглаженные края букв): 250 страниц
+давали 200–226 МБ при лимите пакета 256 МБ. PNG до 600 КБ уходит как есть
+(API ужмёт сам), крупнее — JPEG 1568 px.
+⚠️ **Недописанный пакет — `.jsonl.tmp`**: отправка берёт только `*.jsonl`.
+⚠️ **Отложенные пакеты** (`hold_*.jsonl`) отправка не видит: так убраны пакеты
+Sonnet, страницы которых ушли Haiku.
+⚠️ **ILE сверяется по региону**: муниципальный этап у ILE — только Москва.
+
 ## Следующая олимпиада
 
 Переиспользуется как есть: `apply_olympiad_audit` целиком (режимы, защиты,

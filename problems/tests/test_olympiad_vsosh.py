@@ -364,6 +364,20 @@ class AssembleWrapperTests(SimpleTestCase):
                  'failed': 2}, {'kind': 'submitted', 'model': 'claude-sonnet-5-5', 'cost_usd': 9}]
         self.assertAlmostEqual(vsosh_digitize.page_usd(many)['claude-sonnet-5-5'], 0.0055)
 
+    def test_late_haiku_does_not_overwrite_sonnet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'p1.json')
+            haiku = {'status': 'ok', 'model': 'claude-haiku-5-5', 'blocks': [1]}
+            sonnet = {'status': 'ok', 'model': 'claude-sonnet-5-5', 'blocks': [1]}
+            self.assertFalse(vsosh_digitize.keeps_existing(path, haiku))
+            with open(path, 'w', encoding='utf-8') as fh:
+                json.dump(sonnet, fh)
+            self.assertTrue(vsosh_digitize.keeps_existing(path, haiku))
+            self.assertFalse(vsosh_digitize.keeps_existing(path, dict(sonnet)))
+            with open(path, 'w', encoding='utf-8') as fh:
+                json.dump(dict(sonnet, status='error'), fh)
+            self.assertFalse(vsosh_digitize.keeps_existing(path, haiku))
+
     def test_pending_usd_skips_collected_batches(self):
         ledger = [{'kind': 'submitted', 'batch_id': 'a', 'estimate_usd': 2.5},
                   {'kind': 'result', 'batch_id': 'a', 'cost_usd': 2.8},

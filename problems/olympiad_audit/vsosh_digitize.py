@@ -449,6 +449,21 @@ def page_usd(ledger):
     return out
 
 
+#: Старшинство моделей при заплатке: пакеты забираются в порядке готовности,
+#: и поздний Haiku не должен затирать удачный Sonnet той же страницы.
+MODEL_RANK = {'claude-haiku-5-5': 1, 'claude-sonnet-5-5': 2}
+
+
+def keeps_existing(path, rec):
+    """Уже лежащая удачная запись старшей модели остаётся (новая — мимо)."""
+    if not os.path.isfile(path):
+        return False
+    with open(path, encoding='utf-8') as fh:
+        old = json.load(fh)
+    return (old.get('status') == 'ok'
+            and MODEL_RANK.get(old.get('model'), 0) > MODEL_RANK.get(rec.get('model'), 0))
+
+
 def pending_usd(ledger):
     """Оценка отправленных, но ещё не забранных пакетов. Забранный пакет
     уже сидит в `spent` настоящей ценой — второй раз его не считать
@@ -523,8 +538,9 @@ def run_claude(cmd, opts):
             cost += rec['cost_usd']
             ok += rec['status'] == 'ok'
             sha16 = key.split('/')[1]
-            transcribe.Transcriber._write(
-                os.path.join(digitized, 'pages_claude', sha16, f'p{rec["page"]}.json'), rec)
+            path = os.path.join(digitized, 'pages_claude', sha16, f'p{rec["page"]}.json')
+            if not keeps_existing(path, rec):
+                transcribe.Transcriber._write(path, rec)
         with open(ledger_path, 'a', encoding='utf-8') as fh:
             fh.write(json.dumps({'kind': 'result', 'batch_id': sub['batch_id'], 'cost_usd': round(cost, 4),
                                  'model': sub['model'], 'ok': ok, 'failed': bad},
