@@ -62,3 +62,24 @@
 | `step` считает `has_verified_email` контактом | `test_verified_email_alone_is_not_a_contact` |
 | несданная попытка проверяется после стены | `test_unfinished_attempt_returns_without_wall` |
 | класс из анкеты выше сессии | `test_tab_choice_in_session_beats_survey` |
+
+## Фаза 2. Почта в окне стены
+
+- `39535830`. `POST /vp/wall/email/<слаг>/` (`vp/views_wall.py::wall_email`): `send`,
+  `confirm`, `resend`, `change`, `use`. Вход обязателен (гость → `/login/`), вариант —
+  `_variant_or_404`, стена для варианта нужна, `MAIL_ENABLED=0` → 404. Свою логику кодов
+  не пишем — только `problems.email_codes` и `legal.consent`.
+- `send` при уже подтверждённой почте → 400; `use` без неё → 400, кодов не шлёт.
+  Со стены согласие только даётся (`Source.VP_WALL`), не отзывается.
+- Окно на интро (`vp/templates/vp/_wall.html`, `wall_window`): экраны 04, 04b, 05,
+  «закрыто», 01 (пока без кнопки Telegram — фаза 3). Сообщения — через сессию
+  (`vp_wall_flash`), окно работает без JS. «Другая почта» → `/account/email/?next=интро?wall=email&src=vp`.
+- `ym-hide-content` на показанной почте, `ym-disable-keys` на полях почты и кода.
+- Новые тесты `vp/tests/test_wall_email.py`: 12. Тесты сессии: 635 → **647**, OK.
+
+| Дефект | Покраснело |
+|---|---|
+| галочка отмечена по умолчанию | `test_screens_hide_email_from_webvisor` |
+| `use` шлёт код | `test_use_with_verified_email_needs_no_code` |
+| стена отзывает согласие | `test_unchecked_box_never_revokes` |
+| `send` разрешён при подтверждённой почте | `test_send_with_verified_email_is_refused` |
