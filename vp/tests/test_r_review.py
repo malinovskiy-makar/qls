@@ -60,6 +60,22 @@ class ResultDataTests(TestCase):
                   for f in self.owner.get(self.url).context['status_filters']}
         self.assertEqual(counts, {'all': 18, 'errors': 0, 'fmt': 5, 'none': 12, 'ok': 1})
 
+    def test_wrong_number_in_wrong_format_is_not_a_format_loss(self):
+        other = Client()
+        other.force_login(User.objects.create_user('vp_rr3', password='p12345'))
+        variant = load_demo('11')
+        other.post(reverse('vp:start', args=[variant.slug]))
+        attempt = VPAttempt.objects.get(variant=variant)
+        other.post(reverse('vp:save', args=[attempt.public_code]),
+                   json.dumps({'answers': [{'item': 5, 'raw': '-999 999.5'}]}),
+                   content_type='application/json')
+        other.post(reverse('vp:finish', args=[attempt.public_code]))
+        attempt.refresh_from_db()
+        self.assertEqual(review.format_losses(attempt)['points'], Decimal('0'))
+        self.assertEqual(review.format_losses(attempt)['items'], [])
+        row = next(r for r in review.tests_review(attempt) if r['number'] == 5)
+        self.assertEqual(row['status'], 'bad')
+
     def test_rows_texts(self):
         rows = {r['number']: r for r in self.owner.get(self.url).context['tests']}
         self.assertEqual((rows[9]['status'], rows[9]['given_text'], rows[9]['right_text']),
@@ -67,6 +83,9 @@ class ResultDataTests(TestCase):
         self.assertEqual((rows[16]['status'], rows[16]['given_text'], rows[16]['right_text']),
                          ('none', '–', ''))
         self.assertEqual(rows[5]['status'], 'ok')
+        # Эталона и решения неотвеченного нет уже в данных, а не только в шаблоне.
+        self.assertEqual((rows[16]['solution'], rows[16]['right']), ('', ''))
+        self.assertFalse(any(o['right'] for o in rows[1]['options']))     # тест 1 пуст
         self.assertNotIn('[[', rows[3]['lead'])
         self.assertEqual(rows[18]['shared']['number'], 17)
         self.assertNotIn('shared', rows[17])
