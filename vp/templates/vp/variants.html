@@ -44,12 +44,10 @@
         <span>{{ card.eyebrow }}</span>
         {% if card.variant.source_label %}
         <span class="vp-vcard-src">Источник: <a class="vp-link" href="{{ card.variant.source_url }}" target="_blank" rel="noopener">{{ card.variant.source_label }}</a></span>
-        {% else %}
-        <span class="vp-vcard-src">{{ card.variant.year }}</span>
-        {% endif %}
+        {% endif %}{# год — в строке меты, отдельно в углу не повторяется #}
       </div>
       <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant|with_band }}</a></h2>
-      <p class="vp-vcard-m">{{ card.meta }}{% if card.variant.source_note %} · {{ card.variant.source_note }}{% endif %}{% if card.variant.author %} · {{ card.variant.author }}{% endif %}</p>
+      <p class="vp-vcard-m">{{ card.meta }}</p>
 
       <div class="vp-vcard-f">
         {% if not card.variant.is_published %}

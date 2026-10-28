@@ -19,7 +19,7 @@
     <div class="vp-head-main">
       <div class="vp-eyebrow">Отборочный этап · {{ variant.tour }} тур</div>
       <h1 class="vp-h1">{{ variant|with_band }}</h1>
-      <div class="vp-sub">{{ meta }}{% if variant.author %} · {{ variant.author }}{% endif %}{% if variant.source_note %} · {{ variant.source_note }}{% endif %}</div>
+      <div class="vp-sub">{{ meta }}</div>
       {% if variant.source_label %}<div class="vp-source">Источник: <a class="vp-link" href="{{ variant.source_url }}" target="_blank" rel="noopener">{{ variant.source_label }}</a></div>{% endif %}
     </div>
     <div class="vp-head-clock">

@@ -352,7 +352,7 @@ def variants(request):
             'variant': variant,
             'eyebrow': _variant_eyebrow(variant, published),
             'status': landing.variant_status(request.user, variant),
-            'meta': landing.variant_meta(variant),
+            'meta': landing.variant_meta(variant, origin=False),
             'count': variant.items.count(),
             'minutes': variant.duration_seconds // 60,
         })
@@ -489,19 +489,25 @@ def my_attempts(request):
             # а вместо «в таблице · N-е» — «архив» (таблицы скрытого тура на сайте нет).
             'tour_label': ('' if attempt.variant.tour == config.CURRENT_TOUR
                            else f'{attempt.variant.tour} тур'),
+            'meta': landing.variant_meta(attempt.variant, ()),
             'archived': not visibility.tour_visible(attempt.variant.tour),
             'place': (best_place if best_attempt is not None
                       and attempt.pk == best_attempt.pk else None),
         })
     rows.reverse()
 
+    # Попытка скрытого тура в «В таблице» не считается: таблицы этого тура на сайте нет,
+    # её статус — «архив» (видна только во «Всех»).
+    def _in_filter(row, code):
+        return row['kind'] == code and not (code == 'ranked' and row['archived'])
+
     counts = {'all': len(rows)}
     for code, _ in ATTEMPT_FILTERS[1:]:
-        counts[code] = sum(1 for r in rows if r['kind'] == code)
+        counts[code] = sum(1 for r in rows if _in_filter(r, code))
     chosen = request.GET.get('f') or 'all'
     if chosen not in counts:
         chosen = 'all'
-    shown = rows if chosen == 'all' else [r for r in rows if r['kind'] == chosen]
+    shown = rows if chosen == 'all' else [r for r in rows if _in_filter(r, chosen)]
 
     return render(request, 'vp/my.html', {
         'rows': shown, 'chosen': chosen,
@@ -1001,6 +1007,9 @@ def result(request, code):
             answered=_answered_count(attempt), seconds_used=_spent_seconds(attempt),
             auto=attempt.is_auto_submitted))
     events.append(tracking.event('vp_result_open', variant=slug, own=owner))
+    # Попытка скрытого тура (сейчас — весь 1 тур) — архив: таблицы этого тура на сайте нет,
+    # интро варианта ученику — 404. Ни места, ни «в таблице», ни «Этот же вариант без таймера».
+    archived = not visibility.is_visible(attempt.variant)
     context = {
         'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True,
         'score': attempt.score, 'max': top_score, 'score_percent': _percent(attempt.score, top_score),
@@ -1011,7 +1020,7 @@ def result(request, code):
         'band_label': grade_label(attempt.variant.grade_band),
         'other_url': (reverse('vp:variants') + (f'?band={attempt.variant.grade_band}'
                                                  if attempt.variant.tour != 1 else '')),
-        'blocks': rows, 'is_owner': owner, 'vp_events': events,
+        'blocks': rows, 'is_owner': owner, 'vp_events': events, 'archived': archived,
     }
     comparison = review.comparison(attempt)
     if comparison is not None:
@@ -1030,7 +1039,7 @@ def result(request, code):
             VPAttempt.objects.filter(user_id=attempt.user_id, variant=attempt.variant,
                                      submitted_at__isnull=False)
             .order_by('-started_at', '-id')))
-        place = board.place_of(attempt)
+        place = None if archived else board.place_of(attempt)
         band = '' if attempt.variant.tour == 1 else attempt.variant.grade_band
         chain = review.chain_review(attempt)
         context.update(

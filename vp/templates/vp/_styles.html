@@ -716,9 +716,11 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .vp-land-cv b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Подпись — до двух строк: в одну многоточие резало главное («…потеряно 25 ба…»). */
 .vp-land-cs {
   grid-column: 1; margin: 0; font-size: 12.5px; color: var(--text2); line-height: 1.35;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; line-clamp: 2;
 }
 .vp-land-ca { grid-column: 2; grid-row: 2 / 4; margin: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .vp-land-cell.is-live { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

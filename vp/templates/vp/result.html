@@ -28,7 +28,7 @@
       <div class="vp-res-tags">
         <span class="vp-res-tag">{{ variant.tour }} тур</span>
         <span class="vp-res-tag">{% if attempt.with_timer %}с таймером{% else %}без таймера{% endif %}</span>
-        {% if attempt.is_ranked %}<span class="vp-res-tag is-ok">первая попытка – в таблице</span>{% else %}<span class="vp-res-tag">тренировка</span>{% endif %}
+        {% if archived %}<span class="vp-res-tag">архив {{ variant.tour }} тура</span>{% elif attempt.is_ranked %}<span class="vp-res-tag is-ok">первая попытка – в таблице</span>{% else %}<span class="vp-res-tag">тренировка</span>{% endif %}
       </div>
     </div>
     <div class="vp-res-when">{% if not is_owner %}{{ author }} · {% endif %}сдано {{ attempt.submitted_at|date:"j E в H:i" }}{% if auto %}<br>по истечении времени{% endif %}</div>
@@ -168,7 +168,7 @@
           <summary class="vp-zsum">
             <span class="vp-zn">{{ t.number }}</span>
             <span class="vp-zq"><span class="vp-zlead">{{ t.lead|nbsp_num }}</span><small>{{ t.block_title }} · {{ t.max|points_word }}</small></span>
-            <span class="vp-zgiven">{{ t.given_text }}{% if t.status == 'fmt' %} <span class="vp-ztag">{% with e=t.explain %}{% if e.format_error == 'minus' %}минус{% elif e.format_error == 'dot' %}точка{% elif e.format_error == 'space' %}пробел{% elif e.format_error == 'units' %}единицы{% elif e.format_error == 'decimals' %}знаки{% else %}запись{% endif %}{% endwith %}</span>{% endif %}</span>
+            <span class="vp-zgiven">{{ t.given_text }}{% if t.status == 'fmt' %} <span class="vp-ztag">{% with e=t.explain %}{% if e.format_error == 'minus' %}минус{% elif e.format_error == 'dot' %}точка{% elif e.format_error == 'space' %}пробел{% elif e.format_error == 'units' %}единицы{% elif e.format_error == 'decimals' %}до сотых{% else %}запись{% endif %}{% endwith %}</span>{% endif %}</span>
             <span class="vp-zright">{% if t.right_text %}<span class="vp-zarr" aria-hidden="true">→ </span>{{ t.right_text }}{% endif %}</span>
             <span class="vp-zscore"><b>{{ t.score|num }}</b> / {{ t.max|num }}</span>
             <span class="vp-zchev" aria-hidden="true"></span>
@@ -279,6 +279,7 @@
         </div>
         {% if format_losses.points %}<p class="vp-mute vp-res-small">Из {{ format_losses.number_lost|num }} {{ format_losses.number_lost|plural_word:"балла,баллов,баллов" }}, недобранных в задачах с числом, {{ format_losses.points|num }} – запись ответа.</p>{% endif %}
       </section>
+      {% if variant.tour != 1 or invite_url or not archived %}{# у архива 1 тура карточка была бы пустой #}
       <section class="vp-card vp-side-card">
         <h2 class="vp-h3">Что дальше</h2>
         {% if variant.tour != 1 %}
@@ -295,12 +296,15 @@
           <a class="vp-btn vp-btn--plain vp-btn--sm" href="{{ invite_url }}">Пригласить друга</a>
         </div>
         {% endif %}
+        {% if not archived %}{# интро скрытого варианта ученику — 404 #}
         <div class="vp-next">
           <b>Этот же вариант без таймера</b>
           <p>Без ограничения по времени. В таблицу не идёт.</p>
           <a class="vp-link" href="{% url 'vp:intro' variant.slug %}">Открыть</a>
         </div>
+        {% endif %}
       </section>
+      {% endif %}
       <section class="vp-card vp-side-card">
         <div class="vp-side-head"><h2 class="vp-h3">Мои попытки</h2>{% if user.is_authenticated %}<a class="vp-link" href="{% url 'vp:my' %}">все</a>{% endif %}</div>
         <ul class="vp-own">

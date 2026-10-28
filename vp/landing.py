@@ -364,16 +364,20 @@ def _plural(n, one, few, many):
     return one if n == 1 else few if 2 <= n <= 4 else many
 
 
-def variant_meta(variant, parts=('count', 'minutes')):
-    """Строка меты варианта — ОДНА на раздел: «Демоверсия ВШЭ · 2026/27 · 18 заданий · 70 мин»
-    (карточка экрана вариантов) или с `parts=('count', 'points')` — «… · 18 заданий ·
-    100 баллов» (интро). Происхождение: демонстрационный — «Демоверсия ВШЭ», иначе
-    подпись вида; учебный год из `year`: 2026 → «2026/27». Числа — из заданий варианта."""
+def variant_meta(variant, parts=('count', 'minutes'), origin=True):
+    """Строка меты варианта — ОДНА на раздел, без хвоста `author` / `source_note`:
+    интро — `parts=('count', 'points')`: «Демоверсия ВШЭ · 2026/27 · 18 заданий · 100 баллов»;
+    карточка экрана вариантов — `origin=False` (происхождение уже в надзаголовке):
+    «2026/27 · 18 заданий · 70 мин»; «Мои попытки» — `parts=()`: «Демоверсия ВШЭ · 2026/27».
+    Происхождение: демонстрационный — «Демоверсия ВШЭ», иначе подпись вида; учебный год из
+    `year`: 2026 → «2026/27». Числа — из заданий варианта."""
     from vp.templatetags.vp_extras import points_word
 
-    items = list(variant.items.all())
-    bits = ['Демоверсия ВШЭ' if variant.source_kind == VPVariant.SourceKind.DEMO
-            else variant.get_source_kind_display()]
+    items = list(variant.items.all()) if parts else []
+    bits = []
+    if origin:
+        bits.append('Демоверсия ВШЭ' if variant.source_kind == VPVariant.SourceKind.DEMO
+                    else variant.get_source_kind_display())
     if variant.year:
         bits.append(f'{variant.year}/{(int(variant.year) + 1) % 100:02d}')
     for part in parts:
