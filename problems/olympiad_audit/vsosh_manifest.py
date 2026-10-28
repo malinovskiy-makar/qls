@@ -109,8 +109,11 @@ def extract_archive(path, out_dir, fmt=None):
 
     Возвращает список (rel_path_в_архиве, abs_path). Мусор macOS — мимо."""
     fmt = fmt or detect_format(path)
-    os.makedirs(out_dir, exist_ok=True)
+    marker = os.path.join(out_dir, '.done')
     out = []
+    if os.path.isfile(marker):          # уже раскрыт прошлым прогоном
+        return _walk(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
     if fmt == 'zip':
         with zipfile.ZipFile(path) as z:
             for info in z.infolist():
@@ -127,6 +130,7 @@ def extract_archive(path, out_dir, fmt=None):
                 with z.open(info) as src, open(dest, 'wb') as dst:
                     dst.write(src.read())
                 out.append((rel, dest))
+        open(marker, 'w').close()
         return out
     if fmt == '7z':
         import py7zr
@@ -135,14 +139,24 @@ def extract_archive(path, out_dir, fmt=None):
     elif fmt == 'rar':
         subprocess.run([TAR, '-xf', path, '-C', out_dir], check=False,
                        capture_output=True, timeout=600)
-    for root, _dirs, files in os.walk(out_dir):
+    open(marker, 'w').close()
+    return _walk(out_dir)
+
+
+def _walk(out_dir):
+    """Файлы раскрытого архива (без метки `.done`, мусора macOS и вложенных раскрытий)."""
+    out = []
+    for root, dirs, files in os.walk(out_dir):
+        dirs[:] = [d for d in dirs if d != '_nested']
         for f in files:
+            if f == '.done':
+                continue
             dest = os.path.join(root, f)
-            rel = os.path.relpath(dest, out_dir).replace('\\', '/')
+            rel = os.path.relpath(dest, out_dir).replace(os.sep, '/')
             if _JUNK.search(rel):
                 continue
             out.append((rel, dest))
-    return out
+    return sorted(out)
 
 
 _NAME_GRADE = re.compile(
@@ -362,9 +376,13 @@ def build(data_root, work_dir, run_names, unpack=True, log=print):
             continue
         out.append(row)
     mark_duplicates(out)
-    for r in out:
-        if r.get('status') == 'ok' and r.get('format') == 'pdf' and not r.get('dup_of'):
-            r['pages'], r['text_layer'] = pdf_info(os.path.join(data_root, r['path']))
+    todo = [r for r in out if r.get('status') == 'ok' and r.get('format') == 'pdf'
+            and not r.get('dup_of')]
+    from concurrent.futures import ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=8) as pool:
+        infos = pool.map(pdf_info, [os.path.join(data_root, r['path']) for r in todo], chunksize=8)
+        for r, (pages, layer) in zip(todo, infos):
+            r['pages'], r['text_layer'] = pages, layer
     return out
 
 

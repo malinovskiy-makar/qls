@@ -25,15 +25,33 @@ _LIST_MARK = re.compile(r'(?m)^\s*(?:[-*]\s*)?(?:\(?[а-еa-e]\)|\d{1,2}[.)])\s+
 _OPTION = re.compile(r'(?m)^\s*(?:[-*]\s*)?(?:\(?[а-еa-eА-ЕA-E]\)|[1-6][.)]|[А-ЕA-E][.)])\s+\S')
 
 
-def task_flags(r, event_has_solutions):
+_NUM = re.compile(r'(?<![\w.,])\d{2,}(?:[.,]\d+)?')
+
+
+_THOUSANDS = re.compile('(?<=[0-9])[   ](?=[0-9]{3}(?![0-9]))')
+
+
+def _nums(text):
+    """Числа от двух знаков; «2 040» = «2040», «0,5» = «0.5»."""
+    return {m.replace(',', '.') for m in _NUM.findall(_THOUSANDS.sub('', text or ''))}
+
+
+def numbers_not_on_page(statement, layers):
+    """Числа (от двух знаков) из нашего условия, которых нет в текстовом слое
+    его страниц. Пустой слой (скан) — проверка не делается (None)."""
+    layer = '\n'.join(layers)
+    if len(layer.strip()) < 80:
+        return None
+    return sorted(_nums(statement) - _nums(layer))
+
+
+def task_flags(r, event_has_solutions, layers=None):
     flags = list(r.get('flags') or [])
     st = r.get('statement_md') or ''
     if not st.strip():
         flags.append('пустое_условие')
     if r.get('layer_ratio') is not None and r['layer_ratio'] < 0.9:
         flags.append('расходится_со_слоем')
-    if r.get('numbers_ok') is False:
-        flags.append('числа_слоя_не_найдены')
     if len(_LIST_MARK.findall(st)) >= 2 and not r.get('parts'):
         flags.append('пункты_не_разобраны')
     is_test = str(r.get('number', '')).startswith('тест')
@@ -48,9 +66,27 @@ def task_flags(r, event_has_solutions):
     for f in (r.get('figures') or []) + (r.get('solution_figures') or []):
         if f.get('flag'):
             flags.append('рисунок_' + f['flag'])
-    if r.get('needs_eyes'):
-        flags.append('страница_на_глаза')
+    if layers is not None:
+        missing = numbers_not_on_page(st, layers)
+        if missing:
+            flags.append('числа_не_со_страницы')
+            r['numbers_not_on_page'] = missing[:20]
+        elif missing is None and r.get('needs_eyes'):
+            flags.append('скан_на_глаза')
     return sorted(set(flags))
+
+
+def page_layers(dz, index, refs):
+    r"""Текстовый слой страниц «файл#pN» из `pages\<sha16>\pN.txt`."""
+    out = []
+    for ref in refs or []:
+        pdf, _, page = ref.rpartition('#p')
+        pd = index.get(pdf)
+        path = os.path.join(dz, pd, f'p{page}.txt') if pd else ''
+        if path and os.path.isfile(path):
+            with open(path, encoding='utf-8') as fh:
+                out.append(fh.read())
+    return out
 
 
 def run_check(cmd, opts):
@@ -60,12 +96,14 @@ def run_check(cmd, opts):
     katex_path = os.path.join(dz, 'katex_v1.json')
     katex = json.load(open(katex_path, encoding='utf-8')) if os.path.isfile(katex_path) else {}
     bad_katex = {k for k, v in (katex.get('by_key') or {}).items() if v}
+    index = {x['pdf']: x['page_dir'] for x in digitize.read_jsonl(
+        os.path.join(dz, 'render_index.jsonl'))}
     out, counts = [], Counter()
     for r in rows:
         ev = files.get(r['event_id'], {})
         has_sol = bool(ev.get('solution_files') or ev.get('criteria_files')) or any(
             f.get('source_kind') == 'tasks+solutions' for f in ev.get('task_files') or [])
-        flags = task_flags(r, has_sol)
+        flags = task_flags(r, has_sol, page_layers(dz, index, r.get('source_pages')))
         key = f"{r['event_id']}|{r['number']}|{r.get('task_variant', '')}"
         if key in bad_katex:
             flags.append('katex')

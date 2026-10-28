@@ -129,26 +129,47 @@ CLAUDE_SYSTEM = (transcribe.SYSTEM_PROMPT + transcribe.STRICT_SUFFIX +
                  + json.dumps(transcribe.SCHEMA, ensure_ascii=False))
 
 
-def batch_request(job, model, max_tokens=12000):
-    """Запрос Batches для страницы: system кэшируется (одинаков у всех)."""
-    with open(job.png, 'rb') as fh:
-        b64 = base64.b64encode(fh.read()).decode('ascii')
+#: Длинная сторона картинки для Claude: больше API всё равно ужмёт сам, а
+#: пакет из сотен страниц 1654×2339 упирается в лимит 256 МБ на пакет.
+CLAUDE_MAX_SIDE = 1568
+
+
+def page_png_b64(path, max_side=CLAUDE_MAX_SIDE):
+    """PNG страницы в base64, длинная сторона не больше `max_side`."""
+    import io
+
+    from PIL import Image
+    with Image.open(path) as im:
+        if max(im.size) > max_side:
+            k = max_side / max(im.size)
+            im = im.convert('L' if im.mode in ('L', '1') else 'RGB').resize(
+                (round(im.size[0] * k), round(im.size[1] * k)), Image.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, 'PNG', optimize=True)
+            return base64.b64encode(buf.getvalue()).decode('ascii')
+    with open(path, 'rb') as fh:
+        return base64.b64encode(fh.read()).decode('ascii')
+
+
+def batch_request(job, model, max_tokens=12000, thinking=None, custom_id=None):
+    """Запрос Batches для страницы: system кэшируется (одинаков у всех).
+    `thinking` — {'type': 'between_tools'} у Sonnet 5.5 выключает рассуждение."""
     layer = transcribe.layer_body(job.layer, job.footers)[:LAYER_HINT_CHARS]
     text = job.user_text() + ('\n\nТекстовый слой PDF (подсказка):\n<<<\n' + layer + '\n>>>'
                               if layer.strip() else '\n\nТекстового слоя нет (скан).')
-    return {
-        'custom_id': job.key.replace('/', '__'),
-        'params': {
-            'model': model, 'max_tokens': max_tokens,
-            'system': [{'type': 'text', 'text': CLAUDE_SYSTEM,
-                        'cache_control': {'type': 'ephemeral'}}],
-            'output_config': {'effort': 'low'},
-            'messages': [{'role': 'user', 'content': [
-                {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
-                                             'data': b64}},
-                {'type': 'text', 'text': text}]}],
-        },
+    params = {
+        'model': model, 'max_tokens': max_tokens,
+        'system': [{'type': 'text', 'text': CLAUDE_SYSTEM,
+                    'cache_control': {'type': 'ephemeral'}}],
+        'output_config': {'effort': 'low'},
+        'messages': [{'role': 'user', 'content': [
+            {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
+                                         'data': page_png_b64(job.png)}},
+            {'type': 'text', 'text': text}]}],
     }
+    if thinking:
+        params['thinking'] = thinking
+    return {'custom_id': custom_id or job.key.replace('/', '__'), 'params': params}
 
 
 def write_batches(digitized, groups, model, out_dir, chunk=400):
@@ -351,15 +372,19 @@ def fix_currency_dollars(text):
     return ''.join(out), n
 
 
-_SERVICE_TITLE = re.compile(r'^\s*(задача|задание|вопрос|тест|раздел|часть|эссе|блиц)\b[\s№.]*'
-                            r'[\dIVXivx.,\s-]*(\(.*\))?\s*$|^\s*справка\s*$', re.I)
+#: Слова служебного заголовка: «Задачи - 1-ый тур», «Задание № 2», «Тест (10 вопросов)».
+_SERVICE_WORDS = re.compile(
+    r'задач\w*|задани\w*|вопрос\w*|тест\w*|тур\w*|класс\w*|часть|раздел\w*|эссе|блиц|'
+    r'справк\w*|решени\w*|ответ\w*|критери\w*|баллов|балл\w*|ый|ой|ий|й|го|я|кл|'
+    r'первый|второй|третий|i{1,3}|iv|v|vi{0,3}|\d+', re.I)
 
 
 def official_title(title):
     """Решение Notion 15.10: настоящее название — берём; «Задача 3», «Задание N»,
     «СПРАВКА» — не название (пусто: название даст ИИ при импорте)."""
     t = str(title or '').strip()
-    if not t or _SERVICE_TITLE.match(t):
+    rest = re.sub(r'[\W_]+', ' ', _SERVICE_WORDS.sub(' ', t)).strip()
+    if not t or not rest:
         return ''
     return t
 
@@ -387,7 +412,7 @@ def _ledger(digitized):
 
 
 def run_claude(cmd, opts):
-    """submit — отправить пакеты по порядку, пока расход < 90 % потолка;
+    r"""submit — отправить пакеты по порядку, пока расход < 90 % потолка;
     collect — забрать готовые результаты в pages_claude\ и учесть расход."""
     import time
     digitized = cmd.digitized

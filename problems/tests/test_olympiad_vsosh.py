@@ -349,3 +349,36 @@ class CurrencyDollarTests(SimpleTestCase):
         once, _ = vsosh_digitize.fix_currency_dollars('стоит $700, а потом $300.')
         twice, n = vsosh_digitize.fix_currency_dollars(once)
         self.assertEqual((twice, n), (once, 0))
+
+
+ILE_PRINT = ('<html><body><h2>10 класс</h2>'
+             '<div class="task"><h3>1. Товар Х</h3><div class="condition"><div class="tex2jax">'
+             'Спрос на товар Х задан уравнением $Q=400-4P$, предложение $Q=4P-80$. Найдите цену.'
+             '</div></div><div class="solution_and_answer">Решение: 60</div></div>'
+             '<h2>11 класс</h2><div class="task"><h3>2. Безработица</h3><div class="condition">'
+             'Уровень безработицы составил 8 %.</div></div></body></html>')
+
+
+class IlePrintTests(SimpleTestCase):
+    def test_parse_print_page(self):
+        from problems.olympiad_audit import vsosh_ile
+        tasks = vsosh_ile.parse_print_page(ILE_PRINT)
+        self.assertEqual([(t['grades'], t['number'], t['title']) for t in tasks],
+                         [('10', '1', 'Товар Х'), ('11', '2', 'Безработица')])
+        self.assertIn('$Q=400-4P$', tasks[0]['text'])
+        self.assertNotIn('Решение', tasks[0]['text'])
+
+    def test_compare_sets_title_and_flags(self):
+        from problems.olympiad_audit import vsosh_ile
+        ile = [dict(t, stage='regional', season='2013/14', url='u')
+               for t in vsosh_ile.parse_print_page(ILE_PRINT)]
+        rows = [{'event_id': 'e', 'number': '1', 'stage': 'regional', 'academic_year': '2013/14',
+                 'statement_md': 'Спрос на товар Х задан уравнением $Q=400-4P$, предложение '
+                                 '$Q=4P-80$. Найдите цену.'},
+                {'event_id': 'e', 'number': '9', 'stage': 'regional', 'academic_year': '2013/14',
+                 'statement_md': 'Совсем другая задача про монополию и ценовую дискриминацию '
+                                 'третьей степени на двух рынках.'}]
+        report = vsosh_ile.compare(rows, ile)
+        self.assertEqual(rows[0].get('ile_title'), 'Товар Х')
+        self.assertEqual(report[0]['verdict'], 'совпало')
+        self.assertNotEqual(report[1]['verdict'], 'совпало')
