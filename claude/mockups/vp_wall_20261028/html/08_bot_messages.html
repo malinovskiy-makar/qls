@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru"><head><style>
+    .sc-placeholder{background:color-mix(in srgb,currentColor 8%,transparent);
+      border:1px solid color-mix(in srgb,currentColor 50%,transparent);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:color-mix(in srgb,currentColor 70%,transparent);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:color-mix(in srgb,currentColor 50%,transparent);
+      background:color-mix(in srgb,currentColor 10%,transparent);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts — keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      figure, table { break-inside: avoid; }
+      #dc-root, #dc-root > .sc-host { height: auto; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+<meta charset="utf-8">
+<title>Бот в Telegram</title>
+<style>x-dc{display:none!important}</style>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+<style data-dc-tpl="1">
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+.bt-msg{max-width: 290px; padding: 10px 12px; border-radius: 14px; font-size: 14px; line-height: 1.5; background: var(--surface); border: 1px solid var(--border); color: var(--text); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;}
+.bt-me{align-self: flex-end; background: var(--accent-tint); border-color: var(--accent-ring);}
+.bt-act{display: flex; gap: 6px; flex-wrap: wrap;}
+.bt-act a{flex: 1 1 auto; text-align: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-ink); font-size: 13px; font-weight: 600; text-decoration: none;}
+.bt-div{align-self: center; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); padding: 4px 10px; border-radius: 999px; background: var(--chip-bg);}
+</style><style>
+@font-face{font-family:"Montserrat";font-weight:400;src:url(ds/weconomics/fonts/montserrat-400.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:500;src:url(ds/weconomics/fonts/montserrat-500.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:600;src:url(ds/weconomics/fonts/montserrat-600.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-weight:700;src:url(ds/weconomics/fonts/montserrat-700.woff2) format("woff2")}
+</style>
+<!-- Статичный снимок макета (без логики). Исходник — ../source/Bot.dc.html -->
+</head>
+<body>
+<div id="dc-root"><div class="sc-host" data-sc-name="_Bot"><div data-dc-tpl="2" style="width: 390px; height: 844px; box-sizing: border-box; background: var(--bg); font-family: Montserrat, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; color: var(--text); display: flex; flex-direction: column;">
+  <div data-dc-tpl="3" style="height: 60px; flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 0px 16px;">
+    <span data-dc-tpl="4" aria-hidden="true" style="width: 36px; height: 36px; border-radius: 999px; background: var(--nav-bg); color: var(--brand-cream); font-weight: 700; display: inline-flex; align-items: center; justify-content: center;">W</span>
+    <div data-dc-tpl="5" style="display: flex; flex-direction: column;">
+      <span data-dc-tpl="6" style="font-size: 15px; font-weight: 600;">Weconomics · тренажёр ВП</span>
+      <span data-dc-tpl="7" style="font-size: 12px; color: var(--text3);">бот</span>
+    </div>
+  </div>
+  <div data-dc-tpl="8" style="flex: 1 1 0%; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden;">
+    <div data-dc-tpl="9" class="bt-msg bt-me">Старт</div>
+    <div data-dc-tpl="10" class="bt-msg">Привет! Это бот тренажёра «Высшей пробы» от Weconomics. Проверяю подписку на @weconomics_ru…</div>
+    <div data-dc-tpl="11" class="bt-msg"><span data-dc-tpl="12"><strong data-dc-tpl="13">Готово:</strong> подписка есть, аккаунт привязан к сайту. Вернитесь на вкладку с вариантом – он уже открыт.</span><div data-dc-tpl="14" class="bt-act"><a data-dc-tpl="15" href="Survey.dc.html">Вернуться к варианту</a></div></div>
+    <span data-dc-tpl="16" class="bt-div">Если подписки нет</span>
+    <div data-dc-tpl="17" class="bt-msg"><span data-dc-tpl="18">Подписки на @weconomics_ru пока нет. Подпишитесь и нажмите «Проверить».</span><div data-dc-tpl="19" class="bt-act"><a data-dc-tpl="20" href="https://t.me/weconomics_ru">Подписаться</a><a data-dc-tpl="21" href="#">Проверить</a></div></div>
+    <span data-dc-tpl="22" class="bt-div">Потом – сессия 3</span>
+    <div data-dc-tpl="23" class="bt-msg"><span data-dc-tpl="24">Разбор попытки готов: <strong data-dc-tpl="25">72 из 100</strong>. Три задачи потеряны только из-за формата ответа.</span><div data-dc-tpl="26" class="bt-act"><a data-dc-tpl="27" href="#">Открыть разбор</a></div></div>
+    <div data-dc-tpl="28" class="bt-msg"><span data-dc-tpl="29">До 2 тура 3 дня. Вышел новый вариант для 10 класса.</span><div data-dc-tpl="30" class="bt-act"><a data-dc-tpl="31" href="#">Решить вариант</a></div></div>
+  </div></div></div></div>
+
+
+
+</body></html>

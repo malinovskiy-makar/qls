@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Телефон: стена снизу</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: var(--bg); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); display: flex; flex-direction: column;">
+  <div style="height: 52px; flex-shrink: 0; background: var(--nav-bg); display: flex; align-items: center; justify-content: space-between; padding: 0 16px;">
+    <span style="color: var(--brand-cream); font-weight: 700; font-size: 17px;">Weconomics</span>
+    <button type="button" aria-label="Меню" style="width: 44px; height: 44px; border: 0; background: transparent; color: var(--brand-cream); display: inline-flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+  </div>
+  <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <p class="vp-eyebrow">Отборочный этап · 2 тур</p>
+    <div style="font-size: 22px; font-weight: 600; line-height: 1.25;">Демоверсия 2 тура – 10 класс</div>
+    <div style="font-size: 14px; color: var(--text2);">18 заданий · 100 баллов · 70 минут</div>
+  </div>
+  <div style="position: absolute; inset: 52px 0 0 0; background: rgba(29,26,22,.42);"></div>
+  <div role="dialog" aria-labelledby="hp" style="position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 16px 16px 0 0; box-shadow: var(--shadow-pop); padding: 10px 20px 28px; display: flex; flex-direction: column; gap: 16px;">
+    <div aria-hidden="true" style="width: 40px; height: 4px; border-radius: 999px; background: var(--border); align-self: center;"></div>
+    <ol class="vp-steps" aria-label="Шаги перед вариантом">
+      <li class="vp-step is-now"><b>1</b>Контакт</li>
+      <li class="vp-step"><b>2</b>Три вопроса</li>
+      <li class="vp-step"><b>3</b>Вариант</li>
+    </ol>
+    <h2 class="vp-h" id="hp" style="font-size: 18px;">Подключите Telegram, чтобы начать</h2>
+    <p class="vp-p" style="font-size: 14px;">Тренажёр бесплатный. Взамен – подписка на <a href="https://t.me/weconomics_ru">@weconomics_ru</a>. Бот пришлёт разбор попытки и напомнит о туре.</p>
+    <ol class="vp-list">
+      <li>Откроется бот Weconomics.</li>
+      <li>Подпишитесь на канал и нажмите «Старт».</li>
+      <li>Вернитесь в браузер – вариант откроется сам.</li>
+    </ol>
+    <a class="k-btn k-btn--main k-btn--wide vp-btn-tg" href="TgWaiting.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.7 3.05a.5.5 0 0 0-.68.63l2.84 7.62a2 2 0 0 1 0 1.4l-2.84 7.62a.5.5 0 0 0 .68.63l18-8.5a.5.5 0 0 0 0-.9z"></path><path d="M6 12h16"></path></svg>Подключить Telegram</a>
+    <p class="vp-p" style="font-size: 14px;">Telegram не открывается? <a href="Email.dc.html">Подтвердить почтой</a></p>
+    <p class="vp-fine">Нажимая кнопку, вы соглашаетесь с <a href="#">Политикой обработки персональных данных</a>.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+/* Weconomics — таблица стилей системы.
+   Классы сняты с templates/_kit.html платформы. Каждый цвет — через var(--…):
+   хардкод hex ломает тёмную тему. */
+
+/* ── Кнопки: три веса ─────────────────────────────────────────────── */
+.k-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-size: 14px; font-weight: 500; line-height: 1.2;
+  padding: 8px 16px; border-radius: var(--r);
+  border: var(--line) solid transparent; background: transparent; color: var(--text);
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: background var(--t) ease, border-color var(--t) ease, color var(--t) ease;
+}
+.k-btn:focus-visible { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
+.k-btn:disabled, .k-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.k-btn--main { background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg); }
+.k-btn--main:hover:not(:disabled) { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+.k-btn--main:active:not(:disabled) { background: var(--btn-bg); transform: translateY(1px); }
+.k-btn--plain { border-color: var(--border); background: var(--surface); color: var(--text); }
+.k-btn--plain:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text3); }
+.k-btn--plain:active:not(:disabled) { transform: translateY(1px); }
+.k-btn--quiet { color: var(--text2); padding: 6px 10px; }
+.k-btn--quiet:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+.k-btn--brand { background: var(--brand-amber); color: var(--brand-amber-ink); border-color: var(--brand-amber); font-weight: 600; }
+.k-btn--brand:hover:not(:disabled) { background: var(--brand-amber-hover); border-color: var(--brand-amber-hover); }
+.k-btn--sm { font-size: 13px; padding: 5px 11px; }
+.k-btn--wide { width: 100%; }
+.k-btn.added, .k-btn.added:disabled {
+  opacity: 1; background: var(--green-tint); color: var(--green);
+  border-color: var(--green-border); cursor: default;
+}
+
+/* ── Поля ввода ───────────────────────────────────────────────────── */
+.k-input, .k-area, .k-select {
+  font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border); border-radius: var(--r);
+  padding: 8px 10px; width: 100%;
+  transition: border-color var(--t) ease, background var(--t) ease;
+}
+.k-input:hover, .k-area:hover, .k-select:hover { border-color: var(--text3); }
+.k-input:focus, .k-area:focus, .k-select:focus {
+  outline: none; border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
+}
+.k-input::placeholder, .k-area::placeholder { color: var(--text3); }
+.k-area { min-height: 84px; resize: none; line-height: 1.6; }
+.k-input--num { width: 88px; text-align: center; font-variant-numeric: tabular-nums; }
+.k-label { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+
+/* ── Галочка и переключатель ──────────────────────────────────────── */
+.k-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); cursor: pointer; }
+.k-check input[type="checkbox"], .k-check input[type="radio"] {
+  appearance: none; -webkit-appearance: none;
+  width: 17px; height: 17px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); cursor: pointer; position: relative;
+  transition: border-color var(--t) ease, background var(--t) ease;
+}
+.k-check input[type="radio"] { border-radius: 50%; }
+.k-check input:hover { border-color: var(--accent); }
+.k-check input:checked { border-color: var(--accent); background: var(--accent); }
+.k-check input[type="checkbox"]:checked::after {
+  content: ''; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px;
+  border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.k-check input[type="radio"]:checked { background: var(--surface); }
+.k-check input[type="radio"]:checked::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent);
+}
+.k-check input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.k-check--box input { width: 19px; height: 19px; }
+
+/* ── Карточка ─────────────────────────────────────────────────────── */
+.k-card {
+  background: var(--surface); border: var(--line) solid var(--border);
+  border-radius: var(--r-card); padding: 18px 20px;
+}
+.k-card--flat { background: var(--surface-2); }
+.k-panel {
+  background: var(--surface-tool); border-radius: var(--r-panel); padding: 16px 18px;
+  color: var(--text);
+}
+.k-info {
+  background: var(--surface-info); border: var(--line) solid var(--brand-amber);
+  border-radius: var(--r-card); padding: 14px 16px; color: var(--text);
+}
+
+/* ── Плашка состояния: полоса слева + текст ───────────────────────── */
+.k-state {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface-2); border: var(--line) solid var(--border);
+  border-left: var(--stripe) solid var(--text3);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 12px 14px; font-size: 14px; line-height: 1.6; color: var(--text);
+}
+.k-state__icon { flex-shrink: 0; width: 16px; text-align: center; font-size: 14px; line-height: 1.55; font-weight: 700; }
+.k-state__title { font-weight: 600; margin-bottom: 2px; }
+.k-state__note { color: var(--text2); font-size: 13px; }
+.k-state--warn { border-left-color: var(--amber); }
+.k-state--warn .k-state__icon { color: var(--amber); }
+.k-state--ok { border-left-color: var(--green); }
+.k-state--ok .k-state__icon { color: var(--green); }
+.k-state--bad { border-left-color: var(--error); }
+.k-state--bad .k-state__icon { color: var(--error); }
+.k-state--pending { border-left-color: var(--pending); }
+.k-state--pending .k-state__icon { color: var(--pending); }
+
+/* ── Чипы ─────────────────────────────────────────────────────────── */
+.k-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 500; line-height: 1.7;
+  padding: 1px 9px; border-radius: var(--r-pill); white-space: nowrap;
+  border: var(--line) solid transparent;
+}
+.k-chip--type { background: transparent; border-color: var(--border); color: var(--text2); }
+.k-chip--topic { background: var(--chip-bg); color: var(--chip-text); }
+.k-chip--diff { background: var(--amber-tint); border-color: var(--amber-border); color: var(--amber-ink); }
+.k-chip--sol { background: var(--green-tint); border-color: var(--green-border); color: var(--green); }
+.k-chip--accent { background: var(--accent-tint); border-color: var(--accent-ring); color: var(--accent-ink); }
+
+/* ── Метка результата ─────────────────────────────────────────────── */
+.k-flag {
+  display: inline-block;
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 9px; border-radius: var(--r-pill); white-space: nowrap;
+}
+.k-flag--correct { background: var(--green-tint); color: var(--green-ink); }
+.k-flag--partial { background: var(--amber-tint); color: var(--amber-ink); }
+.k-flag--wrong { background: var(--error-tint); color: var(--error-ink); }
+.k-flag--pending { background: var(--pending-tint); color: var(--pending); }
+.k-flag--empty { background: var(--chip-bg); color: var(--chip-text); }
+
+/* ── Полоса слева у строки: состояние проверки ────────────────────── */
+.k-mark { border-left: var(--stripe-strong) solid var(--border); padding-left: 12px; }
+.k-mark--correct { border-left-color: var(--green); }
+.k-mark--partial { border-left-color: var(--amber); }
+.k-mark--wrong { border-left-color: var(--error); }
+.k-mark--pending { border-left-color: var(--pending); }
+.k-mark--next { border-left-color: var(--accent); }
+
+/* ── Шапка ────────────────────────────────────────────────────────── */
+.k-nav {
+  display: flex; align-items: center; gap: 22px;
+  background: var(--nav-bg); padding: 0 18px; height: 52px;
+  border-radius: var(--r-panel);
+}
+.k-nav__logo { display: inline-flex; align-items: center; color: var(--brand-cream); }
+.k-nav__link {
+  font-size: 14px; font-weight: 500; color: rgba(255,255,255,.62);
+  text-decoration: none; line-height: 52px; border-bottom: 2px solid transparent;
+  transition: color var(--t) ease;
+}
+.k-nav__link:hover { color: #ffffff; }
+.k-nav__link--active { color: var(--nav-accent); border-bottom-color: var(--nav-accent); }
+.k-nav__spacer { flex: 1; }
+
+/* ── Мелочи ───────────────────────────────────────────────────────── */
+.k-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+  background: var(--error); color: var(--on-error);
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.k-num {
+  font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--num-line);
+  cursor: text;
+}
+.k-sep { display: flex; align-items: center; gap: 10px; color: var(--text3); font-size: 13px; font-weight: 500; }
+.k-sep__line { flex: 1; border-top: 1px dashed var(--border); }
+
+/* ══ Снято с прода 22.09.2026 ══════════════════════════════════════ */
+
+/* ── Крупная кнопка сцены (.play в Wecon Rush) ────────────────────── */
+.k-btn--hero {
+  min-width: 260px; height: 58px; padding: 0 30px; gap: 10px;
+  font-size: 17px; font-weight: 700; border-radius: var(--r-panel);
+  background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg);
+}
+
+/* ── Круглое действие (.ask-go — отправка поиска, реплики) ────────── */
+.k-round {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border: 0; border-radius: var(--r-pill);
+  background: var(--brand-amber); color: var(--brand-amber-ink);
+  cursor: pointer; transition: background var(--t) ease;
+}
+.k-round:hover { background: var(--brand-amber-hover); }
+.k-round--accent { background: var(--accent); color: var(--on-accent); }
+.k-round--accent:hover { background: var(--accent-deep); }
+.k-round:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ── Клавиша (.key) ───────────────────────────────────────────────── */
+.k-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 4px;
+  border: var(--line) solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--text3);
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.k-key--cap { border-bottom-width: 2px; }
+
+/* ── Сегментированный переключатель ───────────────────────────────── */
+.k-seg { display: inline-flex; background: var(--surface-2);
+         border: var(--line) solid var(--border); border-radius: var(--r-pill);
+         padding: 2px; gap: 2px; }
+.k-seg__item {
+  height: 32px; padding: 0 10px; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--text2);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background var(--t) ease, color var(--t) ease;
+}
+.k-seg__item:hover { color: var(--text); }
+.k-seg__item[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+/* ── Плитка-переключатель режима ──────────────────────────────────── */
+.k-tile {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 12px 14px; border-radius: var(--r-card);
+  border: var(--line) solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer; font: inherit;
+  transition: border-color var(--t) ease, background var(--t) ease;
+}
+.k-tile:hover { border-color: var(--text3); }
+.k-tile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.k-tile__name { font-size: 15px; font-weight: 600; }
+.k-tile__meta { font-size: 13px; color: var(--text2); }
+
+/* ── Прибор: крупное число с подписью ─────────────────────────────── */
+.k-stat { display: inline-flex; flex-direction: column; gap: 2px; }
+.k-stat__cap { font-size: 11px; font-weight: 600; letter-spacing: .05em;
+               text-transform: uppercase; color: var(--text3); }
+.k-stat__val { font-size: 28px; font-weight: 700; line-height: 1.1;
+               font-variant-numeric: tabular-nums; color: var(--text); }
+.k-stat__val small { font-size: .5em; font-weight: 500; color: var(--text2); }
+
+/* ── Медаль места ─────────────────────────────────────────────────── */
+.k-medal { display: inline-flex; align-items: center; justify-content: center;
+           width: 26px; height: 24px; font-size: 13px; }
+.k-medal--1 { color: var(--medal-gold); }
+.k-medal--2 { color: var(--medal-silver); }
+.k-medal--3 { color: var(--medal-bronze); }
+.k-medal--n { color: var(--text3); font-variant-numeric: tabular-nums; }
+
+/* ── Плавающая полоса выбора ──────────────────────────────────────── */
+.k-selbar {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 10px 12px 10px 20px; border-radius: var(--r-pill);
+  background: var(--btn-bg); color: var(--on-btn);
+  box-shadow: var(--shadow-pop); font-size: 14px; font-weight: 600;
+}
+.k-selbar__act {
+  border: 0; border-radius: var(--r); padding: 6px 12px;
+  background: var(--on-btn); color: var(--btn-bg);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.k-selbar__close { border: 0; background: transparent; color: var(--on-btn);
+                   opacity: .7; cursor: pointer; font-size: 16px; padding: 4px 6px; }
+.k-selbar__close:hover { opacity: 1; }
+
+/* ── Пилюля «Продолжить» (.se-pill) ───────────────────────────────── */
+.k-resume {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 33px; padding: 6px 14px 6px 10px; border-radius: var(--r-pill);
+  border: var(--line) solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 14.5px; text-decoration: none;
+  transition: border-color var(--t) ease;
+}
+.k-resume:hover { border-color: var(--text3); }
+.k-resume__ring { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ── Чип темы с точкой раздела ────────────────────────────────────── */
+.k-topic { display: inline-flex; align-items: center; gap: 7px;
+           padding: 4px 12px; border-radius: var(--r-pill);
+           background: var(--accent-tint); color: var(--text);
+           font-size: 13.5px; font-weight: 500; }
+.k-topic__dot { width: 7px; height: 7px; border-radius: var(--r-pill); flex-shrink: 0; }

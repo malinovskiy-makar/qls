@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Ждём «Старт» в боте</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="vp-scene" style="width: 640px; height: 780px;">
+  <div class="vp-dlg" role="dialog" aria-labelledby="h2">
+    <button type="button" class="vp-x" aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    <p class="vp-eyebrow">Демоверсия 2 тура · 10 класс · 70 минут</p>
+    <ol class="vp-steps" aria-label="Шаги перед вариантом">
+      <li class="vp-step is-now"><b>1</b>Контакт</li>
+      <li class="vp-step"><b>2</b>Три вопроса</li>
+      <li class="vp-step"><b>3</b>Вариант</li>
+    </ol>
+    <h2 class="vp-h" id="h2">Бот открылся в Telegram</h2>
+    <div class="k-state k-state--pending" role="status">
+      <span class="k-state__icon" aria-hidden="true"><span class="vp-spin" style="display: inline-block; margin-top: 3px;"></span></span>
+      <div>
+        <div class="k-state__title">Ждём подтверждения из Telegram</div>
+        <div class="k-state__note">Нажмите в боте «Старт». Как только бот проверит подписку, эта страница обновится сама.</div>
+      </div>
+    </div>
+    <div class="vp-row">
+      <a class="k-btn k-btn--plain" href="Main.dc.html" style="height: 44px; flex: 1 1 200px;">Открыть бота ещё раз</a>
+      <a class="k-btn k-btn--plain" href="TgNoSub.dc.html" style="height: 44px; flex: 1 1 200px;">Я нажал «Старт» – проверить</a>
+    </div>
+    <div class="k-info" style="font-size: 14px; line-height: 1.6;">Telegram не открывается или долго грузится? В России он работает с перебоями. <a href="Email.dc.html">Подтвердите почту</a> – это тоже открывает вариант.</div>
+    <p class="vp-fine">Не закрывайте эту вкладку: после подтверждения вы вернётесь сюда, к варианту.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

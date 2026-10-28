@@ -1,0 +1,93 @@
+/* Токены Weconomics (светлая тема) — из дизайн-системы «weconomics.ai дизайн система (ориентир)», tokens.json.
+   bundle.css системы читает эти переменные. */
+@font-face { font-family: 'Montserrat'; font-weight: 400; font-style: normal; src: url("ds/weconomics/fonts/montserrat-400.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 500; font-style: normal; src: url("ds/weconomics/fonts/montserrat-500.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 600; font-style: normal; src: url("ds/weconomics/fonts/montserrat-600.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 700; font-style: normal; src: url("ds/weconomics/fonts/montserrat-700.woff2") format("woff2"); }
+
+:root {
+  --accent: #00797a; --accent-ink: #006c6d; --accent-deep: #016769;
+  --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+  --on-accent: #ffffff;
+  --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+  --surface-tool: #81b5b4; --surface-info: #f2e8bd;
+  --border: rgba(45,45,45,.14); --border-soft: rgba(45,45,45,.08);
+  --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+  --brand-amber: #d6a525; --brand-amber-ink: #1d1a16; --brand-amber-hover: #e3b03a;
+  --brand-cream: #fffce6;
+  --btn-bg: #2e2b27; --btn-bg-hover: #3d3933; --on-btn: #ffffff;
+  --nav-bg: #3c3531; --nav-accent: #81b5b4;
+  --chip-bg: rgba(45,45,45,.07); --chip-text: #5c5346;
+  --amber: #96500c; --amber-ink: #723c09; --amber-tint: rgba(150,80,12,.11); --amber-border: rgba(150,80,12,.34);
+  --green: #186e3c; --green-ink: #186e3c; --green-tint: rgba(24,110,60,.09); --green-border: rgba(24,110,60,.30); --on-green: #ffffff;
+  --error: #b93526; --error-ink: #b93526; --error-tint: rgba(185,53,38,.09); --error-border: rgba(185,53,38,.28); --on-error: #ffffff;
+  --pending: #43566f; --pending-tint: rgba(67,86,111,.09); --pending-border: rgba(67,86,111,.28);
+  --focus: #7d7466; --focus-ring: rgba(125,116,102,.22);
+  --num-line: rgba(45,45,45,.34);
+  --r-sm: 4px; --r: 6px; --r-card: 10px; --r-panel: 12px; --r-pill: 999px;
+  --line: 1px; --stripe-thin: 2px; --stripe: 3px; --stripe-strong: 4px;
+  --t: .12s; --t-slow: .2s;
+  --shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+}
+
+/* Ширина элемента включает поля и рамку: без этого кнопки «на всю ширину» (k-btn--wide, width: 100%)
+   вылезали вправо на ширину своих полей. */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Общая сцена: затемнённая страница варианта и окно поверх неё */
+.vp-scene { position: relative; width: 100%; height: 100%; box-sizing: border-box; background: var(--bg);
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text);
+  display: flex; align-items: center; justify-content: center; padding: 32px; overflow: hidden; }
+.vp-scene::before { content: ''; position: absolute; inset: 0; background: rgba(29,26,22,.42); }
+.vp-dlg { position: relative; width: 520px; box-sizing: border-box; background: var(--surface);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop); padding: 28px 32px 24px;
+  display: flex; flex-direction: column; gap: 18px; }
+.vp-x { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--text2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.vp-x:hover { background: var(--surface-2); color: var(--text); }
+.vp-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); margin: 0; }
+.vp-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.vp-step { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: var(--r-pill);
+  background: var(--chip-bg); color: var(--chip-text); font-size: 13px; font-weight: 500; }
+.vp-step b { width: 20px; height: 20px; border-radius: var(--r-pill); display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text2); font-size: 12px; font-weight: 600; }
+.vp-step.is-now { background: var(--accent-tint); color: var(--accent-ink); }
+.vp-step.is-now b { background: var(--accent); color: var(--on-accent); }
+.vp-step.is-done { color: var(--green-ink); background: var(--green-tint); }
+.vp-step.is-done b { background: var(--green); color: var(--on-green); }
+.vp-h { font-size: 19px; font-weight: 600; line-height: 1.3; margin: 0; }
+.vp-p { font-size: 15px; line-height: 1.6; color: var(--text2); margin: 0; }
+.vp-p strong { color: var(--text); font-weight: 600; }
+.vp-fine { font-size: 12px; line-height: 1.5; color: var(--text3); margin: 0; }
+.vp-fine a, .vp-p a { color: var(--accent-ink); }
+.vp-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; counter-reset: s; }
+.vp-list li { counter-increment: s; display: flex; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--text); }
+.vp-list li::before { content: counter(s); flex-shrink: 0; width: 22px; height: 22px; border-radius: var(--r-pill);
+  border: var(--line) solid var(--border); color: var(--text2); font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--surface); }
+.vp-btn-tg { height: 48px; font-size: 15px; font-weight: 600; gap: 10px; }
+.vp-btn-tg svg { flex-shrink: 0; }
+.vp-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.vp-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--pending-border); border-top-color: var(--pending); }
+.vp-code { display: flex; gap: 8px; }
+.vp-code input { width: 48px; height: 56px; text-align: center; font: inherit; font-size: 22px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--text); background: var(--surface-2);
+  border: var(--line) solid var(--border); border-radius: var(--r); }
+.vp-code input.is-focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface); }
+.vp-q { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; }
+.vp-q legend { font-size: 14px; font-weight: 600; color: var(--text); padding: 0; margin-bottom: 10px; }
+.vp-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.vp-tiles .k-tile { font-size: 14px; min-height: 48px; }
+.vp-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.vp-pill { height: 36px; padding: 0 14px; border-radius: var(--r-pill); border: var(--line) solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.vp-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.vp-seg3 { display: flex; }
+.vp-seg3 .k-seg__item { flex: 1 1 0; min-width: 64px; height: 36px; font-size: 14px; }
+
+/* Галочка рассылки: текст в несколько строк, квадрат по первой строке */
+.vp-consent { align-items: flex-start; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.vp-consent input[type="checkbox"] { margin-top: 2px; }
+.vp-consent a { color: var(--accent-ink); }
+/* Код из письма — одно поле, как на сайте (вставка из письма целиком, подсказка телефона) */
+.vp-code1 { width: 100%; height: 52px; font-size: 22px; font-weight: 600; letter-spacing: 6px; text-align: center; font-variant-numeric: tabular-nums; }

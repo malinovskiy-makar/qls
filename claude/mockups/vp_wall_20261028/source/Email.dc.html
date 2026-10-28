@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Почта: адрес</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="vp-scene" style="width: 640px; height: 780px;">
+  <div class="vp-dlg" role="dialog" aria-labelledby="h4">
+    <button type="button" class="vp-x" aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    <p class="vp-eyebrow">Демоверсия 2 тура · 10 класс · 70 минут</p>
+    <ol class="vp-steps" aria-label="Шаги перед вариантом">
+      <li class="vp-step is-now"><b>1</b>Контакт</li>
+      <li class="vp-step"><b>2</b>Три вопроса</li>
+      <li class="vp-step"><b>3</b>Вариант</li>
+    </ol>
+    <h2 class="vp-h" id="h4">Подтвердите почту</h2>
+    <p class="vp-p">Если Telegram не работает, вариант откроет почта. Пришлём на неё код из шести цифр.</p>
+    <div>
+      <label class="k-label" for="em">Электронная почта</label>
+      <input class="k-input" id="em" type="email" inputmode="email" autocomplete="email" placeholder="name@example.ru" style="height: 44px; box-sizing: border-box; font-size: 15px;">
+    </div>
+    <label class="k-check vp-consent"><input type="checkbox"><span>Присылать письма о новых тренажёрах, разборах и олимпиадах (<a href="#">согласие на рассылку</a>)</span></label>
+    <a class="k-btn k-btn--main k-btn--wide" href="EmailCode.dc.html" style="height: 48px; font-size: 15px; font-weight: 600;">Отправить код</a>
+    <p class="vp-p" style="font-size: 14px;">Telegram всё-таки работает? <a href="Main.dc.html">Подключить Telegram</a></p>
+    <p class="vp-fine">Нажимая кнопку, вы соглашаетесь с <a href="#">Политикой обработки персональных данных</a>. Галочка – по желанию: без неё на почту приходят только коды.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

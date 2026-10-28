@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Стена: подключить Telegram</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="vp-scene" style="width: 640px; height: 780px;">
+  <div class="vp-dlg" role="dialog" aria-labelledby="h1">
+    <button type="button" class="vp-x" aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    <p class="vp-eyebrow">Демоверсия 2 тура · 10 класс · 70 минут</p>
+    <ol class="vp-steps" aria-label="Шаги перед вариантом">
+      <li class="vp-step is-now"><b>1</b>Контакт</li>
+      <li class="vp-step"><b>2</b>Три вопроса</li>
+      <li class="vp-step"><b>3</b>Вариант</li>
+    </ol>
+    <h2 class="vp-h" id="h1">Подключите Telegram, чтобы начать</h2>
+    <p class="vp-p">Тренажёр бесплатный. Взамен просим подписку на наш канал <a href="https://t.me/weconomics_ru">@weconomics_ru</a>: там разборы задач и всё про «Высшую пробу». Бот пришлёт разбор вашей попытки и напомнит о туре.</p>
+    <div class="k-card k-card--flat" style="display: flex; flex-direction: column; gap: 14px; padding: 16px 18px;">
+      <ol class="vp-list">
+        <li>Нажмите кнопку – откроется бот Weconomics.</li>
+        <li>Подпишитесь на канал и нажмите в боте «Старт».</li>
+        <li>Вернитесь сюда – вариант откроется сам.</li>
+      </ol>
+      <a class="k-btn k-btn--main k-btn--wide vp-btn-tg" href="TgWaiting.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.7 3.05a.5.5 0 0 0-.68.63l2.84 7.62a2 2 0 0 1 0 1.4l-2.84 7.62a.5.5 0 0 0 .68.63l18-8.5a.5.5 0 0 0 0-.9z"></path><path d="M6 12h16"></path></svg>Подключить Telegram</a>
+    </div>
+    <p class="vp-p" style="font-size: 14px;">Telegram не открывается? <a href="Email.dc.html">Подтвердить почтой</a></p>
+    <p class="vp-fine">Нажимая кнопку, вы соглашаетесь с <a href="#">Политикой обработки персональных данных</a>. Мы храним номер вашего аккаунта в Telegram, чтобы проверить подписку и чтобы бот мог вам написать.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

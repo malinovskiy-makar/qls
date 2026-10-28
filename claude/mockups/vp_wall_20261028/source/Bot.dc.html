@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Бот в Telegram</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+.bt-msg{max-width: 290px; padding: 10px 12px; border-radius: 14px; font-size: 14px; line-height: 1.5; background: var(--surface); border: 1px solid var(--border); color: var(--text); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;}
+.bt-me{align-self: flex-end; background: var(--accent-tint); border-color: var(--accent-ring);}
+.bt-act{display: flex; gap: 6px; flex-wrap: wrap;}
+.bt-act a{flex: 1 1 auto; text-align: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-ink); font-size: 13px; font-weight: 600; text-decoration: none;}
+.bt-div{align-self: center; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); padding: 4px 10px; border-radius: 999px; background: var(--chip-bg);}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: var(--bg); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: var(--text); display: flex; flex-direction: column;">
+  <div style="height: 60px; flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 0 16px;">
+    <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 999px; background: var(--nav-bg); color: var(--brand-cream); font-weight: 700; display: inline-flex; align-items: center; justify-content: center;">W</span>
+    <div style="display: flex; flex-direction: column;">
+      <span style="font-size: 15px; font-weight: 600;">Weconomics · тренажёр ВП</span>
+      <span style="font-size: 12px; color: var(--text3);">бот</span>
+    </div>
+  </div>
+  <div style="flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden;">
+    <div class="bt-msg bt-me">Старт</div>
+    <div class="bt-msg">Привет! Это бот тренажёра «Высшей пробы» от Weconomics. Проверяю подписку на @weconomics_ru…</div>
+    <div class="bt-msg"><span><strong>Готово:</strong> подписка есть, аккаунт привязан к сайту. Вернитесь на вкладку с вариантом – он уже открыт.</span><div class="bt-act"><a href="Survey.dc.html">Вернуться к варианту</a></div></div>
+    <span class="bt-div">Если подписки нет</span>
+    <div class="bt-msg"><span>Подписки на @weconomics_ru пока нет. Подпишитесь и нажмите «Проверить».</span><div class="bt-act"><a href="https://t.me/weconomics_ru">Подписаться</a><a href="#">Проверить</a></div></div>
+    <span class="bt-div">Потом – сессия 3</span>
+    <div class="bt-msg"><span>Разбор попытки готов: <strong>72 из 100</strong>. Три задачи потеряны только из-за формата ответа.</span><div class="bt-act"><a href="#">Открыть разбор</a></div></div>
+    <div class="bt-msg"><span>До 2 тура 3 дня. Вышел новый вариант для 10 класса.</span><div class="bt-act"><a href="#">Решить вариант</a></div></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Почта: код</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="vars.css">
+<link rel="stylesheet" href="ds/weconomics/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#006c6d}a:hover{color:#016769}
+</style>
+</helmet>
+<div class="vp-scene" style="width: 640px; height: 780px;">
+  <div class="vp-dlg" role="dialog" aria-labelledby="h5">
+    <button type="button" class="vp-x" aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    <p class="vp-eyebrow">Демоверсия 2 тура · 10 класс · 70 минут</p>
+    <ol class="vp-steps" aria-label="Шаги перед вариантом">
+      <li class="vp-step is-now"><b>1</b>Контакт</li>
+      <li class="vp-step"><b>2</b>Три вопроса</li>
+      <li class="vp-step"><b>3</b>Вариант</li>
+    </ol>
+    <h2 class="vp-h" id="h5">Введите код из письма</h2>
+    <p class="vp-p">Отправили код на <strong>ivan.petrov@yandex.ru</strong>. <a href="Email.dc.html">Изменить</a></p>
+    <div>
+      <label class="k-label" for="code">Код из письма</label>
+      <input class="k-input vp-code1" id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" value="471 9">
+    </div>
+    <div class="k-state k-state--bad" style="font-size: 14px;">
+      <span class="k-state__icon" aria-hidden="true">×</span>
+      <div><div class="k-state__title">Пример ошибки: код не подошёл</div><div class="k-state__note">Проверьте цифры или запросите новый код. Осталось попыток: 4.</div></div>
+    </div>
+    <a class="k-btn k-btn--main k-btn--wide" href="Survey.dc.html" style="height: 48px; font-size: 15px; font-weight: 600;">Подтвердить</a>
+    <div class="vp-row" style="justify-content: space-between; align-items: center;">
+      <span class="vp-fine">Новый код можно запросить через 0:42</span>
+      <span class="vp-fine">Письма нет? Загляните в «Спам».</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
