@@ -269,3 +269,23 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 | из конфига убран `deny all` | `test_only_our_server_is_let_in` |
 | журнал запросов включён | `test_no_access_log_anywhere` |
 | `proxy_read_timeout` 30 с (длинный опрос оборвётся) | `test_forwards_to_telegram_and_holds_a_long_poll` |
+
+## Фаза 4. Проверки
+
+| Проверка | Итог |
+|---|---|
+| тесты сессии + `test_security_headers` | 715 → **757** (+42: опрос и служба 36, `app=1` 6), OK (skipped=1) |
+| `manage.py check` | 0 |
+| `check --deploy --fail-level WARNING`, окружение джоба `deploy-check` | «no issues» |
+| `makemigrations --check --dry-run` | No changes detected (миграций в S2b нет) |
+| `docker compose config` | **`docker` на маке нет** – compose проверен разбором YAML в тесте `TgbotServiceTests` (профиль, без портов, зависимости, метка жизни) |
+| `bash -n deploy/entrypoint-tgbot.sh` | ок; режим в индексе git `100755` (сторож `test_deploy_scripts_executable` зелёный) |
+| `ruff` по изменённым .py | чисто |
+| `bandit -r vp -ll` | новых находок нет |
+| `scripts/check_em_dash.py` | 0 |
+| общая база | мои команды её не открывали (тесты в памяти, ручного прогона на ней не было) |
+| nginx | на маке нет, `nginx -t` на `tg_relay/nginx.conf` не запускался – Андрей на шаге 4б |
+| глазами | экран 02 с новой строкой НЕ смотрел (живой бот и `.env` недоступны); разметка проверена тестом |
+| живой бот | не проверялся (`.env` закрыт); шаги для владельца – в отчёте |
+
+Коммиты S2b: `c7b1e69c` (ф.1), `2c66d152` (ф.2), `3ea1f17a` (ф.3), далее коммит журнала фазы 4.
