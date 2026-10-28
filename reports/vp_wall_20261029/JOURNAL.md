@@ -242,3 +242,30 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 | у `app=1` новый код | `test_app_redirect_is_tg_scheme_with_the_same_code`, `test_app_first_then_site_button_shares_one_code` |
 | форма `app=1` с `target="_blank"` | `test_waiting_has_the_open_in_app_form_without_new_tab` |
 | ответ обычным `HttpResponseRedirect` (схема не разрешена) | три теста `AppLinkTests` |
+
+## Фаза 3. Посредник для Андрея и порядок выкатки
+
+- `deploy/tg_relay/nginx.conf`: порт 80 – только `/.well-known/acme-challenge/` (остальное `return 444`);
+  порт 443 – `allow __OUR_SERVER_IP__; deny all;`, `proxy_pass https://api.telegram.org;`,
+  `proxy_ssl_server_name on`, `Host api.telegram.org`, `proxy_read_timeout`/`send_timeout 90s`,
+  `access_log off` на обоих серверах, `error_log … crit` (строка ошибки nginx несёт адрес с токеном).
+  Имя и IP – две метки `__RELAY_HOST__`, `__OUR_SERVER_IP__`, README подставляет их одной командой `sed`.
+  Без IPv6: запись DNS только A. `nginx` на маке нет – синтаксис конфига не проверялся самим nginx
+  (проверит Андрей командой `nginx -t` на шаге 4б); тесты стерегут состав директив.
+- `deploy/tg_relay/README.md`: шаги 0–6 + «Если не работает». Команды по одной, после каждой – что увидеть.
+  Сертификат: сначала временный блок только на 80 порту (иначе `nginx -t` падает без сертификата), потом настоящий файл.
+- `docs/VP.md`: «Выкатка стены – по шагам» переписана (боты есть → посредник → `.env` → пересоздать `web` и
+  `restart nginx` → `tg_setup --ping` → `--check` → `--delete-webhook` и `tgbot` → почта → `vp_wall_status` →
+  две учётки); раздел «Бот: посредник и длинный опрос»; вебхук – запасной (опрос и вебхук вместе не
+  работают); «Если Telegram перестал отвечать во время тура».
+- `docs/adr/0168`: «Дополнение 28.10: посредник и опрос» (факт, решение, отвергнутое: Cloudflare Worker, стена без Telegram, вебхук).
+- `deploy/env.example`: пояснение к `TELEGRAM_API_BASE` и секрету.
+- Новые тесты `RelayFilesTests` (6) в `test_wall_poll.py`.
+- **Для Анича:** через посредника идут токен бота и Telegram ID учеников. Трансграничная передача (Telegram +
+  хостинг посредника) – в Политику и в уведомление РКН.
+
+| Дефект | Покраснело |
+|---|---|
+| из конфига убран `deny all` | `test_only_our_server_is_let_in` |
+| журнал запросов включён | `test_no_access_log_anywhere` |
+| `proxy_read_timeout` 30 с (длинный опрос оборвётся) | `test_forwards_to_telegram_and_holds_a_long_poll` |

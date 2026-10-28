@@ -361,11 +361,11 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 | Адрес | Что |
 |---|---|
 | `POST /vp/wall/email/<слаг>/` | почтовый путь: `send` / `confirm` / `resend` / `change` / `use`; `MAIL_ENABLED=0` → 404 |
-| `POST /vp/wall/tg/<слаг>/` | 302 на `https://t.me/<бот>?start=<код>`; тот же код 30 минут, 10 новых в час |
+| `POST /vp/wall/tg/<слаг>/` | 302 на `https://t.me/<бот>?start=<код>`; тот же код 30 минут, 10 новых в час. С `app=1` («Не открылось? Открыть в приложении Telegram» на экране 02) – 302 на `tg://resolve?domain=<бот>&start=<код>` с тем же кодом: `TgAppRedirect`, потому что стандартный редирект Django схему `tg` не пускает; форма без `target="_blank"` |
 | `POST /vp/wall/check/<слаг>/` | проверить подписку ещё раз (не чаще раза в 5 с) |
 | `GET /vp/wall/state/?v=<слаг>` | JSON `{step, tg, tg_username}`; гость 403, скрытый слаг 404 |
 | `POST /vp/wall/survey/<слаг>/` | анкета и сразу старт варианта |
-| `POST /vp/tg/hook/` | вебхук бота; пустой секрет — всегда 403 |
+| `POST /vp/tg/hook/` | вебхук бота (запасной режим); пустой секрет – всегда 403 |
 
 Со стены согласие на рассылку только **даётся** (`Source.VP_WALL`), никогда не отзывается.
 «Другая почта» у того, у кого подтверждённая уже есть, — страница «Почта»
@@ -390,7 +390,7 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` | пусто | бот из BotFather (имя без «@») |
 | `TELEGRAM_WEBHOOK_SECRET` | пусто | 1–256 из `A-Za-z0-9_-`; пусто — вебхук закрыт |
 | `TELEGRAM_CHANNEL` | `@` + `LEGAL['telegram']` | канал проверки (бот разработки — можно свой) |
-| `TELEGRAM_API_BASE` | `https://api.telegram.org` | только `https://`; свой посредник — только НАШ сервер |
+| `TELEGRAM_API_BASE` | `https://api.telegram.org` | только `https://`; на бою – посредник `https://tg.weconomics.ai` (только НАШ сервер, через него идёт токен) |
 
 Под тестами все `TELEGRAM_*` пустые. `vp.W001` — предупреждение при `VP_WALL_ENABLED`,
 `DEBUG=False` и ненастроенном пути (джоб `deploy-check` получает подставные значения).
@@ -400,33 +400,72 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 `vp_wall_status` (вкл/выкл, пути «задан / не задан», люди по `contact_via`, с анкетой) ·
 `vp_wall_stats [--days 7]` (по дням: дошли, tg, email, застряли, анкета; распределения ответов) ·
 `tg_setup --ping | --check | --set-webhook <url> | --delete-webhook | --info` ·
-`tg_poll [--force]` (длинный опрос на маке).
+`tg_poll [--timeout 50] [--force]` (длинный опрос: боевая служба `tgbot` и бот разработки на маке).
+
+### Бот: посредник и длинный опрос (решение 28.10.2026, ADR 0168, «Дополнение 28.10»)
+
+С российских серверов Telegram закрыт в обе стороны (с боевого сервера `curl https://api.telegram.org/` –
+timeout), поэтому:
+
+- бот ходит в Telegram **через свой сервер-посредник за рубежом** (nginx, пускает только IP нашего
+  сервера): `TELEGRAM_API_BASE=https://tg.weconomics.ai`. Устройство и инструкция –
+  [deploy/tg_relay/README.md](../deploy/tg_relay/README.md);
+- сообщения бот получает **длинным опросом** `getUpdates`, а не вебхуком: служба `tgbot` в боевом
+  `docker compose` (`manage.py tg_poll`, [SERVER.md](SERVER.md#tgbot--бот-стены-вп-длинный-опрос-telegram)).
+  Вебхук остаётся **запасным** режимом: он нужен, только если Telegram снова начнёт достучаться до нашего
+  сервера; тогда `tgbot` выключить – **опрос и вебхук вместе не работают** (Telegram отвечает `409`);
+- обновление обрабатывается один раз: `vp.bot.handle_once` отсекает повтор `update_id` (кэш, сутки) и для
+  опроса, и для вебхука; сбой одного обновления в лог (`update_id`, тип, класс ошибки – без тела) и дальше;
+- обрыв связи опрос переживает: пауза 5 → 10 → 20 → 40 → 60 с, после удачного ответа снова 5; `409`
+  (вебхук установлен или второй опрос) и `401` (токен не принят) – выход с кодом 1 и понятной строкой;
+- метка жизни `/tmp/tg_poll_alive` обновляется после каждого ответа Telegram – по ней `healthcheck`;
+  SIGTERM (остановка контейнера) – чистый выход с кодом 0;
+- ⚠️ `telegram.call(…, http_timeout=…)`: `timeout` в параметрах – это параметр самого Telegram (длинный
+  опрос `getUpdates`); до S2b оба назывались `timeout`, и `tg_poll` падал на первом запросе;
+- ⚠️ через посредника идут **токен бота и Telegram ID учеников**. Для Политики и уведомления РКН: это
+  трансграничная передача (Telegram и хостинг посредника). Журнал запросов на посреднике выключен.
 
 ### Бот разработки
 
-Отдельный бот (решение 28.10: например `@weconomics_dev_bot`), тоже администратор канала
-без прав — или свой тестовый канал через `TELEGRAM_CHANNEL`. На маке вебхук не придёт:
-`tg_poll`. ⚠️ **`tg_poll --force` — только для бота разработки:** он снимает вебхук, и у
-боевого бота это снимет вебхук на сервере — стена перестанет получать «Старт».
+Отдельный бот `@weconomics_dev_bot` (администратор @weconomics_ru без прав – или свой тестовый канал
+через `TELEGRAM_CHANNEL`). На маке вебхук не придёт: `tg_poll`. ⚠️ **`tg_poll --force` – только для
+бота разработки:** он снимает вебхук, и у боевого бота это снимет вебхук на сервере.
+На маке VPN, `TELEGRAM_API_BASE` не нужен (по умолчанию `https://api.telegram.org`).
 
-### Выкатка стены — по шагам
+### Выкатка стены – по шагам
 
-1. Боевой бот в BotFather.
-2. Бот — администратор @weconomics_ru без дополнительных прав.
-3. Переменные в `.env` сервера; секрет — `python -c "import secrets;print(secrets.token_urlsafe(32))"`.
-4. `docker compose exec web python manage.py tg_setup --ping` на сервере.
-5. Не отвечает → посредник за рубежом и `TELEGRAM_API_BASE`.
-6. `tg_setup --check`.
-7. `tg_setup --set-webhook https://weconomics.ai/vp/tg/hook/`.
-8. Почта — по шагам из [MAIL.md](MAIL.md).
-9. `vp_wall_status` — оба пути «да».
-10. Живая проверка двумя аккаунтами: подписан и не подписан.
+Боты уже созданы: боевой `@weconomics_bot` (администратор @weconomics_ru), для проверок
+`@weconomics_dev_bot`.
+
+1. **Посредник** – по [deploy/tg_relay/README.md](../deploy/tg_relay/README.md) (Андрей): сервер за
+   рубежом, nginx, сертификат; с боевого сервера `curl https://tg.weconomics.ai/` отвечает числом, не `403`.
+2. **Переменные в `/srv/weconomics/.env`** боевого сервера: `TELEGRAM_API_BASE=https://tg.weconomics.ai`,
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME=weconomics_bot`, `TELEGRAM_WEBHOOK_SECRET` (нужен и без
+   вебхука: без него путь Telegram считается ненастроенным), `TELEGRAM_CHANNEL` при необходимости.
+   Секрет: `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`.
+3. **Пересоздать `web`, затем перезапустить `nginx`** (ловушка из [SERVER.md](SERVER.md): иначе nginx
+   держит старый адрес контейнера):
+   `docker compose up -d --force-recreate web && docker compose restart nginx`.
+4. `docker compose exec web python manage.py tg_setup --ping` – «Telegram отвечает за N мс».
+   Не отвечает – вернуться к шагу 1.
+5. `docker compose exec web python manage.py tg_setup --check` – «Бот – администратор канала: да».
+6. **Вебхук снять и включить опрос:**
+   `docker compose exec web python manage.py tg_setup --delete-webhook`, затем
+   `docker compose --profile tgbot up -d tgbot` и `docker compose logs -f tgbot` – в логе
+   «Опрос запущен, бот @weconomics_bot».
+7. **Почта** – по шагам из [MAIL.md](MAIL.md).
+8. `docker compose exec web python manage.py vp_wall_status` – оба пути «да».
+9. **Живая проверка двумя аккаунтами:** подписанный на канал (бот отвечает «Готово…», вкладка с вариантом
+   сама переходит к анкете) и не подписанный (бот просит подписаться, после подписки «Проверить» –
+   «Готово»). Строка «Не открылось? Открыть в приложении Telegram» открывает приложение.
 
 ### Если Telegram перестал отвечать во время тура
 
-Путь почты остаётся: окно ведёт на почту мелкой ссылкой, `VP_WALL_TG_ENABLED=0` делает почту
-единственным путём. Посредник `TELEGRAM_API_BASE` — только наш собственный сервер: через
-него проходит токен бота.
+Путь почты остаётся: окно ведёт на почту мелкой ссылкой. `VP_WALL_TG_ENABLED=0` (и перезапуск `web`)
+делает почту единственным путём; службу `tgbot` тогда можно остановить: `docker compose stop tgbot`.
+Сначала проверить посредника: `curl` с боевого сервера (шаг 1) и `docker compose logs --tail 50 tgbot`
+(«пауза 60 с» подряд – посредник или Telegram недоступен). Посредник `TELEGRAM_API_BASE` – только наш
+собственный сервер: через него проходит токен бота.
 
 ## Тесты и как их гонять
 

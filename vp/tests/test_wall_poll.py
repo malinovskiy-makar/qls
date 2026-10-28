@@ -364,3 +364,57 @@ class TgbotServiceTests(SimpleTestCase):
         from vp.management.commands import tg_poll
         test = ' '.join(self.service()['healthcheck']['test'])
         self.assertIn(tg_poll.ALIVE_FILE, test)
+
+
+class RelayFilesTests(SimpleTestCase):
+    """Пример настройки посредника (deploy/tg_relay): закрыт чужим, без журнала, длинный опрос влезает."""
+
+    RELAY = Path(__file__).resolve().parents[2] / 'deploy' / 'tg_relay'
+
+    def conf(self):
+        text = (self.RELAY / 'nginx.conf').read_text('utf-8')
+        return '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#'))
+
+    def test_only_our_server_is_let_in(self):
+        conf = self.conf()
+        self.assertIn('allow __OUR_SERVER_IP__;\n    deny all;', conf)
+
+    def test_no_access_log_anywhere(self):
+        conf = self.conf()
+        self.assertEqual(conf.count('access_log off;'), 2)
+        self.assertNotIn('access_log on', conf)
+        for line in conf.splitlines():
+            if 'access_log' in line:
+                self.assertIn('off', line)
+        # Журнал ошибок содержит адрес запроса (токен) – только критичное.
+        for line in conf.splitlines():
+            if 'error_log' in line:
+                self.assertTrue(line.strip().endswith('crit;'), line)
+
+    def test_forwards_to_telegram_and_holds_a_long_poll(self):
+        conf = self.conf()
+        for needle in ('proxy_pass https://api.telegram.org;', 'proxy_ssl_server_name on;',
+                       'proxy_set_header Host api.telegram.org;', 'proxy_read_timeout 90s;',
+                       'proxy_send_timeout 90s;'):
+            self.assertIn(needle, conf)
+
+    def test_port_80_is_only_for_certbot(self):
+        conf = self.conf()
+        self.assertIn('location /.well-known/acme-challenge/', conf)
+        self.assertIn('return 444;', conf)
+
+    def test_names_are_placeholders_in_one_place_each(self):
+        conf = self.conf()
+        self.assertNotIn('weconomics', conf.replace('weconomics_', ''))
+        self.assertIn('__RELAY_HOST__', conf)
+        left = conf.replace('__RELAY_HOST__', '').replace('__OUR_SERVER_IP__', '')
+        self.assertNotIn('__', left)
+
+    def test_readme_walks_through_the_agreed_steps(self):
+        readme = (self.RELAY / 'README.md').read_text('utf-8')
+        for needle in ('https://api.telegram.org/', 'ufw allow 22/tcp', 'ufw allow 80/tcp',
+                       'ufw allow 443/tcp', 'PasswordAuthentication no', 'dig +short',
+                       'certbot', 'certbot renew --dry-run', 'TELEGRAM_API_BASE=https://tg.weconomics.ai',
+                       'Spaceship', 'токен бота'):
+            self.assertIn(needle, readme)
+        self.assertNotIn('access_log on', readme)
