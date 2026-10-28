@@ -4,6 +4,7 @@
 (ADR 0134, 0149). Без базы и без сети — `SimpleTestCase`, поставщик `fake`.
 """
 import json
+from unittest import mock
 import os
 import tempfile
 
@@ -36,8 +37,10 @@ class KeyExtractionTests(SimpleTestCase):
         self.assertEqual(reference.answer_lines('**Ответ:**\n\n42 руб.'), ['42 руб.'])
 
     def test_formula_inequality_or_text_is_not_a_key(self):
+        # «40 или более», «100 примерно» — хвост похож на единицы, ловит только
+        # проверка неоднозначности.
         for text in ('Q = 50 - 0,5P', 'P > 25', '32 или 40', 'выпуск вырастет',
-                     'от 10 до 20'):
+                     'от 10 до 20', '40 или более', '100 примерно'):
             self.assertIsNone(reference.segment_value(text), text)
 
     def test_percent_and_unit_tail(self):
@@ -85,6 +88,8 @@ class ExclusionTests(SimpleTestCase):
         statement = 'Какая часть добычи достанется капитану при таком дележе добычи?' + options
         self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='1/10')))
         self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='[2]')))
+        # Совпадает только значение («0,1» и «$1/10$» текстом разные) — тоже выбор.
+        self.assertTrue(reference.is_choice(ref_row(statement_md=statement, answer='0,1')))
         rows = ('\n\n| | |\n|---|---|\n| 1 | Прав. |\n| 2 | Не прав, другое. |\n'
                 '| 3 | Нельзя сказать. |')
         self.assertTrue(reference.is_choice(ref_row(
@@ -248,6 +253,25 @@ class ProviderHeaderTests(SimpleTestCase):
                 del os.environ['ANTHROPIC_WORKSPACE_ID']
         self.assertEqual(client._custom_headers.get('anthropic-workspace-id'), 'wrkspc_test')
 
+    def test_reasoning_becomes_effort_for_claude(self):
+        # Claude 5.5 рассуждает всегда; уровень — только `output_config.effort`.
+        captured = {}
+
+        class _Messages(object):
+            def create(self, **kw):
+                captured.update(kw)
+                raise RuntimeError('стоп')
+
+        provider = providers.AnthropicProvider()
+        with mock.patch.object(provider, 'client', return_value=_Obj(messages=_Messages())):
+            # Поставщик заворачивает любой сбой вызова в свой отказ — нам важна заявка.
+            with self.assertRaises(Exception):
+                provider.complete(['s'], 'u', {'type': 'object'}, 'claude-opus-5-5', 10,
+                                  reasoning='high')
+        self.assertEqual(captured['output_config']['effort'], 'high')
+        self.assertIn('format', captured['output_config'])
+        self.assertNotIn('temperature', captured)
+
     def test_core_is_untouched_by_judge(self):
         self.assertNotIn(judge.PROFILE, core.available_profiles())
 
@@ -294,7 +318,8 @@ class JudgeBatchTests(SimpleTestCase):
             sent = client.messages.batches.created
             self.assertEqual(len(sent), 3)
             self.assertTrue(all(r['custom_id'].startswith('r') for r in sent))
-            self.assertEqual(sent[0]['params']['temperature'], 0)
+            # Claude 5.5 отвечает 400 на temperature — в заявку она не уходит.
+            self.assertNotIn('temperature', sent[0]['params'])
             self.assertIn('cache_control', sent[0]['params']['system'][0])
             out = v1run.read_jsonl(os.path.join(tmp, 'runs', 'm1', 'judge_claude-sonnet-5-5.jsonl'))
             self.assertEqual(len(out), 3)

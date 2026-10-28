@@ -101,13 +101,13 @@ def user_text_b(task):
     return '\n'.join(lines)
 
 
-def solve_call(row, provider, model, reasoning, timeout):
+def solve_call(row, provider, model, reasoning, timeout, max_tokens=SOLVE_MAX_TOKENS):
     task = reference.Task(row)
     if row['block'] == 'A':
         system, text = solve.SYSTEM, solve.user_text(task, task.parts.all(), row['asks'])
     else:
         system, text = SYSTEM_B, user_text_b(task)
-    return core.run('ai_exam_v1_solve', text, solve.SCHEMA, None, max_tokens=SOLVE_MAX_TOKENS,
+    return core.run('ai_exam_v1_solve', text, solve.SCHEMA, None, max_tokens=max_tokens,
                     cache_seconds=0, check_limit=False, timeout=timeout or SOLVE_TIMEOUT,
                     provider=provider, model=model, system=[system], parse=solve.parse,
                     log=False, check_budget=False, reasoning=reasoning)
@@ -140,14 +140,15 @@ def with_retries(call, sleep=time.sleep):
             return None, exc, attempt
 
 
-def solve_one(row, provider, model, reasoning, timeout, sleep=time.sleep):
+def solve_one(row, provider, model, reasoning, timeout, sleep=time.sleep,
+              max_tokens=SOLVE_MAX_TOKENS):
     started = time.monotonic()
     record = {'key': row['key'], 'block': row['block'], 'fresh': row['fresh'],
               'olympiad': row['olympiad'], 'stage': row['stage'],
               'verdict': '', 'format_error': False, 'error': '', 'error_kind': '',
               'solution': '', 'answers': [], 'asks': []}
     result, exc, retries = with_retries(
-        lambda: solve_call(row, provider, model, reasoning, timeout), sleep)
+        lambda: solve_call(row, provider, model, reasoning, timeout, max_tokens), sleep)
     record['retries'] = retries
     if exc is not None:
         record.update(_usage(exc.usage), error=str(exc)[:300], error_kind=exc.kind,
@@ -201,7 +202,8 @@ def run_pool(items, work, *, workers, max_usd, spent, on_record):
 
 
 def solve_run(directory, label, rows, provider, model, *, reasoning=None, workers=4,
-              max_usd=1.0, timeout=None, write=print, sleep=time.sleep, retry_format=False):
+              max_usd=1.0, timeout=None, write=print, sleep=time.sleep, retry_format=False,
+              max_tokens=SOLVE_MAX_TOKENS):
     """Решатель по строкам `rows` в папку `runs/<label>`. → путь папки.
 
     `retry_format` — дозапросить и сбои формата (ответ обрезан потолком
@@ -215,7 +217,7 @@ def solve_run(directory, label, rows, provider, model, *, reasoning=None, worker
             or (retry_format and old[r['key']].get('format_error'))]
     _dump(os.path.join(path, 'config.json'), {
         'label': label, 'provider': provider.name, 'model': model, 'reasoning': reasoning,
-        'max_tokens': SOLVE_MAX_TOKENS, 'workers': workers, 'max_usd': max_usd,
+        'max_tokens': max_tokens, 'workers': workers, 'max_usd': max_usd,
         'set_keys': [r['key'] for r in rows],
         'prompt_sha256': {'solve_system': reference.sha256(solve.SYSTEM),
                           'system_b': reference.sha256(SYSTEM_B)}})
@@ -226,7 +228,8 @@ def solve_run(directory, label, rows, provider, model, *, reasoning=None, worker
             handle.write(json.dumps(record, ensure_ascii=False) + '\n')
             handle.flush()
         spent, stopped, done = run_pool(
-            todo, lambda row: solve_one(row, provider, model, reasoning, timeout, sleep),
+            todo, lambda row: solve_one(row, provider, model, reasoning, timeout, sleep,
+                                        max_tokens),
             workers=workers, max_usd=max_usd, spent=spent, on_record=on_record)
     write('%s: отправлено %d, всего потрачено $%.4f%s' % (label, done, spent,
                                                        ', ОБОРВАН ПО ДЕНЬГАМ' if stopped else ''))
@@ -294,7 +297,7 @@ def judge_run(directory, label, rows, provider, model, *, workers=4, max_usd=1.0
 BATCH_DISCOUNT = 0.5
 
 
-def batch_requests(directory, labels, rows, model, temperature=0, keys=None):
+def batch_requests(directory, labels, rows, model, temperature=None, keys=None):
     """Заявки пакета по ответам блока B нескольких папок прогона.
 
     → (заявки, карта custom_id → (метка, ключ)). Уже оценённые этим судьёй
@@ -323,6 +326,7 @@ def batch_requests(directory, labels, rows, model, temperature=0, keys=None):
                                     'content': judge_mod.user_text(rec['solution'])}],
                       'output_config': {'format': {'type': 'json_schema',
                                                    'schema': judge_mod.SCHEMA}}}
+            # Claude 5.5 temperature не принимает (400) — по умолчанию не передаём.
             if temperature is not None:
                 params['temperature'] = temperature
             requests.append({'custom_id': custom_id, 'params': params})
@@ -363,7 +367,7 @@ def batch_record(rows_by_key, key, model, entry):
     return out
 
 
-def judge_batch(directory, labels, rows, provider, model, *, max_usd=5.0, temperature=0,
+def judge_batch(directory, labels, rows, provider, model, *, max_usd=5.0, temperature=None,
                 keys=None, poll_seconds=300, write=print, sleep=time.sleep, client=None):
     """Судья пакетом: отправить, ждать, разложить по папкам прогона. Смета —
     до отправки (по 5 000 входа + 1 200 выхода на заявку, со скидкой пакета);

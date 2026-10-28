@@ -230,6 +230,10 @@ class AnthropicProvider(BaseProvider):
         # Без схемы — ответ текстом (чат): `output_config` не передаётся.
         extra = ({'output_config': {'format': {'type': 'json_schema', 'schema': schema}}}
                  if schema is not None else {})
+        # Уровень рассуждения: у Claude 5.5 рассуждение включено всегда, глубина —
+        # `output_config.effort` (low…max). Не задан — умолчание модели.
+        if reasoning:
+            extra.setdefault('output_config', {})['effort'] = reasoning
         if self.temperature is not None:
             extra['temperature'] = self.temperature
         client = self.client()

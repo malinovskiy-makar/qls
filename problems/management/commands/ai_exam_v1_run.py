@@ -45,13 +45,17 @@ class Command(BaseCommand):
         parser.add_argument('--workers', type=int, default=4)
         parser.add_argument('--max-usd', type=float, default=1.0)
         parser.add_argument('--timeout', type=float, default=0)
-        parser.add_argument('--temperature', default='0')
+        # Claude 5.5 не принимает temperature вовсе (400 «Extra inputs are not
+        # permitted») — по умолчанию не передаём; число — для моделей, что умеют.
+        parser.add_argument('--temperature', default='none')
         parser.add_argument('--judge', default='')
         parser.add_argument('--second-judge', default='')
         parser.add_argument('--chat-max-tokens', type=int, default=0)
         parser.add_argument('--leak-tasks', type=int, default=40)
         parser.add_argument('--pressure', type=int, default=0)
         parser.add_argument('--retry-format', action='store_true')
+        # Потолок токенов решателя: рассуждение входит в выход, DeepSeek обрезался и на 16 000.
+        parser.add_argument('--max-tokens', type=int, default=v1run.SOLVE_MAX_TOKENS)
         parser.add_argument('--yes', action='store_true')
 
     def handle(self, *args, **o):
@@ -83,7 +87,7 @@ class Command(BaseCommand):
             v1run.solve_run(directory, o['label'], rows, provider, o['model'],
                             reasoning=o['reasoning'] or None, workers=o['workers'],
                             max_usd=o['max_usd'], timeout=timeout, write=write,
-                            retry_format=o['retry_format'])
+                            retry_format=o['retry_format'], max_tokens=o['max_tokens'])
         elif action == 'judge-batch':
             temperature = None if o['temperature'] in ('', 'none') else float(o['temperature'])
             keys = set(r['key'] for r in rows) if (o['pilot'] or o['keys_file'] or o['limit']) else None
