@@ -245,7 +245,7 @@ import_olympiad_reference --olympiad X --queue F [--build-candidates|--apply …
 merge_enrichment_import --parsed F --protect-out C [--apply]  # обогащение только задач журнала, поля импорта не переписывает
 import_olympiad_reference … --decisions F [--as-slug S]       # разметка пар link/new/skip; чужой слаг (ADR 0163)
 import_reference_titles --journal J [--apply|--rollback T]    # заглушки заголовков импорта → title_candidate
-olympiad_text_judge --kind replace|pairs --journal J --out F [--max-usd X --yes]  # судья Claude; без --yes — смета
+olympiad_text_judge --kind replace|pairs --journal J --out F [--max-usd X --yes] [--batch]  # судья Claude; без --yes — смета; --batch — Message Batches, полцены
 apply_official_text --verdicts F --journal J [--apply|--rollback T]  # текст банка → официальный, снимок ProblemVersion
 update_olympiad_reference --olympiad X --journal J --old A --new B [--apply|--rollback T]  # свои задачи из новой версии эталона
 olympiad_digitize inventory|render|transcribe|rescore|assemble --olympiad X  # эталон v2 зрячей моделью; transcribe —
