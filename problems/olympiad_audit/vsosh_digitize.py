@@ -1,0 +1,329 @@
+# -*- coding: utf-8 -*-
+"""ВсОШ: оцифровка страниц, пакеты Claude, сборка эталона v1, проверки.
+
+Подкоманды `olympiad_vsosh`:
+  transcribe — GLM-5.3-Flash по страницам групп плана (библиотека
+               `transcribe.Transcriber`, без правок чужого модуля). Деньги:
+               без `--yes` только план; `--max-usd` — потолок ВСЕГО журнала
+               `transcribe_cost.jsonl` (не одного прогона);
+  assemble   — `assemble.assemble(profile='econ')` поверх страниц
+               (+ заплатки Claude из `pages_claude\\`, если есть) →
+               `reference_problems_v1.jsonl` в схеме эталона ВП/МОШ v6 +
+               поля `stage`, `region_code`, `region_name`, `tour`, `variant`;
+  check      — проверки качества (KaTeX — отдельно node-скриптом);
+  review     — `review_v1.html`: только нерешённое, картинка и текст рядом;
+  bank       — сверка с банком (только чтение).
+
+Пакеты Claude (`claude_batch.py` в этом же модуле — функции `batch_*`)
+готовятся всегда; отправка — только когда ключ отвечает (ночью 28.10 ключ
+требовал `anthropic-workspace-id`, которого нет).
+"""
+from __future__ import annotations
+
+import base64
+import json
+import os
+import re
+from collections import Counter, defaultdict
+
+from problems.olympiad_audit import assemble, digitize, transcribe
+
+#: Оценка цены страницы в Batches (−50 %), $: вход ≈ 4 000 ток. (картинка +
+#: слой + инструкция), выход ≈ 1 500 ток. + рассуждение. Цены 06.10.2026:
+#: Sonnet 5.5 $2/$10, Haiku 5.5 $0,10/$0,50 за 1 млн.
+CLAUDE_PAGE_USD = {'claude-sonnet-5-5': 0.012, 'claude-haiku-5-5': 0.0007}
+CLAUDE_PRICES = {'claude-sonnet-5-5': (2.0, 10.0), 'claude-haiku-5-5': (0.10, 0.50)}
+
+STAGE_NAME = {'final': 'заключительный этап', 'regional': 'региональный этап',
+              'municipal': 'муниципальный этап', 'school': 'школьный этап',
+              'invitational': 'пригласительный этап'}
+
+#: Подсказка модели: текстовый слой PDF (обрезанный) — не источник, мерило.
+LAYER_HINT_CHARS = 6000
+
+FLASH_MODEL = transcribe.MODEL
+
+
+def _read(path):
+    return digitize.read_jsonl(path) if os.path.isfile(path) else []
+
+
+def load_events(digitized):
+    files = {e['event_id']: e for e in _read(os.path.join(digitized, 'events_files.jsonl'))}
+    meta = {m['event_id']: m for m in _read(os.path.join(digitized, 'events_meta.jsonl'))}
+    return files, meta
+
+
+def page_jobs(digitized, groups=None):
+    """Страницы к оцифровке по порядку групп → [(группа, PageJob)].
+
+    Файл, общий для нескольких комплектов, — один раз (по первой группе)."""
+    files, meta = load_events(digitized)
+    seen = set()
+    order = sorted(meta.values(), key=lambda m: (m['group'], m['academic_year'] or '',
+                                                 m['event_id']))
+    out = []
+    for m in order:
+        if groups and m['group'] not in groups:
+            continue
+        ev = files[m['event_id']]
+        name = (f'Всероссийская олимпиада школьников по экономике, '
+                f'{STAGE_NAME.get(m["stage"], m["stage"])} {m["academic_year"]}'
+                + (f', {m["region_name"]}' if m.get('region_name') else ''))
+        for key in ('task_files', 'solution_files', 'criteria_files'):
+            for f in ev[key]:
+                if f['sha256'] in seen:
+                    continue
+                seen.add(f['sha256'])
+                row = {'file': f['file'], 'page_dir': f['page_dir'], 'pages': f['pages'],
+                       'digitize': True, 'duplicate_of': None, 'ext': 'pdf',
+                       'kind': f['kind']}
+                for job in transcribe.build_jobs([row], digitized, name):
+                    out.append((m['group'], job))
+    return out
+
+
+# ── GLM-5.3-Flash ───────────────────────────────────────────────────────
+
+def run_transcribe(cmd, opts):
+    digitized = cmd.digitized
+    groups = {int(g) for g in str(opts['groups']).split(',') if g.strip()}
+    jobs = [j for _g, j in page_jobs(digitized, groups)]
+    if opts.get('pages_file'):
+        wanted = {line.strip() for line in open(opts['pages_file'], encoding='utf-8') if line.strip()}
+        jobs = [j for j in jobs if j.key in wanted or j.key.replace('pages/', '') in wanted]
+    pending = transcribe.todo(jobs, digitized)
+    if opts.get('limit'):
+        pending = pending[:opts['limit']]
+    cost_log = transcribe.CostLog(os.path.join(digitized, 'transcribe_cost.jsonl'))
+    spent, calls = cost_log.total()
+    avg = cost_log.average() or 0.00116
+    cap = opts.get('max_usd')
+    cmd._say(f'страниц в группах {sorted(groups)}: {len(jobs)}; к расшифровке {len(pending)}; '
+             f'оценка ${len(pending) * avg * 1.15:.2f}; журнал: ${spent:.4f} за {calls} вызовов')
+    if not opts.get('yes'):
+        cmd._say('Без --yes вызовов нет (только план).')
+        return
+    if cap is None:
+        from django.core.management.base import CommandError
+        raise CommandError('--max-usd обязателен для платного прогона.')
+    budget = transcribe.Budget(max(0.0, cap - spent), avg * 2)
+    tr = transcribe.Transcriber(root=digitized, provider=transcribe.make_provider(),
+                                budget=budget, cost_log=cost_log, workers=opts['workers'],
+                                stdout=cmd.stdout)
+    tr.progress_name = 'transcribe_progress_vsosh.json'
+    stats = tr.run(pending)
+    cmd._say(f'итог: {dict(stats)}; потрачено в прогоне ${budget.spent:.4f}; '
+             f'стоп: {tr.stopped or "нет"}')
+
+
+# ── Claude: пакеты Message Batches ──────────────────────────────────────
+
+CLAUDE_SYSTEM = (transcribe.SYSTEM_PROMPT + transcribe.STRICT_SUFFIX +
+                 '\n\nК картинке приложен текстовый слой PDF этой страницы — как подсказку '
+                 'для точных чисел и слов. Источник правды — КАРТИНКА: если слой расходится '
+                 'с картинкой или в нём пропали формулы (Equation Editor), переписывай по '
+                 'картинке. Формулы — LaTeX внутри $…$, таблицы — Markdown-таблицами, '
+                 'варианты ответа тестов — списком, рисунок — блок `figure` с рамкой.'
+                 '\n\nОТВЕЧАЙ РОВНО ОДНИМ JSON-ОБЪЕКТОМ по этой схеме, без текста вокруг:\n'
+                 + json.dumps(transcribe.SCHEMA, ensure_ascii=False))
+
+
+def batch_request(job, model, max_tokens=12000):
+    """Запрос Batches для страницы: system кэшируется (одинаков у всех)."""
+    with open(job.png, 'rb') as fh:
+        b64 = base64.b64encode(fh.read()).decode('ascii')
+    layer = transcribe.layer_body(job.layer, job.footers)[:LAYER_HINT_CHARS]
+    text = job.user_text() + ('\n\nТекстовый слой PDF (подсказка):\n<<<\n' + layer + '\n>>>'
+                              if layer.strip() else '\n\nТекстового слоя нет (скан).')
+    return {
+        'custom_id': job.key.replace('/', '__'),
+        'params': {
+            'model': model, 'max_tokens': max_tokens,
+            'system': [{'type': 'text', 'text': CLAUDE_SYSTEM,
+                        'cache_control': {'type': 'ephemeral'}}],
+            'output_config': {'effort': 'low'},
+            'messages': [{'role': 'user', 'content': [
+                {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
+                                             'data': b64}},
+                {'type': 'text', 'text': text}]}],
+        },
+    }
+
+
+def write_batches(digitized, groups, model, out_dir, chunk=400):
+    """Пакеты к утреннему запуску: batch_<model>_g<группы>_<N>.jsonl по `chunk` страниц."""
+    os.makedirs(out_dir, exist_ok=True)
+    jobs = page_jobs(digitized, groups)
+    paths, n, part, fh = [], 0, 0, None
+    for _g, job in jobs:
+        if n % chunk == 0:
+            if fh:
+                fh.close()
+            part += 1
+            path = os.path.join(out_dir, f'batch_{model}_g{"".join(map(str, sorted(groups)))}_{part:03d}.jsonl')
+            paths.append(path)
+            fh = open(path, 'w', encoding='utf-8')
+        fh.write(json.dumps(batch_request(job, model), ensure_ascii=False) + '\n')
+        n += 1
+    if fh:
+        fh.close()
+    return paths, n
+
+
+def claude_client():
+    """Клиент Anthropic с заголовком пространства, если он задан в окружении."""
+    import anthropic
+    headers = {}
+    ws = os.environ.get('ANTHROPIC_WORKSPACE_ID')
+    if ws:
+        headers['anthropic-workspace-id'] = ws
+    return anthropic.Anthropic(default_headers=headers, max_retries=5)
+
+
+def batch_cost(usage, model):
+    """$ за ответ Batches (−50 %); кэш-чтение — 0,1 входа, запись — 1,25."""
+    pin, pout = CLAUDE_PRICES[model]
+    u = usage or {}
+    inp = (u.get('input_tokens') or 0) + 1.25 * (u.get('cache_creation_input_tokens') or 0) \
+        + 0.1 * (u.get('cache_read_input_tokens') or 0)
+    return 0.5 * (inp * pin + (u.get('output_tokens') or 0) * pout) / 1e6
+
+
+def claude_record(job_key, message_text, usage, model):
+    """Ответ Claude → запись страницы в формате `transcribe` (для overlay)."""
+    data = transcribe.tolerant_parse(message_text)
+    blocks = transcribe.clean_blocks(data.get('blocks'))
+    return {'page_dir': job_key.rsplit('/p', 1)[0], 'page': int(job_key.rsplit('/p', 1)[1]),
+            'blocks': blocks, 'status': 'ok' if blocks else 'error',
+            'parse_error': data.get('_parse_error', ''), 'model': model,
+            'cost_usd': round(batch_cost(usage, model), 6),
+            'flags': {k: bool(data.get(k)) for k in ('has_formulas', 'has_table', 'has_figure')}}
+
+
+# ── Сборка ──────────────────────────────────────────────────────────────
+
+class ClaudeOverlay:
+    r"""Заплатка страниц расшифровкой Claude (`pages_claude\<sha16>\p<N>.json`):
+    есть удачная запись Claude — её блоки вместо блоков Flash."""
+
+    def __init__(self, folder):
+        self.folder = folder
+        self.applied = 0
+
+    def path(self, page_dir, page):
+        return os.path.join(self.folder, page_dir.split('/')[-1], f'p{page}.json')
+
+    def apply(self, page_dir, page, record):
+        path = self.path(page_dir, page)
+        if not os.path.isfile(path):
+            return record
+        with open(path, encoding='utf-8') as fh:
+            claude = json.load(fh)
+        if claude.get('status') != 'ok' or not claude.get('blocks'):
+            return record
+        self.applied += 1
+        return dict(record, blocks=claude['blocks'], model=claude.get('model'),
+                    needs_eyes=False, flash_needs_eyes=record.get('needs_eyes'))
+
+
+def ensure_stub(digitized, page_dir, page):
+    """Страница есть только у Claude — пустая запись Flash, чтобы сборка её
+    прочла (блоки придут заплаткой)."""
+    path = os.path.join(digitized, page_dir, f'p{page}.json')
+    if not os.path.isfile(path):
+        transcribe.Transcriber._write(path, {'page_dir': page_dir, 'page': page, 'blocks': [],
+                                             'status': 'claude_only', 'needs_eyes': False})
+
+EXTRA_KEYS = ('stage', 'region_code', 'region_name', 'tour', 'variant')
+
+
+def reference_events(meta):
+    out = []
+    for m in meta.values():
+        out.append({'event_id': m['event_id'], 'olympiad_slug': 'vseros',
+                    'year': m.get('year'), 'academic_year': m.get('academic_year'),
+                    'stage': m.get('stage'), 'grade': m.get('grade'), 'variant': m.get('tour') or 'all',
+                    'official': True, 'source': 'official',
+                    'source_urls': m.get('source_urls', [])})
+    return out
+
+
+def run_assemble(cmd, opts):
+    digitized = cmd.digitized
+    files, meta = load_events(digitized)
+    # Комплекты без единой расшифрованной страницы условий — мимо (не пустые строки).
+    ready = {}
+    for eid, ev in files.items():
+        done = sum(1 for f in ev['task_files'] for p in range(1, int(f['pages'] or 0) + 1)
+                   if transcribe.page_done(os.path.join(digitized, f['page_dir'], f'p{p}.json'))
+                   or os.path.isfile(os.path.join(digitized, 'pages_claude',
+                                                  f['page_dir'].split('/')[-1], f'p{p}.json')))
+        total = sum(int(f['pages'] or 0) for f in ev['task_files'])
+        if done:
+            ready[eid] = (done, total)
+    folder = os.path.join(digitized, 'pages_claude')
+    overlay = ClaudeOverlay(folder) if os.path.isdir(folder) else None
+    if overlay:
+        for eid in ready:
+            for key in ('task_files', 'solution_files', 'criteria_files'):
+                for f in files[eid][key]:
+                    for p in range(1, int(f['pages'] or 0) + 1):
+                        if os.path.isfile(overlay.path(f['page_dir'], p)):
+                            ensure_stub(digitized, f['page_dir'], p)
+    summary = assemble.assemble(digitized, reference_events(meta), [], FLASH_MODEL,
+                                only_events=set(ready), crop=True, overlay=overlay,
+                                out_dir=digitized, suffix='v1asm', profile=assemble.ECON)
+    rows = _read(os.path.join(digitized, 'reference_problems_v1asm.jsonl'))
+    out, keys, dup = [], Counter(), 0
+    for r in rows:
+        m = meta.get(r['event_id'], {})
+        for k in EXTRA_KEYS:
+            r[k] = m.get(k, '') if k != 'stage' else (m.get('stage') or r.get('stage'))
+        r['olympiad_slug'] = 'vseros'
+        r['pages_ready'] = list(ready.get(r['event_id'], (0, 0)))
+        r['event_partial'] = ready.get(r['event_id'], (0, 0))[0] < ready.get(r['event_id'], (0, 1))[1]
+        r['title'] = official_title(r.get('title'))
+        key = (r['event_id'], r['number'], r.get('task_variant', ''))
+        keys[key] += 1
+        if keys[key] > 1:
+            dup += 1
+            r['task_variant'] = (r.get('task_variant') or '') + f'#dup{keys[key]}'
+            r.setdefault('flags', []).append('повтор_ключа')
+        out.append(r)
+    digitize.write_jsonl(os.path.join(digitized, 'reference_problems_v1.jsonl'), out)
+    cmd._say(f'сборка: {dict(summary)}')
+    cmd._say(f'заданий v1: {len(out)}; комплектов с заданиями: '
+             f'{len({r["event_id"] for r in out})}; повторов ключа (переименованы): {dup}')
+
+
+_SERVICE_TITLE = re.compile(r'^\s*(задача|задание|вопрос|тест|раздел|часть|эссе|блиц)\b[\s№.]*'
+                            r'[\dIVXivx.,\s-]*(\(.*\))?\s*$|^\s*справка\s*$', re.I)
+
+
+def official_title(title):
+    """Решение Notion 15.10: настоящее название — берём; «Задача 3», «Задание N»,
+    «СПРАВКА» — не название (пусто: название даст ИИ при импорте)."""
+    t = str(title or '').strip()
+    if not t or _SERVICE_TITLE.match(t):
+        return ''
+    return t
+
+
+def run_step(cmd, step, opts):
+    if step == 'transcribe':
+        return run_transcribe(cmd, opts)
+    if step == 'assemble':
+        return run_assemble(cmd, opts)
+    from problems.olympiad_audit import vsosh_quality
+    return vsosh_quality.run_step(cmd, step, opts)
+
+
+def group_pages(digitized):
+    """{группа: (страниц, готово)} — для отчёта и Notion."""
+    out = defaultdict(lambda: [0, 0])
+    for g, job in page_jobs(digitized):
+        out[g][0] += 1
+        if transcribe.page_done(job.out_path(digitized)):
+            out[g][1] += 1
+    return dict(out)
