@@ -588,3 +588,8 @@ class CheckRulesTests(SimpleTestCase):
         self.assertIn(r'10 \$ в час', out)
         same, k = vsosh_digitize.fix_currency_dollars('Формула $ x + y$ и всё.')
         self.assertEqual(k, 0)
+
+    def test_answer_like_length_limit_and_unbalanced_left(self):
+        self.assertFalse(vsosh_digitize.answer_like('да нет да нет да нет да нет да'))
+        out, n = vsosh_digitize.fix_unbalanced_delims(r'$\left(a + b = c$')
+        self.assertEqual((out, n), (r'$(a + b = c$', 1))
