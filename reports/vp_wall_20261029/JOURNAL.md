@@ -332,3 +332,17 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
   `test_vp_my_attempts_list_is_hidden_header_and_tabs_stay`). Они есть и на `109a7ff9` (проверено отдельным
   временным worktree), к S2c отношения не имеют и в набор «тесты сессии» не входят – заведено как баг.
 - Не проверено: боевой режим CSP целиком (политика остаётся в режиме отчёта; перевод – отдельная работа).
+
+## Фаза 3. Проверки
+
+| Проверка | Итог |
+|---|---|
+| `manage.py test vp problems.tests.test_security_headers` | 616 → **624** (+8: экраны 4, CSP 1, wall.js 3), OK (skipped=1) |
+| `manage.py check` | 0 |
+| `makemigrations --check --dry-run` | No changes detected (миграций в S2c нет) |
+| `scripts/check_em_dash.py` | 0 |
+| `ruff` по `vp`, `config`, `test_security_headers.py` | чисто |
+| `problems.tests.test_signup_source.WebvisorTests` | 2 падения, были и на `109a7ff9` (вне набора сессии) – заведено как баг |
+| глазами / живой бот | экран 03 в браузере и настоящий бот НЕ проверялись (`.env` закрыт); сценарий скрипта проверен в node на заглушках; шаги для владельца – в отчёте |
+
+Коммиты S2c: `e561f716` (ф.1), `663e1cf9` (ф.2), далее коммит журнала фазы 3.
