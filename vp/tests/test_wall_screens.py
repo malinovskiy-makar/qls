@@ -78,13 +78,41 @@ class ScreenTableTests(ScreenCase):
         self.assertIn('target="_blank"', again.split('>', 1)[0])
         self.assertNotIn('name="app"', again.split('</form>', 1)[0])
 
-    def test_no_sub_is_screen_03_without_polling(self):
+    def test_no_sub_is_screen_03(self):
         VPTelegramLink.objects.create(user=self.user, tg_user_id=1, tg_username='ivan_econ',
                                       checked_at=timezone.now(), subscribed=False)
         html = self.page()
         self.assertIn('Осталось подписаться на канал', html)
         self.assertIn('Аккаунт <b class="ym-hide-content">@ivan_econ</b> ещё не подписан', html)
-        self.assertNotIn('data-poll', html)
+
+    @staticmethod
+    def wall_tag(html):
+        """Открывающий тег окна стены `<dialog id="vp-wall" …>`."""
+        return html.split('<dialog class="vp-gate vp-wall" id="vp-wall"', 1)[1].split('>', 1)[0]
+
+    def test_no_sub_polls_only_until_subscription_is_confirmed(self):
+        """03: опрос есть, но «только ok» – с no_sub он ходил бы по кругу (S2c)."""
+        VPTelegramLink.objects.create(user=self.user, tg_user_id=1, tg_username='ivan_econ',
+                                      checked_at=timezone.now(), subscribed=False)
+        html = self.page()
+        dialog = self.wall_tag(html)
+        self.assertIn('data-poll="', dialog)
+        self.assertIn('data-poll-ok-only', dialog)
+
+    def test_error_screen_03_polls_only_for_ok_too(self):
+        VPTelegramLink.objects.create(user=self.user, tg_user_id=1, checked_at=timezone.now(),
+                                      last_error='network')
+        self.assertIn('data-poll-ok-only', self.wall_tag(self.page()))
+
+    def test_waiting_02_polls_to_any_answer(self):
+        """На 02 опрос обычный: ни `data-poll-ok-only`, ни опроса на самом окне."""
+        VPTelegramToken.objects.create(user=self.user, token_hash='x' * 64, slug=self.variant.slug)
+        html = self.page()
+        self.assertNotIn('data-poll-ok-only', html)
+        self.assertNotIn('data-poll', self.wall_tag(html))
+
+    def test_screen_01_and_email_screens_do_not_poll_from_the_dialog(self):
+        self.assertNotIn('data-poll-ok-only', self.page())
 
     def test_no_sub_without_nick(self):
         VPTelegramLink.objects.create(user=self.user, tg_user_id=1, checked_at=timezone.now())

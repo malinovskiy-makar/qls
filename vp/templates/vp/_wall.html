@@ -10,7 +10,7 @@
 не должен записывать ни того, ни другого (docs/SECURITY.md).
 {% endcomment %}
 <dialog class="vp-gate vp-wall" id="vp-wall" aria-labelledby="vp-wall-h"
-        data-screen="{{ wall.screen }}" data-variant="{{ variant.slug }}"{% if wall.open %} data-open open{% endif %}>
+        data-screen="{{ wall.screen }}" data-variant="{{ variant.slug }}"{% if wall.screen == 'nosub' %} data-poll="{{ wall.urls.state }}" data-poll-ok-only{% endif %}{% if wall.open %} data-open open{% endif %}>
   <a class="vp-gate-x" href="{% url 'vp:intro' variant.slug %}" data-close aria-label="Закрыть">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
   </a>
@@ -134,7 +134,7 @@
   <p class="vp-gate-fine">Письма нет? Загляните в «Спам».</p>
 
   {% elif wall.screen == 'nosub' %}
-  {# 03: бот видит аккаунт, подписки нет (или Telegram не ответил). Опроса здесь нет — есть кнопка. #}
+  {# 03: бот видит аккаунт, подписки нет (или Telegram не ответил). Опрос – только до подтверждённой подписки (`data-poll-ok-only` на окне): с «подписки нет» он ходил бы по кругу. #}
   <h2 id="vp-wall-h">Осталось подписаться на канал</h2>
   {% if wall.tg == 'error' %}
   <div class="vp-wall-alert" role="alert">Не получилось проверить подписку – Telegram не ответил. Попробуйте через минуту.</div>

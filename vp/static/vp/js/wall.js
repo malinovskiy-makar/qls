@@ -4,18 +4,35 @@
  * обычная форма POST с редиректом обратно на `?wall=…`. Скрипт только:
  * 1) делает отрисованное открытым окно модальным;
  * 2) после «Подключить Telegram» переключает 01 на 02 без перезагрузки;
- * 3) на экране 02 опрашивает `wall/state` и перезагружает окно, когда бот ответил.
+ * 3) опрашивает `wall/state` и перезагружает окно, когда состояние изменилось.
  *
- * ⚠️ ОПРОС ТОЛЬКО НА 02: на 03 («подписки нет») есть кнопка «проверить», а опрос
- * там только жёг бы запросы. Каждые 3 с, не дольше 10 минут, только видимая вкладка.
+ * ⚠️ ОПРОС НА 02 – ДО ЛЮБОГО ОТВЕТА БОТА (подписка есть, подписки нет, ошибка);
+ * НА 03 («осталось подписаться», `data-poll-ok-only` на окне) – ТОЛЬКО ДО
+ * ПОДТВЕРЖДЁННОЙ ПОДПИСКИ. Бот после «Проверить» обещает, что вкладка обновится сама,
+ * поэтому на 03 опрос нужен. Но уходить с 03 на `no_sub` нельзя: перезагрузка снова
+ * покажет 03, и страница ходила бы по кругу. Решение «уходить или нет» – чистая
+ * функция `vpWallLeave`, её таблица проверяется через node (vp/tests/test_wall_js.py).
+ * Каждые 3 с на 02 и 5 с на 03, не дольше 10 минут, только видимая вкладка.
  */
+/* Что делать с ответом `wall/state`: 'ok' – уходить (стена пройдена или путь Telegram
+   подтверждён), 'nosub' – уходить на экран 03 (только с 02), null – остаться. */
+function vpWallLeave(okOnly, state) {
+  if (!state) return null;
+  if (state.step !== 'contact' || state.tg === 'ok') return 'ok';
+  if (!okOnly && (state.tg === 'no_sub' || state.tg === 'error')) return 'nosub';
+  return null;
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { vpWallLeave: vpWallLeave };
+
 (function () {
   'use strict';
 
+  if (typeof document === 'undefined') return;
   var dialog = document.getElementById('vp-wall');
   if (!dialog) return;
 
   var POLL_EVERY = 3000;
+  var POLL_EVERY_OK_ONLY = 5000;
   var POLL_FOR = 10 * 60 * 1000;
   var slug = dialog.getAttribute('data-variant') || '';
   var modal = typeof dialog.showModal === 'function';
@@ -54,6 +71,9 @@
   var tgScreen = dialog.querySelector('[data-screen="tg"]');
   var waitScreen = dialog.querySelector('[data-screen="waiting"]');
   var openForm = dialog.querySelector('form[data-tg-open]');
+  /* Что опрашиваем: скрытый до «Старт» экран 02 или (на 03) само окно. */
+  var okOnly = dialog.hasAttribute('data-poll-ok-only');
+  var pollUrl = okOnly ? dialog.getAttribute('data-poll') : (waitScreen && waitScreen.getAttribute('data-poll'));
   var timer = null;
   var startedAt = 0;
 
@@ -70,17 +90,17 @@
       return;
     }
     if (document.visibilityState !== 'visible') return;
-    fetch(waitScreen.getAttribute('data-poll'), {
+    fetch(pollUrl, {
       credentials: 'same-origin', headers: { 'Accept': 'application/json' }
     }).then(function (response) {
       return response.ok ? response.json() : null;
     }).then(function (state) {
       if (!state) return;
-      /* Переход — только когда состояние стало другим, чем у экрана 02. */
-      if (state.step !== 'contact' || state.tg === 'ok') {
+      var leave = vpWallLeave(okOnly, state);
+      if (leave === 'ok') {
         track('vp_wall_tg_ok', { variant: slug });
         reloadWall();
-      } else if (state.tg === 'no_sub' || state.tg === 'error') {
+      } else if (leave === 'nosub') {
         track('vp_wall_tg_nosub', { variant: slug, error: state.tg === 'error' });
         reloadWall();
       }
@@ -88,9 +108,10 @@
   }
 
   function poll() {
-    if (!waitScreen || waitScreen.hidden || timer) return;
+    if (!pollUrl || timer) return;
+    if (!okOnly && waitScreen.hidden) return;
     startedAt = Date.now();
-    timer = window.setInterval(tick, POLL_EVERY);
+    timer = window.setInterval(tick, okOnly ? POLL_EVERY_OK_ONLY : POLL_EVERY);
   }
 
   /* 01 → 02: форма уходит в новую вкладку (`target="_blank"`), окно остаётся

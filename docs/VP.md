@@ -349,7 +349,7 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 | шаг `contact`, Telegram выключен, почта включена | 04b / 04 (05 при `?wall=code`) |
 | `?wall=email` | 04b (почта подтверждена) / 04 |
 | `?wall=code` и `vp_wall_email` этого слага | 05, иначе 04 |
-| `tg_state` = `no_sub` / `error` | 03 (для `error` — своя плашка) |
+| `tg_state` = `no_sub` / `error` | 03 (для `error` — своя плашка; опрос `wall/state` каждые 5 с, ≤10 мин, **только до подтверждённой подписки**: `data-poll-ok-only` на окне, уход на `ok` или `step≠contact`, на `no_sub` страница остаётся – иначе перезагрузка снова показала бы 03 по кругу) |
 | `tg_state` = `waiting` | 02 (опрос `wall/state` каждые 3 с, ≤10 мин, только видимая вкладка) |
 | иначе | 01 |
 
