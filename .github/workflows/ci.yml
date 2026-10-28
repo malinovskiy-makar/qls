@@ -339,6 +339,16 @@ jobs:
       # джоб только читает настройки.
       LEGAL_CONTACT_EMAIL: ${{ format('ci{0}example.org', '@') }}
       LEGAL_DOCS_DATE: 15 октября 2026 г.
+      # Стена тренажёра ВП (vp.W001): на бою оба пути стены включены — джоб
+      # проверяет именно это; значения подставные, джоб только читает настройки.
+      # Почта нужна целиком, иначе сработает mail.E001.
+      TELEGRAM_BOT_TOKEN: '000000:ci-dummy-token'
+      TELEGRAM_BOT_USERNAME: ci_dummy_bot
+      TELEGRAM_WEBHOOK_SECRET: ci-dummy-webhook-secret_0123456789
+      MAIL_ENABLED: '1'
+      EMAIL_HOST: smtp.example.org
+      EMAIL_HOST_USER: ci-dummy-user
+      EMAIL_HOST_PASSWORD: ci-dummy-password
 
     steps:
       - uses: actions/checkout@v4

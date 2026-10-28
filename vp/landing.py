@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from vp import blocks, config, scoring
 from vp.loader import chain_letters
-from vp.models import VPAttempt, VPVariant
+from vp.models import VPAttempt, VPVariant, VPWall
 
 _ZERO = Decimal('0')
 
@@ -420,11 +420,13 @@ def student_band(request):
     Порядок:
     1. явный выбор в запросе: `?band=` (экран вариантов) или `?board=` (вкладка таблицы
        без JS) — известный код запоминается в `request.session['vp_band']`;
-    2. (место под будущий источник «класс из анкеты» — сессия стены: он встанет сюда,
-       сразу после явного выбора);
-    3. `request.session['vp_band']` (туда же пишет `views.remember_band` — вкладка с JS);
+    2. `request.session['vp_band']` (туда же пишет `views.remember_band` — вкладка с JS);
+    3. класс из анкеты стены 2 тура (`VPWall.grade`);
     4. класс последней попытки вошедшего в текущем туре;
     5. `None`.
+
+    ⚠️ АНКЕТА ИМЕННО ПОСЛЕ СЕССИИ: выше она навсегда перебила бы выбор вкладкой —
+    человек переключил бы класс, а раздел возвращал бы его к ответу из анкеты.
     """
     codes = [code for code, _ in config.bands()]
     for key in ('band', 'board'):
@@ -436,6 +438,10 @@ def student_band(request):
     if remembered in codes:
         return remembered
     if request.user.is_authenticated:
+        surveyed = (VPWall.objects.filter(user=request.user)
+                    .values_list('grade', flat=True).first())
+        if surveyed in codes:
+            return surveyed
         last = (VPAttempt.objects.filter(user=request.user, variant__tour=config.CURRENT_TOUR)
                 .order_by('-started_at', '-id').select_related('variant').first())
         if last is not None and last.variant.grade_band in codes:

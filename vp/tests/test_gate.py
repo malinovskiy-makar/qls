@@ -27,7 +27,7 @@ class StartRequiresLoginTests(TestCase):
         before = VPAttempt.objects.count()
         response = Client().post(reverse('vp:start', args=['gate-v']), {'with_timer': '1'})
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response['Location'], '/register/?next=%2Fvp%2Fgate-v%2F')
+        self.assertEqual(response['Location'], '/register/?next=%2Fvp%2Fgate-v%2F%3Fwall%3D1')
         self.assertEqual(VPAttempt.objects.count(), before)
         self.assertEqual(before, 0)
 
@@ -67,8 +67,8 @@ class IntroGateMarkupTests(TestCase):
     def test_01_guest_sees_the_dialog_with_both_links(self):
         html = Client().get(reverse('vp:intro', args=['gate-m'])).content.decode()
         self.assertIn('<dialog class="vp-gate" id="vp-gate"', html)
-        self.assertIn('/register/?next=%2Fvp%2Fgate-m%2F', html)
-        self.assertIn('/login/?next=%2Fvp%2Fgate-m%2F', html)
+        self.assertIn('/register/?next=%2Fvp%2Fgate-m%2F%3Fwall%3D1', html)
+        self.assertIn('/login/?next=%2Fvp%2Fgate-m%2F%3Fwall%3D1', html)
         self.assertIn('Сначала короткая регистрация', html)
         self.assertIn('Пройти вариант можно только после короткой бесплатной регистрации.', html)
 
@@ -127,7 +127,7 @@ class RegisterNextTests(TestCase):
         client = Client()
         wall = client.post(reverse('vp:start', args=['gate-way']), {'with_timer': '1'})
         back = wall['Location']
-        self.assertEqual(back, '/register/?next=%2Fvp%2Fgate-way%2F')
+        self.assertEqual(back, '/register/?next=%2Fvp%2Fgate-way%2F%3Fwall%3D1')
 
         done = self._register(client, 'gate_way', next=reverse('vp:intro', args=['gate-way']))
         self.assertEqual(done['Location'], '/vp/gate-way/')

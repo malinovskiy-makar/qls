@@ -55,3 +55,8 @@ def all_band_labels():
     for pairs in BANDS_BY_TOUR.values():
         labels.update(pairs)
     return labels
+
+
+#: Туры, на которых стоит стена «контакт + анкета» (`vp/wall.py`, решение 24.10.2026).
+#: 1 тур — без стены: его варианты сейчас видит только персонал.
+WALL_TOURS = (2,)

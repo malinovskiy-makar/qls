@@ -41,9 +41,10 @@ from django.views.decorators.http import require_GET, require_POST
 from catalog import seo
 from problems import exam_engine
 from vp import answers, blocks, board, config, landing, review, scoring, tracking, visibility
+from vp import wall
 from vp import drill as drill_rules
 from vp.loader import GAP_MARK
-from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
+from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant, VPWall
 from vp.templatetags.vp_extras import grade_label
 
 logger = logging.getLogger(__name__)
@@ -589,64 +590,92 @@ def _band_genitive(band):
     return f'{band.replace("-", "–")} {"классов" if "-" in band else "класса"}'
 
 
+def _wall_url(slug, state='1', **extra):
+    """Интро варианта с окном стены: `?wall=1` (контакт или анкета), `email`, `code`,
+    `closed`."""
+    return '%s?%s' % (reverse('vp:intro', args=[slug]), urlencode({'wall': state, **extra}))
+
+
 def _register_url(slug):
-    """Регистрация с возвратом на интро этого варианта."""
-    return '%s?%s' % (reverse('register'),
-                      urlencode({'next': reverse('vp:intro', args=[slug])}))
+    """Регистрация с возвратом на интро этого варианта, сразу к окну стены.
+
+    ⚠️ `?wall=1` БЕЗУСЛОВНО, без поиска варианта: гостю нельзя давать по ответу
+    `start` узнавать, какие слаги существуют (`test_gate` 04). Варианту без стены
+    параметр ничего не делает — окна просто нет.
+    """
+    return '%s?%s' % (reverse('register'), urlencode({'next': _wall_url(slug)}))
 
 
 def _login_url(slug):
-    """Вход с возвратом на интро этого варианта."""
-    return '%s?%s' % (reverse('login'),
-                      urlencode({'next': reverse('vp:intro', args=[slug])}))
+    """Вход с возвратом на интро этого варианта, сразу к окну стены."""
+    return '%s?%s' % (reverse('login'), urlencode({'next': _wall_url(slug)}))
 
 
 @require_POST
 def start(request, slug):
     """Начинает попытку. Таймер запускает сервер в момент нажатия.
 
-    ⚠️ ЗДЕСЬ СТОИТ СТЕНА РЕГИСТРАЦИИ, И ПРОВЕРКА ИМЕННО СЕРВЕРНАЯ. Окно на интро —
-    только вежливое объяснение; без JS форма доедет сюда и получит этот редирект.
-    Гостю не заводится ни попытки, ни записи в сессии: он уходит на регистрацию и
-    возвращается на тот же вариант.
+    ⚠️ ЗДЕСЬ СТОЯТ ОБЕ СТЕНЫ, И ПРОВЕРКА ИМЕННО СЕРВЕРНАЯ. Окна на интро — только
+    вежливое объяснение; без JS форма доедет сюда и получит этот редирект.
 
-    Несданная попытка этого же человека не дублируется: нажатие возвращает в неё
-    (двойной клик не плодит попыток).
+    Порядок:
+    1. Гость → регистрация. Ни попытки, ни кодов в сессии; в сессию ложится только
+       выбранный режим (`vp_wall_next`), он переживает `login()`.
+    2. Несданная попытка этого человека → в неё: она началась до стены (и двойной
+       клик не плодит попыток).
+    3. Стена 2 тура не пройдена (`vp/wall.py`) → окно стены на интро; попытка НЕ
+       создаётся. Путей контакта нет вовсе → `?wall=closed`.
+    4. Иначе — новая попытка (`_start_attempt`).
     """
+    with_timer = request.POST.get('with_timer', '1') == '1'
     if not request.user.is_authenticated:
+        wall.remember_next(request, slug, with_timer)
         return redirect(_register_url(slug))
     variant = _variant_or_404(request, slug)
     if not variant.items.exists():
         raise Http404
     attempt = _current_attempt(request, variant)
     if attempt is None:
-        with_timer = request.POST.get('with_timer', '1') == '1'
-        user = request.user if request.user.is_authenticated else None
-        if user is None and not request.session.session_key:
-            request.session.create()
-        # Зачётность решается ОДИН РАЗ, здесь, и в базу уезжает вместе с попыткой:
-        # первая попытка человека по этому варианту с таймером. Считать её задним
-        # числом нельзя — смена правила переписала бы уже сыгранное (`vp/board.py`).
-        # ⚠️ Прежние попытки ГОСТЯ, перенесённые на аккаунт при входе
-        # (`vp/signals.py`, у них непустой `session_key`), зачётными не были и
-        # быть не могли — право на зачёт они не съедают (24.09.2026). Касается
-        # только попыток до стены регистрации 22.09.
-        is_ranked = bool(user is not None and with_timer and not VPAttempt.objects.filter(
-            user=user, variant=variant, with_timer=True, session_key='').exists())
-        attempt = VPAttempt.objects.create(
-            variant=variant,
-            user=user,
-            session_key='' if user else request.session.session_key,
-            with_timer=with_timer,
-            is_ranked=is_ranked,
-            expires_at=(timezone.now() + timedelta(seconds=variant.duration_seconds)
-                        if with_timer else None),
-            max_score=variant.max_score,
-            public_code=_new_code(),
-        )
-        tracking.defer(request, 'vp_start', variant=variant.slug, with_timer=with_timer)
+        step = wall.step(request.user) if wall.required(variant) else 'done'
+        if step != 'done':
+            VPWall.objects.get_or_create(user=request.user)
+            wall.remember_next(request, slug, with_timer)
+            if step == 'contact' and not any(wall.paths().values()):
+                logger.warning('Стена ВП: оба пути контакта выключены, вход в варианты закрыт')
+                return redirect(_wall_url(slug, 'closed'))
+            return redirect(_wall_url(slug))
+        attempt = _start_attempt(request, variant, with_timer)
     _remember(request, attempt.public_code)
     return redirect('vp:take', code=attempt.public_code)
+
+
+def _start_attempt(request, variant, with_timer):
+    """Новая попытка вошедшего. Общая для `start` и анкеты стены (`wall_survey`)."""
+    user = request.user if request.user.is_authenticated else None
+    if user is None and not request.session.session_key:
+        request.session.create()
+    # Зачётность решается ОДИН РАЗ, здесь, и в базу уезжает вместе с попыткой:
+    # первая попытка человека по этому варианту с таймером. Считать её задним
+    # числом нельзя — смена правила переписала бы уже сыгранное (`vp/board.py`).
+    # ⚠️ Прежние попытки ГОСТЯ, перенесённые на аккаунт при входе
+    # (`vp/signals.py`, у них непустой `session_key`), зачётными не были и
+    # быть не могли — право на зачёт они не съедают (24.09.2026). Касается
+    # только попыток до стены регистрации 22.09.
+    is_ranked = bool(user is not None and with_timer and not VPAttempt.objects.filter(
+        user=user, variant=variant, with_timer=True, session_key='').exists())
+    attempt = VPAttempt.objects.create(
+        variant=variant,
+        user=user,
+        session_key='' if user else request.session.session_key,
+        with_timer=with_timer,
+        is_ranked=is_ranked,
+        expires_at=(timezone.now() + timedelta(seconds=variant.duration_seconds)
+                    if with_timer else None),
+        max_score=variant.max_score,
+        public_code=_new_code(),
+    )
+    tracking.defer(request, 'vp_start', variant=variant.slug, with_timer=with_timer)
+    return attempt
 
 
 # ------------------------------------------------------------ прохождение

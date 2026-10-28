@@ -902,6 +902,33 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Куда уходит «Ответить». Пусто — почта для обращений из LEGAL.
 MAIL_REPLY_TO = os.environ.get('MAIL_REPLY_TO', '').strip() or LEGAL['contact_email']
 
+# ─── Стена тренажёра ВП и бот Telegram (docs/VP.md, «Стена 2 тура») ─────────
+# VP_WALL_ENABLED: на 2 туре вариант открывается после контакта (подписка на
+# канал через бота или почта) и анкеты. В тестах выключена (новые тесты
+# включают явно), иначе включена. ⚠️ В settings_production.py НЕ
+# переопределяется: тренажёр без стены не выкатываем (решение 28.10.2026).
+VP_WALL_ENABLED = (
+    os.environ.get('VP_WALL_ENABLED', '0' if _TESTING else '1').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+# Путь Telegram — выключатель на случай, если Telegram лёг во время тура.
+VP_WALL_TG_ENABLED = (
+    os.environ.get('VP_WALL_TG_ENABLED', '1').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+# ⚠️ Под тестами всё TELEGRAM_* пустое, как YANDEX_METRIKA_ID: настоящий токен
+# из .env не должен попасть ни в один тест. Тесты подставляют своё сами.
+TELEGRAM_BOT_TOKEN = '' if _TESTING else os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+TELEGRAM_BOT_USERNAME = ('' if _TESTING else
+                         os.environ.get('TELEGRAM_BOT_USERNAME', '').strip().lstrip('@'))
+# Секрет вебхука: 1–256 символов из A-Za-z0-9_-. Пусто — вебхук закрыт для всех.
+TELEGRAM_WEBHOOK_SECRET = ('' if _TESTING else
+                           os.environ.get('TELEGRAM_WEBHOOK_SECRET', '').strip())
+# Канал, подписку на который проверяет бот. Бот разработки может смотреть свой.
+TELEGRAM_CHANNEL = (('' if _TESTING else os.environ.get('TELEGRAM_CHANNEL', '').strip())
+                    or '@' + LEGAL['telegram'])
+# Только https://. Свой посредник за рубежом — если с сервера Telegram не отвечает.
+TELEGRAM_API_BASE = (('' if _TESTING else os.environ.get('TELEGRAM_API_BASE', '').strip())
+                     or 'https://api.telegram.org')
+
 # ─── Сроки хранения данных (часть Б правового контура, 09.10.2026) ──────────
 #
 # Политика обработки ПДн, раздел 7: фотографии и файлы решений, диалоги с

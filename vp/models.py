@@ -228,3 +228,102 @@ class VPAnswer(models.Model):
         unique_together = [('attempt', 'item')]
         verbose_name = 'Ответ ВП'
         verbose_name_plural = 'Ответы ВП'
+
+
+# ------------------------------------------------------------------ стена 2 тура
+#
+# Правило «пускать ли в вариант» — ТОЛЬКО `vp/wall.py`; здесь только хранение
+# (docs/VP.md, «Стена 2 тура», ADR 0168). Порядок и подписи вариантов ответа —
+# порядок кнопок анкеты на экране.
+
+class VPWall(models.Model):
+    """Пройденное человеком на стене 2 тура: контакт и анкета. Одна строка на аккаунт.
+
+    ⚠️ КОНТАКТ ПОСТОЯННЫЙ. Отписка от канала после прохода стены его не отбирает:
+    во время тура человек не должен внезапно упереться в стену посреди недели.
+    """
+
+    CONTACT_CHOICES = (('', 'Нет'), ('tg', 'Telegram'), ('email', 'Почта'))
+    GRADE_CHOICES = (('9', '9'), ('10', '10'), ('11', '11'))
+    TOUR2_CHOICES = (
+        ('passed', 'Да, прошёл'),
+        ('waiting', 'Жду результатов'),
+        ('future', 'Нет, готовлюсь на будущее'),
+        ('no_tour1', 'Не писал 1 тур'),
+    )
+    SOURCE_CHOICES = (
+        ('telegram', 'Telegram-канал'),
+        ('tiktok', 'TikTok'),
+        ('instagram', 'Instagram*'),
+        ('vk', 'ВКонтакте'),
+        ('friend', 'Друг или одноклассник'),
+        ('teacher', 'Учитель'),
+        ('search', 'Поиск'),
+        ('other', 'Другое'),
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vp_wall',
+        verbose_name='Аккаунт')
+    contact_via = models.CharField(
+        'Контакт', max_length=8, choices=CONTACT_CHOICES, blank=True, default='')
+    contact_at = models.DateTimeField('Контакт получен', null=True, blank=True)
+    grade = models.CharField('Класс', max_length=2, choices=GRADE_CHOICES, blank=True)
+    tour2_status = models.CharField(
+        'Прошёл во 2 тур', max_length=10, choices=TOUR2_CHOICES, blank=True)
+    source = models.CharField(
+        'Откуда узнал', max_length=10, choices=SOURCE_CHOICES, blank=True)
+    survey_at = models.DateTimeField('Анкета', null=True, blank=True)
+    created_at = models.DateTimeField('Дошёл до стены', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Стена ВП: человек'
+        verbose_name_plural = 'Стена ВП: люди'
+
+    def __str__(self):
+        return f'{self.user_id}: {self.contact_via or "без контакта"}'
+
+
+class VPTelegramLink(models.Model):
+    """Привязка Telegram к аккаунту — НЕ вход на сайт: сессию по ней не открывает никто."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vp_telegram',
+        verbose_name='Аккаунт')
+    tg_user_id = models.BigIntegerField('ID в Telegram', unique=True)
+    tg_username = models.CharField('Ник в Telegram', max_length=64, blank=True)
+    linked_at = models.DateTimeField('Привязан', auto_now_add=True)
+    checked_at = models.DateTimeField('Подписка проверена', null=True, blank=True)
+    subscribed = models.BooleanField('Подписан', default=False)
+    last_error = models.CharField('Последняя ошибка', max_length=32, blank=True)
+
+    class Meta:
+        verbose_name = 'Стена ВП: привязка Telegram'
+        verbose_name_plural = 'Стена ВП: привязки Telegram'
+
+    def __str__(self):
+        return f'{self.user_id} ↔ tg'
+
+
+class VPTelegramToken(models.Model):
+    """Одноразовый код привязки из ссылки `t.me/<бот>?start=<код>`.
+
+    ⚠️ САМ КОД В БАЗЕ НЕ ХРАНИТСЯ — только отпечаток HMAC-SHA256 на `SECRET_KEY`,
+    как у кодов почты (`problems/models_mail.py`).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vp_tg_tokens',
+        verbose_name='Аккаунт')
+    token_hash = models.CharField('Отпечаток кода', max_length=64, unique=True)
+    slug = models.SlugField('Вариант', max_length=80, blank=True)
+    created_at = models.DateTimeField('Выдан', auto_now_add=True)
+    used_at = models.DateTimeField('Погашен', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Стена ВП: код привязки'
+        verbose_name_plural = 'Стена ВП: коды привязки'
+        indexes = [models.Index(fields=['user', 'created_at'])]
+
+    def __str__(self):
+        return f'{self.user_id}: код от {self.created_at:%d.%m %H:%M}'
