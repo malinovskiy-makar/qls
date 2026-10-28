@@ -83,3 +83,29 @@
 | `use` шлёт код | `test_use_with_verified_email_needs_no_code` |
 | стена отзывает согласие | `test_unchecked_box_never_revokes` |
 | `send` разрешён при подтверждённой почте | `test_send_with_verified_email_is_refused` |
+
+## Фаза 3. Telegram: ссылка, бот, проверка подписки
+
+- `b2244469`. `vp/telegram.py` (`call`, `subscription`, `check_subscription`; `urllib`,
+  `# nosec B310` после проверки схемы `https://`; токен вычищается, исключение
+  поднимается вне `except` — без цепочки с адресом). `vp/bot.py` (`TEXTS`, `/start <код>`
+  с атомарным гашением, переход привязки к свежему коду, кнопка «Проверить» с
+  `answerCallbackQuery` на каждое нажатие, правка → `sendMessage` при отказе).
+- Адреса: `POST wall/tg/<слаг>/` (тот же код 30 минут, 10 новых в час → `?tg=often`),
+  `POST wall/check/<слаг>/` (не чаще раза в 5 с), `GET wall/state/?v=` (гость 403,
+  скрытый слаг 404), `POST tg/hook/` (пустой секрет — всегда 403; `compare_digest` по
+  байтам; >64 КБ / не JSON → 400; повтор `update_id` за сутки не обрабатывается; ошибка → 200).
+- Команды `tg_setup` (`--ping/--check/--set-webhook/--delete-webhook/--info`) и `tg_poll`
+  (`--force` только для бота разработки). Переменные — в `deploy/env.example`,
+  `deploy/env.dev.example`.
+- Экраны окна 01 (кнопка), 02 (скрыт рядом с 01, `data-poll`), 03 (без опроса).
+- Новые тесты `vp/tests/test_wall_tg.py`: 24. Тесты сессии: 647 → **671**, OK.
+
+| Дефект | Покраснело |
+|---|---|
+| вебхук не проверяет секрет | `test_empty_secret_closes_the_hook_for_everyone`, `test_missing_or_wrong_secret_is_403_and_does_nothing`, `test_non_ascii_header_is_403_not_500` |
+| пустой секрет пропускает | `test_empty_secret_closes_the_hook_for_everyone` |
+| код не гасится после использования | `test_same_or_old_code_is_expired`, `test_start_with_subscription_links_and_gives_contact` |
+| `left` считается подпиской | `test_left_asks_to_subscribe_then_check_gives_contact`, `test_states` |
+| на «Проверить» без подписки нет `answerCallbackQuery` | `test_every_check_press_is_answered` |
+| токен попадает в текст исключения | `test_network_error_has_no_token` |
