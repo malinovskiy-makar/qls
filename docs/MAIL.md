@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-27 (почта, сессия 1: коды, регистрация, вход почтой, сброс пароля, «Почта»)
+> **Обновлён:** 2026-10-29 (стена ВП: `attach_verified_email`, тексты ошибок в `email_codes`)
 > **Статус:** актуален
 
 # Почта: отправка, коды, флаг MAIL_ENABLED
@@ -26,7 +26,7 @@
 | Коды | `problems/email_codes.py` (правила), модель `problems/models_mail.py::EmailCode` |
 | Подтверждённая почта | `User.email_verified_at`; уникальность без учёта регистра — ограничение `user_verified_email_ci_unique` |
 | Вход почтой | `problems/auth_backends.py::EmailOrUsernameBackend` (первый в `AUTHENTICATION_BACKENDS`) |
-| Регистрация, сброс, «Почта» | `problems/views_auth.py` |
+| Регистрация, сброс, «Почта» | `problems/views_auth.py` (тексты ошибок и привязка почты — `problems/email_codes.py`) |
 | Согласие на рассылку | `ConsentRecord.Kind.MAIL`, `legal/consent.py::wants_mail`, `legal:mail_grant` / `legal:mail_revoke`, документ `legal/texts/consent_mail.md` (ЧЕРНОВИК) |
 | Проверка канала | `manage.py send_test_email <адрес>`; проверка Django `mail.E001` (`problems/checks.py`) |
 | Сроки хранения | коды старше суток удаляет `purge_expired`; `erase_user` удаляет коды по связи и по адресу |
@@ -107,14 +107,25 @@ from problems.email_codes import has_verified_email   # у человека ес
 from legal.consent import wants_mail                  # согласился на рассылку (любой редакции)
 ```
 
-Собрать почту и согласие — увести на
-`/account/email/?next=<свой адрес>&src=vp`: `next` — куда вернуть (только свой
-адрес, чужой отбрасывается), `src=vp` — источник согласия «Стена тренажёра ВП».
-Вернувшийся человек проверяется теми же двумя функциями.
-
 Нужно отправить код из своего экрана — `email_codes.send_code(email, purpose,
 user=…, request=…)` и `check_code(email, purpose, code)`; результаты —
-`SendResult` / `CheckResult` с причиной отказа.
+`SendResult` / `CheckResult` с причиной отказа. Тексты для человека — там же:
+`email_codes.send_error(result)`, `check_error(check)`, `TAKEN_MESSAGE` (одни на
+страницу «Почта» и стену ВП; только «–»).
+
+Код сошёлся — привязать почту к аккаунту **только** через
+`email_codes.attach_verified_email(user, email)`: в транзакции заново проверяет,
+что почту не подтвердил другой аккаунт (два человека могли ввести коды
+одновременно), а `IntegrityError` от `user_verified_email_ci_unique` превращает
+в `EmailTaken`; занята — в базе ничего не меняется. Согласие на рассылку она НЕ
+ставит: у страницы «Почта» галочка и даёт, и отзывает, у стены — только даёт.
+
+**Стена тренажёра ВП (29.10.2026, docs/VP.md, «Стена 2 тура»)** вводит почту и код
+в СВОЁМ окне (решение 28.10), а не на этой странице. Страница «Почта» с
+`?next=<интро>?wall=email&src=vp` нужна стене только для одного: человек с уже
+подтверждённой почтой хочет другую — почта ключ входа, и стена её молча не меняет.
+`next` — куда вернуть (только свой адрес), `src=vp` — источник согласия «Стена
+тренажёра ВП».
 
 ## Как проверить у себя
 

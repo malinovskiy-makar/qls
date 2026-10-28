@@ -374,6 +374,21 @@ TypeError: Field 'id' expected a number but got
 
 ---
 
+## Тренажёр ВП: стена 2 тура (29.10.2026, ADR 0168)
+
+Устройство — [VP.md](VP.md), «Стена 2 тура». Все маршруты ДО `<slug:slug>/` в `vp/urls.py`.
+Вариант везде берётся через `_variant_or_404` (скрытый тур — 404, как у интро).
+⚠️ **Ни один маршрут не открывает сессию по Telegram**: привязка — не вход.
+
+| Путь | Имя | Роль | Клиент | Владелец | Файл |
+|---|---|---|---|---|---|
+| `/vp/wall/email/<slug>/` | `vp:wall_email` | вход (гость → `/login/`); `require_POST`; без `MAIL_ENABLED` 404 | POST: `action` (`send`/`confirm`/`resend`/`change`/`use`), почта, код, галочка | ✅ `request.user`; почта из сессии | [vp/views_wall.py](../vp/views_wall.py) `wall_email` |
+| `/vp/wall/tg/<slug>/` | `vp:wall_tg` | вход; `require_POST`; путь Telegram включён | — | ✅ код выдаётся только `request.user`; в базе отпечаток | [vp/views_wall.py](../vp/views_wall.py) `wall_tg` |
+| `/vp/wall/check/<slug>/` | `vp:wall_check` | вход; `require_POST`; раз в 5 с | — | ✅ привязка `request.user` | [vp/views_wall.py](../vp/views_wall.py) `wall_check` |
+| `/vp/wall/state/` | `vp:wall_state` | вход (гость 403); `require_GET`, `never_cache` | GET: `v` — слаг | ✅ `request.user` | [vp/views_wall.py](../vp/views_wall.py) `wall_state` |
+| `/vp/wall/survey/<slug>/` | `vp:wall_survey` | вход; `require_POST` | POST: три ответа анкеты, `with_timer` | ✅ `request.user` | [vp/views_wall.py](../vp/views_wall.py) `wall_survey` |
+| `/vp/tg/hook/` | `vp:tg_hook` | ⚠️ `csrf_exempt`; заголовок `X-Telegram-Bot-Api-Secret-Token` (`compare_digest` по байтам); пустой секрет — всегда 403 | POST JSON ≤ 64 КБ, повтор `update_id` за сутки игнорируется | ⚠️ по коду привязки из `/start <код>` — код одноразовый, 30 минут | [vp/views_wall.py](../vp/views_wall.py) `tg_hook` |
+
 ## Админка
 
 252 маршрута под `/admin/`, все — автоген Django + зарегистрированные модели.

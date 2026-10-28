@@ -8,7 +8,7 @@ from django.contrib import admin, messages
 from django.db.models import Count, Sum
 
 from vp import loader
-from vp.models import VPItem, VPVariant
+from vp.models import VPItem, VPTelegramLink, VPTelegramToken, VPVariant, VPWall
 
 
 def _comma(value):
@@ -64,3 +64,40 @@ class VPItemAdmin(admin.ModelAdmin):
         # Поправили эталон — буквы связки пересчитываем тем же кодом, что и импорт.
         obj.chain_first, obj.chain_second = loader.chain_letters(obj.chain_word())
         super().save_model(request, obj, form, change)
+
+
+# ------------------------------------------------------------------ стена 2 тура
+
+class _ReadOnly(admin.ModelAdmin):
+    """Только чтение: привязки и коды пишет бот, а не человек в админке."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(VPWall)
+class VPWallAdmin(admin.ModelAdmin):
+    list_display = ('user', 'contact_via', 'grade', 'tour2_status', 'source',
+                    'created_at', 'contact_at', 'survey_at')
+    list_filter = ('contact_via', 'grade', 'source', 'tour2_status')
+    search_fields = ('user__username',)
+    raw_id_fields = ('user',)
+    date_hierarchy = 'created_at'
+
+
+@admin.register(VPTelegramLink)
+class VPTelegramLinkAdmin(_ReadOnly):
+    list_display = ('user', 'tg_username', 'subscribed', 'linked_at', 'checked_at', 'last_error')
+    list_filter = ('subscribed',)
+    search_fields = ('user__username', 'tg_username')
+
+
+@admin.register(VPTelegramToken)
+class VPTelegramTokenAdmin(_ReadOnly):
+    # Самого кода в базе нет — только отпечаток; его в списке не показываем.
+    list_display = ('user', 'slug', 'created_at', 'used_at')
+    exclude = ('token_hash',)
+    search_fields = ('user__username',)

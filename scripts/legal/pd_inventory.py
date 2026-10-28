@@ -83,9 +83,12 @@ def _read(path):
 # Поля «без ключа на User», по которым модель всё равно попадает в список
 # (задание: ip / user_agent / session / email / phone / name). Совпадение —
 # по слову в имени поля через подчёркивание: `session_key`, `region_name`.
+# Telegram ID и ник — стена тренажёра ВП (vp.VPTelegramLink, 29.10.2026). Ответы
+# анкеты стены (vp.VPWall: класс, «прошёл во 2 тур», откуда узнал) по имени поля
+# не отобрать — `grade` и `source` есть и у банка задач; они названы в docs/VP.md.
 PD_FIELD = re.compile(
     r'(^|_)(ip|ip_address|remote_addr|user_agent|session|session_key|email|'
-    r'phone|name)($|_)')
+    r'phone|name|tg_user_id|tg_username|telegram)($|_)')
 
 
 def _setup_django():

@@ -16,6 +16,15 @@
   vp_result_open — открыл результат: variant, own — каждое открытие;
   vp_share_click, vp_practice_check, vp_practice_reveal — шлёт `static/vp/js/result.js`
               (клик, проверка, «Показать ответ»): variant, item.
+Стена 2 тура (`vp/views_wall.py`, `static/vp/js/wall.js`; docs/VP.md, «Стена 2 тура»):
+  vp_wall_shown — окно стены отрисовано открытым: variant, screen;
+  vp_wall_tg_click — выдан НОВЫЙ код привязки Telegram: variant;
+  vp_wall_tg_ok, vp_wall_tg_nosub — итог проверки подписки кнопкой «проверить» или
+              опросом страницы: variant;
+  vp_wall_email_sent — ушёл код на почту: variant;
+  vp_wall_email_ok — контакт по почте: variant, how ('code' | 'use');
+  vp_wall_survey_done — анкета сохранена: variant, grade, tour2_status, source.
+⚠️ ИЗ ВЕБХУКА СОБЫТИЯ НЕ ШЛЮТСЯ: там нет сессии браузера.
 `variant` — слаг варианта. Воронку считает `vp.funnel`.
 """
 SESSION_PENDING = 'vp_events'

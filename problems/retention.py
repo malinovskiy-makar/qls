@@ -9,7 +9,8 @@
   (`Event`), журнал поиска (`SearchLog`), обращения (`Feedback`, вместе со снимком
   экрана) и жалобы на задачи (`ProblemReport`).
 Что теряет только файл (строка остаётся): файл сдачи `Submission.solution_file`.
-Что живёт сутки, а не общий срок: коды подтверждения почты (`EmailCode`).
+Что живёт сутки, а не общий срок: коды подтверждения почты (`EmailCode`) и коды
+привязки Telegram стены ВП (`vp.VPTelegramToken`).
 Что только перечисляется числом: аккаунты, в которые не входили 3 года.
 
 ⚠️ `FileAsset`, привязанные к задаче банка (`Problem.files`), НЕ удаляются: это материал
@@ -79,6 +80,17 @@ def _old_email_codes(now=None):
     return EmailCode.objects.filter(created_at__lt=edge)
 
 
+#: Коды привязки Telegram стены ВП живут 30 минут; погашенные и просроченные
+#: хранятся сутки, как коды почты (docs/VP.md, «Стена 2 тура»).
+TG_TOKEN_HOURS = 24
+
+
+def _old_tg_tokens(now=None):
+    from vp.models import VPTelegramToken
+    edge = (now or timezone.now()) - timedelta(hours=TG_TOKEN_HOURS)
+    return VPTelegramToken.objects.filter(created_at__lt=edge)
+
+
 def _old_submissions(edge):
     from problems.models import Submission
     return Submission.objects.filter(submitted_at__lt=edge).exclude(solution_file='')
@@ -117,6 +129,7 @@ def plan(now=None):
     rows = {label: qs.count() for label, qs in _querysets(edge).items()}
     rows['problems.Submission (только файл)'] = _old_submissions(edge).count()
     rows['problems.EmailCode (старше суток)'] = _old_email_codes(now).count()
+    rows['vp.VPTelegramToken (старше суток)'] = _old_tg_tokens(now).count()
     files = {kind: len(paths) for kind, paths in _file_names(edge).items()}
     return {
         'cutoff': edge,
@@ -139,6 +152,7 @@ def purge(now=None):
         old = _old_submissions(edge)
         rows['problems.Submission (только файл)'] = old.update(solution_file='')
         rows['problems.EmailCode (старше суток)'] = _old_email_codes(now).delete()[0]
+        rows['vp.VPTelegramToken (старше суток)'] = _old_tg_tokens(now).delete()[0]
     deleted, missing, failed = erasure.delete_files(all_names)
     return {'cutoff': edge, 'rows': rows, 'files_deleted': deleted,
             'files_missing': missing, 'files_failed': failed}
