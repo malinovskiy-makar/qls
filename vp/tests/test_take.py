@@ -228,8 +228,9 @@ class OwnerTests(ViewBase):
 class IntroTests(ViewBase):
     def test_intro_numbers_come_from_the_database(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        for expected in ('1–30', 'Змейка, короткий ответ', '60 б.', '31–35', '10 б.',
-                         '36–40', '15 б.', '41–42', '6 б.', '43–44', '9 б.'):
+        # Сессия R: таблица «№ / Блок / Баллы / Как считается», баллы — числом в своей ячейке.
+        for expected in ('1–30', 'Змейка, короткий ответ', '<b>60</b>', '31–35', '<b>10</b>',
+                         '36–40', '<b>15</b>', '41–42', '<b>6</b>', '43–44', '<b>9</b>'):
             self.assertIn(expected, html)
         self.assertIn('44 задания', html)
         self.assertIn('100 баллов', html)
@@ -242,19 +243,24 @@ class IntroTests(ViewBase):
         other.points = D('9')
         other.save()
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        self.assertIn('61 б.', html)
-        self.assertIn('13 б.', html)
+        self.assertIn('<b>61</b>', html)
+        self.assertIn('<b>13</b>', html)
 
     def test_rules_ranges_and_penalty_example_follow_the_data(self):
+        """Сессия R: карточка «Как считаются баллы» ушла с интро в столбец «Как считается»
+        (фразы диапазонов и пример штрафа живут в окне правил — `test_landing`). Суть та же:
+        что написано у блока, следует за данными."""
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        self.assertIn('Задания 1–35 и 43–44 – или полный балл, или ноль.', html)
-        self.assertIn('В заданиях 36–42 балл делится', html)
-        self.assertIn('верный даёт +1,5, лишний – −1', html)     # для трёхбалльных
-        for item in self.variant.items.filter(block__in=('multi', 'analytic')):
-            item.points = D('6')
+        self.assertIn('по 2 балла: полный балл или ноль', html)              # змейка 1–30
+        self.assertIn('верный вариант – доля балла, лишний отнимает долю', html)
+        self.assertIn('от 4 до 5 баллов: полный балл или ноль', html)        # 43 и 44
+        for item in self.variant.items.filter(block='snake'):
+            item.points = D('3')
             item.save()
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        self.assertIn('верный даёт +3, лишний – −2', html)
+        snake = html.split('data-block="snake"', 1)[1].split('</tr>', 1)[0]
+        self.assertIn('по 3 балла: полный балл или ноль', snake)
+        self.assertNotIn('по 2 балла', snake)
 
     def test_intro_shows_the_chain_example_and_mode_choice(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()

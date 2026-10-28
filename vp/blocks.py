@@ -74,6 +74,18 @@ SECTION_HOW = {
 }
 
 
+def _how_full(block, penalty):
+    """«Как считается» для таблицы интро; пусто — «<баллы>: полный балл или ноль» (шаблон)."""
+    if block in SHARE_WITH_PENALTY:
+        return ('верный вариант – доля балла, лишний отнимает долю' if penalty
+                else 'каждый верный вариант – своя доля')
+    if block == 'gaptext':
+        return 'каждый пропуск – своя доля, штрафа нет'
+    if block == 'matching':
+        return 'каждая строка – своя доля, штрафа нет'
+    return ''
+
+
 def number_range(first, last):
     """«1–30» или «44» для блока из одного задания (короткое тире)."""
     return str(first) if first == last else f'{first}–{last}'
@@ -111,6 +123,7 @@ def sections(items):
                 'table': section['block'], 'heading': section['block'],
                 'short': section['block'], 'nav': section['block']}),
             how=SECTION_HOW.get(section['block'], ''),
+            how_full=_how_full(section['block'], any(i.penalty for i in items_)),
         )
     return result
 

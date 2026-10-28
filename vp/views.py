@@ -564,6 +564,8 @@ def intro(request, slug):
         'share_phrase': blocks.in_tasks(shared),
         'number_rule': blocks.NUMBER_RULE,
         'drill_url': reverse('vp:drill'),
+        'meta': landing.variant_meta(variant, ('count', 'points')),
+        'band_genitive': _band_genitive(variant.grade_band),
         'penalty_example': example,
         'attempt': attempt,
         'attempt_answered': _answered_count(attempt) if attempt else 0,
@@ -574,6 +576,11 @@ def intro(request, slug):
         **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year,
                               variant.tour),
     })
+
+
+def _band_genitive(band):
+    """«10» → «10 класса», «9-10» → «9–10 классов»: «в таблицу 10 класса»."""
+    return f'{band.replace("-", "–")} {"классов" if "-" in band else "класса"}'
 
 
 def _register_url(slug):
