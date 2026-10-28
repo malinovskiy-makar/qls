@@ -129,11 +129,38 @@ class PageOverlay:
     * `human` — остаток: если перечитывание дало меньше замечаний, берётся
       оно (в заплатке есть `blocks`), страница остаётся «на глаза»;
     * `needs_fix`, `judge_error` — запись v2 как была;
+    * `numbers_loss_ok` в заплатке (v5) — человек проверил по картинке, что
+      пропавший номер был выдуман моделью: защита номеров не мешает заплатке;
     * страница из `norm` (ярусы B/C вне выборки контроля) — норма.
     """
 
-    def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES):
+    def __init__(self, digitized, norm=(), patches=DEFAULT_PATCHES, keep_points=False,
+                 check_numbers=True, check_kinds=False):
         self.digitized, self.norm, self.patches = digitized, set(norm), patches
+        #: Защита «перечитывание потеряло номера» (13.10). Слой pages_v3 в сборке
+        #: v5 — без неё: так собран v3 (09.10), и сборка v5 с пустым pages_v5
+        #: даёт v3 ровно.
+        self.check_numbers = check_numbers
+        #: v5: у перечитанного блока без баллов баллы берутся у того же блока
+        #: прежней расшифровки (МОШ 2011, 10 кл., «Тест II»: перечитывание
+        #: вернуло шапку теста, но потеряло «2 балла» у вопросов 16–21).
+        self.keep_points = keep_points
+        #: v5: защита вида блоков (`kinds_kept`) — только у слоя v5 экономики;
+        #: заплатки финграм/бизнеса (pages_v2) собираются как раньше.
+        self.check_kinds = check_kinds
+
+    def _kinds_ok(self, base_blocks, new_blocks):
+        return not self.check_kinds or kinds_kept(base_blocks, new_blocks)
+
+    def _take(self, out, patch, base):
+        for key in PATCH_FIELDS:
+            if key in patch:
+                out[key] = patch[key]
+        if self.keep_points and 'blocks' in patch:
+            # Слой v5: баллы — из прежней расшифровки; блоки помечаются `_v5`
+            # (сборка не даёт перечитыванию заводить новые задания из файла ответов).
+            out['blocks'] = [dict(b, _v5=True) for b in title_stems(
+                keep_points(base.get('blocks') or [], out['blocks']))]
 
     def apply(self, page_dir, page, base):
         if base is None:
@@ -149,8 +176,10 @@ class PageOverlay:
         if status == RESCORE_OK:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status in PATCH_OK:
-            if ((status == 'fixed' or 'blocks' in patch) and 'blocks' in patch
-                    and not numbers_kept(base.get('blocks'), patch['blocks'])):
+            if (self.check_numbers and (status == 'fixed' or 'blocks' in patch)
+                    and 'blocks' in patch and not patch.get('numbers_loss_ok')
+                    and (not numbers_kept(base.get('blocks'), patch['blocks'])
+                         or not self._kinds_ok(base.get('blocks'), patch['blocks']))):
                 # Перечитывание поправило текст, но потеряло номера блоков
                 # (МОШ-предпринимательство 2009/10: 15 ответов → один блок без
                 # номера): старая разметка, страница — человеку.
@@ -158,22 +187,81 @@ class PageOverlay:
                            needs_eyes_reasons=['перечитывание потеряло номера'])
                 return out
             if status == 'fixed' or 'blocks' in patch:
-                for key in PATCH_FIELDS:
-                    if key in patch:
-                        out[key] = patch[key]
+                self._take(out, patch, base)
             out.update(needs_eyes=False, needs_eyes_reasons=[], status=status)
         elif status == 'human':
             # Расшифровка human-страницы судьёй не подтверждена: берём её, только
             # если «скелет» (тип+номер блоков заданий/решений/критериев) тот же —
             # иначе задание могло бы тихо исчезнуть из сборки (mosh-2019-final-6).
-            if 'blocks' in patch and skeleton(patch['blocks']) == skeleton(base.get('blocks')):
-                for key in PATCH_FIELDS:
-                    if key in patch:
-                        out[key] = patch[key]
+            if 'blocks' in patch and (patch.get('numbers_loss_ok')
+                                      or skeleton(patch['blocks']) == skeleton(base.get('blocks'))) \
+                    and self._kinds_ok(base.get('blocks'), patch['blocks']):
+                self._take(out, patch, base)
             out.update(needs_eyes=True, status='human')
         elif patch is None and f'{page_dir}/p{page}' in self.norm:
             out.update(needs_eyes=False, needs_eyes_reasons=[], status='ok_norm')
         return out
+
+
+class LayeredOverlay:
+    """Несколько слоёв заплаток по порядку (v5: `pages_v3`, затем `pages_v5`):
+    каждый следующий накладывается на результат предыдущего, так что поздний
+    слой перекрывает ранний, а его защиты (скелет, номера) сверяются с уже
+    поправленной страницей."""
+
+    def __init__(self, layers):
+        self.layers = list(layers)
+
+    def apply(self, page_dir, page, base):
+        for layer in self.layers:
+            base = layer.apply(page_dir, page, base)
+        return base
+
+
+def layer_stack(digitized, names, norm=()):
+    """Слои заплаток сборки v5 по порядку `names` («pages_v3,pages_v5»): pages_v3 —
+    как сборка v3 («норма» ярусов B/C, без защиты номеров), остальные — с
+    защитами номеров и вида блоков и с баллами прежней расшифровки."""
+    return LayeredOverlay([
+        PageOverlay(digitized, norm=norm if name == 'pages_v3' else (), patches=name,
+                    keep_points=name != 'pages_v3', check_numbers=name != 'pages_v3',
+                    check_kinds=name != 'pages_v3')
+        for name in names])
+
+
+def keep_points(base_blocks, new_blocks):
+    """Баллы блока (тип, номер, вариант), потерянные перечитыванием, — из
+    прежней расшифровки; блоки без номера и с баллами не трогаются."""
+    points = {}
+    for b in base_blocks or []:
+        key = (b.get('type'), str(b.get('number') or ''), str(b.get('task_variant') or ''))
+        if key[1] and b.get('points') not in (None, ''):
+            points.setdefault(key, b['points'])
+    out = []
+    for b in new_blocks or []:
+        key = (b.get('type'), str(b.get('number') or ''), str(b.get('task_variant') or ''))
+        if key[1] and b.get('points') in (None, '') and key in points:
+            b = dict(b, points=points[key])
+        out.append(b)
+    return out
+
+
+_OPTION_LINE = re.compile(r'^\s*(?:[-*]\s+|\(?[1-9а-еa-eА-ЕA-E][).]\s*)')
+
+
+def title_stems(blocks):
+    """Слой v5: формулировка вопроса, которую перечитывание положило в поле
+    названия («Главная проблема экономики состоит в том, что:»), а текст блока
+    начинается со списка вариантов, — возвращается в начало текста (МОШ 2012/13,
+    7–8 кл., тест: 7 вопросов без формулировки)."""
+    out = []
+    for b in blocks or []:
+        title, text = (b.get('title') or '').strip(), (b.get('text') or '').strip()
+        if (b.get('type') == 'task' and title and _OPTION_LINE.match(text)
+                and (title.endswith((':', '?', '…')) or len(title) >= 60)):
+            b = dict(b, title='', text=f'{title}\n\n{text}')
+        out.append(b)
+    return out
 
 
 STRUCTURE_TYPES = ('task', 'task_continuation', 'solution', 'criteria')
@@ -187,6 +275,32 @@ def numbers_kept(base_blocks, new_blocks):
         return {str(b.get('number') or '').strip() for b in blocks or []
                 if b.get('type') in STRUCTURE_TYPES and str(b.get('number') or '').strip()}
     return numbers(base_blocks) <= numbers(new_blocks)
+
+
+def kinds_kept(base_blocks, new_blocks):
+    """Перечитывание не превратило решение/критерии с номером N в условие N
+    (vp-2017-final-11, файл решений: блоки «решение 1, 2» стали «задание 1, 2» —
+    повтор условия в файле решений сборка не хранит, и решение пропадало)."""
+    def kinds(blocks):
+        out = {}
+        for b in blocks or []:
+            number = str(b.get('number') or '').strip()
+            if number and b.get('type') in STRUCTURE_TYPES:
+                out.setdefault(number, set()).add(b.get('type'))
+        return out
+    old, new = kinds(base_blocks), kinds(new_blocks)
+    for number, was in old.items():
+        lost = was & {'solution', 'criteria'} - new.get(number, set())
+        if lost and 'task' in new.get(number, set()) and 'task' not in was:
+            return False
+
+    def solution_text(blocks):
+        return sum(len(b.get('text') or '') for b in blocks or []
+                   if b.get('type') in ('solution', 'criteria'))
+    # Безномерные «Типичные ошибки…» критериев стали другим видом блока
+    # (vp-2020-final-9, № 3): решений и критериев на странице не меньше 80 %.
+    was = solution_text(base_blocks)
+    return was < 200 or solution_text(new_blocks) >= 0.8 * was
 
 
 def skeleton(blocks):

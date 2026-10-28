@@ -228,15 +228,16 @@ class JudgeBase(Transcriber):
     def v3(self, job):
         return triage.v3_path(self.digitized, job.page_dir, job.page, self.patches)
 
-    def judge_blocks(self, job, blocks, expected_numbers, kind):
-        """(вердикт | None, ошибка, расход). Невалидный ответ — один повтор."""
+    def judge_blocks(self, job, blocks, expected_numbers, kind, extra=''):
+        """(вердикт | None, ошибка, расход). Невалидный ответ — один повтор.
+        `extra` — дописать к запросу (подсказка очереди v5)."""
         from problems.ai import core
         cost, error = 0.0, ''
         for _attempt in range(JUDGE_ATTEMPTS):
             self.stats['судья вызовов'] += 1
             try:
                 data, usage = self._call(
-                    job, JUDGE_PROMPT, judge_user_text(job.key, blocks, expected_numbers),
+                    job, JUDGE_PROMPT, judge_user_text(job.key, blocks, expected_numbers) + extra,
                     JUDGE_SCHEMA, kind, JUDGE_PROFILE)
             except core.AiUnavailable as exc:
                 error = f'сбой вызова: {exc}'[:300]
@@ -352,6 +353,212 @@ class AnswerRejudgeRunner(JudgeBase):
                 result[key] = reread[key]
         triage.write_json_atomic(self.v3(job), result)
         return result['status']
+
+
+# ── Очередь с подсказкой (сессия v5, 14.10.2026) ─────────────────────────
+#
+# Судья и перечитывание идут по ГОТОВОМУ списку страниц (`reread_queue_v4.csv`),
+# а не по плану triage. Расшифровка страницы «сейчас» — запись `pages\` с
+# наложенными заплатками прежних разборов (`prior` — для base v4 это
+# `pages_v3`, по правилам `PageOverlay`), результат — заплатка следующей
+# версии (`pages_v5`). К запросу судьи и перечитывания добавляется подсказка:
+# что именно проверить (причины очереди, формулировка сверки глазами, правки
+# v4 этой страницы).
+
+QUEUE_HINT = """
+
+Подсказка проверяющего: на этой странице раньше находили (или подозревали) вот что. Проверь каждый пункт ПО КАРТИНКЕ — подсказка может ошибаться: чего на картинке нет, того не пиши.
+{hints}"""
+
+REREAD_RULES = """
+
+Правила перечитывания: перепиши страницу целиком, ничего не пропуская и ничего не выдумывая. Номера заданий, вариантов и баллы — ровно как на картинке. Таблицы — Markdown-таблицей по ячейкам. Сноски — отдельной строкой внизу текста задания, с тем же маркером (¹, ²). Служебные строки страницы (инструкции раздела вроде «Блок 2», «Выберите все верные ответы», «Выберите единственный верный ответ», время, сумма баллов) — отдельным блоком `task` БЕЗ номера, не внутри чужого задания. Не добавляй строку «Ответ: …», если на картинке ответа нет."""
+
+MAX_HINTS = 12
+
+
+def hint_text(hints):
+    if not hints:
+        return ''
+    return QUEUE_HINT.format(hints='\n'.join(f'- {h[:400]}' for h in hints[:MAX_HINTS]))
+
+
+class QueueMixin:
+    """Текущая расшифровка = страница + прежние заплатки; подсказка к запросу."""
+
+    def __init__(self, *, prior=(), hints=None, priority=None, **kwargs):
+        super().__init__(**kwargs)
+        self.prior = [triage.PageOverlay(self.digitized, patches=p) for p in prior]
+        self.prior_names = list(prior)
+        self.hints = hints or {}
+        self.priority = priority or {}
+
+    def current(self, job):
+        record = triage.read_json(job.out_path(self.root))
+        for layer in self.prior:
+            record = layer.apply(job.page_dir, job.page, record)
+        return record
+
+    def hints_for(self, job):
+        return self.hints.get(job.key.partition('/')[2], [])
+
+
+class QueueJudgeRunner(QueueMixin, JudgeBase):
+    """Судья с подсказкой по текущей расшифровке → заплатка `ok_judge` /
+    `needs_fix` / `judge_error` в папке следующей версии."""
+
+    def transcribe_page(self, job):
+        record = self.current(job)
+        expected = list(record.get('numbers_missing') or []) if job.has_layer else []
+        hints = self.hints_for(job)
+        verdict, error, cost = self.judge_blocks(job, record.get('blocks') or [], expected,
+                                                 'judge_v5', extra=hint_text(hints))
+        patch = {'file': job.file, 'page_dir': job.page_dir, 'page': job.page,
+                 'phase': 'judge', 'queue_priority': self.priority.get(job.key, ''),
+                 'hints': hints, 'prior': self.prior_names, 'judge': verdict,
+                 'error': error, 'cost_usd': round(cost, 6), 'at': _now()}
+        patch['status'] = decide_status(verdict) if verdict else 'judge_error'
+        triage.write_json_atomic(self.v3(job), patch)
+        return patch['status']
+
+
+class QueueRereadRunner(QueueMixin, JudgeBase):
+    """Одно перечитывание с подсказкой и замечаниями судьи → пересчёт мерила →
+    повторный судья → `fixed` / `human` (как `RereadRunner`, но от текущей
+    расшифровки и с подсказкой)."""
+
+    def transcribe_page(self, job):
+        old = self.current(job)
+        patch = triage.read_json(self.v3(job))
+        before = patch['judge']
+        hints = patch.get('hints') or self.hints_for(job)
+        missing_layer = list(old.get('numbers_missing') or []) if job.has_layer else []
+        data, usage = self._call(
+            job, SYSTEM_PROMPT,
+            reread_user_text(job, before['issues'], missing_layer) + hint_text(hints)
+            + REREAD_RULES, SCHEMA, 'reread_v5', PROFILE)
+        cost = float((usage or {}).get('cost_usd') or 0)
+        attempt = self._attempt(job, data, usage, retry=True)
+        new = {'blocks': attempt['blocks'], 'flags': attempt['flags'],
+               'layer_ratio': attempt['metrics'][0], 'numbers_ok': attempt['metrics'][1],
+               'numbers_missing': attempt['metrics'][2][:50],
+               'numbers_extra': attempt['metrics'][3][:50], 'layer_fuzz': attempt['metrics'][4],
+               'parse_error': attempt.get('parse_error', '')}
+        after, error = None, ''
+        if new['parse_error'] and not new['blocks']:
+            error = 'сбой формата перечитывания'
+        else:
+            expected = list(new['numbers_missing']) if job.has_layer else []
+            after, error, judge_cost = self.judge_blocks(job, new['blocks'], expected,
+                                                         'rejudge_v5', extra=hint_text(hints))
+            cost += judge_cost
+        result = {key: value for key, value in patch.items() if key not in triage.PATCH_FIELDS}
+        result.update({'phase': 'reread', 'judge_before': before, 'judge': after,
+                       'error': error, 'reread': new, 'at': _now(),
+                       'status_before': patch.get('status'),
+                       'cost_usd': round(float(patch.get('cost_usd') or 0) + cost, 6)})
+        fixed = after is not None and decide_status(after) == 'ok_judge'
+        result['status'] = 'fixed' if fixed else 'human'
+        better = after is not None and defect_count(after) < defect_count(before)
+        # «v3» — историческое имя «перечитанная расшифровка» (PageOverlay его не читает).
+        result['chosen'] = 'v3' if (fixed or better) else 'v2'
+        if result['chosen'] == 'v3':
+            for key in triage.PATCH_FIELDS:
+                result[key] = new[key]
+        triage.write_json_atomic(self.v3(job), result)
+        return result['status']
+
+
+class QueueSecondRunner(QueueMixin, JudgeBase):
+    """Второй заход для `human` после перечитывания: ещё одно перечитывание с
+    замечаниями ОБОИХ судей (до и после первого захода), повторный судья;
+    берётся версия с наименьшим числом замечаний из трёх (текущая, первый и
+    второй заход; при равенстве — более ранняя). Пилот v5: первый заход часто
+    чинит замечание, но вносит новую опечатку («игрекка», «транссраничного»)."""
+
+    def transcribe_page(self, job):
+        old = self.current(job)
+        patch = triage.read_json(self.v3(job))
+        before, after1 = patch.get('judge_before') or {}, patch.get('judge') or {}
+        hints = patch.get('hints') or self.hints_for(job)
+        issues, seen = [], set()
+        for item in (before.get('issues') or []) + (after1.get('issues') or []):
+            if item['detail'] not in seen:
+                seen.add(item['detail'])
+                issues.append(item)
+        missing_layer = list(old.get('numbers_missing') or []) if job.has_layer else []
+        data, usage = self._call(
+            job, SYSTEM_PROMPT,
+            reread_user_text(job, issues, missing_layer) + hint_text(hints) + REREAD_RULES,
+            SCHEMA, 'reread2_v5', PROFILE)
+        cost = float((usage or {}).get('cost_usd') or 0)
+        attempt = self._attempt(job, data, usage, retry=True)
+        new = {'blocks': attempt['blocks'], 'flags': attempt['flags'],
+               'layer_ratio': attempt['metrics'][0], 'numbers_ok': attempt['metrics'][1],
+               'numbers_missing': attempt['metrics'][2][:50],
+               'numbers_extra': attempt['metrics'][3][:50], 'layer_fuzz': attempt['metrics'][4],
+               'parse_error': attempt.get('parse_error', '')}
+        after2, error = None, ''
+        if new['parse_error'] and not new['blocks']:
+            error = 'сбой формата второго захода'
+        else:
+            expected = list(new['numbers_missing']) if job.has_layer else []
+            after2, error, judge_cost = self.judge_blocks(job, new['blocks'], expected,
+                                                          'rejudge2_v5', extra=hint_text(hints))
+            cost += judge_cost
+        result = dict(patch)
+        result.update({'reread2': new, 'judge2': after2, 'error2': error, 'at2': _now(),
+                       'cost_usd': round(float(patch.get('cost_usd') or 0) + cost, 6)})
+        options = [('v2', before, None)]
+        if patch.get('judge') is not None and patch.get('reread'):
+            options.append(('v3', after1, patch['reread']))
+        if after2 is not None:
+            options.append(('v3b', after2, new))
+        best = min(options, key=lambda o: defect_count(o[1]))
+        for key in triage.PATCH_FIELDS:
+            result.pop(key, None)
+        result['chosen'] = best[0]
+        if best[2] is not None:
+            for key in triage.PATCH_FIELDS:
+                result[key] = best[2][key]
+        result['status'] = ('fixed' if best[2] is not None and decide_status(best[1]) == 'ok_judge'
+                            else 'human')
+        triage.write_json_atomic(self.v3(job), result)
+        return result['status']
+
+
+def select_for_second(keys, digitized, patches):
+    """Второй заход: `human` после перечитывания, второго захода ещё не было."""
+    return [key for key in keys
+            if (lambda p: p.get('phase') == 'reread' and p.get('status') == 'human'
+                and 'reread2' not in p)(triage.read_json(_patch_path(digitized, key, patches)) or {})]
+
+
+def queue_keys(queue_rows, set_name, priorities):
+    """Страницы очереди своей олимпиады с нужными приоритетами →
+    [«pages/<sha16>/pN»] по порядку очереди и {ключ: приоритет}."""
+    keys, prio = [], {}
+    for row in queue_rows:
+        if row['set'] == set_name and str(row['priority']) in priorities:
+            key = 'pages/' + row['page']
+            if key not in prio:
+                keys.append(key)
+                prio[key] = str(row['priority'])
+    return keys, prio
+
+
+def select_for_queue_reread(keys, digitized, patches, force=()):
+    """На перечитывание: `needs_fix` без перечитывания; из `force` — ещё и
+    `ok_judge` (находки сверки глазами: судья мог их не увидеть)."""
+    out = []
+    for key in keys:
+        patch = triage.read_json(_patch_path(digitized, key, patches)) or {}
+        if patch.get('phase') != 'judge':
+            continue
+        if patch.get('status') == 'needs_fix' or (patch.get('status') == 'ok_judge'
+                                                  and key in force):
+            out.append(key)
+    return out
 
 
 # ── Отбор страниц ────────────────────────────────────────────────────────
