@@ -98,6 +98,20 @@ def page_layers(dz, index, refs):
     return out
 
 
+def figure_eyes(path):
+    """Решения глаз по контактным листам вырезок: путь рисунка → флаг
+    (`плохая_вырезка`, `лишний_текст`). Файл переживает пересборку."""
+    if not os.path.isfile(path):
+        return {}
+    out = {}
+    with open(path, encoding='utf-8') as fh:
+        for line in fh:
+            cells = line.rstrip('\n').split('\t')
+            if len(cells) >= 2 and not line.startswith('#'):
+                out[cells[0]] = cells[1]
+    return out
+
+
 def event_layers(dz, ev):
     """Текстовый слой всех страниц файлов комплекта: инструкция раздела
     приходит в условие со страниц других файлов (файл ответов), её числа —
@@ -122,8 +136,12 @@ def run_check(cmd, opts):
     bad_katex = {k for k, v in (katex.get('by_key') or {}).items() if v}
     index = {x['pdf']: x['page_dir'] for x in digitize.read_jsonl(
         os.path.join(dz, 'render_index.jsonl'))}
+    eyes = figure_eyes(os.path.join(dz, 'figure_flags_eyes.tsv'))
     out, counts = [], Counter()
     for r in rows:
+        for f in (r.get('figures') or []) + (r.get('solution_figures') or []):
+            if f.get('path') in eyes:
+                f['flag'] = eyes[f['path']]
         ev = files.get(r['event_id'], {})
         has_sol = bool(ev.get('solution_files') or ev.get('criteria_files')) or any(
             f.get('source_kind') == 'tasks+solutions' for f in ev.get('task_files') or [])

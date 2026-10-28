@@ -567,3 +567,12 @@ class CheckRulesTests(SimpleTestCase):
     def test_key_table_true_false_letters(self):
         hor = '| № теста | 1 | 2 | 3 |\n|---|---|---|---|\n| Ответы | Н | Н | В |'
         self.assertEqual(vsosh_digitize.key_table_pairs(hor), [('1', 'Н'), ('2', 'Н'), ('3', 'В')])
+
+    def test_figure_eyes_file(self):
+        from problems.olympiad_audit import vsosh_quality as Q
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'eyes.tsv')
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write('# комментарий\nfigures/a.png\tплохая_вырезка\te|1\n')
+            self.assertEqual(Q.figure_eyes(path), {'figures/a.png': 'плохая_вырезка'})
+            self.assertEqual(Q.figure_eyes(os.path.join(tmp, 'нет.tsv')), {})
