@@ -12,10 +12,24 @@
   /* Вкладки таблицы лучших попыток по классам (2 тур). Это ссылки `?board=`: без
      скрипта страница перезагрузится с нужной таблицей, со скриптом — переключит на месте. */
   var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-board-tab]'));
+  var tablist = document.querySelector('[data-band-url]');
+  /* `?board=` до сервера не доходит — выбор класса сообщаем ему сами (он запомнит его
+     для экрана вариантов и «что дальше»). Ответа не ждём. */
+  function remember(band) {
+    if (!tablist || !window.fetch) return;
+    try {
+      fetch(tablist.getAttribute('data-band-url'), {
+        method: 'POST', credentials: 'same-origin', body: band,
+        headers: { 'X-CSRFToken': tablist.getAttribute('data-csrf') || '',
+                   'Content-Type': 'text/plain;charset=UTF-8' }
+      }).catch(function () { /* не запомнили — не беда */ });
+    } catch (error) { /* старый браузер */ }
+  }
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function (event) {
       event.preventDefault();
       var band = tab.getAttribute('data-board-tab');
+      remember(band);
       tabs.forEach(function (other) {
         other.setAttribute('aria-selected', other === tab ? 'true' : 'false');
       });

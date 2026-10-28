@@ -1,6 +1,6 @@
 """Адреса тренажёра «Высшая проба, 1 тур».
 
-⚠️ ПОРЯДОК ВАЖЕН: `a/…`, `r/…`, `variants/` и `my/` объявлены ДО `<slug:slug>/…`.
+⚠️ ПОРЯДОК ВАЖЕН: `a/…`, `r/…`, `variants/`, `my/` и `band/` объявлены ДО `<slug:slug>/…`.
 Маршрут со слагом жаднее любого фиксированного слова, а вариант со слагом
 «variants» или «my» тоже возможен – тогда он просто не откроется по своему
 адресу, зато экраны раздела останутся на месте.
@@ -20,6 +20,7 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('variants/', views.variants, name='variants'),
     path('my/', views.my_attempts, name='my'),
+    path('band/', views.remember_band, name='remember_band'),
     path('a/<str:code>/', views.take, name='take'),
     path('a/<str:code>/save/', views.save, name='save'),
     path('a/<str:code>/time/', views.time_left, name='time'),

@@ -313,6 +313,37 @@ def _dots(user, published):
     return dots, done
 
 
+def student_band(request):
+    """Класс ученика для всего раздела — ЕДИНСТВЕННЫЙ источник: код из `config.bands()`
+    или `None`. Посадочная (вкладка таблицы, «моё»), экран вариантов и «что дальше»
+    спрашивают только её.
+
+    Порядок:
+    1. явный выбор в запросе: `?band=` (экран вариантов) или `?board=` (вкладка таблицы
+       без JS) — известный код запоминается в `request.session['vp_band']`;
+    2. (место под будущий источник «класс из анкеты» — сессия стены: он встанет сюда,
+       сразу после явного выбора);
+    3. `request.session['vp_band']` (туда же пишет `views.remember_band` — вкладка с JS);
+    4. класс последней попытки вошедшего в текущем туре;
+    5. `None`.
+    """
+    codes = [code for code, _ in config.bands()]
+    for key in ('band', 'board'):
+        asked = request.GET.get(key)
+        if asked in codes:
+            request.session['vp_band'] = asked
+            return asked
+    remembered = request.session.get('vp_band')
+    if remembered in codes:
+        return remembered
+    if request.user.is_authenticated:
+        last = (VPAttempt.objects.filter(user=request.user, variant__tour=config.CURRENT_TOUR)
+                .order_by('-started_at', '-id').select_related('variant').first())
+        if last is not None and last.variant.grade_band in codes:
+            return last.variant.grade_band
+    return None
+
+
 def _ordered(published):
     """Опубликованные варианты в порядке страницы выбора: по классам, потом `order`."""
     order = {code: n for n, (code, _) in enumerate(config.bands())}
@@ -324,6 +355,8 @@ def my_block(request, published):
 
     Гостю полоса не нужна — вернётся `None`, и шаблон покажет приглашение
     зарегистрироваться. Все числа — из попыток этого человека, не из сессии.
+    «Следующий вариант» и «пройдено» — по вариантам СВОЕГО класса (`student_band`);
+    класса нет — по всем.
     """
     from problems import exam_engine
     from vp import board
@@ -331,7 +364,10 @@ def my_block(request, published):
     user = request.user
     if not user.is_authenticated:
         return None
+    band = student_band(request)
     ordered = _ordered(published)
+    if band is not None:
+        ordered = [v for v in ordered if v.grade_band == band]
 
     current = current_attempt_any(request)
     dots, done = _dots(user, ordered)
@@ -355,4 +391,6 @@ def my_block(request, published):
         'done': done,
         'total': len(ordered),
         'all_done': not untouched,
+        'band': band,
+        'band_label': dict(config.bands()).get(band, ''),
     }

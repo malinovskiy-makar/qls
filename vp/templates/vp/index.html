@@ -81,7 +81,7 @@
 
     {% if boards|length > 1 %}
     {# Вкладки — ссылки `?board=`: без JS страница откроется с нужной таблицей, с JS переключит на месте. #}
-    <div class="vp-land-tabs" role="tablist" aria-label="Классы">
+    <div class="vp-land-tabs" role="tablist" aria-label="Классы" data-band-url="{% url 'vp:remember_band' %}" data-csrf="{{ csrf_token }}">
       {% for b in boards %}<a class="vp-land-tab" role="tab" href="?board={{ b.band }}" data-board-tab="{{ b.band }}" aria-selected="{% if b.active %}true{% else %}false{% endif %}" aria-controls="vp-board-{{ b.band }}">{{ b.label }}</a>{% endfor %}
     </div>
     {% endif %}
@@ -90,24 +90,25 @@
     <div class="vp-land-panel" id="vp-board-{{ b.band|default:'all' }}" data-board-panel="{{ b.band }}"{% if boards|length > 1 %} role="tabpanel"{% endif %}{% if not b.active %} hidden{% endif %}>
     {% if b.rows %}
     {# `ym-hide-content` — логины в запись Вебвизора не попадают (ADR 0133). #}
-    <div class="vp-land-rows ym-hide-content">
-      <div class="vp-land-row is-head"><span>#</span><span>Игрок</span><span>Класс</span><span class="is-num">Балл</span><span class="is-num">Время</span></div>
+    {# Колонка «Класс» — только когда таблица одна на все классы (1 тур); во 2 туре у класса своя вкладка. #}
+    <div class="vp-land-rows ym-hide-content{% if boards|length > 1 %} is-nocls{% endif %}">
+      <div class="vp-land-row is-head"><span>#</span><span>Игрок</span>{% if boards|length == 1 %}<span>Класс</span>{% endif %}<span class="is-num">Балл</span><span class="is-num">Время</span></div>
       {% for r in b.rows %}
-      <div class="vp-land-row">
+      <div class="vp-land-row{% if r.place == b.my_place %} is-me{% endif %}">
         <span class="vp-land-pl">{% if r.place < 4 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</span>
-        <span class="vp-land-who">{{ r.name }}</span>
-        <span class="vp-land-cls">{{ r.band|grade_chip }}</span>
+        <span class="vp-land-who">{% if r.place == b.my_place %}Вы · {% endif %}{{ r.name }}</span>
+        {% if boards|length == 1 %}<span class="vp-land-cls">{{ r.band|grade_chip }}</span>{% endif %}
         <span class="vp-land-sc">{{ r.score|num }}</span>
         <span class="vp-land-tm">{{ r.seconds|mmss }}</span>
       </div>
       {% endfor %}
     </div>
     {% if b.my_row %}
-    <div class="vp-land-pin ym-hide-content">
+    <div class="vp-land-pin ym-hide-content{% if boards|length > 1 %} is-nocls{% endif %}">
       <div class="vp-land-row is-me">
         <span class="vp-land-pl">{{ b.my_row.place }}</span>
         <span class="vp-land-who">Вы · {{ b.my_row.name }}</span>
-        <span class="vp-land-cls">{{ b.my_row.band|grade_chip }}</span>
+        {% if boards|length == 1 %}<span class="vp-land-cls">{{ b.my_row.band|grade_chip }}</span>{% endif %}
         <span class="vp-land-sc">{{ b.my_row.score|num }}</span>
         <span class="vp-land-tm">{{ b.my_row.seconds|mmss }}</span>
       </div>
@@ -120,10 +121,12 @@
     <p class="vp-land-bfoot">
       {% if not user.is_authenticated %}
         В таблицу попадают только зарегистрированные. Попыток в таблице: {{ b.attempts }}.
-      {% elif mine.best %}
-        Попыток в таблице: {{ b.attempts }}. Ваша лучшая – {{ mine.best_place }}-е место; выше можно подняться первой попыткой по другому варианту.
+      {% elif b.my_place == 1 %}
+        Попыток в таблице: {{ b.attempts }}. Вы на первом месте.
+      {% elif b.my_place %}
+        Попыток в таблице: {{ b.attempts }}. Ваше место – {{ b.my_place }}-е; выше можно подняться первой попыткой по другому варианту.
       {% else %}
-        Попыток в таблице: {{ b.attempts }}. Первая попытка с таймером по любому варианту попадёт сюда.
+        Попыток в таблице: {{ b.attempts }}.
       {% endif %}
     </p>
     </div>
@@ -199,7 +202,7 @@
     <div class="vp-land-card vp-land-cell">
       <p class="vp-land-ct">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-        Пройдено вариантов
+        Пройдено{% if mine.band_label %} · {{ mine.band_label }}{% else %} вариантов{% endif %}
       </p>
       <p class="vp-land-cv"><b>{{ mine.done }}</b> из {{ mine.total }}
         <span class="vp-land-dots" aria-hidden="true">{% for dot in mine.dots %}<i class="{{ dot }}"></i>{% endfor %}</span>

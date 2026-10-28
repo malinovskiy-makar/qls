@@ -28,7 +28,7 @@ from datetime import timedelta
 
 from django.db.models import Q
 from django.db import transaction
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
@@ -224,25 +224,18 @@ def _published(request=None):
 def _boards(request):
     """Таблицы лучших попыток посадочной: одна на тур (1 тур) или по классу (2 тур).
 
-    Открыта вкладка из `?board=`, иначе класса последней попытки вошедшего в текущем
-    туре, иначе первая (9 класс).
+    Открыта вкладка класса ученика (`landing.student_band`: `?board=`, запомненный
+    выбор, класс последней попытки), иначе первая (9 класс).
     Строки и правило отбора — `vp/board.py`.
     """
     tour = config.CURRENT_TOUR
-    active = None
-    if request.user.is_authenticated:
-        last = (VPAttempt.objects.filter(user=request.user, variant__tour=tour)
-                .order_by('-started_at', '-id').select_related('variant').first())
-        active = last.variant.grade_band if last else None
+    active = landing.student_band(request)
     result = []
     for band, label in board.tables(tour):
-        rows, my_row, humans, attempts = board.top(me=request.user, tour=tour, band=band)
-        result.append({'band': band or '', 'label': label, 'rows': rows, 'my_row': my_row,
-                       'humans': humans, 'attempts': attempts})
+        found = board.panel(me=request.user, tour=tour, band=band)
+        result.append({'band': band or '', 'label': label, **found})
     codes = [b['band'] for b in result]
-    asked = request.GET.get('board')        # вкладка-ссылка без JS
-    chosen = (asked if asked in codes else active if active in codes
-              else codes[0] if codes else '')
+    chosen = active if active in codes else codes[0] if codes else ''
     for item in result:
         item['active'] = item['band'] == chosen
     return result
@@ -344,7 +337,7 @@ def variants(request):
         if chosen:
             bands.append({'code': code, 'label': label, 'variants': chosen,
                           'count': len(chosen)})
-    chosen_code = request.GET.get('band') or ''
+    chosen_code = landing.student_band(request) or ''
     current = next((b for b in bands if b['code'] == chosen_code), bands[0] if bands else None)
 
     cards = []
@@ -363,6 +356,20 @@ def variants(request):
         'tour': config.CURRENT_TOUR,
         **seo.vp_variants_meta(config.CURRENT_TOUR),
     })
+
+
+@require_POST
+def remember_band(request):
+    """Вкладка класса на посадочной переключается скриптом без перезагрузки, и `?board=`
+    до сервера не доходит, — поэтому скрипт сообщает выбор сюда. Тело — код класса
+    (или поле `band`). Известный код → `request.session['vp_band']`, 204; иначе 400."""
+    if len(request.body) > 64:
+        return _json({'error': 'too_large'}, status=400)
+    code = request.POST.get('band') or request.body.decode('utf-8', 'replace').strip()
+    if code not in dict(config.bands()):
+        return _json({'error': 'bad_band'}, status=400)
+    request.session['vp_band'] = code
+    return HttpResponse(status=204)
 
 
 ATTEMPT_FILTERS = (

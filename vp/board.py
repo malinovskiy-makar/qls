@@ -111,21 +111,28 @@ def rows(tour=None, band=None):
     } for place, (_, attempt) in enumerate(ordered, 1)]
 
 
-def top(me=None, limit=TOP, tour=None, band=None):
-    """Что показывает посадочная.
-
-    Возвращает `(строки топа, моя строка вне топа или None, людей в таблице,
-    зачётных сданных попыток)`. Своя строка приходит отдельно только тогда, когда
-    она НЕ попала в топ: иначе человек увидел бы себя дважды.
-    """
+def panel(me=None, limit=TOP, tour=None, band=None):
+    """Вкладка таблицы посадочной: `rows` (топ), `my_row` (моя строка ВНЕ топа или
+    None — иначе человек увидел бы себя дважды), `my_place` (моё место в этой таблице,
+    в топе или нет, или None), `humans`, `attempts` (зачётных сданных попыток)."""
     all_rows = rows(tour, band)
-    head = all_rows[:limit]
-    mine = None
+    me_row = None
     if me is not None and getattr(me, 'is_authenticated', False):
-        mine = next((r for r in all_rows if r['user'].pk == me.pk), None)
-        if mine is not None and mine['place'] <= limit:
-            mine = None
-    return head, mine, len(all_rows), ranked_attempts(tour, band).count()
+        me_row = next((r for r in all_rows if r['user'].pk == me.pk), None)
+    return {
+        'rows': all_rows[:limit],
+        'my_row': me_row if me_row is not None and me_row['place'] > limit else None,
+        'my_place': me_row['place'] if me_row is not None else None,
+        'humans': len(all_rows),
+        'attempts': ranked_attempts(tour, band).count(),
+    }
+
+
+def top(me=None, limit=TOP, tour=None, band=None):
+    """Что показывает посадочная: `(строки топа, моя строка вне топа или None, людей в
+    таблице, зачётных сданных попыток)` — то же, что `panel`, кортежем."""
+    found = panel(me, limit, tour, band)
+    return found['rows'], found['my_row'], found['humans'], found['attempts']
 
 
 def tables(tour=None):

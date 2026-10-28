@@ -648,6 +648,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-land-sc { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; font-size: 14.5px; }
 .vp-land-tm { font-variant-numeric: tabular-nums; color: var(--text2); text-align: right; font-size: 13px; }
 .vp-land-row.is-me { background: var(--accent-tint); outline: 1px solid var(--accent); outline-offset: -1px; }
+.is-nocls > .vp-land-row { grid-template-columns: 32px minmax(0, 1fr) 56px 52px; }
 /* Медаль мест 1–3 — общий `game/_medal.html`, цвет токеном места. */
 .vp-land-pl .gb-medal { display: inline-grid; place-items: center; width: 20px; height: 20px; }
 .vp-land-pl .gb-medal svg { width: 20px; height: 20px; }
@@ -780,6 +781,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-land-board { padding: 16px 16px 14px; }
   .vp-land-rows { overflow: visible; flex: none; }
   .vp-land-row { grid-template-columns: 28px minmax(0, 1fr) 42px 50px 48px; gap: 6px; }
+  .is-nocls > .vp-land-row { grid-template-columns: 28px minmax(0, 1fr) 50px 48px; }
   .vp-land-cell { grid-template-columns: 1fr; padding: 12px 14px; }
   .vp-land-ca { grid-column: 1; grid-row: auto; margin-top: 6px; }
   .vp-land-cv, .vp-land-cs { white-space: normal; }
