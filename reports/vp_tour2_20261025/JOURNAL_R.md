@@ -171,3 +171,43 @@ Notion прочитан: R1 `404b11c9…5224` (переведена в «В ра
 | `with_band` всегда дописывает класс | `test_card_meta_and_band_once_on_result` |
 
 **Конец запуска 1 по ориентиру промпта (фазы −1…4). Следующее — фаза 5.**
+
+## Фаза 5. Результат: данные и «Показать ответ» — ЗАКРЫТА (коммиты `4330afd5`, `+1`)
+
+* `review.format_losses(attempt)` → `points`, `items` (`number`, `given`, `fix` — `_number_fix` или
+  эталон), `with_fix`, `number_lost` (всего недобрано в задачах с числом — для «Из N баллов…, M –
+  запись ответа»). На фикстуре: 25 баллов, пять пар (9: 98.0 → 98,0; 11: -0.12 → -0,12; 13: 11 800 →
+  11800; 14: 160 ед → 160; 17: 1,607 → 1,61), `with_fix` 30, `number_lost` 65.
+* Строки `tests_review` += `status` (`ok`/`mid`/`fmt`/`bad`/`none`; `tone` не тронут), `lead` (начало
+  условия без `[[k]]`), `given_text` / `right_text` («6 из 8 пропусков», «3 из 4 строк», «в разборе»,
+  у неотвеченного «–» и пусто), `group`, `letters`, `shared` (общее условие у второй задачи группы);
+  `match_rows` += `chosen_letter`, `right_letter`. `review.match_letters` перенесена из `views`
+  (одна на прохождение и разбор). `review.STATUS_FILTERS`, `status_counts` → Все 18 / Ошибки 0 /
+  Формат 5 / Без ответа 12 / Верно 1.
+* `views.result` (только владельцу): `format_losses`, `status_filters`, `own_attempts` (свои сданные
+  по варианту, «эта попытка»), `place` (`board.place_of`), `board_url` (`/vp/?board=10`),
+  `invite_url` (`config.VP_INVITE_URL = ''`); `_mark_groups` по строкам разбора.
+* `practice_check`: `{"item", "reveal": true}` → `{"right", "solution"}` без проверки; обычная
+  проверка тоже отдаёт `solution`; охраны те же (владелец, сданная, ничего не пишет).
+  `_practice.html` — кнопка «Показать ответ», `result.js` — `reveal()`, решение текстом +
+  `renderMathIn`, событие `vp_practice_reveal`.
+* Змейка 1 тура: `statement` у каждого слова.
+* Тесты `vp/tests/test_r_review.py` (9). `manage.py test vp`: 436 → 444, OK (`skipped=1`).
+
+Изменённые старые тесты:
+* `test_review.py::test_stranger_gets_no_review_rows_in_the_context` — в список ключей, которых нет у чужого, добавлены `format_losses`, `status_filters`, `own_attempts`, `place`, `board_url` (промпт; проверка стала строже).
+* `test_review.py::test_11_checks_on_the_fly_and_writes_nothing` и `test_tour2_review.py::test_number_gaps_and_matching_by_the_same_rules` — ответ `practice_check` теперь с `solution` (промпт: «расширь»).
+
+| Дефект | Покраснело |
+|---|---|
+| потеря записи без `would_be_correct` | `test_wrong_number_in_wrong_format_is_not_a_format_loss` (сначала мутант ЖИЛ — тест добавлен) |
+| `fix` без эталона | `test_format_losses_and_counters` |
+| нет статуса `ok` | `test_format_losses_and_counters`, `test_rows_texts` |
+| «Ошибки» считают и формат | `test_format_losses_and_counters` |
+| решение неотвеченного в данных | `test_rows_texts` (сначала мутант ЖИЛ: шаблон его не печатал — проверка перенесена в данные) |
+| верные варианты неотвеченного в данных | `test_rows_texts` |
+| `reveal` не работает | `test_reveal_gives_answer_and_solution_and_writes_nothing` |
+| `practice_check` по несданной | `test_reveal_is_for_the_owner_of_a_submitted_attempt_only` |
+| определение только у пустых слов змейки | `test_answered_word_has_its_definition` |
+| нет `shared` | `test_rows_texts` |
+| нет места | `test_owner_side_column_data` |
