@@ -10,13 +10,14 @@ import re
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from vp import views
 from vp.models import VPAnswer, VPAttempt
 from vp.tests.helpers import load_demo, make_full_variant
+from vp.tests.test_rfix_phone import STYLES, _rule
 
 User = get_user_model()
 
@@ -112,3 +113,11 @@ class ArchiveResultTests(TestCase):
         html = self.client.get(self.current_url).content.decode()
         self.assertIn('<span class="vp-ztag">до сотых</span>', html)
         self.assertNotIn('>знаки<', html)
+
+
+class LandingCaptionStyleTests(SimpleTestCase):
+    def test_caption_may_take_two_lines(self):
+        # В одну строку многоточие резало главное: «…потеряно 25 ба…», «… · 00:…».
+        rule = _rule(STYLES.read_text(encoding='utf-8'), '.vp-land-cs')
+        self.assertEqual(rule.get('-webkit-line-clamp'), '2')
+        self.assertNotIn('white-space', rule)
