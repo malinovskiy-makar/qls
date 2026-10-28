@@ -97,10 +97,55 @@
   </form>
   <p class="vp-gate-fine">Письма нет? Загляните в «Спам».</p>
 
+  {% elif wall.screen == 'nosub' %}
+  {# 03: бот видит аккаунт, подписки нет (или Telegram не ответил). Опроса здесь нет — есть кнопка. #}
+  <h2 id="vp-wall-h">Осталось подписаться на канал</h2>
+  {% if wall.tg == 'error' %}
+  <div class="vp-wall-alert" role="alert">Не получилось проверить подписку – Telegram не ответил. Попробуйте через минуту.</div>
   {% else %}
-  {# 01: Telegram — главный путь. #}
-  <h2 id="vp-wall-h">Подключите Telegram, чтобы начать</h2>
-  <p>Тренажёр бесплатный. Взамен просим подписку на наш канал <a class="vp-link" href="{{ wall.channel_url }}" target="_blank" rel="noopener">@{{ wall.channel }}</a>: там разборы задач и всё про «Высшую пробу».</p>
-  {% if wall.mail_link %}<p class="vp-wall-alt">Telegram не открывается? <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердить почтой</a></p>{% endif %}
+  <div class="vp-wall-warn">
+    <b>Бот видит ваш аккаунт, но подписки нет</b>
+    <span>{% if wall.tg_username %}Аккаунт <b class="ym-hide-content">@{{ wall.tg_username }}</b> ещё не подписан на @{{ wall.channel }}.{% else %}Ваш аккаунт Telegram ещё не подписан на @{{ wall.channel }}.{% endif %}</span>
+  </div>
+  {% endif %}
+  <a class="vp-btn vp-btn--lg vp-wall-main" href="{{ wall.channel_url }}" target="_blank" rel="noopener">Подписаться на @{{ wall.channel }}</a>
+  <form method="post" action="{{ wall.urls.check }}">{% csrf_token %}<button type="submit" class="vp-btn vp-btn--plain vp-wall-main">Я подписался – проверить</button></form>
+  <form method="post" action="{{ wall.urls.tg }}" target="_blank" class="vp-wall-alt">
+    {% csrf_token %}Не тот аккаунт? <button type="submit" class="vp-wall-linkbtn">Подключить другой Telegram</button>.{% if wall.mail_link %} Или <a class="vp-link" href="{{ wall.urls.email_screen }}">подтвердите почту</a> вместо Telegram.{% endif %}
+  </form>
+
+  {% else %}
+  {# 01: Telegram — главный путь. 02 лежит рядом скрытым: скрипт переключает на него без перезагрузки. #}
+  <section class="vp-wall-screen" data-screen="tg"{% if wall.screen == 'waiting' %} hidden{% endif %}>
+    <h2 id="vp-wall-h">Подключите Telegram, чтобы начать</h2>
+    <p>Тренажёр бесплатный. Взамен просим подписку на наш канал <a class="vp-link" href="{{ wall.channel_url }}" target="_blank" rel="noopener">@{{ wall.channel }}</a>: там разборы задач и всё про «Высшую пробу».</p>
+    <div class="vp-wall-how">
+      <ol>
+        <li>Нажмите кнопку – откроется бот Weconomics.</li>
+        <li>Подпишитесь на канал и нажмите в боте «Старт».</li>
+        <li>Вернитесь сюда – страница обновится сама.</li>
+      </ol>
+      <noscript><p class="vp-wall-quiet">После «Старт» в боте обновите эту страницу.</p></noscript>
+      {% if wall.tg_often %}<div class="vp-wall-alert" role="alert">Слишком много попыток. Попробуйте через {{ wall.tg_often }} мин.</div>{% endif %}
+      <form method="post" action="{{ wall.urls.tg }}" target="_blank" data-tg-open>
+        {% csrf_token %}
+        <button type="submit" class="vp-btn vp-btn--lg vp-wall-main vp-wall-tg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.7 3.05a.5.5 0 0 0-.68.63l2.84 7.62a2 2 0 0 1 0 1.4l-2.84 7.62a.5.5 0 0 0 .68.63l18-8.5a.5.5 0 0 0 0-.9z"/><path d="M6 12h16"/></svg> Подключить Telegram</button>
+      </form>
+    </div>
+    {% if wall.mail_link %}<p class="vp-wall-alt">Telegram не открывается? <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердить почтой</a></p>{% endif %}
+    <p class="vp-gate-fine">Нажимая кнопку, вы соглашаетесь с <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политикой обработки персональных данных</a>. Мы храним номер вашего аккаунта в Telegram, чтобы проверить подписку и чтобы бот мог вам написать.</p>
+  </section>
+  <section class="vp-wall-screen" data-screen="waiting" data-poll="{{ wall.urls.state }}"{% if wall.screen != 'waiting' %} hidden{% endif %}>
+    <h2>Бот открылся в Telegram</h2>
+    <div class="vp-wall-wait">
+      <span class="vp-wall-spin" aria-hidden="true"></span>
+      <b>Ждём подтверждения из Telegram</b>
+      <span>Нажмите в боте «Старт». Как только бот проверит подписку, эта страница обновится сама.</span>
+    </div>
+    <form method="post" action="{{ wall.urls.tg }}" target="_blank">{% csrf_token %}<button type="submit" class="vp-btn vp-btn--plain vp-wall-main">Открыть бота ещё раз</button></form>
+    <form method="post" action="{{ wall.urls.check }}">{% csrf_token %}<button type="submit" class="vp-btn vp-btn--plain vp-wall-main">Я нажал «Старт» – проверить</button></form>
+    {% if wall.mail_link %}<div class="vp-wall-note">Telegram не открывается или долго грузится? В России он работает с перебоями. <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердите почту</a> – это тоже открывает вариант.</div>{% endif %}
+    <p class="vp-gate-fine">Не закрывайте эту вкладку: после подтверждения вы вернётесь сюда, к варианту.</p>
+  </section>
   {% endif %}
 </dialog>

@@ -11,23 +11,36 @@ Telegram к аккаунту, который уже вошёл и получил
 ⚠️ СО СТЕНЫ СОГЛАСИЕ НА РАССЫЛКУ ТОЛЬКО ДАЁТСЯ, НИКОГДА НЕ ОТЗЫВАЕТСЯ. Галочка
 по желанию и не отмечена заранее; неотмеченная галочка ничего не отбирает.
 """
+import hmac
+import json
+import logging
+import secrets
+import time
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import Http404, HttpResponseBadRequest
+from django.http import Http404, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import urlencode
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 
 from legal import consent
 from problems import email_codes
 from problems.email_codes import Purpose
 from problems.models_legal import ConsentRecord
-from vp import landing, tracking, wall
-from vp.models import VPWall
+from vp import bot, landing, telegram, tracking, wall
+from vp.models import VPTelegramLink, VPTelegramToken, VPWall
 from vp.views import _variant_or_404, _wall_url
+
+hook_logger = logging.getLogger('vp.bot')
 
 #: Почта, на которую ушёл код со стены: `{'email', 'mail_consent', 'slug'}`.
 SESSION_EMAIL = 'vp_wall_email'
@@ -194,6 +207,8 @@ def wall_window(request, variant, attempt):
     else:
         tg = wall.tg_state(user)
         screen = {'no_sub': 'nosub', 'error': 'nosub', 'waiting': 'waiting'}.get(tg, 'tg')
+    link = VPTelegramLink.objects.filter(user=user).only('tg_username').first()
+    often = _tg_wait_minutes(user) if request.GET.get('tg') == 'often' else 0
     nxt = request.session.get(wall.SESSION_NEXT) or {}
     with_timer = nxt.get('with_timer', True) if nxt.get('slug') == variant.slug else True
     intro_url = reverse('vp:intro', args=[variant.slug])
@@ -206,6 +221,8 @@ def wall_window(request, variant, attempt):
         'paths': paths,
         'mail_link': paths['email'],
         'tg': tg,
+        'tg_username': link.tg_username if link else '',
+        'tg_often': often,
         'note': note,
         'verified': verified,
         'email': user.email if verified else '',
@@ -226,5 +243,138 @@ def wall_window(request, variant, attempt):
             'other_email': '/account/email/?%s' % urlencode(
                 {'next': _wall_url(variant.slug, 'email'), 'src': 'vp'}),
             'intro': intro_url,
+            'tg': reverse('vp:wall_tg', args=[variant.slug]),
+            'check': reverse('vp:wall_check', args=[variant.slug]),
+            'state': '%s?%s' % (reverse('vp:wall_state'), urlencode({'v': variant.slug})),
         },
     }
+
+
+# ------------------------------------------------------------------ Telegram
+
+#: Код привязки в сессии: `{'token', 'slug', 'at'}` — повторный клик по тому же
+#: варианту в течение `TOKEN_TTL` отдаёт ТОТ ЖЕ код (в базе только отпечаток).
+SESSION_TG = 'vp_wall_tg'
+#: Не больше стольких новых кодов на человека в час.
+TG_TOKENS_PER_HOUR = 10
+#: Кнопка «проверить» — не чаще раза в столько секунд на человека.
+CHECK_EVERY = 5
+#: Вебхук: тело больше этого — 400; повтор `update_id` не обрабатывается сутки.
+HOOK_MAX_BYTES = 64 * 1024
+HOOK_DEDUP_SECONDS = 24 * 3600
+
+
+def _tg_wait_minutes(user):
+    """Через сколько минут можно взять новый код, если лимит часа выбран; 0 — можно."""
+    hour_ago = timezone.now() - timedelta(hours=1)
+    recent = VPTelegramToken.objects.filter(user=user, created_at__gt=hour_ago)
+    if recent.count() < TG_TOKENS_PER_HOUR:
+        return 0
+    oldest = recent.order_by('created_at').first()
+    left = (oldest.created_at + timedelta(hours=1) - timezone.now()).total_seconds()
+    return email_codes.minutes(max(1, int(left)))
+
+
+@require_POST
+def wall_tg(request, slug):
+    """«Подключить Telegram»: 302 на `https://t.me/<бот>?start=<код>`. Форма с
+    `target="_blank"` — бот открывается в новой вкладке, окно ждёт «Старт».
+
+    Именно POST: в проекте GET ничего не пишет в базу.
+    """
+    if not request.user.is_authenticated:
+        return redirect_to_login(_wall_url(slug), '/login/')
+    variant = _wall_variant(request, slug)
+    if not telegram.enabled():
+        raise Http404
+    user = request.user
+    if wall.step(user) != 'contact':
+        return redirect(_wall_url(variant.slug))
+    kept = request.session.get(SESSION_TG) or {}
+    token = ''
+    if (kept.get('slug') == variant.slug
+            and time.time() - kept.get('at', 0) < wall.TOKEN_TTL.total_seconds()
+            and VPTelegramToken.objects.filter(
+                user=user, token_hash=bot.token_hash(kept.get('token', '')),
+                used_at__isnull=True).exists()):
+        token = kept['token']
+    if not token:
+        if _tg_wait_minutes(user):
+            return redirect(_wall_url(variant.slug, tg='often'))
+        token = secrets.token_urlsafe(24)
+        VPTelegramToken.objects.create(user=user, token_hash=bot.token_hash(token),
+                                       slug=variant.slug)
+        request.session[SESSION_TG] = {'token': token, 'slug': variant.slug, 'at': time.time()}
+        tracking.defer(request, 'vp_wall_tg_click', variant=variant.slug)
+    return redirect('https://t.me/%s?start=%s' % (settings.TELEGRAM_BOT_USERNAME, token))
+
+
+@require_POST
+def wall_check(request, slug):
+    """«Я подписался – проверить» / «Я нажал «Старт» – проверить»: подписка ещё раз."""
+    if not request.user.is_authenticated:
+        return redirect_to_login(_wall_url(slug), '/login/')
+    variant = _wall_variant(request, slug)
+    user = request.user
+    link = VPTelegramLink.objects.filter(user=user).first()
+    if (link is not None and wall.step(user) == 'contact'
+            and cache.add('vp:wall:check:%d' % user.pk, 1, CHECK_EVERY)):
+        subscribed = bot.check_link(link)
+        if subscribed:
+            tracking.defer(request, 'vp_wall_tg_ok', variant=variant.slug)
+        elif subscribed is False:
+            tracking.defer(request, 'vp_wall_tg_nosub', variant=variant.slug)
+    return redirect(_wall_url(variant.slug))
+
+
+@never_cache
+@require_GET
+def wall_state(request):
+    """JSON для опроса со страницы (экран 02): шаг стены и путь Telegram.
+
+    Вариант — через `_variant_or_404`: по ответу нельзя перебирать скрытые слаги.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=403)
+    _variant_or_404(request, request.GET.get('v', ''))
+    user = request.user
+    link = VPTelegramLink.objects.filter(user=user).only('tg_username').first()
+    return JsonResponse({'step': wall.step(user), 'tg': wall.tg_state(user),
+                         'tg_username': link.tg_username if link else ''})
+
+
+@csrf_exempt
+@require_POST
+def tg_hook(request):
+    """Вебхук бота. ⚠️ СЕКРЕТ НЕ ЗАДАН — ВСЕГДА 403: пустой секрет открыл бы вебхук всем.
+
+    Заголовок `X-Telegram-Bot-Api-Secret-Token` сравнивается по байтам за постоянное
+    время. Ошибка обработки — в лог (без тела) и всё равно 200: иначе Telegram
+    засыпал бы повторами.
+    """
+    secret = getattr(settings, 'TELEGRAM_WEBHOOK_SECRET', '')
+    given = request.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
+    if not secret or not hmac.compare_digest(given.encode('utf-8'), secret.encode('utf-8')):
+        return HttpResponseForbidden()
+    try:
+        length = int(request.META.get('CONTENT_LENGTH') or 0)
+    except ValueError:
+        length = HOOK_MAX_BYTES + 1
+    if length > HOOK_MAX_BYTES or len(request.body) > HOOK_MAX_BYTES:
+        return HttpResponseBadRequest()
+    try:
+        update = json.loads(request.body.decode('utf-8'))
+    except (UnicodeDecodeError, ValueError):
+        return HttpResponseBadRequest()
+    if not isinstance(update, dict):
+        return HttpResponseBadRequest()
+    update_id = update.get('update_id')
+    if update_id is not None and not cache.add('vp:tg:update:%s' % update_id, 1,
+                                               HOOK_DEDUP_SECONDS):
+        return JsonResponse({'ok': True})
+    try:
+        bot.handle(update)
+    except Exception as error:  # noqa: BLE001 — Telegram не должен получить 500
+        hook_logger.warning('Бот: обновление %s (%s) — %s', update_id,
+                            bot.update_kind(update), type(error).__name__)
+    return JsonResponse({'ok': True})
