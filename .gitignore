@@ -527,3 +527,7 @@ deploy/env.loadtest
 !reports/mail_s1_20261026/
 reports/mail_s1_20261026/*
 !reports/mail_s1_20261026/JOURNAL.md
+# Журнал сессии стены ВП (29.10.2026)
+!reports/vp_wall_20261029/
+reports/vp_wall_20261029/*
+!reports/vp_wall_20261029/JOURNAL.md
