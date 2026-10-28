@@ -85,7 +85,7 @@
     if (!button) return;
     var field = document.getElementById('vp-drill-' + button.getAttribute('data-pm-drill'));
     if (!field) return;
-    field.value = /^[-−‒–—﹣－]/.test(field.value)
+    field.value = /^[-\u2212\u2012\u2013\u2014\ufe63\uff0d]/.test(field.value)
       ? field.value.slice(1) : '-' + field.value;
     field.focus();
   });
