@@ -81,8 +81,9 @@ def chain_review(attempt):
         rows.append({
             'item': item,
             'number': item.number,
-            # Условие нужно только там, где его будут дорешивать (пустое задание).
-            'statement': item.statement if blank else '',
+            # Определение — у каждого слова (разбор видит только владелец): в архиве 1 тура
+            # чип раскрывает определение, ответ и эталон (эталон — только отвеченному).
+            'statement': item.statement,
             'prefix': item.prefix, 'suffix': item.suffix,
             'mine': '' if blank else str(raw).strip(),
             'right': '' if blank else item.answer,
@@ -145,13 +146,127 @@ def _number_fix(explain):
     return fixed if scoring.NUMBER_FORMAT.fullmatch(fixed) else ''
 
 
+_LETTER_PREFIX = re.compile(r'^\s*([А-ЯЁA-Z])\s*[–—-]\s*(.+)$', re.S)
+_LETTERS = 'АБВГДЕЖЗИКЛМН'
+
+
+def match_letters(options):
+    """Варианты соотнесения → буквы: «А – абсолютная бедность» → «А» и «абсолютная
+    бедность»; без такого префикса — буква по порядку, подпись — весь текст. Одна на
+    раздел: кнопки А/Б в прохождении и «ваш: Б / верно: А» в разборе."""
+    result = []
+    for index, option in enumerate(options):
+        found = _LETTER_PREFIX.match(option['text'])
+        letter, label = (found.group(1), found.group(2).strip()) if found else (
+            _LETTERS[index] if index < len(_LETTERS) else str(index + 1), option['text'])
+        result.append({'n': option['n'], 'letter': letter, 'label': label})
+    return result
+
+
+def _option_list(item):
+    return [{'n': o['n'], 'text': o['text']} for o in (item.options or [])
+            if isinstance(o, dict) and 'n' in o]
+
+
 def _match_rows(item, explain):
-    """Строки разбора сопоставления: подпись, выбранное и верное СЛОВАМИ, верно ли."""
+    """Строки разбора сопоставления: подпись, выбранное и верное СЛОВАМИ и буквой, верно ли."""
     texts, labels = _option_texts(item), match_labels(item)
+    letters = {o['n']: o['letter'] for o in match_letters(_option_list(item))}
     return [{'key': p['key'], 'label': labels.get(p['key'], p['key']),
              'chosen': texts.get(p['chosen'], '') if p['chosen'] is not None else '',
-             'right': texts.get(p['right'], ''), 'ok': p['ok']}
+             'chosen_letter': letters.get(p['chosen'], '') if p['chosen'] is not None else '',
+             'right': texts.get(p['right'], ''), 'right_letter': letters.get(p['right'], ''),
+             'ok': p['ok']}
             for p in explain['pairs']]
+
+
+def _from_n(n, one, many):
+    """«из 1 строки», «из 4 строк»: после «из N» существительное согласуется с N."""
+    return one if n % 10 == 1 and n % 100 != 11 else many
+
+
+#: Сколько символов начала условия показывает строка таблицы разбора.
+LEAD_MAX = 90
+
+
+def _lead(statement):
+    """Начало условия для строки таблицы: без меток `[[k]]`, в одну строку."""
+    text = ' '.join(GAP_MARK.sub('…', statement or '').split())
+    if len(text) <= LEAD_MAX:
+        return text
+    return text[:LEAD_MAX].rsplit(' ', 1)[0] + '…'
+
+
+def _status(item, answer, blank, explain):
+    """Статус строки разбора: `ok` — полный балл, `mid` — часть, `fmt` — 0 за формат при
+    верном числе, `bad` — прочие нули с ответом, `none` — без ответа. Значки карты:
+    ✓ ½ Ф ✕ «–»."""
+    if blank:
+        return 'none'
+    score = answer.score if answer.score is not None else _ZERO
+    if score >= item.points:
+        return 'ok'
+    if score > 0:
+        return 'mid'
+    if explain and explain['kind'] == 'number' and explain['format_error'] \
+            and explain['would_be_correct']:
+        return 'fmt'
+    return 'bad'
+
+
+def _given_and_right(item, raw, blank, explain, chosen, correct):
+    """«Ваш ответ» и «верный» для строки таблицы: число — как введено; тест — «1, 4, 5»;
+    пропуски — «6 из 8 пропусков»; соотнесение — «3 из 4 строк»; верный у пропусков и
+    соотнесения — «в разборе», у неотвеченного — пусто (эталон не в HTML)."""
+    if blank:
+        return '–', ''
+    if explain and explain['kind'] == 'match':
+        hit, total = explain['hit'], explain['total']
+        noun = (_from_n(total, 'пропуска', 'пропусков') if item.block == VPItem.Block.GAPTEXT
+                else _from_n(total, 'строки', 'строк'))
+        return f'{hit} из {total} {noun}', 'в разборе'
+    if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER):
+        return str(raw).strip(), item.answer
+    return ', '.join(str(n) for n in chosen), ', '.join(str(n) for n in correct)
+
+
+STATUS_FILTERS = (
+    ('all', 'Все'), ('errors', 'Ошибки'), ('fmt', 'Формат'), ('none', 'Без ответа'),
+    ('ok', 'Верно'),
+)
+
+
+def status_counts(rows):
+    """Числа у фильтров разбора: Все, Ошибки (`mid` + `bad`), Формат, Без ответа, Верно."""
+    statuses = [r['status'] for r in rows]
+    return {'all': len(statuses),
+            'errors': sum(1 for s in statuses if s in ('mid', 'bad')),
+            'fmt': statuses.count('fmt'), 'none': statuses.count('none'),
+            'ok': statuses.count('ok')}
+
+
+def format_losses(attempt):
+    """Сколько баллов потеряно на ЗАПИСИ ответа: отвеченные задачи с числом, где формат
+    не тот, а само число верно (`would_be_correct`). `items` — `number`, `given` (как
+    введено), `fix` (как надо: `_number_fix`, а если его нет — эталон). `with_fix` — каким
+    был бы балл при верной записи. `number_lost` — всего недобрано в задачах с числом.
+    Только владельцу: здесь эталоны."""
+    answers = _answers(attempt)
+    points, lost, items = _ZERO, _ZERO, []
+    for item in attempt.variant.items.filter(kind=VPItem.Kind.NUMBER).order_by('number'):
+        answer = answers.get(item.pk)
+        raw = answer.raw if answer else None
+        got = answer.score if answer is not None and answer.score is not None else _ZERO
+        lost += item.points - got
+        if scoring.is_blank(raw):
+            continue
+        explain = scoring.explain_item(item, raw)
+        if explain['format_error'] and explain['would_be_correct']:
+            points += item.points - got
+            items.append({'number': item.number, 'given': explain['given'],
+                          'fix': _number_fix(explain) or item.answer})
+    return {'points': points, 'items': items,
+            'with_fix': (attempt.score or _ZERO) + points, 'number_lost': lost}
 
 
 def gap_chunks(text):
@@ -181,11 +296,19 @@ def tests_review(attempt):
         chosen = [] if blank else _numbers(raw)
         correct = [] if blank else _numbers(item.correct)
         explain = None if blank else scoring.explain_item(item, raw)
+        given_text, right_text = _given_and_right(item, raw, blank, explain, chosen, correct)
         rows.append({
             'item': item,
             'number': item.number,
             'block_title': blocks.TITLES.get(item.block, {}).get('short', item.block),
             'statement': item.statement,
+            'lead': _lead(item.statement),
+            'status': _status(item, answer, blank, explain),
+            'given_text': given_text,
+            'right_text': right_text,
+            'group': item.group,
+            'letters': (match_letters(_option_list(item))
+                        if item.block == VPItem.Block.MATCHING else []),
             'kind': item.kind,
             'options': [{'n': o['n'], 'text': o['text'],
                          'chosen': o['n'] in chosen, 'right': o['n'] in correct}
@@ -211,6 +334,18 @@ def tests_review(attempt):
             'figure': item.figure, 'figure_caption': item.figure_caption,
             'figure_source': item.figure_source, 'table_html': item.table_html,
         })
+    # Пара с общим условием: у второй и следующих задач группы — условие первой.
+    first = {}
+    for row in rows:
+        if row['group'] is None:
+            continue
+        if row['group'] not in first:
+            first[row['group']] = row
+        else:
+            lead = first[row['group']]
+            row['shared'] = {'number': lead['number'], 'statement': lead['statement'],
+                             'table_html': lead['table_html'], 'figure': lead['figure'],
+                             'figure_caption': lead['figure_caption']}
     return rows
 
 

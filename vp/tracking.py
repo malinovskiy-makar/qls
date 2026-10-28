@@ -14,7 +14,8 @@
   vp_submit — сдал: variant, score, answered, seconds_used, auto — один раз на попытку
               на браузер (первое открытие её результата владельцем);
   vp_result_open — открыл результат: variant, own — каждое открытие;
-  vp_share_click, vp_practice_check — шлёт `static/vp/js/result.js` (клик, проверка).
+  vp_share_click, vp_practice_check, vp_practice_reveal — шлёт `static/vp/js/result.js`
+              (клик, проверка, «Показать ответ»): variant, item.
 `variant` — слаг варианта. Воронку считает `vp.funnel`.
 """
 SESSION_PENDING = 'vp_events'

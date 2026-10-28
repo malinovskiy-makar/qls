@@ -123,8 +123,11 @@ class Tour2PracticeTests(TestCase):
 
     def test_number_gaps_and_matching_by_the_same_rules(self):
         before = list(VPAnswer.objects.values_list('id', 'raw', 'score'))
-        self.assertEqual(self.check(5, '25000'), (200, {'is_correct': True, 'right': '25000'}))
-        self.assertEqual(self.check(5, '25 000'), (200, {'is_correct': False, 'right': '25000'}))
+        solution = self.variant.items.get(number=5).solution      # сессия R: и решение
+        self.assertEqual(self.check(5, '25000'),
+                         (200, {'is_correct': True, 'right': '25000', 'solution': solution}))
+        self.assertEqual(self.check(5, '25 000'),
+                         (200, {'is_correct': False, 'right': '25000', 'solution': solution}))
         self.assertEqual(self.check(17, '1,610')[1]['is_correct'], False)   # три знака
         self.assertEqual(self.check(17, '1,61')[1]['is_correct'], True)
         status, data = self.check(4, {'1': 2, '2': 1, '3': 2, '4': 2})

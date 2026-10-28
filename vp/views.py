@@ -22,7 +22,6 @@
 """
 import json
 import logging
-import re
 import secrets
 from datetime import timedelta
 
@@ -597,22 +596,6 @@ def _figure_url(path):
         return ''
 
 
-_LETTER_PREFIX = re.compile(r'^\s*([А-ЯЁA-Z])\s*[–—-]\s*(.+)$', re.S)
-_LETTERS = 'АБВГДЕЖЗИКЛМН'
-
-
-def match_letters(options):
-    """Варианты соотнесения → буквы для кнопок А/Б: «А – абсолютная бедность» → «А» и
-    «абсолютная бедность»; без такого префикса — буква по порядку, подпись — весь текст."""
-    result = []
-    for index, option in enumerate(options):
-        found = _LETTER_PREFIX.match(option['text'])
-        letter, label = (found.group(1), found.group(2).strip()) if found else (
-            _LETTERS[index] if index < len(_LETTERS) else str(index + 1), option['text'])
-        result.append({'n': option['n'], 'letter': letter, 'label': label})
-    return result
-
-
 def _row(item, raw):
     """Задание для страницы прохождения — ТОЛЬКО то, что участнику можно видеть.
 
@@ -657,7 +640,7 @@ def _row(item, raw):
         # Строка соотнесения №i — ключ «i» в ответе (так их проверяет загрузчик).
         rows = [{'key': str(i), 'text': text, 'value': given.get(str(i))}
                 for i, text in enumerate(item.rows or [], start=1)]
-        letters = match_letters(options)
+        letters = review.match_letters(options)
     text = ''
     if item.kind in (VPItem.Kind.SHORT_TEXT, VPItem.Kind.NUMBER) and isinstance(raw, str):
         text = raw
@@ -967,10 +950,30 @@ def result(request, code):
         tests = review.tests_review(attempt)
         for row in tests:
             row['figure_url'] = _figure_url(row['figure'])
+            if row.get('shared'):
+                row['shared']['figure_url'] = _figure_url(row['shared']['figure'])
+        _mark_groups(tests)
+        counts = review.status_counts(tests)
+        # Свои попытки по ЭТОМУ варианту (боковая колонка): у гостя-владельца — только эта.
+        own = ([attempt] if attempt.user_id is None else list(
+            VPAttempt.objects.filter(user_id=attempt.user_id, variant=attempt.variant,
+                                     submitted_at__isnull=False)
+            .order_by('-started_at', '-id')))
+        place = board.place_of(attempt)
+        band = '' if attempt.variant.tour == 1 else attempt.variant.grade_band
         context.update(
             chain=review.chain_review(attempt), tests=tests,
             practice_url=reverse('vp:practice', args=[code]),
-            offer_signup=not request.user.is_authenticated)
+            offer_signup=not request.user.is_authenticated,
+            format_losses=review.format_losses(attempt),
+            status_filters=[{'code': c, 'label': label, 'count': counts[c]}
+                            for c, label in review.STATUS_FILTERS],
+            own_attempts=[{'attempt': a, 'is_this': a.pk == attempt.pk,
+                           'seconds': board.spent_seconds(a)} for a in own],
+            place=place,
+            board_url=(reverse('vp:index') + (f'?board={band}' if band else '')
+                       if place else ''),
+            invite_url=config.VP_INVITE_URL)
     else:
         # ⚠️ ВЛАДЕЛЬЦА НЕ НАЗЫВАЕМ НИКОМУ, КРОМЕ НЕГО САМОГО — ни имя, ни логин, вошёл
         # автор или нет (ADR 0127, отмена части ADR 0126). Ссылка открывается кем угодно,
@@ -984,7 +987,9 @@ def result(request, code):
 
 @require_POST
 def practice_check(request, code):
-    """«Дорешать вне зачёта»: проверка ответа на лету, `{"item": 27, "raw": "…"}`.
+    """«Дорешать вне зачёта»: проверка ответа на лету, `{"item": 27, "raw": "…"}` →
+    `{"is_correct", "right", "solution"}`; «Показать ответ» — `{"item": 27, "reveal": true}`
+    → `{"right", "solution"}` без проверки.
 
     ⚠️ НИЧЕГО НЕ ПИШЕТ: ни `VPAnswer`, ни балл попытки. Только владельцу и только по
     СДАННОЙ попытке (иначе 404, как чужая): балл уже записан и не меняется. Доступ
@@ -1005,6 +1010,9 @@ def practice_check(request, code):
         item = attempt.variant.items.filter(number=number).first()
     if item is None:
         return _json({'error': 'Нет такого задания'}, status=400)
+    if body.get('reveal') is True:
+        # «Показать ответ»: эталон и решение без проверки ответа. Тоже ничего не пишет.
+        return _json({'right': review.right_answer(item), 'solution': item.solution})
     try:
         cleaned = answers.clean_answer(item, body.get('raw'))
     except answers.AnswerError as error:
@@ -1012,4 +1020,5 @@ def practice_check(request, code):
     if cleaned is None:
         return _json({'error': 'Пустой ответ'}, status=400)
     _, is_correct = scoring.score_item(item, cleaned)
-    return _json({'is_correct': bool(is_correct), 'right': review.right_answer(item)})
+    return _json({'is_correct': bool(is_correct), 'right': review.right_answer(item),
+                  'solution': item.solution})

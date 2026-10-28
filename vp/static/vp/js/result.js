@@ -84,6 +84,41 @@
     out.className = 'vp-practice-out' + (tone ? ' is-' + tone : '');
   }
 
+  /* Решение приходит с сервера текстом и вставляется как текст (не разметка), формулы — KaTeX. */
+  function showSolution(box, text) {
+    var sol = box.querySelector('[data-practice-sol]');
+    if (!sol) return;
+    sol.textContent = text ? 'Решение: ' + text : '';
+    sol.hidden = !text;
+    if (text && typeof window.renderMathIn === 'function') window.renderMathIn(sol);
+  }
+
+  function post(box, payload) {
+    return fetch(practiceUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      return response.json().then(function (data) { return { ok: response.ok, data: data }; });
+    });
+  }
+
+  /* «Показать ответ»: эталон и решение без проверки. Тоже ничего не пишет. */
+  function reveal(box) {
+    var out = box.querySelector('[data-practice-out]');
+    var item = Number(box.getAttribute('data-item'));
+    show(out, 'Загружаем…', '');
+    post(box, { item: item, reveal: true }).then(function (reply) {
+      if (!reply.ok) { show(out, reply.data.error || 'Не удалось показать.', 'bad'); return; }
+      track('vp_practice_reveal', { variant: variantSlug, item: item });
+      show(out, 'Верный ответ: ' + reply.data.right, '');
+      showSolution(box, reply.data.solution);
+    }).catch(function () {
+      show(out, 'Нет связи. Попробуйте ещё раз.', 'bad');
+    });
+  }
+
   function check(box) {
     var kind = box.getAttribute('data-kind');
     var out = box.querySelector('[data-practice-out]');
@@ -91,18 +126,12 @@
     var empty = kind === 'match' ? !Object.keys(raw).length : (!raw || !raw.length);
     if (empty) { show(out, 'Сначала ответьте.', 'bad'); return; }
     show(out, 'Проверяем…', '');
-    fetch(practiceUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-      credentials: 'same-origin',
-      body: JSON.stringify({ item: Number(box.getAttribute('data-item')), raw: raw })
-    }).then(function (response) {
-      return response.json().then(function (data) { return { ok: response.ok, data: data }; });
-    }).then(function (reply) {
+    post(box, { item: Number(box.getAttribute('data-item')), raw: raw }).then(function (reply) {
       if (!reply.ok) { show(out, reply.data.error || 'Не удалось проверить.', 'bad'); return; }
       track('vp_practice_check', { variant: variantSlug, item: Number(box.getAttribute('data-item')) });
       if (reply.data.is_correct) show(out, 'Верно: ' + reply.data.right, 'ok');
       else show(out, 'Неверно. Верный ответ: ' + reply.data.right, 'bad');
+      showSolution(box, reply.data.solution);
     }).catch(function () {
       show(out, 'Нет связи. Попробуйте ещё раз.', 'bad');
     });
@@ -124,5 +153,7 @@
       event.preventDefault();
       check(box);
     });
+    var revealButton = box.querySelector('[data-practice-reveal]');
+    if (revealButton) revealButton.addEventListener('click', function () { reveal(box); });
   });
 })();

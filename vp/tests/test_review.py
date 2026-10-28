@@ -409,7 +409,8 @@ class ResultViewTests(ReviewBase):
 
     def test_stranger_gets_no_review_rows_in_the_context(self):
         response = Client().get(self.url)
-        for key in ('chain', 'tests', 'practice_url'):
+        for key in ('chain', 'tests', 'practice_url', 'format_losses', 'status_filters',
+                    'own_attempts', 'place', 'board_url'):
             self.assertNotIn(key, response.context, key)
         self.assertFalse(response.context['is_owner'])
 
@@ -585,7 +586,9 @@ class PracticeCheckTests(ReviewBase):
             with self.subTest(item=item, raw=raw):
                 response = self.ask(item, raw)
                 self.assertEqual(response.status_code, 200, response.content)
-                self.assertEqual(response.json(), {'is_correct': is_correct, 'right': right})
+                # Сессия R: ответ несёт и решение (у тестовых заданий оно пустое).
+                self.assertEqual(response.json(), {'is_correct': is_correct, 'right': right,
+                                                   'solution': ''})
                 self.assertEqual(response['Cache-Control'], 'no-store')
         self.assertEqual(VPAnswer.objects.count(), count)
         self.assertEqual(self.snapshot(), before)
