@@ -1153,7 +1153,10 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-zsum:hover { background: var(--surface-2); }
 .vp-zrow[open] > .vp-zsum { background: var(--surface-2); }
 .vp-zn { font-weight: 600; }
-.vp-zq { min-width: 0; display: flex; flex-direction: column; }
+/* Заголовок строки обрезает своё содержимое. `position: relative` обязателен: служебный слой
+   KaTeX `.katex-mathml` позиционирован абсолютно и без него выходит из-под обрезки — на 390 px
+   формула строки 16 растягивала страницу до 649 px. */
+.vp-zq { min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 .vp-zlead { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vp-zq small { font-size: 12px; color: var(--text2); }
 .vp-zgiven { font-weight: 600; overflow-wrap: anywhere; }
@@ -1165,7 +1168,9 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-zscore b { color: var(--text); }
 .vp-zchev::before { content: '▸'; color: var(--accent-ink); display: inline-block; transition: transform var(--t, .12s); }
 .vp-zrow[open] > .vp-zsum .vp-zchev::before { transform: rotate(90deg); }
-.vp-zbody { padding: 4px 18px 18px 52px; display: flex; flex-direction: column; gap: 10px; }
+.vp-zbody { padding: 4px 18px 18px 52px; display: flex; flex-direction: column; gap: 10px; min-width: 0; position: relative; }
+/* Длинная выключная формула листается внутри себя, а не двигает страницу. */
+.vp-zbody .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding-bottom: 2px; }
 .vp-zmeta { font-size: 12px; color: var(--text2); }
 .vp-zbody .vp-tcard-text { margin-top: 0; padding: 12px 14px; border-radius: var(--r-card); background: var(--surface); border: var(--line, 1px) solid var(--border); }
 .vp-zbody .vp-topts, .vp-zbody .vp-tcard-line { margin-top: 0; }
@@ -1339,7 +1344,10 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-res-grid { grid-template-columns: minmax(0, 1fr); }
   .vp-res-act { width: 100%; margin-left: 0; }
   .vp-res-when { text-align: left; }
-  .vp-res-loss { flex-wrap: wrap; }
+  /* Плашка потерь из-за записи ответа (макет 02): всё друг под другом, кнопка на всю ширину внизу. */
+  .vp-res-loss { flex-wrap: wrap; padding: 14px; gap: 10px 12px; }
+  .vp-res-loss-main { flex: 1 1 calc(100% - 42px); }
+  .vp-res-loss > .vp-btn { flex: 1 1 100%; }
   .vp-zmap { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .vp-zcell { width: auto; }
   .vp-zfilters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
@@ -1361,6 +1369,16 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-drill-row .vp-numrow, .vp-drill-out { grid-column: 2; }
   .vp-drill-count { text-align: left; }
   .vp-snake-sum { margin-left: 0; }
+  /* Интро: «Как считается» — второй строкой под названием блока, таблица в ширину экрана. */
+  .vp-intro-card { padding: 4px 16px; }
+  .vp-intro-table, .vp-intro-table thead, .vp-intro-table tbody { display: block; }
+  .vp-intro-table tr { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; border-bottom: 1px solid var(--border-soft); }
+  .vp-intro-table tr:last-child { border-bottom: 0; }
+  .vp-intro-table thead th, .vp-intro-table td { border-bottom: 0; }
+  .vp-intro-table td:first-child { width: auto; }
+  .vp-intro-table th:last-child { display: none; }
+  .vp-intro-table .is-num { padding-right: 0; }
+  .vp-intro-table td.vp-intro-how { grid-column: 2 / -1; padding-top: 0; font-size: 12.5px; font-weight: 400; white-space: normal; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vp-input, .vp-btn { transition: none; }
