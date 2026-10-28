@@ -133,6 +133,47 @@ class LinkTests(TgCase):
         self.assertEqual(self.client.get(reverse('vp:wall_tg', args=[self.variant.slug])).status_code, 405)
 
 
+class AppLinkTests(TgCase):
+    """«Не открылось? Открыть в приложении Telegram»: `app=1` – та же привязка, но `tg://`."""
+
+    def app_post(self, client=None, slug=None):
+        return (client or self.client).post(
+            reverse('vp:wall_tg', args=[slug or self.variant.slug]), {'app': '1'})
+
+    def test_app_redirect_is_tg_scheme_with_the_same_code(self):
+        site_code = self.link_code()
+        response = self.app_post()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'],
+                         'tg://resolve?domain=test_wall_bot&start=' + site_code)
+        self.assertEqual(VPTelegramToken.objects.count(), 1)
+
+    def test_app_first_then_site_button_shares_one_code(self):
+        location = self.app_post()['Location']
+        self.assertEqual(self.link_code(), location.rsplit('start=', 1)[1])
+        self.assertEqual(VPTelegramToken.objects.count(), 1)
+
+    def test_without_app_it_is_still_t_me(self):
+        response = self.client.post(reverse('vp:wall_tg', args=[self.variant.slug]))
+        self.assertTrue(response['Location'].startswith('https://t.me/test_wall_bot?start='))
+        other = self.client.post(reverse('vp:wall_tg', args=[self.variant.slug]), {'app': '0'})
+        self.assertTrue(other['Location'].startswith('https://t.me/'))
+
+    def test_guest_goes_to_login(self):
+        response = self.app_post(client=Client())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response['Location'].startswith('/login/'))
+        self.assertFalse(VPTelegramToken.objects.exists())
+
+    def test_app_link_obeys_the_hourly_limit(self):
+        for i in range(10):
+            VPTelegramToken.objects.create(user=self.user, token_hash='%064d' % i,
+                                           slug=self.variant.slug, used_at=timezone.now())
+        response = self.app_post()
+        self.assertIn('tg=often', response['Location'])
+        self.assertEqual(VPTelegramToken.objects.count(), 10)
+
+
 class HookGuardTests(TgCase):
     @override_settings(TELEGRAM_WEBHOOK_SECRET='')
     def test_empty_secret_closes_the_hook_for_everyone(self):

@@ -179,6 +179,8 @@
       <span>Нажмите в боте «Старт». Как только бот проверит подписку, эта страница обновится сама.</span>
     </div>
     <form method="post" action="{{ wall.urls.tg }}" target="_blank">{% csrf_token %}<button type="submit" class="vp-btn vp-btn--plain vp-wall-main">Открыть бота ещё раз</button></form>
+    {# t.me в России в браузере может не открываться: tg:// открывает приложение сразу. Без target="_blank" – иначе останется пустая вкладка. #}
+    <form method="post" action="{{ wall.urls.tg }}">{% csrf_token %}<input type="hidden" name="app" value="1"><p class="vp-gate-fine">Не открылось? <button type="submit" class="vp-wall-linkbtn">Открыть в приложении Telegram</button></p></form>
     <form method="post" action="{{ wall.urls.check }}">{% csrf_token %}<button type="submit" class="vp-btn vp-btn--plain vp-wall-main">Я нажал «Старт» – проверить</button></form>
     {% if wall.mail_link %}<div class="vp-wall-note">Telegram не открывается или долго грузится? В России он работает с перебоями. <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердите почту</a> – это тоже открывает вариант.</div>{% endif %}
     <p class="vp-gate-fine">Не закрывайте эту вкладку: после подтверждения вы вернётесь сюда, к варианту.</p>

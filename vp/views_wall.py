@@ -22,7 +22,8 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import Http404, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.http import (Http404, HttpResponseBadRequest, HttpResponseForbidden,
+                         HttpResponseRedirect, JsonResponse)
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -279,10 +280,19 @@ def _tg_wait_minutes(user):
     return email_codes.minutes(max(1, int(left)))
 
 
+class TgAppRedirect(HttpResponseRedirect):
+    """302 на `tg://…`: стандартный редирект Django схему `tg` не пускает (DisallowedRedirect)."""
+    allowed_schemes = ['tg']
+
+
 @require_POST
 def wall_tg(request, slug):
     """«Подключить Telegram»: 302 на `https://t.me/<бот>?start=<код>`. Форма с
     `target="_blank"` — бот открывается в новой вкладке, окно ждёт «Старт».
+
+    С `app=1` («Не открылось? Открыть в приложении Telegram») – тот же код, но 302 на
+    `tg://resolve?domain=<бот>&start=<код>`: приложение открывается сразу, без сайта t.me,
+    который в России в браузере может не открываться. Эта форма без `target="_blank"`.
 
     Именно POST: в проекте GET ничего не пишет в базу.
     """
@@ -310,6 +320,9 @@ def wall_tg(request, slug):
                                        slug=variant.slug)
         request.session[SESSION_TG] = {'token': token, 'slug': variant.slug, 'at': time.time()}
         tracking.defer(request, 'vp_wall_tg_click', variant=variant.slug)
+    if request.POST.get('app') == '1':
+        return TgAppRedirect('tg://resolve?domain=%s&start=%s'
+                             % (settings.TELEGRAM_BOT_USERNAME, token))
     return redirect('https://t.me/%s?start=%s' % (settings.TELEGRAM_BOT_USERNAME, token))
 
 

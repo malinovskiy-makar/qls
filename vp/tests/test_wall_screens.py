@@ -64,6 +64,20 @@ class ScreenTableTests(ScreenCase):
         self.assertRegex(html, r'data-screen="tg"\s+hidden')
         self.assertIn('Ждём подтверждения из Telegram', html)
 
+    def test_waiting_has_the_open_in_app_form_without_new_tab(self):
+        VPTelegramToken.objects.create(user=self.user, token_hash='x' * 64, slug=self.variant.slug)
+        html = self.page()
+        self.assertIn('Не открылось?', html)
+        self.assertIn('Открыть в приложении Telegram', html)
+        waiting = html.split('data-screen="waiting"', 1)[1]
+        form = [f for f in waiting.split('<form')[1:] if 'name="app" value="1"' in f]
+        self.assertEqual(len(form), 1)
+        self.assertNotIn('target=', form[0].split('>', 1)[0])
+        # «Открыть бота ещё раз» по-прежнему в новой вкладке и без app.
+        again = [f for f in waiting.split('<form')[1:] if 'Открыть бота ещё раз' in f][0]
+        self.assertIn('target="_blank"', again.split('>', 1)[0])
+        self.assertNotIn('name="app"', again.split('</form>', 1)[0])
+
     def test_no_sub_is_screen_03_without_polling(self):
         VPTelegramLink.objects.create(user=self.user, tg_user_id=1, tg_username='ivan_econ',
                                       checked_at=timezone.now(), subscribed=False)

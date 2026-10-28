@@ -222,3 +222,23 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 | SIGTERM не прерывает ожидание | `test_sigterm_while_waiting_for_telegram_exits_cleanly` |
 | вебхук не ловит сбой обработки | `test_hook_answers_200_when_handling_fails` (**раньше этого теста не было** – мутация выжила, тест добавлен) |
 | у службы нет профиля / в entrypoint `migrate` | `TgbotServiceTests` |
+
+## Фаза 2. «Открыть в приложении Telegram»
+
+- `POST /vp/wall/tg/<слаг>/` с `app=1` – тот же выбор кода (тот же 30-минутный код, тот же лимит
+  10 в час), 302 на `tg://resolve?domain=<бот>&start=<код>`. Стандартный `HttpResponseRedirect`
+  схему `tg` не пускает (`DisallowedRedirect`), поэтому класс `TgAppRedirect` с `allowed_schemes = ['tg']`.
+- Экран 02: под «Открыть бота ещё раз» мелкая строка «Не открылось? Открыть в приложении Telegram» –
+  форма с `app=1` БЕЗ `target="_blank"` (иначе останется пустая вкладка). Экран 01 не менялся.
+- Новые тесты: `AppLinkTests` (5) в `test_wall_tg.py` и 1 в `test_wall_screens.py`. Всего новых 6.
+- ⚠️ Замечено, не чинилось: `form-action 'self'` в CSP. Политика сейчас в режиме отчёта (ничего не
+  блокирует), но Chrome сверяет с `form-action` и перенаправление формы, так что при включении
+  принуждения `t.me` и `tg://` после POST придётся разрешить (`form-action 'self' https://t.me tg:`).
+  Сейчас на каждое нажатие уйдёт отчёт на `/csp-report/`.
+
+| Дефект | Покраснело |
+|---|---|
+| `app=1` отдаёт `t.me` | `test_app_redirect_is_tg_scheme_with_the_same_code` |
+| у `app=1` новый код | `test_app_redirect_is_tg_scheme_with_the_same_code`, `test_app_first_then_site_button_shares_one_code` |
+| форма `app=1` с `target="_blank"` | `test_waiting_has_the_open_in_app_form_without_new_tab` |
+| ответ обычным `HttpResponseRedirect` (схема не разрешена) | три теста `AppLinkTests` |
