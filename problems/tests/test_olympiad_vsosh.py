@@ -538,3 +538,13 @@ class CheckRulesTests(SimpleTestCase):
         rows = [{'number': 'тест-1'}, {'number': 'тест-2'}]
         self.assertEqual(vsosh_digitize.fill_test_keys(
             rows, [('1', 'Да'), ('1', 'а'), ('2', 'б')]), 0)
+
+    def test_key_table_pairs_vertical_horizontal_and_not_data(self):
+        vert = 'Ответы\n\n| Номер вопроса | Правильный ответ |\n|---|---|\n| 11 | а |\n| 17 | а,в,д |'
+        self.assertEqual(vsosh_digitize.key_table_pairs(vert), [('11', 'а'), ('17', 'а,в,д')])
+        hor = ('| Номер вопроса | 1 | 2 | 3 |\n|---|---|---|---|\n'
+               '| Ответ | Да | **Нет** | Да |')
+        self.assertEqual(vsosh_digitize.key_table_pairs(hor),
+                         [('1', 'Да'), ('2', 'Нет'), ('3', 'Да')])
+        data = '| Год | ВВП |\n|---|---|\n| 2017 | 91,8 |\n| 2018 | 103,9 |'
+        self.assertEqual(vsosh_digitize.key_table_pairs(data), [])

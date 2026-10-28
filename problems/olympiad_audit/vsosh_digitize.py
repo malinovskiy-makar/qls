@@ -331,10 +331,41 @@ def key_blocks(digitized, ev):
                             break
                 for b in (rec or {}).get('blocks') or []:
                     num = str(b.get('number') or '').strip().rstrip('.')
-                    text = b.get('answer') or b.get('text') or ''
-                    if b.get('type') in ('criteria', 'solution') and num.isdigit() \
+                    text = b.get('text') or ''
+                    ans = re.sub(r'[*_`]', '', b.get('answer') or '').strip()
+                    if num.isdigit() and ans and len(ans) <= 60 and b.get('type') in (
+                            'task', 'task_continuation', 'solution', 'criteria'):
+                        out.append((num, ans))      # вопрос повторён с «(отмечено)»
+                    elif b.get('type') in ('criteria', 'solution') and num.isdigit() \
                             and answer_like(text):
                         out.append((num, re.sub(r'[*_`]', '', text).strip()))
+                    elif b.get('type') in ('criteria', 'solution', 'task') \
+                            and re.search(r'ответ|ключ', text, re.I):
+                        out.extend(key_table_pairs(text))
+    seen, uniq = set(), []
+    for pair in out:                # один ключ мог прийти и вопросом, и таблицей
+        if pair not in seen:
+            seen.add(pair)
+            uniq.append(pair)
+    return uniq
+
+
+def key_table_pairs(text):
+    """Ключ теста Markdown-таблицей → [(номер, ответ)]: вертикальной
+    («| 11 | а |») или горизонтальной (строка номеров, под ней строка ответов).
+    Номер — до двух цифр (таблица данных «| 2017 | 91,8 |» — не ключ)."""
+    rows = [[c.strip() for c in line.strip().strip('|').split('|')]
+            for line in text.splitlines()
+            if line.strip().startswith('|') and not re.fullmatch(r'[|\s:-]+', line.strip())]
+    out = []
+    for cells in rows:
+        if len(cells) == 2 and re.fullmatch(r'\d{1,2}', cells[0]) and answer_like(cells[1]):
+            out.append((cells[0], re.sub(r'[*_`]', '', cells[1]).strip()))
+    for head, vals in zip(rows, rows[1:]):
+        idx = [i for i, c in enumerate(head) if re.fullmatch(r'\d{1,2}', c)]
+        if len(idx) >= 3 and len(vals) == len(head):
+            out.extend((head[i], re.sub(r'[*_`]', '', vals[i]).strip())
+                       for i in idx if answer_like(vals[i]))
     return out
 
 
