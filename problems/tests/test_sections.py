@@ -37,7 +37,7 @@ class V2CoverageTests(SimpleTestCase):
     """Все 29 тем таксономии v2 разложены, и ни одна не забыта."""
 
     def test_all_29_numbers_covered(self):
-        self.assertEqual(sorted(V2_SECTION_BY_NUMBER), list(range(1, 30)))
+        self.assertEqual(sorted(V2_SECTION_BY_NUMBER), list(range(1, 31)))
 
     def test_every_number_has_a_known_section(self):
         unknown = {n: s for n, s in V2_SECTION_BY_NUMBER.items()
@@ -56,9 +56,10 @@ class V2CoverageTests(SimpleTestCase):
         self.assertEqual(V2_SECTION_BY_NUMBER[27], 'math')
         self.assertEqual(V2_SECTION_BY_NUMBER[28], 'math')
         self.assertEqual(V2_SECTION_BY_NUMBER[29], 'other')    # Другое
+        self.assertEqual(V2_SECTION_BY_NUMBER[30], 'other')    # Бизнес и предпринимательство (15.10.2026)
 
     def test_names_cover_all_29(self):
-        self.assertEqual(sorted(V2_TOPIC_NAMES), list(range(1, 30)))
+        self.assertEqual(sorted(V2_TOPIC_NAMES), list(range(1, 31)))
 
 
 class CanonicalCoverageTests(SimpleTestCase):

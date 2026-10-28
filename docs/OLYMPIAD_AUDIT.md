@@ -502,7 +502,59 @@ merge_enrichment_import --parsed <run_parsed без problem_type>.jsonl --protec
 если с записи их никто не менял. ⚠️ НЕ `human_review_mark --revert` — он
 очищает ревью у всех задач банка.
 
+### Двигатель v2 (ночь 28.10.2026, ADR 0163)
+
+```bash
+# разметка пар человеком или судьёй: link → к bank_id, new → новой, skip; unsure/пусто — как решил двигатель
+import_olympiad_reference ... --decisions <link_review_decisions.json>
+# МОШ-предпринимательство под слагом финграма (Source — свой, исходная олимпиада — raw_meta.original_olympiad)
+import_olympiad_reference --olympiad mosh-entrepreneurship --as-slug mosh-fingram ...
+# заголовки: заглушка импорта → title_candidate (после merge_enrichment_import), только задачи журналов
+import_reference_titles --journal <import_….json> [--journal …] [--apply --yes-…] | --rollback <titles_….json>
+# судья Claude: без --yes — план и смета; ключ без workspace требует ANTHROPIC_WORKSPACE_ID
+olympiad_text_judge --kind replace --journal <import_….json> --out verdicts.jsonl --max-usd 3 --yes
+olympiad_text_judge --kind pairs --journal <import_…_dryrun.json> --out pairs.jsonl --decisions-out dec.json --max-usd 1 --yes
+# замена текста банка официальным по вердиктам: ProblemVersion, журнал, откат
+apply_official_text --verdicts verdicts.jsonl --journal <import_….json> [--apply --yes-…] | --rollback <official_text_….json>
+# свои задачи — из новой версии эталона (только изменившиеся поля, только нетронутые)
+update_olympiad_reference --olympiad vp --journal <import_….json> --old v6.jsonl --new v7.jsonl [--apply --yes-…]
+```
+
+- **Заголовки** (`olympiad_audit/title_rule.py`): официальное название остаётся;
+  заглушка — пусто, «ВП по …», «Задача N», «Задание N (25 баллов)», «Тест № 1.»,
+  служебное слово капсом — после обогащения → `title_candidate` (≤ 60, без номера и
+  названия олимпиады; `title_source` = `model-empty`); «начало текста» короче 80 —
+  остаётся. Новые задачи с заглушкой эталона получают свою заглушку `default_title`.
+- **Строка олимпиады** на странице задачи — `catalog/olympiad_line.py`,
+  `catalog/stol/_olympiad_line.html`: official и ILE, SolveHub — нет; одинаковые
+  строки склеены, до трёх, «и ещё N».
+- **Числовой отпечаток**: склейка разрядов только у настоящих групп (1–3 цифры,
+  дальше по 3), разделители `\ ` `\,` `\;` `~` `{}` и тонкие/неразрывные пробелы,
+  в том числе с пробелами вокруг (`$60 \ 000$`); перенос строки — только между
+  группами по 3 (`200` / `000`). `2{,}5` — десятичная. Из 34 пар части 1 причину
+  сменили 6.
+- **Тема 30** «Бизнес и предпринимательство» — данными (`data/taxonomy.json` v1.2,
+  `catalog/data/taxonomy_tree.md` → `build_topic_map`, `problems/sections.py`,
+  блок «Прочее»), в базе — тема и 6 тегов. Теги — предложение на сверку канона.
+- **Тестовые вопросы** `тест-N.M`: вид — `верно_неверно` (подпункты «а» Верно /
+  «б» Неверно), `единственный_выбор` / `множественный_выбор` (варианты в подпункты,
+  «верно» у верных, блок вариантов вырезан), без вариантов — `тест: короткий ответ`;
+  ключ — в `Problem.answer` (`reference_import.test_fields`).
+- **Варианты одного файла** (`task_variant`): одинаковое задание двух вариантов —
+  одна задача; вторая строка `OlympiadRef` не заводится (пара задача + тур
+  уникальна), вариант пишется в `raw_meta.also_variants`.
+- **Строки v6 без `auto_publish_ok`** — `reference_import.auto_publish_of`:
+  `needs_eyes`, `numbers_ok`, пустое условие, ответ при файле решений, ключ у
+  теста, флаг рисунка. `needs_eyes` не пишется вовсе (список — `plan.csv`).
+- **Адреса PDF**: `download_plan.csv` → `raw/fetch_log.jsonl` (ВП-экономика) →
+  имя файла `хост__путь` (МОШ, зеркало SolveHub).
+- **Замена официальным** — условие и подпункты на месте (лишние подпункты банка
+  остаются, недостающие добавляются), `content_format` → markdown; ответ и решение
+  не трогаются. Пары «комплект одной задачей» судье не отдаются.
+
 ### Ловушки импорта
+- ⚠️ **Пары (задача, тур) уникальны** (`unique_together`): второе задание того же
+  тура в ту же задачу — только номером в `kit_numbers` или `also_variants`.
 - ⚠️ **Пункты эталона уже стоят в `statement_md`.** Ключ сравнения с банком
   без проверки задваивал хвост — вхождение в задачу-комплект падало до 0,74
   при дословном совпадении (`bank_match.task_text` дописывает только пункты,

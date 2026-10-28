@@ -18,6 +18,7 @@ from problems.enrich import features as enrich_features
 from problems.templatetags.ru import plural_ru
 
 from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, seo, testplay
+from .olympiad_line import olympiad_lines
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -1568,6 +1569,7 @@ def _problem_context(request, problem):
         'is_test':      problem_types.is_test(problem.problem_type),
         'heading':      heading,
         'show_title':   show_title,
+        'olympiad_line': olympiad_lines(problem.olympiad_refs.all()),
         'clouds_1':     row1,
         'tags_total':   sum(1 for c in row1 if c['kind'] == 'tag'),
         'clouds_2':     row2,

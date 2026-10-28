@@ -53,6 +53,7 @@
 </div>
 
 {% if show_title %}<h1 class="pd-title">{{ problem.title }}</h1>{% else %}<h1 class="sr-only">{{ heading }}</h1>{% endif %}
+{% include 'catalog/stol/_olympiad_line.html' %}
 
 {% if clouds_1 or clouds_2 %}
 <div class="pp-line" aria-label="Темы и сложность">

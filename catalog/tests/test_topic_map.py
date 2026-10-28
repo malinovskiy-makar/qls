@@ -28,13 +28,13 @@ class TreeInvariantsTests(SimpleTestCase):
         cls.tags = [t for th in cls.tree for t in th['tags']]
 
     def test_twenty_nine_themes(self):
-        self.assertEqual(len(self.tree), 29)
+        self.assertEqual(len(self.tree), 30)          # 30-я — решение 15.10.2026
 
     def test_theme_numbers_are_one_to_twenty_nine(self):
-        self.assertEqual([th['n'] for th in self.tree], list(range(1, 30)))
+        self.assertEqual([th['n'] for th in self.tree], list(range(1, 31)))
 
     def test_three_hundred_forty_three_tags(self):
-        self.assertEqual(len(self.tags), 343)
+        self.assertEqual(len(self.tags), 349)
 
     def test_tags_per_theme_spread(self):
         sizes = [len(th['tags']) for th in self.tree]
@@ -124,8 +124,8 @@ class GraphIntegrityTests(SimpleTestCase):
         cls.by_id = {n['id']: n for n in cls.nodes}
 
     def test_node_and_link_counts(self):
-        self.assertEqual(len(self.nodes), 372)          # 29 тем + 343 тега
-        self.assertEqual(len(self.links), 425)          # 343 дерева + 82 кросса
+        self.assertEqual(len(self.nodes), 379)          # 30 тем + 349 тегов
+        self.assertEqual(len(self.links), 431)          # 349 дерева + 82 кросса
 
     def test_node_ids_are_unique(self):
         self.assertEqual(len(self.by_id), len(self.nodes))
@@ -201,7 +201,7 @@ class GraphIntegrityTests(SimpleTestCase):
             for n in nums:
                 self.assertNotIn(n, seen, 'тема %d в двух разделах' % n)
                 seen[n] = key
-        self.assertEqual(sorted(seen), list(range(1, 30)))
+        self.assertEqual(sorted(seen), list(range(1, 31)))
 
     def test_group_of_tag_matches_group_of_its_theme(self):
         theme_group = {n['n']: n['g'] for n in self.nodes if n['k'] == 'theme'}
@@ -769,8 +769,8 @@ class PanelTreeTests(TestCase):
         """
         html = self._page()
         self.assertEqual(html.count('class="tmap-sec-row"'), 5)
-        self.assertEqual(html.count('class="tmap-theme-row"'), 29)
-        self.assertEqual(html.count('class="tmap-tag-row"'), 343)
+        self.assertEqual(html.count('class="tmap-theme-row"'), 30)
+        self.assertEqual(html.count('class="tmap-tag-row"'), 349)
 
     def test_tree_starts_collapsed(self):
         """Свёрнуто по умолчанию: пять строк вместо двадцати девяти.
@@ -782,7 +782,7 @@ class PanelTreeTests(TestCase):
         дереву разделов отношения не имеет.
         """
         tree = self._page().split('class="tmap-tree"', 1)[-1]
-        self.assertEqual(tree.count('aria-expanded="false"'), 5 + 29)
+        self.assertEqual(tree.count('aria-expanded="false"'), 5 + 30)
         self.assertNotIn('aria-expanded="true"', tree)
 
     def test_section_headers_are_painted_with_their_colour(self):

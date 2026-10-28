@@ -243,6 +243,11 @@ apply_olympiad_audit --olympiad vp|mosh --new-refs|--update-existing|--import|--
 import_olympiad_reference --olympiad X --queue F [--build-candidates|--apply …|--rollback J]  # эталон v2 → банк:
                                   # создать/привязать/на проверку, автопубликация уверенных (ADR 0149); v1-импорт выше — только старый
 merge_enrichment_import --parsed F --protect-out C [--apply]  # обогащение только задач журнала, поля импорта не переписывает
+import_olympiad_reference … --decisions F [--as-slug S]       # разметка пар link/new/skip; чужой слаг (ADR 0163)
+import_reference_titles --journal J [--apply|--rollback T]    # заглушки заголовков импорта → title_candidate
+olympiad_text_judge --kind replace|pairs --journal J --out F [--max-usd X --yes]  # судья Claude; без --yes — смета
+apply_official_text --verdicts F --journal J [--apply|--rollback T]  # текст банка → официальный, снимок ProblemVersion
+update_olympiad_reference --olympiad X --journal J --old A --new B [--apply|--rollback T]  # свои задачи из новой версии эталона
 olympiad_digitize inventory|render|transcribe|rescore|assemble --olympiad X  # эталон v2 зрячей моделью; transcribe —
                                   # деньги: без --yes только план, --max-usd обязателен; в базу не пишет
                                   # + очередь «на глаза»: triage|judge|reread|report|review-pack|control-pack, assemble --v3

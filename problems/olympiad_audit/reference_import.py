@@ -304,15 +304,56 @@ def place_figures(text, figures):
 
 # ── Источник ───────────────────────────────────────────────────────────
 
-def load_url_map(subdir):
-    """basename файла PDF → (адрес на сайте, official) из download_plan.csv."""
-    path = os.path.join(subdir, 'download_plan.csv')
+def load_url_map(subdir, official_hosts=()):
+    """basename файла PDF → (адрес на сайте, official).
+
+    Источники по старшинству: `download_plan.csv` подпапки (финграм, бизнес),
+    `raw/fetch_log.jsonl` (ВП-экономика: файл → адрес скачивания). Файл,
+    которого нет ни там, ни там, но имя которого кодирует адрес
+    (`mos.olimpiada.ru__upload__files__…pdf`, `api.solvehub.app__uploads__…pdf`),
+    раскрывается по имени: `__` → `/` (у МОШ так сходятся 3 015 из 3 015
+    файлов с `session1/download_plan.csv`). `official` — хост из реестра."""
+    import json
     out = {}
-    with open(path, encoding='utf-8-sig', newline='') as handle:
-        for row in csv.DictReader(handle):
-            if row.get('file') and row.get('url'):
-                out[os.path.basename(row['file'])] = (row['url'], row.get('official') == 'true')
-    return out
+    path = os.path.join(subdir, 'download_plan.csv')
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8-sig', newline='') as handle:
+            for row in csv.DictReader(handle):
+                if row.get('file') and row.get('url'):
+                    out[os.path.basename(row['file'])] = (row['url'], row.get('official') == 'true')
+    log = os.path.join(subdir, 'raw', 'fetch_log.jsonl')
+    if os.path.isfile(log):
+        with open(log, encoding='utf-8') as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                if rec.get('file') and rec.get('url') and rec.get('curl_rc', 0) == 0:
+                    out.setdefault(os.path.basename(rec['file']),
+                                   (rec['url'], _host_official(rec['url'], official_hosts)))
+    return UrlMap(out, official_hosts)
+
+
+def _host_official(url, official_hosts):
+    from urllib.parse import urlsplit
+    host = urlsplit(url).netloc.lower()
+    return any(host == h or host.endswith('.' + h) for h in official_hosts)
+
+
+class UrlMap(dict):
+    """dict с запасным путём: адрес из имени файла `хост__путь`."""
+
+    def __init__(self, data=None, official_hosts=()):
+        super().__init__(data or {})
+        self.official_hosts = tuple(official_hosts)
+
+    def get(self, key, default=None):
+        if key in self:
+            return self[key]
+        if key and '__' in key and '.' in key.split('__', 1)[0]:
+            url = 'https://' + key.replace('__', '/')
+            return url, _host_official(url, self.official_hosts)
+        return default
 
 
 def default_title(olympiad_short, row):
@@ -324,6 +365,83 @@ def problem_type_for(parts):
     return TYPE_MULTI if len(parts or []) >= 2 else TYPE_OPEN
 
 
+#: Тестовые вопросы (2.3 ночи 28.10): вид — по самому вопросу.
+TYPE_SINGLE = 'единственный_выбор'
+TYPE_MULTI_CHOICE = 'множественный_выбор'
+TYPE_BOOLEAN = 'верно_неверно'
+TYPE_SHORT = 'тест: короткий ответ'
+CORRECT_MARK = 'верно'
+
+
+def is_test_row(row):
+    """Вопрос теста: номер `тест-N` / `тест-N.M` (эталон v2 и дальше)."""
+    return str(row.get('number') or '').startswith('тест')
+
+
+def test_fields(statement, answer):
+    """Вопрос теста → (условие, problem_type, подпункты, заметка).
+
+    По обычаю банка (`test_options_from_statement`, решение 15.09.2026):
+    варианты — в `ProblemPart` (метка, текст, «верно» у верных), блок
+    вариантов вырезается из условия; у «верно/неверно» — подпункты «а»
+    Верно, «б» Неверно, строка вариантов в хвосте снимается. Ключ остаётся
+    в `Problem.answer`. Нет вариантов — «тест: короткий ответ»."""
+    from problems.test_options_parse import (
+        BOOLEAN_PARTS, boolean_correct_label, correct_labels, cut_boolean_tail,
+        formula_worse, parse_with_reason,
+    )
+    parsed, why = parse_with_reason(statement)
+    if parsed is None:
+        return statement, TYPE_SHORT, [], f'тест без вариантов ({why}) — короткий ответ'
+    texts = [_norm(t) for _label, t in parsed.options]
+    if texts in (['верно', 'неверно'], ['да', 'нет']):
+        label = boolean_correct_label(answer, statement)
+        stem = cut_boolean_tail(statement)
+        stem = stem if isinstance(stem, str) and stem.strip() else parsed.stem
+        parts = [{'label': key, 'statement_md': text,
+                  'answer': CORRECT_MARK if key == label else '', 'points': None}
+                 for key, text in BOOLEAN_PARTS]
+        return (stem, TYPE_BOOLEAN, parts,
+                'тест верно/неверно' + ('' if label else ': ключа нет'))
+    if formula_worse(statement, parsed.stem) or any(formula_worse('', t) for _l, t in parsed.options):
+        return statement, TYPE_SHORT, [], 'варианты с формулами не вырезаю (баланс $) — условие как есть'
+    correct = correct_labels(answer, parsed) if (answer or '').strip() else set()
+    kind = TYPE_MULTI_CHOICE if len(correct) > 1 else TYPE_SINGLE
+    parts = [{'label': label, 'statement_md': text,
+              'answer': CORRECT_MARK if label in correct else '', 'points': None}
+             for label, text in parsed.options]
+    return (parsed.stem, kind, parts,
+            f'тест: {len(parts)} вариантов, верных {len(correct)}' + ('' if correct else ' (ключа нет)'))
+
+
+def auto_publish_of(row):
+    """(ok, причины) для строки без готового `auto_publish_ok` (эталон v6).
+
+    Строгая автопроверка по полям самого эталона: `needs_eyes` (судья и
+    мерило страниц), `numbers_ok`, непустое условие, ответ/решение при
+    файле решений, ключ у теста, рисунки без флага. Строка очереди с
+    готовым флагом — как есть (решение 13–14.10)."""
+    if 'auto_publish_ok' in row:
+        return bool(row.get('auto_publish_ok')), list(row.get('auto_publish_fail') or [])
+    why = []
+    if row.get('needs_eyes'):
+        why.append('needs_eyes: страница на глаза')
+    if row.get('numbers_ok') is False:
+        why.append('числа слоя не сошлись')
+    if not (row.get('statement_md') or '').strip():
+        why.append('пустое условие')
+    if row.get('solution_pages') and not any(
+            (row.get(k) or '').strip() for k in ('answer', 'solution_md', 'criteria_md')):
+        why.append('нет ответа/решения при файле решений')
+    if is_test_row(row) and not (row.get('answer') or '').strip():
+        why.append('тест без ключа')
+    for fig in (row.get('figures') or []) + (row.get('solution_figures') or []):
+        if fig.get('flag'):
+            why.append(f'рисунок с флагом «{fig["flag"]}»')
+            break
+    return not why, why
+
+
 def build_fields(row, *, digitized_dir, url_map, olympiad_short):
     """Строка эталона → план новой задачи (dict без обращения к базе).
 
@@ -333,6 +451,11 @@ def build_fields(row, *, digitized_dir, url_map, olympiad_short):
     parts_in = row.get('parts') or []
     statement = row.get('statement_md') or ''
     parts_out = []
+    problem_type = None
+    if is_test_row(row):
+        statement, problem_type, parts_out, note = test_fields(statement, row.get('answer') or '')
+        notes.append(note)
+        parts_in = []
     if parts_in:
         cut, ok, why = split_parts_from_statement(statement, parts_in)
         if ok:
@@ -347,7 +470,7 @@ def build_fields(row, *, digitized_dir, url_map, olympiad_short):
         else:
             notes.append(f'пункты оставлены в условии: {why}')
     answer = row.get('answer') or ''
-    if parts_out and any(p['answer'] for p in parts_out):
+    if parts_out and any(p['answer'] for p in parts_out) and not problem_type:
         answer = ''
     solution = solution_with_criteria(row.get('solution_md'), row.get('criteria_md'))
 
@@ -395,13 +518,18 @@ def build_fields(row, *, digitized_dir, url_map, olympiad_short):
             figures.extend(items)
 
     stage = row.get('stage') or 'final'
-    title = (row.get('title') or '').strip() or default_title(olympiad_short, row)
+    from problems.olympiad_audit.title_rule import is_stub
+    title = (row.get('title') or '').strip()
+    if is_stub(title):
+        # Заглушка эталона («Задача 1», «Тест № 1.») — своя заглушка; настоящий
+        # заголовок поставит обогащение (`import_reference_titles`).
+        title = default_title(olympiad_short, row)
     return {
         'title': title[:300],
         'statement': statement.strip(),
         'answer': answer.strip(),
         'solution': solution.strip(),
-        'problem_type': problem_type_for(row.get('parts')),
+        'problem_type': problem_type or problem_type_for(row.get('parts')),
         'parts': parts_out,
         'figures': figures,
         'source_url': url,

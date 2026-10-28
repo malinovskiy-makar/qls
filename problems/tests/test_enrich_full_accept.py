@@ -179,11 +179,11 @@ class EnrichFullAcceptTests(TestCase):
         self.assertFalse(digits['passed'])
 
     def test_неиспользованные_теги_перечислены_поимённо(self):
-        # Все строки используют только тег «3.1» — 343 остальных не тронуты.
+        # Все строки используют только тег «3.1» — 349 остальных (тема 30 — 28.10.2026) не тронуты.
         result, _ = self._run()
         tags = result['phase2']['tags']
         self.assertEqual(tags['used_count'], 1)
-        self.assertEqual(len(tags['unused_names']), 343)
+        self.assertEqual(len(tags['unused_names']), 349)
         self.assertNotIn(taxonomy.tag_name_from_id('3.1'), tags['unused_names'])
 
     def test_расхождение_растра_с_отправкой_видно_поимённо(self):

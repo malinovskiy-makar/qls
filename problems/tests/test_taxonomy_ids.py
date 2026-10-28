@@ -13,13 +13,13 @@ from problems.enrich import taxonomy
 class TaxonomyIdsTests(SimpleTestCase):
     def test_29_уникальных_идентификаторов_тем(self):
         ids = taxonomy.theme_ids()
-        self.assertEqual(len(ids), 29)
-        self.assertEqual(len(set(ids)), 29)
+        self.assertEqual(len(ids), 30)
+        self.assertEqual(len(set(ids)), 30)
 
     def test_344_уникальных_идентификатора_тегов(self):
         ids = taxonomy.tag_ids()
-        self.assertEqual(len(ids), 344)
-        self.assertEqual(len(set(ids)), 344)
+        self.assertEqual(len(ids), 350)
+        self.assertEqual(len(set(ids)), 350)
 
     def test_обратное_преобразование_темы_даёт_исходное_название(self):
         for identifier, name in zip(taxonomy.theme_ids(), taxonomy.theme_names()):

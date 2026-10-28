@@ -387,6 +387,8 @@ span.pp--src:active { transform: none; }
 .pp-ext { flex: none; }
 .pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 .pd-stat { margin: -8px 0 16px; font-size: 13px; color: var(--text3); }
+/* Строка олимпиады под заголовком (catalog/olympiad_line.py). */
+.pd-olymp { margin: -4px 0 12px; font-size: 13px; line-height: 1.45; color: var(--text3); }
 
 /* ── Условие: своя поверхность, подпункты внутри, вплотную ─────────── */
 .stm { background: var(--surface-info); border-radius: 14px; padding: 22px 26px 8px; margin: 0 0 18px;

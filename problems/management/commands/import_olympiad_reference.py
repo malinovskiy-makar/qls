@@ -27,6 +27,26 @@
   или олимпиады, слабый числовой отпечаток;
 * **пропустить** с причиной.
 
+Дополнения ночи 28→29.10.2026 (ADR 0163):
+
+* `--decisions <json>` — разметка пар человеком или судьёй-моделью
+  (`link_review_decisions.json`: `link` → привязать к `bank_id` даже вопреки
+  двигателю, `new` → завести новой, `skip` → пропустить; `unsure` и пусто —
+  как решил двигатель, то есть на проверку);
+* `--as-slug <слаг>` — строки олимпиады `--olympiad` пишутся под чужим
+  слагом (МОШ по предпринимательству → `mosh-fingram`, решение 14.10):
+  исходная олимпиада — в `raw_meta.original_olympiad` и в заметке
+  `SourceReference`, `Source` — свой, из реестра `--olympiad`;
+* строки с `needs_eyes`, пустым условием и служебным блоком не пишутся
+  (список — `plan.csv`);
+* у строк эталона без готового `auto_publish_ok` (v6) видимость решает
+  `reference_import.auto_publish_of`;
+* одинаковые задания двух вариантов одного файла (`task_variant`) — одна
+  задача: вторая привязка не заводится (уникальная пара задача + тур),
+  вариант пишется в `raw_meta.also_variants` её строки;
+* тестовые вопросы `тест-N.M` — вид теста и варианты в подпункты
+  (`reference_import.test_fields`).
+
 Сухой прогон по умолчанию; запись — `--apply --yes-i-have-owner-approval`.
 Журнал записи — id всего созданного и [{id, поле, old, new}] дописанного;
 `--rollback` возвращает базу до единицы. Правила текста (пункты, критерии,
@@ -117,6 +137,11 @@ class Command(BaseCommand):
                             help='дата в имени пакета автоодобрения')
         parser.add_argument('--no-katex', action='store_true',
                             help='не запускать KaTeX-проверку (только тесты/отладка)')
+        parser.add_argument('--decisions', metavar='JSON',
+                            help='разметка пар (link_review_decisions.json): link/new/skip')
+        parser.add_argument('--as-slug', metavar='SLUG', choices=sorted(registry.REGISTRY),
+                            help='писать строки OlympiadRef под этим слагом (исходная '
+                                 'олимпиада — в raw_meta.original_olympiad)')
         parser.add_argument('--rollback', metavar='JOURNAL')
         parser.add_argument('--apply', action='store_true')
         parser.add_argument(APPROVAL_FLAG, dest='approved', action='store_true')
@@ -130,6 +155,9 @@ class Command(BaseCommand):
             raise CommandError('--olympiad <слаг> обязателен. Ничего не сделано.')
         self.olympiad = registry.get(options['olympiad'])
         self.slug = self.olympiad.slug
+        #: Слаг строк OlympiadRef: свой или `--as-slug` (решение 14.10 про МОШ-предпринимательство).
+        self.write_slug = options.get('as_slug') or self.slug
+        self.decisions = self._load_decisions(options.get('decisions'))
         if self.apply and not options['approved']:
             raise CommandError(f'--apply требует {APPROVAL_FLAG}. Ничего не записано.')
         if options['rollback']:
@@ -158,7 +186,7 @@ class Command(BaseCommand):
         if not os.path.isfile(cand_path):
             raise CommandError(f'Нет кандидатов {cand_path}: сначала --build-candidates')
         self.cand_meta, self.candidates = bank_match.load_candidates(cand_path)
-        self.url_map = ri.load_url_map(self.subdir)
+        self.url_map = ri.load_url_map(self.subdir, self.olympiad.official_hosts)
         ref_path = options['reference'] or os.path.join(self.digitized,
                                                         'reference_problems_v2.jsonl')
         self.reference = read_jsonl(ref_path) if os.path.isfile(ref_path) else []
@@ -167,7 +195,9 @@ class Command(BaseCommand):
                        'candidates': os.path.abspath(cand_path),
                        'candidates_meta': self.cand_meta,
                        'reference': os.path.abspath(ref_path) if self.reference else '',
-                       'bundle': self._bundle(), 'database': str(settings.DATABASES['default']['NAME'])}
+                       'bundle': self._bundle(), 'database': str(settings.DATABASES['default']['NAME']),
+                       'write_slug': self.write_slug,
+                       'decisions': os.path.abspath(options['decisions']) if options.get('decisions') else ''}
 
         plan = self._plan(rows)
         if not options['no_katex']:
@@ -186,6 +216,25 @@ class Command(BaseCommand):
 
     def _bundle(self):
         return f'auto_import_{self.slug}_{self.options["bundle_date"]}'
+
+    @staticmethod
+    def _load_decisions(path):
+        """{ключ задания: строка разметки} — только решённые link/new/skip."""
+        if not path:
+            return {}
+        with open(path, encoding='utf-8') as handle:
+            data = json.load(handle)
+        return {r['key']: r for r in data.get('rows', [])
+                if r.get('decision') in ('link', 'new', 'skip')}
+
+    def _original(self):
+        """Исходная олимпиада для raw_meta, если строки пишутся под чужим слагом."""
+        if self.write_slug == self.slug:
+            return None
+        return {'slug': self.slug, 'name': OLYMPIAD_NAMES[self.slug]}
+
+    def _note_prefix(self):
+        return f'{OLYMPIAD_NAMES[self.slug]}. ' if self._original() else ''
 
     # ── План ────────────────────────────────────────────────────────────
 
@@ -207,6 +256,9 @@ class Command(BaseCommand):
             taken.setdefault((ev, ref.number, variant), ref.problem_id)
             for n in (ref.raw_meta or {}).get('kit_numbers') or []:
                 taken.setdefault((ev, str(n), variant), ref.problem_id)
+            for extra in (ref.raw_meta or {}).get('also_variants') or []:
+                taken.setdefault((ev, str(extra['number']), extra.get('variant') or ''),
+                                 ref.problem_id)
         # Банк: кандидаты всех строк + подсказки очереди (сверка 13.10).
         pids = set()
         for row in rows:
@@ -214,6 +266,7 @@ class Command(BaseCommand):
             for hint in ('best_bank_problem_id', 'containment_problem_id'):
                 if row.get(hint):
                     pids.add(int(row[hint]))
+        pids.update(int(d['bank_id']) for d in self.decisions.values() if d.get('bank_id'))
         self.bank = {}
         for p in Problem.objects.filter(pk__in=pids).prefetch_related(
                 'parts', 'olympiad_refs', 'source_references__source'):
@@ -263,10 +316,17 @@ class Command(BaseCommand):
             if any('служебн' in f for f in row.get('auto_publish_fail') or []):
                 self._set(item, 'skip', 'служебный блок')
                 continue
+            if row.get('needs_eyes'):
+                self._set(item, 'skip', 'needs_eyes — страница на глаза, не пишется')
+                continue
             owner = taken.get((row['event_id'], str(row['number']), variant))
             if owner:
                 self._set(item, 'skip', f'пара уже есть (задача #{owner})')
                 item['pid'] = owner
+                continue
+            decision = self.decisions.get(key)
+            if decision:
+                self._plan_decision(item, row, decision, linked_pairs, creates, short)
                 continue
             pid, ratio, contain, via = matches[key]
             item.update(pid=pid, ratio=round(ratio, 4), contain=round(contain, 4), via=via)
@@ -298,8 +358,12 @@ class Command(BaseCommand):
         key = bank_match.task_key(row)
         for other in creates:
             o = other['row']
-            if (o['year'], o.get('stage')) != (row['year'], row.get('stage')) \
-                    or o['event_id'] == row['event_id']:
+            if (o['year'], o.get('stage')) != (row['year'], row.get('stage')):
+                continue
+            # Тот же файл — близнец только между РАЗНЫМИ вариантами (2.4):
+            # одинаковое задание варианта 1 и варианта 2 — одна задача.
+            if o['event_id'] == row['event_id'] and \
+                    (o.get('task_variant') or '') == (row.get('task_variant') or ''):
                 continue
             ratio, _c = bank_match.scores(key, bank_match.task_key(o))
             if ratio >= ri.LINK_THRESHOLD and bank_match.numbers_compatible(
@@ -317,13 +381,13 @@ class Command(BaseCommand):
             if ev == event_id:
                 self._set(item, 'skip', f'пара уже есть (задача #{pid}, ref {ref.id})')
                 return
-        other = [r for r in bank['refs'] if r.olympiad_slug != self.slug]
+        other = [r for r in bank['refs'] if r.olympiad_slug != self.write_slug]
         if other:
             r = other[0]
             self._set(item, 'review', f'у задачи банка строка другой олимпиады '
                                       f'({r.olympiad_slug} {r.year})')
             return
-        same = [r for r in bank['refs'] if r.olympiad_slug == self.slug]
+        same = [r for r in bank['refs'] if r.olympiad_slug == self.write_slug]
         if any(r.year and r.year != year for r in same):
             r = next(r for r in same if r.year and r.year != year)
             self._set(item, 'review', f'у задачи банка строка этой олимпиады другого года ({r.year})')
@@ -363,6 +427,49 @@ class Command(BaseCommand):
         else:
             self._set(item, 'link', 'сходство' if item['ratio'] >= ri.LINK_THRESHOLD
                       else 'вхождение')
+        item['fill'], item['fill_skipped'] = self._fills(item, row, bank['obj'])
+
+    def _plan_decision(self, item, row, decision, linked_pairs, creates, short):
+        """Разметка человека/судьи сильнее двигателя (гейт 2 И3, 2.7 ночи 28.10)."""
+        who = decision.get('decided_by') or 'разметка'
+        if decision['decision'] == 'skip':
+            self._set(item, 'skip', f'разметка ({who}): не заводить')
+            return
+        if decision['decision'] == 'new':
+            item['fields'] = ri.build_fields(row, digitized_dir=self.digitized,
+                                             url_map=self.url_map, olympiad_short=short)
+            twin = self._twin_of(row, creates)
+            if twin:
+                self._set(item, 'twin', f'разметка ({who}): другая задача; близнец {twin["key"]}')
+                item['twin_of'] = twin['key']
+            else:
+                self._set(item, 'create', f'разметка ({who}): другая задача банка')
+                creates.append(item)
+            return
+        pid = int(decision['bank_id'])
+        if pid not in self.bank:
+            self._set(item, 'review', f'разметка ({who}): задачи #{pid} нет в банке')
+            return
+        bank = self.bank[pid]
+        ratio, contain = bank_match.scores(bank_match.task_key(row), bank['key'])
+        item.update(pid=pid, ratio=round(ratio, 4), contain=round(contain, 4), via='разметка')
+        event_id = row['event_id']
+        if not bank['obj'].status == Problem.Status.PUBLISHED or bank['obj'].hidden_pending_review:
+            item['bank_hidden'] = True
+        same_event = [r for r in bank['refs'] if r.event_id == event_id]
+        if same_event or (pid, event_id) in linked_pairs:
+            # Пара (задача, тур) уникальна: задача уже привязана к этому туру
+            # другим заданием — номер дописывается в kit_numbers её строки.
+            item['kit_add_ref'] = same_event[0].id if same_event else None
+            item['kit_add_to'] = None if same_event else linked_pairs[(pid, event_id)]['key']
+            self._set(item, 'link', f'разметка ({who}): та же задача; задача уже привязана '
+                                    'к этому туру — номер в kit_numbers')
+            item['fill'], item['fill_skipped'] = {}, ['пара (задача, тур) уже есть — не дописываю']
+            item['fields'] = ri.build_fields(row, digitized_dir=self.digitized,
+                                             url_map=self.url_map, olympiad_short=short)
+            return
+        linked_pairs[(pid, event_id)] = item
+        self._set(item, 'link', f'разметка ({who}): та же задача')
         item['fill'], item['fill_skipped'] = self._fills(item, row, bank['obj'])
 
     def _fills(self, item, row, problem):
@@ -445,13 +552,13 @@ class Command(BaseCommand):
             if item['action'] != 'create':
                 continue
             row = item['row']
-            why = list(row.get('auto_publish_fail') or [])
+            ok, why = ri.auto_publish_of(row)
             if item.get('katex_errors'):
                 why.append(f'KaTeX новых текстов: {item["katex_errors"]} пол. с ошибкой')
             for fig in item['fields']['figures']:
                 if not os.path.isfile(fig['path']):
                     why.append(f'нет файла рисунка {fig["path"]}')
-            item['visible'] = bool(row.get('auto_publish_ok')) and not why
+            item['visible'] = ok and not why
             item['hidden_why'] = why
 
     # ── Инварианты ──────────────────────────────────────────────────────
@@ -533,7 +640,7 @@ class Command(BaseCommand):
         w(f'База: {settings.DATABASES["default"]["NAME"]}')
         w(f'Source «{self.olympiad.official_source_name}»: '
           f'{"id " + str(self.source.id) if self.source else "НЕ ЗАВЕДЁН"}')
-        for name, value in _counts(self.slug).items():
+        for name, value in _counts(self.write_slug).items():
             w(f'  {name}: {value}')
         a = Counter(i['action'] for i in plan)
         vis = sum(1 for i in plan if i['action'] == 'create' and i['visible'])
@@ -580,15 +687,16 @@ class Command(BaseCommand):
         return {
             'command': 'import_olympiad_reference', 'olympiad': self.slug, 'applied': applied,
             'started_at': datetime.now().isoformat(timespec='seconds'),
-            'inputs': self.inputs, 'counts_before': _counts(self.slug),
+            'inputs': self.inputs, 'counts_before': _counts(self.write_slug),
             'invariants': self.invariants,
             'plan': [{'key': i['key'], 'action': i['action'], 'reason': i['reason'],
                       'visible': i.get('visible'), 'pid': i['pid'], 'ratio': i['ratio'],
                       'contain': i['contain'], 'fill': sorted(i.get('fill', {})),
-                      'hidden_why': i.get('hidden_why', [])} for i in plan],
+                      'hidden_why': i.get('hidden_why', []),
+                      'bank_hidden': bool(i.get('bank_hidden'))} for i in plan],
             'created_problem_ids': [], 'created_part_ids': [], 'created_sourceref_ids': [],
             'created_figure_ids': [], 'created_ref_ids': [], 'created_verdict_ids': [],
-            'filled': [], 'visible_problem_ids': [],
+            'filled': [], 'visible_problem_ids': [], 'ref_meta_changes': [],
             'how_to_revert': ('manage.py import_olympiad_reference --olympiad <слаг> '
                               '--rollback <этот файл> [--apply --yes-i-have-owner-approval]'),
         }
@@ -613,6 +721,7 @@ class Command(BaseCommand):
                                f'olympiad_official_sources --olympiad {self.slug} --apply')
         journal = self._journal(plan, applied=True)
         by_key = {}
+        self._created_refs = {}
         try:
             for item in plan:
                 if item['action'] == 'create':
@@ -639,7 +748,7 @@ class Command(BaseCommand):
             journal['error'] = repr(error)
             raise
         finally:
-            journal['counts_after'] = _counts(self.slug)
+            journal['counts_after'] = _counts(self.write_slug)
             journal['finished_at'] = datetime.now().isoformat(timespec='seconds')
             path = self._dump(journal, '')
         self.stdout.write(self.style.SUCCESS(
@@ -660,8 +769,8 @@ class Command(BaseCommand):
         event_id, number = row['event_id'], str(row['number'])
         variant = row.get('task_variant') or ''
         return dict(
-            source_site='official', olympiad_slug=self.slug,
-            olympiad_name=OLYMPIAD_NAMES[self.slug],
+            source_site='official', olympiad_slug=self.write_slug,
+            olympiad_name=OLYMPIAD_NAMES[self.write_slug],
             academic_year=bank_academic_year(row.get('academic_year')),
             year=int(row['year']), stage=row.get('stage') or 'final', grade=row['grade'],
             variant=variant_of(event_id), number=number, event_id=event_id,
@@ -674,8 +783,8 @@ class Command(BaseCommand):
             problem=problem, source=self.source, problem_number=bank_match.row_key(row)[:50],
             stage=fields['stage_label'], grade=row['grade'], year=int(row['year']),
             url=fields['source_url'],
-            note=(f'{fields["stage_label"]}, {row["grade"]} класс, задание {number}; '
-                  f'максимум {row.get("max_score")} баллов')[:300])
+            note=(f'{self._note_prefix()}{fields["stage_label"]}, {row["grade"]} класс, '
+                  f'задание {number}; максимум {row.get("max_score")} баллов')[:300])
         created['created_sourceref_ids'].append(sref.id)
 
     def _create(self, item, created):
@@ -685,8 +794,8 @@ class Command(BaseCommand):
             statement_md=f['statement'], answer_md=f['answer'], solution_md=f['solution'],
             parts=[{'label': p['label'], 'statement_md': p['statement_md'], 'answer': p['answer']}
                    for p in f['parts']],
-            reference_note=(f'{f["stage_label"]}, {row["grade"]} класс, задание {row["number"]}; '
-                            f'максимум {row.get("max_score")} баллов'),
+            reference_note=(f'{self._note_prefix()}{f["stage_label"]}, {row["grade"]} класс, '
+                            f'задание {row["number"]}; максимум {row.get("max_score")} баллов'),
             reference_url=f['source_url'], reference_year=int(row['year']))
         created['created_problem_ids'].append(problem.id)
         parts = list(problem.parts.order_by('order'))
@@ -723,9 +832,12 @@ class Command(BaseCommand):
                             for x in f['figures']]}
         if not f['source_url_official']:
             meta['statement_mirror'] = True
+        if self._original():
+            meta['original_olympiad'] = self._original()
         ref = OlympiadRef.objects.create(problem=problem, match_method='url_exact', match_score=1.0,
                                          raw_meta=self._with_variant(meta, row), **self._ref_fields(row, f['source_url']))
         created['created_ref_ids'].append(ref.id)
+        self._created_refs[(problem.id, row['event_id'])] = ref.id
         if item['visible']:
             verdict = ReviewVerdict.objects.create(
                 problem=problem, bundle=self._bundle(), category='perfect',
@@ -734,32 +846,63 @@ class Command(BaseCommand):
             created['visible_problem_ids'].append(problem.id)
         return problem.id
 
+    def _add_to_ref_meta(self, ref_id, key, value, created):
+        """Дописать в raw_meta строки OlympiadRef список `key` (журнал — старое raw_meta)."""
+        ref = OlympiadRef.objects.get(pk=ref_id)
+        old = dict(ref.raw_meta or {})
+        meta = dict(old)
+        meta[key] = list(meta.get(key) or []) + [value]
+        ref.raw_meta = meta
+        ref.save(update_fields=['raw_meta'])
+        created['ref_meta_changes'].append({'id': ref.id, 'old': old, 'new': meta})
+
     def _twin(self, item, problem_id, created):
         row = item['row']
         fields = item['fields']
         problem = Problem.objects.get(pk=problem_id)
         self._sref(problem, row, fields, created)
+        same_event = self._created_refs.get((problem.id, row['event_id'])) or \
+            OlympiadRef.objects.filter(problem=problem, event_id=row['event_id']).values_list(
+                'id', flat=True).first()
+        if same_event:
+            # Другой вариант того же файла (2.4): пара (задача, тур) уникальна.
+            self._add_to_ref_meta(same_event, 'also_variants',
+                                  {'number': str(row['number']),
+                                   'variant': row.get('task_variant') or '',
+                                   'twin_of': item['twin_of']}, created)
+            return
         ref = OlympiadRef.objects.create(
             problem=problem, match_method='text_fuzzy_numeric', match_score=1.0,
-            raw_meta=self._with_variant({'origin': ORIGIN, 'twin_of': item['twin_of'],
-                                        'max_score': row.get('max_score')}, row),
+            raw_meta=self._with_variant(dict({'origin': ORIGIN, 'twin_of': item['twin_of'],
+                                             'max_score': row.get('max_score')},
+                                            **({'original_olympiad': self._original()}
+                                               if self._original() else {})), row),
             **self._ref_fields(row, fields['source_url']))
         created['created_ref_ids'].append(ref.id)
 
     def _link(self, item, created):
         row = item['row']
         fields = item['fields']
+        if 'kit_add_ref' in item:
+            ref_id = item['kit_add_ref'] or self._created_refs.get((item['pid'], row['event_id']))
+            if ref_id is None:
+                ref_id = OlympiadRef.objects.get(problem_id=item['pid'], event_id=row['event_id']).id
+            self._add_to_ref_meta(ref_id, 'kit_numbers', str(row['number']), created)
+            return
         meta = {'origin': ORIGIN + '_link', 'confirm': item['reason'],
                 'fuzzy': item['ratio'], 'containment': item['contain'], 'candidate_from': item['via'],
                 'max_score': row.get('max_score')}
         if item.get('kit_numbers'):
             meta['kit_numbers'] = [str(n) for n in item['kit_numbers']]
+        if self._original():
+            meta['original_olympiad'] = self._original()
         ref = OlympiadRef.objects.create(
             problem_id=item['pid'], match_method='text_fuzzy_numeric',
             match_score=max(item['ratio'], item['contain']),
             raw_meta=self._with_variant(meta, row),
             **self._ref_fields(row, fields['source_url']))
         created['created_ref_ids'].append(ref.id)
+        self._created_refs[(item['pid'], row['event_id'])] = ref.id
         for field, value in item.get('fill', {}).items():
             # Условная правка: только если поле всё ещё пустое (ADR 0005).
             n = Problem.objects.filter(pk=item['pid']).filter(
@@ -793,8 +936,11 @@ class Command(BaseCommand):
         if not self.apply:
             w(self.style.WARNING('СУХОЙ ПРОГОН отката — ничего не изменено.'))
             return
-        before = _counts(self.slug)
+        write_slug = (journal.get('inputs') or {}).get('write_slug') or self.slug
+        before = _counts(write_slug)
         with transaction.atomic():
+            for change in reversed(journal.get('ref_meta_changes') or []):
+                OlympiadRef.objects.filter(pk=change['id']).update(raw_meta=change['old'])
             for change in restore:
                 Problem.objects.filter(pk=change['id']).update(**{change['field']: ''})
             ReviewVerdict.objects.filter(pk__in=journal['created_verdict_ids']).delete()
@@ -803,7 +949,7 @@ class Command(BaseCommand):
             SourceReference.objects.filter(pk__in=journal['created_sourceref_ids']).delete()
             ProblemPart.objects.filter(pk__in=journal['created_part_ids']).delete()
             Problem.objects.filter(pk__in=journal['created_problem_ids']).delete()
-        after = _counts(self.slug)
+        after = _counts(write_slug)
         report = {'journal': os.path.abspath(path), 'restored': len(restore),
                   'conflicts': conflicts, 'counts_before': before, 'counts_after': after}
         out = os.path.join(os.path.dirname(os.path.abspath(path)),

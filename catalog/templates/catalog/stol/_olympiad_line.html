@@ -1,0 +1,2 @@
+{% comment %}Строка олимпиады под заголовком (решение 15.10.2026, catalog/olympiad_line.py): привязки official и ILE, одинаковые склеены, до трёх, дальше «и ещё N». Нет привязок — нет строки (правило нуля).{% endcomment %}
+{% if olympiad_line.lines %}<p class="pd-olymp">{% for line in olympiad_line.lines %}<span class="pd-olymp-line">{{ line }}</span>{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if olympiad_line.more %} <span class="pd-olymp-more">и ещё {{ olympiad_line.more }}</span>{% endif %}</p>{% endif %}
