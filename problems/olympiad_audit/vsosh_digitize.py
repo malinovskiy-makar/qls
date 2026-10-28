@@ -28,10 +28,10 @@ from collections import Counter, defaultdict
 
 from problems.olympiad_audit import assemble, digitize, transcribe
 
-#: Оценка цены страницы в Batches (−50 %), $: вход ≈ 4 000 ток. (картинка +
-#: слой + инструкция), выход ≈ 1 500 ток. + рассуждение. Цены 06.10.2026:
-#: Sonnet 5.5 $2/$10, Haiku 5.5 $0,10/$0,50 за 1 млн.
-CLAUDE_PAGE_USD = {'claude-sonnet-5-5': 0.012, 'claude-haiku-5-5': 0.0007}
+#: Цена страницы в Batches (−50 %), $: калибровка 28.10 на 30 страницах ×1,1
+#: (Sonnet low $0,0089, Haiku low $0,00068; вход ≈ 3 400 ток., из них ≈ 1 900
+#: из кэша). Цены 06.10.2026: Sonnet 5.5 $2/$10, Haiku 5.5 $0,10/$0,50 за 1 млн.
+CLAUDE_PAGE_USD = {'claude-sonnet-5-5': 0.0098, 'claude-haiku-5-5': 0.00075}
 CLAUDE_PRICES = {'claude-sonnet-5-5': (2.0, 10.0), 'claude-haiku-5-5': (0.10, 0.50)}
 
 STAGE_NAME = {'final': 'заключительный этап', 'regional': 'региональный этап',
@@ -129,26 +129,31 @@ CLAUDE_SYSTEM = (transcribe.SYSTEM_PROMPT + transcribe.STRICT_SUFFIX +
                  + json.dumps(transcribe.SCHEMA, ensure_ascii=False))
 
 
-#: Длинная сторона картинки для Claude: больше API всё равно ужмёт сам, а
-#: пакет из сотен страниц 1654×2339 упирается в лимит 256 МБ на пакет.
+#: Длинная сторона картинки для Claude: больше API всё равно ужмёт сам.
 CLAUDE_MAX_SIDE = 1568
+#: PNG страницы до этого размера уходит как есть (API ужмёт сам); крупнее —
+#: уменьшается и идёт JPEG: уменьшенный PNG со сглаженными краями букв
+#: весит БОЛЬШЕ исходного (замер 28.10: 250 стр. — 200–226 МБ при лимите
+#: пакета 256 МБ).
+PNG_AS_IS_BYTES = 600_000
 
 
-def page_png_b64(path, max_side=CLAUDE_MAX_SIDE):
-    """PNG страницы в base64, длинная сторона не больше `max_side`."""
+def page_image_b64(path, max_side=CLAUDE_MAX_SIDE):
+    """Картинка страницы для Claude → (media_type, base64)."""
+    if os.path.getsize(path) <= PNG_AS_IS_BYTES:
+        with open(path, 'rb') as fh:
+            return 'image/png', base64.b64encode(fh.read()).decode('ascii')
     import io
 
     from PIL import Image
     with Image.open(path) as im:
+        im = im.convert('L' if im.mode in ('L', '1', 'LA') else 'RGB')
         if max(im.size) > max_side:
             k = max_side / max(im.size)
-            im = im.convert('L' if im.mode in ('L', '1') else 'RGB').resize(
-                (round(im.size[0] * k), round(im.size[1] * k)), Image.LANCZOS)
-            buf = io.BytesIO()
-            im.save(buf, 'PNG', optimize=True)
-            return base64.b64encode(buf.getvalue()).decode('ascii')
-    with open(path, 'rb') as fh:
-        return base64.b64encode(fh.read()).decode('ascii')
+            im = im.resize((round(im.size[0] * k), round(im.size[1] * k)), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, 'JPEG', quality=90)
+    return 'image/jpeg', base64.b64encode(buf.getvalue()).decode('ascii')
 
 
 def batch_request(job, model, max_tokens=12000, thinking=None, custom_id=None):
@@ -157,14 +162,15 @@ def batch_request(job, model, max_tokens=12000, thinking=None, custom_id=None):
     layer = transcribe.layer_body(job.layer, job.footers)[:LAYER_HINT_CHARS]
     text = job.user_text() + ('\n\nТекстовый слой PDF (подсказка):\n<<<\n' + layer + '\n>>>'
                               if layer.strip() else '\n\nТекстового слоя нет (скан).')
+    media_type, data = page_image_b64(job.png)
     params = {
         'model': model, 'max_tokens': max_tokens,
         'system': [{'type': 'text', 'text': CLAUDE_SYSTEM,
                     'cache_control': {'type': 'ephemeral'}}],
         'output_config': {'effort': 'low'},
         'messages': [{'role': 'user', 'content': [
-            {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
-                                         'data': page_png_b64(job.png)}},
+            {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type,
+                                         'data': data}},
             {'type': 'text', 'text': text}]}],
     }
     if thinking:
@@ -177,24 +183,34 @@ THINKING_OFF = {'claude-sonnet-5-5': {'type': 'between_tools'},
                 'claude-haiku-5-5': {'type': 'disabled'}}
 
 
-def write_batches(digitized, groups, model, out_dir, chunk=250, thinking=None, pages=None):
+def write_batches(digitized, groups, model, out_dir, chunk=250, thinking=None, pages=None,
+                  max_bytes=150_000_000):
     """Пакеты Batches: batch_<model>_g<группы>_<N>.jsonl по `chunk` страниц
     в порядке плана (группа, сезон). `pages` — только эти ключи страниц."""
     os.makedirs(out_dir, exist_ok=True)
     jobs = [(g, j) for g, j in page_jobs(digitized, groups) if not pages or j.key in pages]
-    paths, n, part, fh = [], 0, 0, None
+    paths, n, part, fh, in_file, size = [], 0, 0, None, 0, 0
+
+    def close():
+        # Готовый файл — под своим именем: отправка не подхватит недописанный.
+        fh.close()
+        os.replace(paths[-1] + '.tmp', paths[-1])
+
     for _g, job in jobs:
-        if n % chunk == 0:
+        if fh is None or in_file >= chunk or size >= max_bytes:
             if fh:
-                fh.close()
+                close()
             part += 1
-            path = os.path.join(out_dir, f'batch_{model}_g{"".join(map(str, sorted(groups)))}_{part:03d}.jsonl')
-            paths.append(path)
-            fh = open(path, 'w', encoding='utf-8')
-        fh.write(json.dumps(batch_request(job, model, thinking=thinking), ensure_ascii=False) + '\n')
+            paths.append(os.path.join(
+                out_dir, f'batch_{model}_g{"".join(map(str, sorted(groups)))}_{part:03d}.jsonl'))
+            fh, in_file, size = open(paths[-1] + '.tmp', 'w', encoding='utf-8'), 0, 0
+        line = json.dumps(batch_request(job, model, thinking=thinking), ensure_ascii=False) + '\n'
+        fh.write(line)
+        size += len(line)
+        in_file += 1
         n += 1
     if fh:
-        fh.close()
+        close()
     return paths, n
 
 
@@ -455,6 +471,9 @@ def run_claude(cmd, opts):
                 continue
             model = 'claude-sonnet-5-5' if 'sonnet' in name else 'claude-haiku-5-5'
             reqs = _read(os.path.join(out_dir, name))
+            if opts.get('thinking_off'):     # решение калибровки — при отправке
+                for req in reqs:
+                    req['params']['thinking'] = THINKING_OFF[model]
             projected = spent + len(reqs) * per_page[model] + sum(
                 x.get('estimate_usd', 0) for x in ledger
                 if x.get('kind') == 'submitted' and not x.get('collected'))

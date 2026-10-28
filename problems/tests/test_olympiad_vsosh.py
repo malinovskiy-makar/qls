@@ -349,8 +349,14 @@ class AssembleWrapperTests(SimpleTestCase):
             req = vsosh_digitize.batch_request(
                 job, model, thinking=vsosh_digitize.THINKING_OFF[model])
             data = req['params']['messages'][0]['content'][0]['source']['data']
-            size = Image.open(io.BytesIO(base64.b64decode(data))).size
-            self.assertEqual(max(size), vsosh_digitize.CLAUDE_MAX_SIDE)
+            # Маленький PNG уходит как есть (API ужмёт сам).
+            self.assertEqual(Image.open(io.BytesIO(base64.b64decode(data))).size, (1654, 2339))
+            noisy = os.path.join(tmp, 'p2.png')
+            Image.effect_noise((1654, 2339), 64).save(noisy)
+            media, big = vsosh_digitize.page_image_b64(noisy)
+            self.assertEqual(media, 'image/jpeg')
+            self.assertEqual(max(Image.open(io.BytesIO(base64.b64decode(big))).size),
+                             vsosh_digitize.CLAUDE_MAX_SIDE)
             self.assertEqual(req['params']['thinking'], {'type': 'between_tools'})
             self.assertEqual(req['custom_id'], 'pages__abc__p1')
             self.assertNotIn('thinking', vsosh_digitize.batch_request(job, model)['params'])
