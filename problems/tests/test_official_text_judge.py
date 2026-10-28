@@ -1,6 +1,7 @@
 """Судья Claude и замена текста банка официальным (решение 28.10.2026, ADR 0163).
 
-Модель не вызывается: `text_judge.call_model` подменяется ответом-строкой.
+Модель не вызывается: `text_judge.call_model` подменяется ответом-строкой,
+пакетный путь — подменой `submit_batch` / `batch_status` / `batch_results`.
 """
 import json
 import os
@@ -85,6 +86,29 @@ class OfficialTextReplaceTests(TestCase):
         self.assertEqual((self.bank.statement, self.bank.content_format), (BANK, 'plain'))
         self.assertFalse(ProblemVersion.objects.filter(problem=self.bank).exists())
 
+    def test_one_problem_two_tasks_replaced_once(self):
+        """Задача банка привязана к двум заданиям (варианты классов) — одна замена, повтор ноль."""
+        with open(self.journal, encoding='utf-8') as h:
+            j = json.load(h)
+        with open(j['inputs']['queue'], encoding='utf-8') as h:
+            row = json.loads(h.readline())
+        row2 = dict(row, event_id='vp-fingram-2019-final-10-v1', statement_md=OFFICIAL + ' Вариант 10.')
+        with open(j['inputs']['queue'], 'a', encoding='utf-8') as h:
+            h.write(json.dumps(row2, ensure_ascii=False) + '\n')
+        j['plan'].append({'key': 'vp-fingram-2019-final-10-v1:2', 'action': 'link', 'pid': self.bank.id,
+                          'reason': 'сходство'})
+        with open(self.journal, 'w', encoding='utf-8') as h:
+            json.dump(j, h)
+        self.judge(_reply())
+        self.apply('--apply', '--yes-i-have-owner-approval')
+        self.assertEqual(ProblemVersion.objects.filter(problem=self.bank).count(), 1)
+        self.bank.refresh_from_db()
+        first = self.bank.statement
+        self.apply('--apply', '--yes-i-have-owner-approval')                  # повтор — ноль
+        self.bank.refresh_from_db()
+        self.assertEqual(self.bank.statement, first)
+        self.assertEqual(ProblemVersion.objects.filter(problem=self.bank).count(), 1)
+
     def test_low_confidence_or_no_quotes_not_replaced(self):
         self.judge(_reply(confidence=0.7))
         self.apply('--apply', '--yes-i-have-owner-approval')
@@ -129,6 +153,43 @@ class OfficialTextReplaceTests(TestCase):
         self.assertEqual((rows[0]['key'], rows[0]['decision'], rows[0]['bank_id']), (KEY, 'link', self.bank.id))
 
 
+    def test_batch_submit_once_resume_and_half_price(self):
+        """--batch: один пакет, id в F.batch.json; обрыв ожидания → повтор не шлёт второй пакет."""
+        sent = []
+
+        def submit(requests):
+            sent.append(requests)
+            return 'msgbatch_1'
+
+        reply = _reply()
+        with mock.patch.object(tj, 'submit_batch', side_effect=submit), \
+                mock.patch.object(tj, 'batch_status', side_effect=KeyboardInterrupt), \
+                mock.patch.object(tj, 'call_model', side_effect=AssertionError('синхронный вызов')):
+            with self.assertRaises(KeyboardInterrupt):
+                call_command('olympiad_text_judge', '--kind', 'replace', '--journal', self.journal,
+                             '--out', self.verdicts, '--yes', '--max-usd', '1', '--batch', stdout=_quiet())
+        self.assertEqual(len(sent), 1)
+        cid, params = sent[0][0]
+        self.assertNotIn('temperature', params)
+        self.assertTrue(os.path.isfile(self.verdicts + '.batch.json'))
+        with mock.patch.object(tj, 'submit_batch', side_effect=AssertionError('второй пакет')), \
+                mock.patch.object(tj, 'batch_status', return_value=('ended', {})), \
+                mock.patch.object(tj, 'batch_results', return_value={cid: reply}):
+            call_command('olympiad_text_judge', '--kind', 'replace', '--journal', self.journal,
+                         '--out', self.verdicts, '--max-usd', '1', stdout=_quiet())
+        self.assertFalse(os.path.isfile(self.verdicts + '.batch.json'))
+        with open(self.verdicts, encoding='utf-8') as h:
+            rec = json.loads(h.readline())
+        self.assertTrue(rec['verdict']['replace'])
+        self.assertAlmostEqual(rec['usd'], tj.cost_of('claude-sonnet-5-5', reply[1]) / 2)
+
+    def test_batch_cut_by_budget(self):
+        with mock.patch.object(tj, 'submit_batch', side_effect=AssertionError('пакет сверх потолка')):
+            call_command('olympiad_text_judge', '--kind', 'replace', '--journal', self.journal,
+                         '--out', self.verdicts, '--yes', '--max-usd', '0.001', '--batch', stdout=_quiet())
+        self.assertFalse(os.path.exists(self.verdicts + '.batch.json'))
+
+
 class JudgeRulesTests(SimpleTestCase):
     def test_pair_decision(self):
         self.assertEqual(tj.pair_decision({'same': 'different', 'evidence': ['x'], 'confidence': 0.9}), 'new')
@@ -145,4 +206,12 @@ class JudgeRulesTests(SimpleTestCase):
 
     def test_cost(self):
         self.assertAlmostEqual(tj.cost_of('claude-sonnet-5-5', {'input_tokens': 1_000_000,
-                                                                 'output_tokens': 0}), 3.0)
+                                                                 'output_tokens': 0}), 2.0)
+        self.assertAlmostEqual(tj.cost_of('claude-sonnet-5-5', {'output_tokens': 1_000_000}, batch=True), 5.0)
+
+    def test_request_has_no_temperature_and_cut_reply_is_error(self):
+        params = tj.request_params('s', [{'type': 'text', 'text': 'x'}])
+        self.assertNotIn('temperature', params)
+        msg = mock.Mock(stop_reason='max_tokens', content=[])
+        with self.assertRaises(ValueError):
+            tj.reply_text(msg)

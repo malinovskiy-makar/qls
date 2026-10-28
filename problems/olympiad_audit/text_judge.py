@@ -29,8 +29,14 @@ import os
 from datetime import datetime
 
 MODEL = 'claude-sonnet-5-5'
-#: $ за миллион токенов (вход, выход) — сверено с docs.claude.com 28.10.2026.
-PRICES = {'claude-sonnet-5-5': (3.0, 15.0)}
+#: $ за миллион токенов (вход, выход) — сверено 28.10.2026 (skill claude-api, кэш 06.10).
+PRICES = {'claude-sonnet-5-5': (2.0, 10.0)}
+#: Message Batches — половина цены за все токены.
+BATCH_DISCOUNT = 0.5
+#: Глубина размышления: medium — сверка двух текстов, не олимпиадное решение.
+EFFORT = 'medium'
+#: С размышлением вывод длиннее самого JSON — запас, чтобы ответ не обрезался.
+MAX_TOKENS = 8000
 MISSING_KINDS = ('text', 'table', 'options', 'parts', 'figure', 'numbers')
 STRUCTURAL = frozenset({'table', 'options', 'parts', 'figure'})
 REPLACE_MIN_CONFIDENCE = 0.8
@@ -127,28 +133,81 @@ def build_content(official, bank, images):
 
 # ── Вызов модели ──────────────────────────────────────────────────────────
 
-def cost_of(model, usage):
-    pin, pout = PRICES.get(model, (3.0, 15.0))
-    return ((usage.get('input_tokens') or 0) * pin
-            + (usage.get('cache_creation_input_tokens') or 0) * pin * 1.25
-            + (usage.get('cache_read_input_tokens') or 0) * pin * 0.1
-            + (usage.get('output_tokens') or 0) * pout) / 1e6
+def cost_of(model, usage, batch=False):
+    pin, pout = PRICES.get(model, (2.0, 10.0))
+    usd = ((usage.get('input_tokens') or 0) * pin
+           + (usage.get('cache_creation_input_tokens') or 0) * pin * 1.25
+           + (usage.get('cache_read_input_tokens') or 0) * pin * 0.1
+           + (usage.get('output_tokens') or 0) * pout) / 1e6
+    return usd * BATCH_DISCOUNT if batch else usd
 
 
-def call_model(system, content, model=MODEL, max_tokens=1500):
-    """(текст ответа, usage) — Claude Messages API. Ключ из окружения
-    `ANTHROPIC_API_KEY`; ключ без привязки к рабочему пространству требует
-    `ANTHROPIC_WORKSPACE_ID` (заголовок `anthropic-workspace-id`)."""
+def request_params(system, content, model=MODEL, max_tokens=MAX_TOKENS):
+    """Тело запроса Messages. `temperature` не шлём: у Sonnet 5.5 значение не по
+    умолчанию — ошибка 400 (а с версии API 2026-10-21 — у всех моделей)."""
+    return {'model': model, 'max_tokens': max_tokens, 'system': system,
+            'output_config': {'effort': EFFORT},
+            'messages': [{'role': 'user', 'content': content}]}
+
+
+def client():
+    """Клиент Claude. Ключ из окружения `ANTHROPIC_API_KEY`; ключ без привязки к
+    рабочему пространству требует `ANTHROPIC_WORKSPACE_ID` (заголовок
+    `anthropic-workspace-id`)."""
     import anthropic
     headers = {}
     if os.environ.get('ANTHROPIC_WORKSPACE_ID'):
         headers['anthropic-workspace-id'] = os.environ['ANTHROPIC_WORKSPACE_ID']
-    client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'),
-                                 default_headers=headers or None, max_retries=4)
-    reply = client.messages.create(model=model, max_tokens=max_tokens, temperature=0,
-                                   system=system, messages=[{'role': 'user', 'content': content}])
-    text = ''.join(getattr(b, 'text', '') for b in reply.content)
-    return text, reply.usage.model_dump() if hasattr(reply.usage, 'model_dump') else dict(reply.usage)
+    return anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'),
+                               default_headers=headers or None, max_retries=4)
+
+
+def _usage(message):
+    u = message.usage
+    return u.model_dump() if hasattr(u, 'model_dump') else dict(u)
+
+
+def reply_text(message):
+    """Текст ответа; обрезанный по max_tokens или отказ — ошибка, а не пустой JSON."""
+    if message.stop_reason in ('max_tokens', 'refusal'):
+        raise ValueError(f'stop_reason={message.stop_reason}')
+    return ''.join(getattr(b, 'text', '') for b in message.content if b.type == 'text')
+
+
+def call_model(system, content, model=MODEL, max_tokens=MAX_TOKENS):
+    """(текст ответа, usage) — один синхронный вызов Messages API."""
+    reply = client().messages.create(**request_params(system, content, model, max_tokens))
+    return reply_text(reply), _usage(reply)
+
+
+def submit_batch(requests):
+    """requests: [(custom_id, params)] → id пакета Message Batches."""
+    batch = client().messages.batches.create(
+        requests=[{'custom_id': cid, 'params': params} for cid, params in requests])
+    return batch.id
+
+
+def batch_status(batch_id):
+    b = client().messages.batches.retrieve(batch_id)
+    return b.processing_status, b.request_counts.model_dump() if hasattr(b.request_counts, 'model_dump')         else dict(b.request_counts)
+
+
+def batch_results(batch_id):
+    """{custom_id: (текст, usage) | исключение} — результаты в любом порядке, ключ — custom_id."""
+    out = {}
+    # Клиент держим в переменной: временный объект закрывает сокет посреди потока результатов.
+    api = client()
+    for item in api.messages.batches.results(batch_id):
+        res = item.result
+        if res.type == 'succeeded':
+            try:
+                out[item.custom_id] = (reply_text(res.message), _usage(res.message))
+            except ValueError as error:
+                out[item.custom_id] = error
+        else:
+            out[item.custom_id] = RuntimeError(f'пакет: {res.type} '
+                                               f'{getattr(getattr(res, "error", None), "type", "")}')
+    return out
 
 
 def parse_json(text):

@@ -37,6 +37,7 @@ from problems.olympiad_audit import registry
 from problems.olympiad_audit import text_judge as tj
 
 APPROVAL_FLAG = '--yes-i-have-owner-approval'
+NOTE_PREFIX = 'замена официальным эталоном: '
 _MARKER = re.compile(r'\[\[FIGURE:([0-9a-f]{64})\]\]')
 
 
@@ -94,6 +95,13 @@ class Command(BaseCommand):
             if problem.statement == fields['statement']:
                 skipped.append((rec['key'], rec['pid'], 'уже официальный текст (повтор)'))
                 continue
+            # Одна задача банка бывает привязана к двум заданиям (варианты соседних
+            # классов): меняем один раз, иначе вторая замена затрёт первую, а повтор
+            # не даст ноль. Уже заменённую прежним прогоном тоже не трогаем.
+            if problem.id in {p['pid'] for p in plan} or problem.versions.filter(
+                    note__startswith=NOTE_PREFIX).exists():
+                skipped.append((rec['key'], rec['pid'], 'задача уже заменена по другому заданию'))
+                continue
             plan.append({'key': rec['key'], 'pid': problem.id, 'why': why, 'fields': fields})
         self.stdout.write(f'Вердиктов «заменить» к записи: {len(plan)}; не меняю: {len(skipped)}')
         for key, pid, why in skipped[:20]:
@@ -129,7 +137,7 @@ class Command(BaseCommand):
         number = (problem.versions.aggregate(n=Max('number'))['n'] or 0) + 1
         version = ProblemVersion.objects.create(
             problem=problem, number=number, snapshot=old,
-            note=f'замена официальным эталоном: {item["why"]}'[:300])
+            note=f'{NOTE_PREFIX}{item["why"]}'[:300])
         change = {'id': problem.id, 'key': item['key'], 'version_id': version.id, 'old': {
             'statement': problem.statement, 'content_format': problem.content_format},
             'new': {}, 'parts_old': [], 'created_part_ids': [], 'created_figure_ids': []}
