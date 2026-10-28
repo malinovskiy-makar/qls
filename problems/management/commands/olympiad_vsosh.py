@@ -43,6 +43,8 @@ class Command(BaseCommand):
         parser.add_argument('--limit', type=int, default=None)
         parser.add_argument('--workers', type=int, default=12)
         parser.add_argument('--pages-file', default=None, help='только эти страницы (sha16/pN)')
+        parser.add_argument('--thinking-off', action='store_true',
+                            help='batches: Claude без рассуждения (Sonnet — between_tools, Haiku — disabled)')
 
     # ── пути ────────────────────────────────────────────────────────────
     def _paths(self, root):

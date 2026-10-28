@@ -327,6 +327,34 @@ class AssembleWrapperTests(SimpleTestCase):
         # (1000 + 0,1·2000)·2 + 1000·10 = 12 400 → ×0,5 / 1e6
         self.assertAlmostEqual(vsosh_digitize.batch_cost(usage, 'claude-sonnet-5-5'), 0.0062)
 
+    def test_page_usd_from_ledger_after_50_pages(self):
+        few = [{'kind': 'result', 'model': 'claude-sonnet-5-5', 'cost_usd': 1.0, 'ok': 10}]
+        self.assertEqual(vsosh_digitize.page_usd(few)['claude-sonnet-5-5'],
+                         vsosh_digitize.CLAUDE_PAGE_USD['claude-sonnet-5-5'])
+        many = [{'kind': 'result', 'model': 'claude-sonnet-5-5', 'cost_usd': 0.5, 'ok': 98,
+                 'failed': 2}, {'kind': 'submitted', 'model': 'claude-sonnet-5-5', 'cost_usd': 9}]
+        self.assertAlmostEqual(vsosh_digitize.page_usd(many)['claude-sonnet-5-5'], 0.0055)
+
+    def test_batch_request_downscales_and_turns_thinking_off(self):
+        import base64
+        import io
+
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as tmp:
+            png = os.path.join(tmp, 'p1.png')
+            Image.new('L', (1654, 2339), 255).save(png)
+            job = type('J', (), {'png': png, 'layer': '', 'footers': (), 'key': 'pages/abc/p1',
+                                 'user_text': lambda self: 'стр'})()
+            model = 'claude-sonnet-5-5'
+            req = vsosh_digitize.batch_request(
+                job, model, thinking=vsosh_digitize.THINKING_OFF[model])
+            data = req['params']['messages'][0]['content'][0]['source']['data']
+            size = Image.open(io.BytesIO(base64.b64decode(data))).size
+            self.assertEqual(max(size), vsosh_digitize.CLAUDE_MAX_SIDE)
+            self.assertEqual(req['params']['thinking'], {'type': 'between_tools'})
+            self.assertEqual(req['custom_id'], 'pages__abc__p1')
+            self.assertNotIn('thinking', vsosh_digitize.batch_request(job, model)['params'])
+
 
 class CurrencyDollarTests(SimpleTestCase):
     BS = chr(92)

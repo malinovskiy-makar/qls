@@ -172,10 +172,16 @@ def batch_request(job, model, max_tokens=12000, thinking=None, custom_id=None):
     return {'custom_id': custom_id or job.key.replace('/', '__'), 'params': params}
 
 
-def write_batches(digitized, groups, model, out_dir, chunk=400):
-    """Пакеты к утреннему запуску: batch_<model>_g<группы>_<N>.jsonl по `chunk` страниц."""
+#: Рассуждение выключается по-разному: Sonnet 5.5 не принимает `disabled`.
+THINKING_OFF = {'claude-sonnet-5-5': {'type': 'between_tools'},
+                'claude-haiku-5-5': {'type': 'disabled'}}
+
+
+def write_batches(digitized, groups, model, out_dir, chunk=250, thinking=None, pages=None):
+    """Пакеты Batches: batch_<model>_g<группы>_<N>.jsonl по `chunk` страниц
+    в порядке плана (группа, сезон). `pages` — только эти ключи страниц."""
     os.makedirs(out_dir, exist_ok=True)
-    jobs = page_jobs(digitized, groups)
+    jobs = [(g, j) for g, j in page_jobs(digitized, groups) if not pages or j.key in pages]
     paths, n, part, fh = [], 0, 0, None
     for _g, job in jobs:
         if n % chunk == 0:
@@ -185,7 +191,7 @@ def write_batches(digitized, groups, model, out_dir, chunk=400):
             path = os.path.join(out_dir, f'batch_{model}_g{"".join(map(str, sorted(groups)))}_{part:03d}.jsonl')
             paths.append(path)
             fh = open(path, 'w', encoding='utf-8')
-        fh.write(json.dumps(batch_request(job, model), ensure_ascii=False) + '\n')
+        fh.write(json.dumps(batch_request(job, model, thinking=thinking), ensure_ascii=False) + '\n')
         n += 1
     if fh:
         fh.close()
@@ -398,7 +404,11 @@ def run_batches(cmd, opts):
                       ('claude-haiku-5-5', groups & {4, 5})):
         if not gs:
             continue
-        paths, n = write_batches(cmd.digitized, gs, model, out_dir)
+        pages = None
+        if opts.get('pages_file'):
+            pages = {x.strip() for x in open(opts['pages_file'], encoding='utf-8') if x.strip()}
+        paths, n = write_batches(cmd.digitized, gs, model, out_dir, pages=pages,
+                                 thinking=THINKING_OFF[model] if opts.get('thinking_off') else None)
         total[model] = {'pages': n, 'files': len(paths),
                         'estimate_usd': round(n * CLAUDE_PAGE_USD[model], 2)}
     with open(os.path.join(out_dir, 'batches_plan.json'), 'w', encoding='utf-8') as fh:
@@ -411,6 +421,18 @@ def _ledger(digitized):
     return path, _read(path)
 
 
+def page_usd(ledger):
+    """Цена страницы по модели: средняя по уже забранным пакетам (×1,1 запас),
+    пока их нет — оценка `CLAUDE_PAGE_USD`."""
+    out = dict(CLAUDE_PAGE_USD)
+    for model in out:
+        rs = [x for x in ledger if x.get('kind') == 'result' and x.get('model') == model]
+        n = sum((x.get('ok') or 0) + (x.get('failed') or 0) for x in rs)
+        if n >= 50:
+            out[model] = 1.1 * sum(float(x['cost_usd']) for x in rs) / n
+    return out
+
+
 def run_claude(cmd, opts):
     r"""submit — отправить пакеты по порядку, пока расход < 90 % потолка;
     collect — забрать готовые результаты в pages_claude\ и учесть расход."""
@@ -421,6 +443,7 @@ def run_claude(cmd, opts):
     spent = sum(float(x.get('cost_usd') or 0) for x in ledger if x.get('kind') == 'result')
     cap = opts.get('max_usd') or 0
     action = opts.get('action') or 'collect'
+    per_page = page_usd(ledger)
     client = claude_client()
     if action == 'submit':
         if not opts.get('yes') or not cap:
@@ -432,7 +455,7 @@ def run_claude(cmd, opts):
                 continue
             model = 'claude-sonnet-5-5' if 'sonnet' in name else 'claude-haiku-5-5'
             reqs = _read(os.path.join(out_dir, name))
-            projected = spent + len(reqs) * CLAUDE_PAGE_USD[model] + sum(
+            projected = spent + len(reqs) * per_page[model] + sum(
                 x.get('estimate_usd', 0) for x in ledger
                 if x.get('kind') == 'submitted' and not x.get('collected'))
             if projected > 0.9 * cap:
@@ -448,7 +471,7 @@ def run_claude(cmd, opts):
                     cmd._say(f'  повтор отправки {name}: {exc}')
                     time.sleep(30 * (attempt + 1))
             rec = {'kind': 'submitted', 'file': name, 'batch_id': batch.id, 'model': model,
-                   'requests': len(reqs), 'estimate_usd': round(len(reqs) * CLAUDE_PAGE_USD[model], 3)}
+                   'requests': len(reqs), 'estimate_usd': round(len(reqs) * per_page[model], 3)}
             with open(ledger_path, 'a', encoding='utf-8') as fh:
                 fh.write(json.dumps(rec, ensure_ascii=False) + '\n')
             ledger.append(rec)
@@ -477,7 +500,8 @@ def run_claude(cmd, opts):
                 os.path.join(digitized, 'pages_claude', sha16, f'p{rec["page"]}.json'), rec)
         with open(ledger_path, 'a', encoding='utf-8') as fh:
             fh.write(json.dumps({'kind': 'result', 'batch_id': sub['batch_id'], 'cost_usd': round(cost, 4),
-                                 'ok': ok, 'failed': bad}, ensure_ascii=False) + '\n')
+                                 'model': sub['model'], 'ok': ok, 'failed': bad},
+                                ensure_ascii=False) + '\n')
             fh.write(json.dumps({'kind': 'collected', 'batch_id': sub['batch_id']}) + '\n')
         cmd._say(f'{sub["file"]}: ok {ok}, сбоев {bad}, ${cost:.3f}')
 
