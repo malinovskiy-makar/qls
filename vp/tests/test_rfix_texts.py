@@ -8,13 +8,14 @@
 import json
 import re
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from vp import views
+from vp import config, views
 from vp.models import VPAnswer, VPAttempt
 from vp.tests.helpers import load_demo, make_full_variant
 from vp.tests.test_rfix_phone import STYLES, _rule
@@ -100,6 +101,16 @@ class ArchiveResultTests(TestCase):
                      'Этот же вариант без таймера', 'Что дальше'):
             self.assertIn(kept, html, kept)
         self.assertNotIn('архив 2 тура', html)
+
+    def test_hidden_tour_2_keeps_drill_but_not_the_intro_link(self):
+        # Любой скрытый тур, не только 1: «Что дальше» с тренировкой записи остаётся,
+        # а ссылки на интро скрытого варианта (ученику — 404) нет.
+        with mock.patch.object(config, 'VISIBLE_TOURS', (3,)):
+            html = self.client.get(self.current_url).content.decode()
+        self.assertIn('архив 2 тура', html)
+        self.assertIn('Потренировать запись ответа', html)
+        self.assertNotIn('Этот же вариант без таймера', html)
+        self.assertNotIn(reverse('vp:intro', args=[self.variant.slug]), html)
 
     def test_ranked_counter_skips_the_hidden_tour(self):
         html = self.client.get(reverse('vp:my')).content.decode()
