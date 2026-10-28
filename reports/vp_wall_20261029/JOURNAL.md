@@ -173,3 +173,52 @@
 | `bandit -r vp problems -ll` | Medium 0, High 0 |
 | общая база: `VPAttempt` / `VPAnswer` / пользователи | 2 / 88 / 16 — как в фазе −1; `vp/0005` к ней не применялась |
 | живой бот | пропущено: чтение `.env` закрыто правилами доступа сессии, токена я не видел |
+
+---
+
+# S2b: доделка стены (28.10.2026, вечер)
+
+Продолжение в той же ветке `feat/vp-wall-20261029` от `c0f006d3`. Причина: с боевого сервера
+Telegram недоступен (`curl https://api.telegram.org/` – timeout, Андрей, 28.10) –
+решения Notion `407b11c9-2bc1-8120-98b1-faa08aea97d1` (посредник и длинный опрос) и
+`407b11c9-2bc1-818f-9138-f2539e50d554` (боты `@weconomics_bot`, `@weconomics_dev_bot`).
+
+## Фаза −1. Сверка
+
+| # | Проверка | Результат |
+|---|---|---|
+| 1 | ветка, дерево, `HEAD` после `git fetch` | `feat/vp-wall-20261029`, чисто, `HEAD` = `origin/…` = `c0f006d3` |
+| 2 | другая сессия в worktree | нет (по `git worktree list` у ветки один worktree) |
+| 3 | тесты сессии + `test_security_headers` | **715**, OK (skipped=1). Состав: `vp`, `problems.tests.{test_auth_hardening, test_account_email, test_attach_verified_email, test_email_codes, test_mail_channel, test_register_email, test_password_reset_code, test_security_headers}`, `legal.tests.{test_register, test_erase_user, test_purge_expired, test_mail_consent}` |
+| 4 | `tg_poll`, `wall_tg` как в журнале S2 | да; **расхождение: `tg_poll` не мог работать вовсе** (см. фазу 1) |
+
+## Фаза 1. Длинный опрос как боевая служба
+
+- **Найдена ошибка S2.** `telegram.call(method, *, timeout=8, **params)`: HTTP-таймаут назывался так же,
+  как параметр `timeout` метода `getUpdates`. Прежний `tg_poll` падал с `TypeError: got multiple values
+  for keyword argument 'timeout'` на первом же запросе – в S2 живого бота не было, и тесты `getUpdates`
+  не гоняли. Теперь HTTP-таймаут – `http_timeout`.
+- `TelegramError.code` (код Telegram или HTTP): по нему опрос отличает 409 и 401.
+- `vp.bot.handle_once(update)` – единственный отсев повторов (`cache.add('vp:tg:update:<id>', сутки)`) и
+  единственный перехват сбоя обработки; вебхук и опрос пользуются ею.
+- `tg_poll`: `timeout=50`, HTTP `timeout+10`, `allowed_updates`, `offset`; сетевая ошибка и 5xx – пауза
+  5/10/20/40/60 с, сброс после удачи; 409 и 401 – `CommandError` (код 1); старт `getMe` → «Опрос запущен,
+  бот @…» → `getWebhookInfo`; метка жизни `/tmp/tg_poll_alive`; SIGTERM – выход с кодом 0 (прерывает
+  ожидание сети, но не обработку уже взятого обновления); скрытые `--max-loops` и `sleep` для тестов.
+- `config/settings.py`: логгер `vp` (INFO, консоль) – без него «Опрос запущен» и паузы не попали бы в
+  `docker compose logs`.
+- Служба `tgbot` в `deploy/docker-compose.yml` (профиль `tgbot`, без портов, ждёт `web` и `redis`),
+  `deploy/entrypoint-tgbot.sh` (без `migrate`, режим 755), раздел в `docs/SERVER.md`.
+  `docker` на маке нет: compose проверен разбором YAML (тест `TgbotServiceTests`).
+- Новые тесты `vp/tests/test_wall_poll.py`: 30.
+
+| Дефект | Покраснело |
+|---|---|
+| пауза не растёт | 4 теста `PollNetworkTests` |
+| повтор не отсекается в опросе | 3 теста `PollOnceTests` |
+| 409 продолжает цикл | `test_409_stops_with_a_clear_message`, `test_exit_code_of_409_is_not_zero` |
+| `offset` не сдвигается | `test_two_updates_are_handled_and_offset_moves` |
+| HTTP- и Telegram-`timeout` снова одно имя | оба теста `RealCallShapeTests` |
+| SIGTERM не прерывает ожидание | `test_sigterm_while_waiting_for_telegram_exits_cleanly` |
+| вебхук не ловит сбой обработки | `test_hook_answers_200_when_handling_fails` (**раньше этого теста не было** – мутация выжила, тест добавлен) |
+| у службы нет профиля / в entrypoint `migrate` | `TgbotServiceTests` |

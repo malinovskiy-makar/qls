@@ -848,6 +848,9 @@ LOGGING = {
         'student': {'handlers': ['console'], 'level': 'INFO'},
         'game': {'handlers': ['console'], 'level': 'INFO'},
         'calendar_stub': {'handlers': ['console'], 'level': 'INFO'},
+        # Бот стены ВП (`vp.bot`, `tg_poll`): без этой строки «опрос запущен» и
+        # паузы при обрыве связи в `docker compose logs tgbot` не попадали бы.
+        'vp': {'handlers': ['console'], 'level': 'INFO'},
         'security': {'handlers': ['console'], 'level': 'INFO'},
         # ⚠️ `django.request` пишет трассировку пятисоток. Она нужна, и она
         # обязана быть ЗДЕСЬ, а не на экране: наружу уходит страница 500 без

@@ -23,11 +23,16 @@ MEMBER_STATUSES = ('creator', 'administrator', 'member')
 
 
 class TelegramError(Exception):
-    """Отказ Telegram. `kind`: 'network' | 'api' | 'config'. Токена в тексте нет."""
+    """Отказ Telegram. `kind`: 'network' | 'api' | 'config'. Токена в тексте нет.
 
-    def __init__(self, kind, description=''):
+    `code` – код ответа Telegram (`error_code`) или HTTP, если он известен: по нему
+    `tg_poll` отличает «второй опрос или вебхук» (409) от «токен отозван» (401).
+    """
+
+    def __init__(self, kind, description='', code=None):
         self.kind = kind
         self.description = description
+        self.code = code
         super().__init__(f'{kind}: {description}' if description else kind)
 
 
@@ -45,10 +50,13 @@ def _scrub(text):
     return text.replace(token, '***') if token else text
 
 
-def call(method, *, timeout=8, **params):
+def call(method, *, http_timeout=8, **params):
     """POST JSON на `{TELEGRAM_API_BASE}/bot{token}/{method}`; результат `result`.
 
     Сеть или `ok=false` → `TelegramError`. Ни адрес, ни токен наружу не выходят.
+
+    ⚠️ `http_timeout` – ожидание ответа по HTTP; `timeout` в `params` – параметр самого
+    Telegram (длинный опрос `getUpdates`). Раньше называлось одинаково, и опрос падал.
     """
     token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
     base = (getattr(settings, 'TELEGRAM_API_BASE', '') or '').rstrip('/')
@@ -62,14 +70,14 @@ def call(method, *, timeout=8, **params):
     data = None
     failure = None
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 — схема проверена выше: только https
+        with urllib.request.urlopen(request, timeout=http_timeout) as response:  # nosec B310 — схема проверена выше: только https
             data = json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as error:
         # Telegram отвечает 4xx с телом {"ok": false, "description": …}.
         try:
             data = json.loads(error.read().decode('utf-8'))
         except (ValueError, OSError):
-            failure = TelegramError('network', f'HTTP {error.code}')
+            failure = TelegramError('network', f'HTTP {error.code}', error.code)
     except (urllib.error.URLError, OSError, ValueError) as error:
         failure = TelegramError('network', type(error).__name__)
     # ⚠️ Вне блока except: цепочка исключений (`__context__`) несла бы адрес с токеном.
@@ -77,7 +85,9 @@ def call(method, *, timeout=8, **params):
         raise failure
     if not isinstance(data, dict) or not data.get('ok'):
         description = data.get('description', '') if isinstance(data, dict) else ''
-        raise TelegramError('api', _scrub(description)[:200])
+        code = data.get('error_code') if isinstance(data, dict) else None
+        raise TelegramError('api', _scrub(description)[:200],
+                            code if isinstance(code, int) else None)
     return data.get('result')
 
 

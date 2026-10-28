@@ -159,6 +159,43 @@ services:
       retries: 3
       start_period: 20s
 
+  # ⚠️ СЕРВИС `tgbot` – БОТ СТЕНЫ ВП, ДЛИННЫЙ ОПРОС TELEGRAM. МИГРАЦИЙ НЕТ.
+  # Telegram не достучится до нашего сервера (вебхук закрыт), поэтому бот сам
+  # забирает сообщения через `TELEGRAM_API_BASE` (посредник за рубежом,
+  # deploy/tg_relay/README.md). Образ тот же, что у web, entrypoint СВОЙ и без
+  # `migrate` по той же причине, что у ws.
+  #
+  # ⚠️ ПО УМОЛЧАНИЮ НЕ СТАРТУЕТ (profiles): включает Андрей при выкатке стены,
+  # когда `tg_setup --ping` отвечает и вебхук снят:
+  #   docker compose --profile tgbot up -d tgbot
+  # ⚠️ ЭКЗЕМПЛЯР ОДИН: второй опрос получит 409 от Telegram и остановится.
+  # ⚠️ Порт наружу не публикуется – бот ходит только ВО ВНЕ, входящих нет.
+  tgbot:
+    image: weconomics-web:latest
+    container_name: weco-tgbot
+    restart: unless-stopped
+    profiles: ["tgbot"]
+    env_file:
+      - /srv/weconomics/.env
+    entrypoint: ["/app/deploy/entrypoint-tgbot.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      # Метка жизни: tg_poll обновляет /tmp/tg_poll_alive после каждого ответа
+      # Telegram (раз в ≤60 с даже без сообщений). Старше 3 минут – не жив.
+      test: ["CMD-SHELL", "test -f /tmp/tg_poll_alive && test -z \"$$(find /tmp/tg_poll_alive -mmin +3)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
   # ⚠️ СЕРВИС КОДИРОВАНИЯ ЗАПРОСОВ (С4). ПОРТ НАРУЖУ НЕ ПУБЛИКУЕТСЯ.
   # Секции `ports` здесь нет и быть не должно: эндпоинт /encode работает
   # без авторизации, и опубликованный порт раздавал бы кому угодно нашу

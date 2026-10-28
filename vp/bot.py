@@ -21,6 +21,7 @@ import hmac
 import logging
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
@@ -51,6 +52,9 @@ TEXTS = {
 }
 
 CHECK = 'check'
+
+#: Повтор `update_id` не обрабатывается сутки: вебхук и опрос шлют его заново после сбоя.
+DEDUP_SECONDS = 24 * 3600
 
 
 def token_hash(token):
@@ -212,6 +216,25 @@ def handle(update):
         _message(update['message'] or {})
     elif 'callback_query' in update:
         _callback(update['callback_query'] or {})
+
+
+def handle_once(update):
+    """Обработать обновление ОДИН раз: `True` – обработано, `False` – повтор.
+
+    Единственное место отсева повторов для вебхука и для `tg_poll`. Кэш на бою – Redis,
+    общий для контейнеров, поэтому отсев переживает перезапуск службы опроса.
+    Сбой обработки пишется в лог (`update_id`, тип, класс ошибки, без тела) и наружу не
+    выходит: повтор обновления с ошибкой Telegram не лечит, а вебхук должен ответить 200.
+    """
+    update_id = update.get('update_id')
+    if update_id is not None and not cache.add('vp:tg:update:%s' % update_id, 1, DEDUP_SECONDS):
+        return False
+    try:
+        handle(update)
+    except Exception as error:  # noqa: BLE001 — один сбой не роняет ни вебхук, ни опрос
+        logger.warning('Бот: обновление %s (%s) – %s', update_id, update_kind(update),
+                       type(error).__name__)
+    return True
 
 
 def update_kind(update):

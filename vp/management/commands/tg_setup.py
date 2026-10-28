@@ -40,7 +40,7 @@ class Command(BaseCommand):
         out = self.stdout.write
         if options['ping']:
             started = time.monotonic()
-            self._call('getMe', timeout=10)
+            self._call('getMe', http_timeout=10)
             out('Telegram отвечает за %d мс' % ((time.monotonic() - started) * 1000))
         elif options['check']:
             me = self._call('getMe')

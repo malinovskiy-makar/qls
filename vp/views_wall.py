@@ -13,7 +13,6 @@ Telegram к аккаунту, который уже вошёл и получил
 """
 import hmac
 import json
-import logging
 import secrets
 import time
 from datetime import timedelta
@@ -39,8 +38,6 @@ from problems.models_legal import ConsentRecord
 from vp import bot, landing, telegram, tracking, wall
 from vp.models import VPTelegramLink, VPTelegramToken, VPWall
 from vp.views import _current_attempt, _remember, _start_attempt, _variant_or_404, _wall_url
-
-hook_logger = logging.getLogger('vp.bot')
 
 #: Почта, на которую ушёл код со стены: `{'email', 'mail_consent', 'slug'}`.
 SESSION_EMAIL = 'vp_wall_email'
@@ -267,9 +264,8 @@ SESSION_TG = 'vp_wall_tg'
 TG_TOKENS_PER_HOUR = 10
 #: Кнопка «проверить» — не чаще раза в столько секунд на человека.
 CHECK_EVERY = 5
-#: Вебхук: тело больше этого — 400; повтор `update_id` не обрабатывается сутки.
+#: Вебхук: тело больше этого — 400. Повтор `update_id` отсекает `vp.bot.handle_once`.
 HOOK_MAX_BYTES = 64 * 1024
-HOOK_DEDUP_SECONDS = 24 * 3600
 
 
 def _tg_wait_minutes(user):
@@ -376,15 +372,7 @@ def tg_hook(request):
         return HttpResponseBadRequest()
     if not isinstance(update, dict):
         return HttpResponseBadRequest()
-    update_id = update.get('update_id')
-    if update_id is not None and not cache.add('vp:tg:update:%s' % update_id, 1,
-                                               HOOK_DEDUP_SECONDS):
-        return JsonResponse({'ok': True})
-    try:
-        bot.handle(update)
-    except Exception as error:  # noqa: BLE001 — Telegram не должен получить 500
-        hook_logger.warning('Бот: обновление %s (%s) — %s', update_id,
-                            bot.update_kind(update), type(error).__name__)
+    bot.handle_once(update)
     return JsonResponse({'ok': True})
 
 
