@@ -16,6 +16,11 @@
 
 Приложение НИЧЕГО не пишет в `problems`. Связь с банком задач — только на
 чтение, через `problems.OlympiadRef.olympiad_slug`.
+
+⚠️ С 30.10.2026 у комплекта из пакета олимпиад есть состав —
+`OlympiadVariantItem`: позиция комплекта ссылается на задачу банка
+(`Problem`), сами тексты заданий живут в банке, а не здесь (решение
+владельца 30.10 «задания пакета едут в банк скрытыми», ADR 0169).
 """
 from datetime import date
 
@@ -790,7 +795,10 @@ class OlympiadVariant(models.Model):
         OlympiadStage, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='variants', verbose_name='Этап',
     )
-    year = models.PositiveSmallIntegerField('Год')
+    # ⚠️ Год может быть неизвестен: в пакете олимпиад 30.10 есть комплект
+    # без сезона (`vseros-regional-unknown-ru-all-all`). Выдумывать ему год
+    # нельзя — по году строится сетка «этап × сезон».
+    year = models.PositiveSmallIntegerField('Год', null=True, blank=True)
     grade = models.PositiveSmallIntegerField('Класс', null=True, blank=True)
     variant_label = models.CharField('Вариант', max_length=100, blank=True)
     problem_count = models.PositiveSmallIntegerField(
@@ -821,6 +829,45 @@ class OlympiadVariant(models.Model):
         FactSource, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='variants', verbose_name='Источник',
     )
+
+    # --- Поля пакета олимпиад (olympiads_20261029, ADR 0169) --------------
+    # ⚠️ `kit_key` — КЛЮЧ ИДЕМПОТЕНТНОСТИ комплекта, `kit_id` пакета как
+    # есть. Естественный ключ (олимпиада, сезон, этап, тур, класс, вариант)
+    # не годится: в пакете шесть комплектов совпадают по нему целиком.
+    # NULL — комплект заведён не из пакета (12 прежних, демонстрационные).
+    kit_key = models.CharField(
+        'Ключ комплекта в пакете', max_length=100, null=True, blank=True,
+        unique=True)
+    # Учебный год строкой «2022/23»; год `year` — год конца сезона.
+    season = models.CharField('Сезон', max_length=10, blank=True)
+    # ⚠️ Тур СТРОКОЙ, как в пакете: «1», «2», «test», «problems», «essay»,
+    # «tur1». Приведение к числу потеряло бы «test» и «essay», а русская
+    # подпись — дело шаблона.
+    tour = models.CharField('Тур', max_length=20, blank=True)
+    # Исходная строка класса («10-11», «all», пусто) — для подписи комплекта.
+    # По какому классу комплект ищется — `OlympiadVariantGrade`.
+    grade_raw = models.CharField('Класс (как в источнике)', max_length=20,
+                                 blank=True)
+    subject = models.CharField('Предмет', max_length=60, blank=True)
+    region_code = models.CharField('Код региона', max_length=10, blank=True)
+    region_name = models.CharField('Регион', max_length=200, blank=True)
+    reference_version = models.CharField('Версия эталона', max_length=20,
+                                         blank=True)
+    # Известные пропуски: на странице источника есть задания, которых нет
+    # в эталоне. Непустой список — на экране плашка «вариант неполный».
+    open_issues = models.JSONField('Известные пропуски', default=list,
+                                   blank=True)
+
+    class Visibility(models.TextChoices):
+        PUBLISHED = 'published', 'Показывается'
+        HIDDEN = 'hidden', 'Скрыт'
+
+    # ⚠️ Скрыт — например, все задания комплекта «под вопросом» (8 в пакете
+    # 30.10). Прежние 12 комплектов получают «показывается»: так они и
+    # показывались до этого поля.
+    visibility = models.CharField(
+        'Видимость', max_length=10, choices=Visibility.choices,
+        default=Visibility.PUBLISHED, db_index=True)
 
     class Meta:
         verbose_name = 'Комплект заданий'
@@ -866,6 +913,154 @@ class OlympiadVariant(models.Model):
         else:
             word = 'заданий'
         return '{} {}'.format(n, word)
+
+
+class OlympiadVariantGrade(models.Model):
+    """Один класс комплекта. Диапазон «10-11» — две строки, 10 и 11.
+
+    ⚠️ Решение владельца 30.10: школьник ищет «мне в 10 класс», а не
+    «мне комплект на 10-11», поэтому комплект с диапазоном попадает и в
+    фильтр 10, и в фильтр 11, и в обе ячейки сетки. Исходная строка — в
+    `OlympiadVariant.grade_raw`. У «all» и пустого класса строк нет вовсе.
+    """
+
+    variant = models.ForeignKey(
+        OlympiadVariant, on_delete=models.CASCADE, related_name='grades',
+        verbose_name='Комплект')
+    grade = models.PositiveSmallIntegerField('Класс')
+
+    class Meta:
+        verbose_name = 'Класс комплекта'
+        verbose_name_plural = 'Классы комплектов'
+        ordering = ['variant', 'grade']
+        constraints = [
+            models.UniqueConstraint(fields=['variant', 'grade'],
+                                    name='olymp_variant_grade_uniq'),
+            # Классы школы — с 1 по 11; в пакете бывают «3-4».
+            models.CheckConstraint(condition=models.Q(grade__gte=1, grade__lte=11),
+                                   name='olymp_variant_grade_1_11'),
+        ]
+
+    def __str__(self):
+        return '{} · {} класс'.format(self.variant, self.grade)
+
+
+class OlympiadVariantFile(models.Model):
+    """Файл-источник комплекта: PDF условий, решений, критериев.
+
+    Ключ — `(variant, sha256)`: тот же файл повторным импортом не
+    перекладывается. Один PDF бывает общим у нескольких комплектов — тогда
+    у каждого своя строка с тем же `sha256`.
+    """
+
+    variant = models.ForeignKey(
+        OlympiadVariant, on_delete=models.CASCADE, related_name='files',
+        verbose_name='Комплект')
+    # Вид как в пакете: «условия», «решения+критерии», «ответы» и т. п.
+    kind = models.CharField('Что в файле', max_length=40)
+    url = models.URLField('Адрес на сайте', max_length=800, blank=True)
+    # False — файл взят с зеркала (SolveHub и т. п.), а не с сайта
+    # организатора: экран пишет об этом рядом со ссылкой.
+    official = models.BooleanField('С сайта организатора', default=True)
+    sha256 = models.CharField('SHA-256', max_length=64)
+    size = models.PositiveBigIntegerField('Размер, байт', null=True,
+                                          blank=True)
+    original_name = models.CharField('Имя файла у источника', max_length=300,
+                                     blank=True)
+    # Сам файл в томе media. Пусто — строка заведена, файл ещё не залит.
+    file = models.FileField('Файл', upload_to='olympiads/', max_length=300,
+                            blank=True)
+    # Если PDF получен конвертацией из Word — путь к Word в пакете.
+    original_path = models.CharField('Исходный Word', max_length=500,
+                                     blank=True)
+    note = models.CharField('Заметка', max_length=300, blank=True)
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Файл комплекта'
+        verbose_name_plural = 'Файлы комплектов'
+        ordering = ['variant', 'order', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['variant', 'sha256'],
+                                    name='olymp_variant_file_sha_uniq'),
+        ]
+
+    def __str__(self):
+        return '{} · {}'.format(self.variant, self.original_name or self.kind)
+
+
+class OlympiadVariantItem(models.Model):
+    """Позиция комплекта: «задание № N этого тура — вот эта задача банка».
+
+    ⚠️ ТЕКСТОВ ЗДЕСЬ НЕТ И НЕ БУДЕТ. Условие, пункты, ответ, решение и
+    рисунки живут в `Problem` (решение владельца 30.10). Здесь — только то,
+    что принадлежит ТУРУ, а не задаче: номер и порядок в комплекте, балл,
+    страницы PDF и вердикт пакета о качестве оцифровки этой позиции.
+
+    ⚠️ ПОЧЕМУ `ref_key` ЗДЕСЬ, А НЕ В `problems.OlympiadRef`. Там стоит
+    `unique(problem, event_id)`, а в пакете 238 пар «задача × комплект»
+    несут по два-три ключа (564 задания: варианты 5:1 / 5:2 / 5:3 отборочного
+    МОШ с одним текстом). В `OlympiadRef` эти ключи не помещаются, и
+    повторный импорт не узнал бы потерянные — заводил бы их заново.
+
+    ⚠️ «ПОД ВОПРОСОМ» — ПРИЗНАК ПОЗИЦИИ, А НЕ ПЯТЫЙ ПРИЗНАК ЗАДАЧИ. В
+    `Problem` четыре механизма скрытия, и пятый заводить запрещено
+    (CLAUDE.md). Импортированная задача и так скрыта до ревью; этот признак
+    говорит разделу, показывать ли позицию, а ревьюеру — с чего начинать.
+    """
+
+    class Quality(models.TextChoices):
+        CLEAN = 'clean', 'Чисто'
+        FLAGGED = 'flagged', 'Под вопросом'
+
+    variant = models.ForeignKey(
+        OlympiadVariant, on_delete=models.CASCADE, related_name='items',
+        verbose_name='Комплект')
+    # ⚠️ Ключ пакета как есть: «событие:номер» или «событие:номер:вариант».
+    # Не пересчитывать и не нормализовать (правило README пакета).
+    ref_key = models.CharField('Ключ задания в пакете', max_length=100,
+                               unique=True)
+    # ⚠️ PROTECT: задача банка, стоящая в комплекте, не удаляется молча —
+    # иначе комплект потерял бы задание, а попытки — то, что решали.
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.PROTECT,
+        related_name='olympiad_items', verbose_name='Задача банка')
+    number = models.CharField('Номер в туре', max_length=20, blank=True)
+    task_variant = models.CharField('Вариант задания', max_length=20,
+                                    blank=True)
+    order = models.PositiveIntegerField('Порядок в комплекте', default=0)
+    max_score = models.DecimalField('Максимум баллов', max_digits=6,
+                                    decimal_places=2, null=True, blank=True)
+    quality = models.CharField(
+        'Качество оцифровки', max_length=10, choices=Quality.choices,
+        default=Quality.CLEAN, db_index=True)
+    quality_reasons = models.JSONField('Почему под вопросом', default=list,
+                                       blank=True)
+    has_solution = models.BooleanField('Есть решение', default=False)
+    # Файл-источник и страницы: {"source_file": [...], "source_pages": [...],
+    # "solution_pages": [...], "criteria_pages": [...]} — пути как в пакете.
+    pages = models.JSONField('Страницы в PDF', default=dict, blank=True)
+    # Хеш записи пакета: тот же хеш при повторном импорте — «без изменений».
+    content_hash = models.CharField('Хеш записи пакета', max_length=64,
+                                    blank=True)
+    # Задания нет в последнем пакете. Позиция НЕ удаляется: на ней могут
+    # висеть попытки, а пропуск в пакете бывает и ошибкой сборки.
+    absent_in_last_import = models.BooleanField(
+        'Нет в последнем пакете', default=False)
+    created_at = models.DateTimeField('Заведена', auto_now_add=True)
+    updated_at = models.DateTimeField('Изменена', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Позиция комплекта'
+        verbose_name_plural = 'Позиции комплектов'
+        ordering = ['variant', 'order', 'id']
+        indexes = [
+            models.Index(fields=['variant', 'order'],
+                         name='olymp_item_variant_order'),
+        ]
+
+    def __str__(self):
+        return self.ref_key
 
 
 class RegionalCoordinator(models.Model):

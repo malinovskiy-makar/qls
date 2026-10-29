@@ -115,7 +115,10 @@ def olympiad_detail(request, slug):
         'variants': variants,
         'variant_stages': stages,
         'variant_grades': sorted({v.grade for v in variants if v.grade}),
-        'variant_years': sorted({v.year for v in variants}, reverse=True),
+        # ⚠️ Год у комплекта бывает пустым (пакет 30.10): `None` с числом
+        # не сравнивается, и без фильтра падала бы вся страница олимпиады.
+        'variant_years': sorted({v.year for v in variants if v.year is not None},
+                                reverse=True),
         'regions': regions,
         'show_regions': show_regions,
         # Год берётся из данных, а не зашивается в шаблон: правила приёма
