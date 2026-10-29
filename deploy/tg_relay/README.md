@@ -54,11 +54,17 @@ api.telegram.org → host-gateway  ──TLS──►  172.17.0.1:18443  ◄═�
 useradd --system --create-home --shell /usr/sbin/nologin tgtunnel
 ```
 
-**2. Ключ посредника.** На посреднике ключ (без пароля) лежит у пользователя, от которого работает служба
-`tg-tunnel`; его публичную часть кладём в `~tgtunnel/.ssh/authorized_keys` **одной строкой с ограничениями**:
+**2. Ключ посредника.** Создаётся **на посреднике** (от `root`, служба `tg-tunnel` работает от него же), без пароля:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C tgtunnel@relay -f /root/.ssh/tgtunnel
+cat /root/.ssh/tgtunnel.pub
+```
+
+Публичную часть (`tgtunnel.pub`) кладём на боевой в `~tgtunnel/.ssh/authorized_keys` **одной строкой с ограничениями**:
 
 ```
-restrict,port-forwarding,permitlisten="172.17.0.1:18443" ssh-ed25519 AAAA…публичный_ключ… tg-relay
+restrict,port-forwarding,permitlisten="172.17.0.1:18443" ssh-ed25519 AAAA…публичный_ключ… tgtunnel@relay
 ```
 
 Права: `chmod 700 ~tgtunnel/.ssh && chmod 600 ~tgtunnel/.ssh/authorized_keys && chown -R tgtunnel: ~tgtunnel/.ssh`.
@@ -91,17 +97,18 @@ ufw allow from 172.16.0.0/12 to 172.17.0.1 port 18443 proto tcp
 ## На посреднике (служба `tg-tunnel`)
 
 Unit-файл – [`tg-tunnel.service`](tg-tunnel.service) в этой папке; кладётся в `/etc/systemd/system/`.
-⚠️ Сверьте его с тем, что реально стоит на посреднике (`systemctl cat tg-tunnel`): путь ключа и
-пользователь в репозитории – по описанию команды, а не копия файла с сервера.
+Файл сверен с рабочей службой на посреднике (29.10.2026): ключ `/root/.ssh/tgtunnel`, запуск от `root`,
+строки `User=` нет.
 
 ```bash
 install -m 644 tg-tunnel.service /etc/systemd/system/tg-tunnel.service
 systemctl daemon-reload && systemctl enable --now tg-tunnel
 ```
 
-Суть команды: `ssh -NT -R 172.17.0.1:18443:api.telegram.org:443 tgtunnel@135.106.181.151`
-(`Restart=always`, `ExitOnForwardFailure=yes`, `ServerAliveInterval=30`, `ServerAliveCountMax=3`).
-Первый вход на боевой хост запомните вручную (`known_hosts`), иначе служба будет ждать подтверждения.
+Команда службы: `ssh -NT -i /root/.ssh/tgtunnel -o ServerAliveInterval=30 -o ServerAliveCountMax=3
+-o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -R 172.17.0.1:18443:api.telegram.org:443
+tgtunnel@135.106.181.151` (`Restart=always`, `RestartSec=10`).
+Отпечаток боевого хоста служба запоминает при первом входе сама (`StrictHostKeyChecking=accept-new`).
 
 ## Проверка
 

@@ -102,10 +102,18 @@ class TunnelUnitTests(SimpleTestCase):
 
     def test_unit_reconnects_and_fails_loudly_on_a_busy_port(self):
         unit = self.unit()
-        for needle in ('Restart=always', 'ExitOnForwardFailure=yes', 'ServerAliveInterval=30',
-                       'ServerAliveCountMax=3', '-R 172.17.0.1:18443:api.telegram.org:443',
-                       'tgtunnel@'):
+        for needle in ('Restart=always', 'RestartSec=10', 'ExitOnForwardFailure=yes',
+                       'ServerAliveInterval=30', 'ServerAliveCountMax=3',
+                       'StrictHostKeyChecking=accept-new',
+                       '-R 172.17.0.1:18443:api.telegram.org:443', 'tgtunnel@135.106.181.151'):
             self.assertIn(needle, unit)
+        self.assertNotIn('User=', unit)  # на посреднике служба запускается от root
+
+    def test_unit_and_readme_use_the_same_key_path(self):
+        # Ключ создан на посреднике 29.10.2026: ssh-keygen … -f /root/.ssh/tgtunnel
+        keygen = 'ssh-keygen -t ed25519 -N "" -C tgtunnel@relay -f /root/.ssh/tgtunnel'
+        self.assertIn('-i /root/.ssh/tgtunnel ', self.unit())
+        self.assertIn(keygen, (self.RELAY / 'README.md').read_text('utf-8'))
 
     def test_port_in_env_example_matches_the_tunnel(self):
         env = (self.RELAY.parents[1] / 'deploy' / 'env.example').read_text('utf-8')

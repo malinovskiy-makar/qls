@@ -5,28 +5,20 @@
 # (посредник пересылает байты, токена не видит). Соединение открывает ПОСРЕДНИК: с боевого сервера
 # до него ничего не доходит (29.10.2026), а в обратную сторону пускает.
 #
-# ⚠️ Файл написан по описанию рабочей команды, а не скопирован с сервера: путь ключа (-i) и
-# User= сверить с `systemctl cat tg-tunnel` на посреднике.
+# Сверено с рабочей службой на посреднике 29.10.2026 (проверено руками). Запускается от root, строки
+# User= нет. Ключ: ssh-keygen -t ed25519 -N "" -C tgtunnel@relay -f /root/.ssh/tgtunnel
 [Unit]
 Description=Обратный SSH-туннель Telegram до боевого сервера (172.17.0.1:18443 -> api.telegram.org:443)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=root
 Restart=always
 RestartSec=10
 # ExitOnForwardFailure: если порт на боевом ещё занят старым сеансом, ssh выходит, а systemd
 # пробует снова (порт освобождается за ~90 с, ClientAlive на стороне sshd).
-ExecStart=/usr/bin/ssh -NT \
-    -i /root/.ssh/tg_tunnel_ed25519 \
-    -o ExitOnForwardFailure=yes \
-    -o ServerAliveInterval=30 \
-    -o ServerAliveCountMax=3 \
-    -o BatchMode=yes \
-    -o StrictHostKeyChecking=yes \
-    -R 172.17.0.1:18443:api.telegram.org:443 \
-    tgtunnel@135.106.181.151
+# StrictHostKeyChecking=accept-new: отпечаток боевого хоста запоминается при первом входе сам.
+ExecStart=/usr/bin/ssh -NT -i /root/.ssh/tgtunnel -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -R 172.17.0.1:18443:api.telegram.org:443 tgtunnel@135.106.181.151
 
 [Install]
 WantedBy=multi-user.target
