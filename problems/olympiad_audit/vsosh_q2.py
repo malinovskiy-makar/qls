@@ -194,7 +194,7 @@ PRIMARY, SECOND = 'gpt-6.1-terra', 'claude-haiku-5-5'
 #: Оценка $ за запрос пакетом (калибровка ×0,5 скидки ×1,1 запаса) — для
 #: потолка до отправки; в журнал денег идёт настоящая цена по `usage`.
 BATCH_ITEM_USD = {'gpt-6.1-terra': 0.0047, 'claude-haiku-5-5': 0.00095,
-                  'claude-sonnet-5-5': 0.011, 'claude-opus-5-5': 0.045}
+                  'claude-sonnet-5-5': 0.0095, 'claude-opus-5-5': 0.045}
 #: Запросов в пакете: у OpenAI файл ≤ 200 МБ, у Anthropic пакет ≤ 256 МБ
 #: (страница с картинкой — до ~0,8 МБ base64).
 CHUNK = {'openai': 200, 'anthropic': 200}
