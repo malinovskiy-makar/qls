@@ -869,6 +869,28 @@ class OlympiadVariant(models.Model):
         'Видимость', max_length=10, choices=Visibility.choices,
         default=Visibility.PUBLISHED, db_index=True)
 
+    # --- Счётчики комплекта (миграция 0010) -------------------------------
+    # ⚠️ СНИМАЮТСЯ С ПАКЕТА ПРИ ИМПОРТЕ, а не считаются по позициям. Навигатор
+    # выводит разом все комплекты, и пересчёт по `items` на каждое открытие
+    # страницы был бы расточителен; к тому же позиций у комплекта может не
+    # быть вовсе (задания пакета в банк едут отдельной волной). Меняет их
+    # только импорт: тот же пакет — те же числа.
+    tasks_total = models.PositiveIntegerField('Заданий всего', default=0)
+    tasks_clean = models.PositiveIntegerField('Заданий чистых', default=0)
+    tasks_flagged = models.PositiveIntegerField(
+        'Заданий под вопросом', default=0)
+    # Эталон ответа — непустой `answer` ИЛИ непустой ключ теста. Не разбор.
+    tasks_with_answer = models.PositiveIntegerField(
+        'Заданий с эталоном ответа', default=0)
+    tasks_with_solution = models.PositiveIntegerField(
+        'Заданий с решением', default=0)
+    tasks_with_criteria = models.PositiveIntegerField(
+        'Заданий с критериями', default=0)
+    # Комплекта нет в последнем пакете. НЕ удаляется: на нём могут висеть
+    # попытки, а пропуск в пакете бывает и ошибкой сборки.
+    absent_in_last_import = models.BooleanField(
+        'Нет в последнем пакете', default=False)
+
     class Meta:
         verbose_name = 'Комплект заданий'
         verbose_name_plural = 'Комплекты заданий'
@@ -1043,6 +1065,10 @@ class OlympiadVariantItem(models.Model):
     # сдачи. По умолчанию «нет» — забытая разметка не включит таймер там,
     # где проверить нечем.
     has_answer = models.BooleanField('Есть эталон ответа', default=False)
+    # ⚠️ КРИТЕРИИ — ОСНОВА ПРОВЕРКИ ИИ (решение владельца 30.10): балл за
+    # развёрнутое решение ставится по официальным критериям. Нет критериев —
+    # ученику показывается только эталонное решение, без балла.
+    has_criteria = models.BooleanField('Есть критерии', default=False)
     # Файл-источник и страницы: {"source_file": [...], "source_pages": [...],
     # "solution_pages": [...], "criteria_pages": [...]} — пути как в пакете.
     pages = models.JSONField('Страницы в PDF', default=dict, blank=True)
