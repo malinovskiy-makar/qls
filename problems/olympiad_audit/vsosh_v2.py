@@ -491,6 +491,58 @@ def build_queue(rows, v1_root, key_queue, human_pages, path):
     return out
 
 
+#: Рабочая база банка (в папке worktree база пустая). Открывается ТОЛЬКО на
+#: чтение (`mode=ro`): Q2 в базу не пишет.
+BANK_DB = r'C:\Users\shipu\qls\db.sqlite3'
+
+
+def bank_plan(rows, out_dir, db_path=BANK_DB):
+    """Сухой план импорта v2 — то же правило, что `vsosh_quality.run_bank`
+    (P3, `BANK_v1.md`): внутри (этап, сезон) по тексту без разметки,
+    token_set ≥ 0,90 — привязать, ≥ 0,70 — сомнительно, иначе создать.
+    → Counter((этап, вердикт))."""
+    import sqlite3
+
+    from rapidfuzz import fuzz
+
+    from problems.olympiad_official import markup_free_key
+    con = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+    refs = con.execute(
+        "SELECT r.problem_id, r.source_site, r.academic_year, r.year, r.stage, p.statement "
+        "FROM problems_olympiadref r JOIN problems_problem p ON p.id = r.problem_id "
+        "WHERE r.olympiad_slug = 'vseros'").fetchall()
+    con.close()
+    bank_by = defaultdict(list)
+    for pid, _site, ay, year, stage, statement in refs:
+        season = vsosh_quality._season({'academic_year': ay, 'year': year})
+        bank_by[(vsosh_quality._stage_bank(stage), season)].append(
+            (pid, markup_free_key(statement or '')))
+    plan, detail = Counter(), []
+    for t in rows:
+        key = markup_free_key(t.get('statement_md') or '')
+        best, pid = 0, None
+        for p, k in bank_by.get((t['stage'], t['academic_year']), []):
+            if k and key:
+                s = fuzz.token_set_ratio(key[:3000], k[:3000]) / 100
+                if s > best:
+                    best, pid = s, p
+        verdict = 'привязать' if best >= 0.9 else 'сомнительно' if best >= 0.7 else 'создать'
+        plan[(t['stage'], verdict)] += 1
+        detail.append({'ref_key': row_key(t), 'best': round(best, 3), 'problem_id': pid,
+                       'verdict': verdict})
+    digitize.write_jsonl(os.path.join(out_dir, 'bank_match_v2.jsonl'), detail)
+    lines = ['# ВсОШ v2: сухой план импорта (только чтение базы)', '',
+             f'Привязок `vseros` в банке: {len(refs)}. Правило — как `BANK_v1.md` (P3): '
+             'текст без разметки внутри (этап, сезон), token_set ≥ 0,90 / 0,70.', '',
+             '| этап | создать | привязать | сомнительно |', '|---|---|---|---|']
+    for st in STAGES:
+        lines.append(f'| {st} | {plan[(st, "создать")]} | {plan[(st, "привязать")]} | '
+                     f'{plan[(st, "сомнительно")]} |')
+    with open(os.path.join(out_dir, 'BANK_v2.md'), 'w', encoding='utf-8') as fh:
+        fh.write('\n'.join(lines) + '\n')
+    return plan
+
+
 def changed_keys(v1_rows, v2_rows, path):
     """`changed_keys_v1_v2.csv`: ключ, этап, что случилось (added / removed /
     changed: поля)."""

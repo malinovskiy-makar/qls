@@ -902,7 +902,7 @@ QUEUE_PATH = r'C:\Users\shipu\weconomics-data\quality_20261029\queues\q2_vsosh_v
 
 def build_v2(q, cmd, opts, log):
     """Сборка эталона v2 и все проверки фазы 5 → `digitized\\v2\\`."""
-    from problems.olympiad_audit import digitize, vsosh_quality
+    from problems.olympiad_audit import digitize
     from problems.olympiad_audit import vsosh_v2 as V
     v2_root = os.path.dirname(q.work)
     rows = V.assemble_v2(q.v1, v2_root, log)
@@ -942,8 +942,7 @@ def build_v2(q, cmd, opts, log):
            'queue_items': len(queue), 'queue_by_check': dict(Counter(x['check'] for x in queue)),
            'queue_tasks': len({x['ref_key'] for x in queue})}
     if not opts.get('no_bank'):
-        res['bank_plan'] = {f'{s}|{v}': n for (s, v), n in vsosh_quality.run_bank(
-            cmd, {'ref_file': out, 'out_dir': v2_root, 'tag': 'v2'}).items()}
+        res['bank_plan'] = {f'{s}|{v}': n for (s, v), n in V.bank_plan(rows, v2_root).items()}
     with open(os.path.join(v2_root, 'check_v2.json'), 'w', encoding='utf-8') as fh:
         json.dump(res, fh, ensure_ascii=False, indent=1)
     log(json.dumps({k: v for k, v in res.items() if k not in ('figures_bad',)}, ensure_ascii=False)[:4000])
