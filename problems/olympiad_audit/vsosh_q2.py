@@ -499,10 +499,22 @@ def p2_merge(q, opts, log):
         job = q.jobs[k]
         a = vv.read_record(vv.rec_path(pages_dir(q), PRIMARY, k))
         b = vv.read_record(vv.rec_path(pages_dir(q), SECOND, k))
+        base = {'primary': PRIMARY, 'second': SECOND}
+        final = opts.get('round') == 'final'
+        if final and b and b.get('status') == 'ok' and not (a and a.get('status') == 'ok'):
+            # terra не досталась странице (потолок OpenAI, 29.10): одно мнение
+            # Haiku принимается, только если все числа сошлись со слоем PDF.
+            ok_layer = job.has_layer and vv.layer_check(b, job) == ([], [])
+            write_v2(q, k, b, dict(base, primary=None, decision='одно_мнение_слой' if ok_layer
+                                   else 'человеку', why=['одно_мнение'], needs_human=not ok_layer))
+            if not ok_layer:
+                human.append({'key': k, 'why': ['одно_мнение'], 'reasons': ['terra не прочитала'],
+                              'differences': [], 'confidence': None})
+            stats['одно_мнение_слой' if ok_layer else 'одно_мнение_человеку'] += 1
+            continue
         if not a or not b or a.get('status') != 'ok' and b.get('status') != 'ok':
             stats['ждёт_чтения'] += 1
             continue
-        base = {'primary': PRIMARY, 'second': SECOND}
         ok, why = vv.agree(a, b, job.kind)
         if ok:
             write_v2(q, k, a, dict(base, decision='согласие'))
@@ -519,6 +531,13 @@ def p2_merge(q, opts, log):
             if reply:
                 verdict, rec, reasons, data = vv.judge_arbiter(reply['text'], job, a, b)
                 break
+        if verdict is None and final:   # арбитр не оплачен — основная версия, человеку
+            write_v2(q, k, a, dict(base, decision='человеку', why=why, needs_human=True,
+                                   reasons=['арбитр_не_оплачен']))
+            human.append({'key': k, 'why': why, 'reasons': ['арбитр_не_оплачен'],
+                          'differences': [], 'confidence': None})
+            stats['человеку_без_арбитра'] += 1
+            continue
         if verdict is None:
             todo_arb.append({'key': k, 'why': why, 'round': '1'})
             stats['к_арбитру'] += 1
