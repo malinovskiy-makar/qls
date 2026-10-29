@@ -204,6 +204,11 @@ class AgreeRefinedTests(SimpleTestCase):
                 {'type': 'criteria', 'number': '3', 'text': 'Цена $P = 25$.'})
         self.assertEqual(vv.agree(a, b, 'tasks'), (True, []))
 
+    def test_options_in_one_line_or_two_agree(self):
+        a = rec(task('1', 'Верно ли?\n\n- 1) Да. 2) Нет.'))
+        b = rec(task('1', 'Верно ли?\n\n- 1) Да.\n- 2) Нет.'))
+        self.assertEqual(vv.agree(a, b), (True, []))
+
     def test_list_labels_not_numbers(self):
         a = rec(task('1', 'Вопрос\n\n1) 300\n2) 500'))
         b = rec(task('1', 'Вопрос\n\na) 300\nb) 500'))
@@ -237,6 +242,12 @@ class LayerTiebreakTests(SimpleTestCase):
         b = rec(task('1', 'Спрос $Q_d = 100 - 3P$'))
         self.assertIsNone(vv.layer_tiebreak(a, b, page(), ['числа', 'варианты']))
         self.assertIsNone(vv.layer_tiebreak(a, b, page(layer=''), ['числа']))
+
+    def test_rival_number_also_on_page_goes_to_arbiter(self):
+        # 5 и 10 оба есть в слое (10 — баллы задачи): слой не рассудит.
+        a = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 5 рублей.'))
+        b = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 10 рублей.'))
+        self.assertIsNone(vv.layer_tiebreak(a, b, page(), vv.agree(a, b)[1]))
 
     def test_both_off_page_goes_to_arbiter(self):
         a = rec(task('1', 'налог 7 рублей'))
