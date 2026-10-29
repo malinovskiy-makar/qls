@@ -255,18 +255,20 @@ def submit(q, phase, model, items, log, limit=None):
     prov = vv.provider_of(model)
     sent, chunks = 0, 0
     # Пакет режется и по числу запросов, и по объёму: 200 позиций Opus по
-    # 5 картинок — больше 256 МБ, сервер рвёт соединение (29.10).
-    parts, cur, cur_bytes = [], [], 0
-    for item in items:
-        size = len(json.dumps(item[1], ensure_ascii=False))
-        if cur and (len(cur) >= CHUNK[prov] or cur_bytes + size > MAX_BATCH_BYTES):
-            parts.append(cur)
-            cur, cur_bytes = [], 0
-        cur.append(item)
-        cur_bytes += size
-    if cur:
-        parts.append(cur)
-    for i, part in enumerate(parts):
+    # 5 картинок — больше 256 МБ, сервер рвёт соединение (29.10). `items` —
+    # генератор: тела с картинками 7 140 страниц в памяти — это ~3 ГБ.
+    def parts_of(it):
+        cur, cur_bytes = [], 0
+        for item in it:
+            size = len(json.dumps(item[1], ensure_ascii=False))
+            if cur and (len(cur) >= CHUNK[prov] or cur_bytes + size > MAX_BATCH_BYTES):
+                yield cur
+                cur, cur_bytes = [], 0
+            cur.append(item)
+            cur_bytes += size
+        if cur:
+            yield cur
+    for i, part in enumerate(parts_of(items)):
         est = round(len(part) * BATCH_ITEM_USD[model], 3)
         if not q.ledger.allow(prov, est + bl.pending_usd(prov)):
             log(f'стоп {model}: пакет поднял бы расход {prov} выше 90 % потолка')
@@ -404,14 +406,7 @@ def p2_submit(q, opts, log):
             f'оценка ${len(todo) * BATCH_ITEM_USD[model]:.2f}')
         if not opts.get('yes') or not todo:
             continue
-        items = []
-        for k in todo:
-            body = vv.body_for(model, q.jobs[k])
-            if vv.provider_of(model) == 'anthropic':
-                body.pop('stream', None)
-            items.append((custom_id(k), body))
-            if len(items) >= CHUNK[vv.provider_of(model)] * (opts.get('limit') or 10 ** 6):
-                break
+        items = ((custom_id(k), vv.body_for(model, q.jobs[k])) for k in todo)
         submit(q, 'p2', model, items, log, limit=opts.get('limit'))
     if not opts.get('yes'):
         log('Без --yes пакеты не отправляются (только план).')
@@ -748,10 +743,48 @@ def key_body(model, ev):
     return body
 
 
+def keys_folder(q, rnd='1'):
+    return os.path.join(q.work, 'keys') if str(rnd) == '1' else os.path.join(q.work, 'keys', 'r2')
+
+
+def keys2_prepare(q, log):
+    """Второй проход ключей: комплекты, где обе модели не нашли ключ хотя бы
+    к одному вопросу, — со ВСЕМИ страницами файлов ответов (до 20): в файлах
+    «вопрос — решение» ответы разбросаны по 17–18 страницам, а первый проход
+    видел до 8."""
+    folder = keys_folder(q)
+    with open(os.path.join(folder, 'events.json'), encoding='utf-8') as fh:
+        events = {e['event_id']: e for e in json.load(fh)}
+    files = {e['event_id']: e for e in (json.loads(x) for x in open(
+        os.path.join(q.v1, 'events_files.jsonl'), encoding='utf-8'))}
+    need = set()
+    for x in (json.loads(y) for y in open(os.path.join(folder, 'queue.jsonl'), encoding='utf-8')):
+        reps = [v for v in x['replies'].values()]
+        if x['why'] == 'нет_ответа_модели' and all(v is None or v[0] is None for v in reps):
+            need.add(x['row'].split('|')[0])
+    out = []
+    for eid in sorted(need):
+        ev = files[eid]
+        pages = []
+        for key in ('solution_files', 'criteria_files', 'task_files'):
+            for f in ev.get(key) or []:
+                if key == 'task_files' and f.get('source_kind') != 'tasks+solutions':
+                    continue
+                pages += [os.path.join(q.v1, f['page_dir'], f'p{p}.png')
+                          for p in range(1, int(f.get('pages') or 0) + 1)]
+        if len(pages) > len(events[eid]['pages']):
+            out.append(dict(events[eid], pages=pages[:20]))
+    os.makedirs(keys_folder(q, 2), exist_ok=True)
+    with open(os.path.join(keys_folder(q, 2), 'events.json'), 'w', encoding='utf-8') as fh:
+        json.dump(out, fh, ensure_ascii=False, indent=1)
+    log(f'второй проход ключей: комплектов {len(out)} (из {len(need)} без ключа у обеих моделей), '
+        f'страниц {sum(len(e["pages"]) for e in out)}')
+
+
 def keys_run(q, opts, log):
     """Ключи двумя моделями (синхронно: ~200 комплектов). `--limit` — первые N."""
     from concurrent.futures import ThreadPoolExecutor
-    folder = os.path.join(q.work, 'keys')
+    folder = keys_folder(q, opts.get('round') or '1')
     with open(os.path.join(folder, 'events.json'), encoding='utf-8') as fh:
         events = json.load(fh)
     if opts.get('pages_file'):   # калибровка: только комплекты из файла
@@ -793,15 +826,27 @@ def keys_decide(q, opts, log):
     folder = os.path.join(q.work, 'keys')
     with open(os.path.join(folder, 'events.json'), encoding='utf-8') as fh:
         events = json.load(fh)
-    models = (opts.get('models') or KEY_MODELS).split(',')
     rows = {_key_row_id(r): r for r in (json.loads(x) for x in open(
         os.path.join(q.v1, 'reference_problems_v1.jsonl'), encoding='utf-8'))}
     acc, queue, why = [], [], Counter()
     for ev in events:
-        replies = []
-        for m in models:
-            rec = vv.read_record(os.path.join(folder, m.replace('/', '__'), ev['event_id'] + '.json'))
-            replies.append(vsosh_keys.parse_reply(rec['text']) if rec else {})
+        # Второе мнение — Gemini; где OpenRouter упёрся в лимит ключа (29.10,
+        # 18 комплектов) — Claude Sonnet: тоже другое семейство, чем GPT.
+        models, replies = [], []
+        for group in (('gpt-6.1-terra',), ('google/gemini-4-argon', 'claude-sonnet-5-5')):
+            for m in group:
+                # Второй проход (все страницы файлов ответов) старше первого.
+                rec = None
+                for fold in (keys_folder(q, 2), folder):
+                    rec = rec or vv.read_record(os.path.join(fold, m.replace('/', '__'),
+                                                             ev['event_id'] + '.json'))
+                if rec:
+                    models.append(m)
+                    replies.append(vsosh_keys.parse_reply(rec['text']))
+                    break
+            else:
+                models.append(group[0])
+                replies.append({})
         tests = [rows[k] for k in ev['rows']]
         for i, (r, ans, reason) in enumerate(vsosh_keys.decide(tests, replies[0], replies[1]), 1):
             k = _key_row_id(r)
@@ -850,6 +895,8 @@ def run(cmd, opts):
         return keys_prepare(q, log)
     if action == 'keys':
         return keys_run(q, opts, log)
+    if action == 'keys2-prepare':
+        return keys2_prepare(q, log)
     if action == 'keys-decide':
         return keys_decide(q, opts, log)
     raise ValueError(action)

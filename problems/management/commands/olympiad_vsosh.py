@@ -37,6 +37,7 @@ class Command(BaseCommand):
         parser.add_argument('--action', default='collect',
                             help='claude: submit/collect; q2: шаг сессии Q2 (vsosh_q2)')
         parser.add_argument('--models', default=None, help='q2: модели через запятую')
+        parser.add_argument('--round', default='1', help='q2 keys: 1 — основной проход, 2 — все страницы файлов ответов')
         parser.add_argument('--root', default=DEFAULT_ROOT)
         parser.add_argument('--groups', default='1,2,3,4,5', help='группы плана (transcribe)')
         parser.add_argument('--max-usd', type=float, default=None)

@@ -313,19 +313,21 @@ def answer_like(text):
     return bool(tokens) and all(_KEY_TOKEN.match(x) for x in tokens)
 
 
-def key_blocks(digitized, ev):
+def key_blocks(digitized, ev, first_dirs=()):
     """Ключ теста из файлов ответов комплекта по порядку страниц, по видам
     источника (каждый раздаётся отдельно — у задач 1–5 тоже есть `answer`,
     и в общей куче номера сталкиваются): `marked` — вопрос повторён с
     «(отмечено)», `table` — таблица ответов, `short` — блок-ответ «Да», «1)».
-    Страница — заплатка Claude, если удачна, иначе GLM. → {вид: [(номер, ответ)]}"""
+    Страница — заплатка Claude, если удачна, иначе GLM; `first_dirs` — папки
+    страниц, которые старше обеих (v2: `pages_v2`). → {вид: [(номер, ответ)]}"""
     out = {'marked': [], 'table': [], 'short': []}
     for key in ('solution_files', 'criteria_files'):
         for f in ev.get(key) or []:
             sha16 = f['page_dir'].split('/')[-1]
             for p in range(1, int(f.get('pages') or 0) + 1):
                 rec = None
-                for path in (os.path.join(digitized, 'pages_claude', sha16, f'p{p}.json'),
+                for path in tuple(os.path.join(d, sha16, f'p{p}.json') for d in first_dirs) + (
+                        os.path.join(digitized, 'pages_claude', sha16, f'p{p}.json'),
                              os.path.join(digitized, f['page_dir'], f'p{p}.json')):
                     if os.path.isfile(path):
                         with open(path, encoding='utf-8') as fh:
