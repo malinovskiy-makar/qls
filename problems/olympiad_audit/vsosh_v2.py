@@ -538,6 +538,46 @@ def build_queue(rows, v1_root, key_queue, human_pages, path):
     return out
 
 
+def new_figures(rows, v2_root):
+    """Вырезки v2 со страниц, прочитанных в Q2 (`pages_v2`): [(ключ строки, путь)]."""
+    v2_pages = os.path.join(v2_root, 'pages_v2')
+    out = []
+    for r in rows:
+        for f in (r.get('figures') or []) + (r.get('solution_figures') or []):
+            pd, page = f.get('page_dir') or '', f.get('page')
+            if pd and page and os.path.isfile(os.path.join(v2_pages, pd.split('/')[-1], f'p{page}.json')):
+                out.append((row_key(r), f['path']))
+    return out
+
+
+def contact_sheets(figs, v2_root, out_dir, per=24, cols=4, cell=(380, 300)):
+    """Контактные листы PNG: по `per` вырезок, у каждой — порядковый номер.
+    → [(путь листа, [номера])]; номер — индекс в `figs` (для figures_rejected.txt)."""
+    from PIL import Image, ImageDraw
+    os.makedirs(out_dir, exist_ok=True)
+    sheets = []
+    for start in range(0, len(figs), per):
+        part = figs[start:start + per]
+        rows_n = (len(part) + cols - 1) // cols
+        sheet = Image.new('RGB', (cols * cell[0], rows_n * cell[1]), 'white')
+        draw = ImageDraw.Draw(sheet)
+        for j, (_k, path) in enumerate(part):
+            x, y = (j % cols) * cell[0], (j // cols) * cell[1]
+            try:
+                with Image.open(os.path.join(v2_root, *path.split('/'))) as im:
+                    im = im.convert('RGB')
+                    im.thumbnail((cell[0] - 10, cell[1] - 30))
+                    sheet.paste(im, (x + 5, y + 25))
+            except OSError:
+                draw.text((x + 5, y + 40), 'НЕ ОТКРЫВАЕТСЯ', fill='red')
+            draw.rectangle([x, y, x + cell[0] - 1, y + cell[1] - 1], outline='gray')
+            draw.text((x + 5, y + 5), f'#{start + j}', fill='blue')
+        path = os.path.join(out_dir, f'contact_{start // per:03d}.png')
+        sheet.save(path)
+        sheets.append((path, list(range(start, start + len(part)))))
+    return sheets
+
+
 #: Рабочая база банка (в папке worktree база пустая). Открывается ТОЛЬКО на
 #: чтение (`mode=ro`): Q2 в базу не пишет.
 BANK_DB = r'C:\Users\shipu\qls\db.sqlite3'

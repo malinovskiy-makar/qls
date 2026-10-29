@@ -249,6 +249,13 @@ class LayerTiebreakTests(SimpleTestCase):
         b = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 10 рублей.'))
         self.assertIsNone(vv.layer_tiebreak(a, b, page(), vv.agree(a, b)[1]))
 
+    def test_rival_number_in_page_footer_blocks_tiebreak(self):
+        # 7 — только в номере страницы «7 из 9» (вне тела слоя, но на странице):
+        # версия B не выдумала его, слой не рассудит.
+        a = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 5 рублей.'))
+        b = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 7 рублей.'))
+        self.assertIsNone(vv.layer_tiebreak(a, b, page(layer=LAYER + '\n7 из 9'), vv.agree(a, b)[1]))
+
     def test_both_off_page_goes_to_arbiter(self):
         a = rec(task('1', 'налог 7 рублей'))
         b = rec(task('1', 'налог 8 рублей'))
