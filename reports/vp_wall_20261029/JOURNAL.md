@@ -453,3 +453,11 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - Тесты: `test_requisites` (маркер редакции по документам), `test_pages` (дата у изменённых из настройки, у трёх неизменённых – 20.10.2026, получатели, пункт 3.4). Пока ожидание «Редакция 2» зашито литералом; фаза 4 свяжет его с `docs_version`.
 - `manage.py test legal`: 164 теста, OK.
 - Зубастость: `[ДАТА]` обратно в `cookies.md` → красные 3 теста (`..._stay_untouched_by_substitution`, `..._keep_their_own_date`, `..._right_edition_marker`); возвращено.
+
+### Фаза 2. Метка `[ПОСРЕДНИК]` и `legal.E003`
+- `settings.LEGAL['tg_relay']` ← `LEGAL_TG_RELAY`; `legal/documents.py`: третья метка (приватный символ до разбора, экранированный HTML после; пусто, длиннее 200 или с переводом строки → «[не заполнено]»).
+- `legal/checks.py`: `legal.E003` при `DEBUG=False` и пустом `LEGAL_TG_RELAY` (E001/E002 не менялись).
+- Подставное «Example Hosting B.V., Нидерланды»: джоб `deploy-check` в `ci.yml`, `problems/tests/test_production_settings.py`. Переменная (пустая) добавлена в `deploy/env.example` и `deploy/env.dev.example` (площадка dev живёт на боевых настройках, E003 иначе не даст ей подняться). Строки в `docs/VP.md` (порядок выкатки) и `docs/SERVER.md`.
+- Тесты: `legal` 170 OK (было 164), `test_production_settings` + `test_signup_source` 62 OK (в них `check --deploy` с окружением джоба – 0 замечаний).
+- Зубастость: условие E003 заменено на `if False` → `test_empty_relay_is_error_e003_when_not_debug` красный; возвращено.
+- Ловушка: метки в `documents.py` – это `…` (невидимые символы); правка файла скриптом по строке «DATE_MARK = 'DATE'» не находит.

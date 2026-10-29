@@ -130,3 +130,4 @@ class CheckTests(SimpleTestCase):
         from django.core.checks.registry import registry
         ids = {m.id for m in registry.run_checks()}
         self.assertIn('legal.E001', ids)
+        self.assertIn('legal.E003', ids)
