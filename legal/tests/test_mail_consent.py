@@ -24,7 +24,7 @@ class MailConsentTests(TestCase):
     def test_raising_docs_version_does_not_unsubscribe(self):
         consent.grant(self.user, MAIL, ConsentRecord.Source.REGISTER)
         self.assertTrue(consent.wants_mail(self.user))
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '4'}):
             self.assertFalse(consent.has_current(self.user, MAIL))
             self.assertTrue(consent.wants_mail(self.user))
 

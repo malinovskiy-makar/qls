@@ -22,7 +22,7 @@ class RequisitesTests(SimpleTestCase):
         self.assertEqual(legal['operator_inn'], '662333547172')
         self.assertEqual(legal['operator_status'], 'плательщик налога на профессиональный доход')
         self.assertEqual(legal['telegram'], 'weconomics_ru')
-        self.assertEqual(legal['docs_version'], '2')
+        self.assertEqual(legal['docs_version'], '3')
 
     def test_no_private_data_in_the_public_repository(self):
         """Репозиторий публичный: ни домашнего адреса, ни телефона, ни почты в коде."""

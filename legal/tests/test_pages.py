@@ -39,7 +39,7 @@ class PublicPagesTests(TestCase):
     @override_settings(LEGAL=FILLED)
     def test_values_are_substituted_from_settings(self):
         html = self.client.get('/legal/privacy/').content.decode('utf-8')
-        self.assertIn('Редакция 2 от 15 октября 2026 г.', html)
+        self.assertIn('Редакция 3 от 15 октября 2026 г.', html)
         self.assertIn('<a href="mailto:%s">%s</a>' % (MAIL, MAIL), html)
         self.assertNotIn('class="lg-missing"', html)
 
@@ -102,11 +102,13 @@ class PublicPagesTests(TestCase):
             for name in ('Яндекс.Облако', 'Юнисендер Смарт', 'Telegram Messenger Inc.'):
                 self.assertIn(name, html, '%s: %s' % (slug, name))
 
-    def test_privacy_says_there_is_no_third_party_login(self):
+    def test_privacy_names_exactly_the_two_services_of_login(self):
+        """Ред. 3: вход через VK ID и Яндекс ID есть; Telegram, Google, Apple и прочие нет."""
         html = self.client.get('/legal/privacy/').content.decode('utf-8')
-        self.assertIn('3.4. Войти в Сервис можно только по логину', html)
+        self.assertIn('3.4. Войти в Сервис можно по логину', html)
+        self.assertIn('а также через VK ID и Яндекс ID', html)
         self.assertIn('Вход через Telegram, Google, Apple', html)
-        self.assertIn('не предусмотрен', html)
+        self.assertIn('кроме названных, не предусмотрен', html)
 
     def test_tables_render_as_tables(self):
         privacy = self.client.get('/legal/privacy/').content.decode('utf-8')

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Редакция 2 (29.10.2026): принявшие редакцию 1 один раз видят экран согласия.
 
+Номер действующей редакции здесь не проверяется (с 30.10.2026 это ред. 3, см.
+`test_edition3.py`): тесты ниже играют перенос с ред. 1 на любую более новую.
+
 Согласие на рассылку от номера редакции не зависит: правка Политики не должна
 молча отписывать людей (`legal.consent.wants_mail`).
 """
@@ -25,9 +28,6 @@ class EditionTwoTests(TestCase):
         self.user = make_user('edition_two')
         self.client.force_login(self.user)
 
-    def test_the_site_runs_edition_two(self):
-        self.assertEqual(consent.current_version(), '2')
-
     def test_edition_one_acceptor_is_sent_to_the_consent_screen_once(self):
         old = old_record(self.user, PD)
         response = self.client.get('/profile/')
@@ -40,7 +40,7 @@ class EditionTwoTests(TestCase):
         self.assertIsNotNone(old.superseded_at)
         active = ConsentRecord.objects.get(user=self.user, kind=PD,
                                            revoked_at__isnull=True, superseded_at__isnull=True)
-        self.assertEqual(active.version, '2')
+        self.assertEqual(active.version, consent.current_version())
         self.assertEqual(ConsentRecord.objects.filter(user=self.user, kind=PD).count(), 2)
         # Второй раз экран уже не показывается.
         self.assertEqual(self.client.get('/profile/').status_code, 200)

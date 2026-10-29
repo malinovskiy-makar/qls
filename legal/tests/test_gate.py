@@ -79,7 +79,7 @@ class GateTests(TestCase):
         consent.grant(self.user, PD, ConsentRecord.Source.REGISTER)
         self._login()
         self.assertEqual(self.client.get('/profile/').status_code, 200)
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '4'}):
             response = self.client.get('/profile/')
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response['Location'].startswith('/legal/accept/'))
