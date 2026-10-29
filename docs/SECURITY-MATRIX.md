@@ -74,6 +74,9 @@
 | `/password/forgot/` | `password_forgot` | — (без `MAIL_ENABLED` 404) | POST: почта; ответ одинаков для любой | — | [problems/views_auth.py](../problems/views_auth.py) `password_forgot` |
 | `/password/forgot/code/` | `password_forgot_code` | — (только с запросом в сессии; без `MAIL_ENABLED` 404) | POST: код, новый пароль ×2 или `action=resend` | ✅ пользователь — только владелец ПОДТВЕРЖДЁННОЙ почты из сессии | [problems/views_auth.py](../problems/views_auth.py) `password_forgot_code` |
 | `/logout/` | `logout` | — | **только POST** (GET → 405) | — | Django |
+| `/auth/<vk\|yandex>/start/` | `social_start` | — (без `SOCIAL_LOGIN_ENABLED` и ключей сервиса 404) | GET `next` (только свой адрес) | — (`state` и `code_verifier` в сессию на 10 мин) | [problems/social/views.py](../problems/social/views.py) `start` |
+| `/auth/<vk\|yandex>/callback/` | `social_callback` | — (как выше); частота — scope `social` | GET `code`, `state`, `device_id`; чужой/устаревший `state` → 400, аккаунтов 0 | ✅ известный uid → его владелец; вошедший → только `request.user`; склейка — только по почте, подтверждённой у сервиса И у нас, не сотрудник | [problems/social/views.py](../problems/social/views.py) `callback` |
+| `/auth/finish/` | `social_finish` | — (только с `social_pending` в сессии, 30 мин); частота — scope `register` | POST: согласие, галочка рассылки; GET `cancel` | — (аккаунт создаётся из данных сервиса в сессии, без токенов) | [problems/social/views.py](../problems/social/views.py) `finish` |
 | `/textbook/` | `textbook` | — | — | — | [catalog/views.py](../catalog/views.py) `textbook` |
 | `/catalog/` | `catalog:problem_list` | — | 10× GET (фильтры, поиск, страница) | — | [catalog/views.py:85](../catalog/views.py) |
 | `/catalog/random/` | `catalog:random_problem` | — | — | — | [catalog/views.py:72](../catalog/views.py) |
@@ -277,6 +280,7 @@ TypeError: Field 'id' expected a number but got
 | `/api/graphs/save/` | `api_graph_save` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:193](../problems/views_platform.py) |
 | `/password/change/` | `password_change` | `login_required` | POST: новый пароль ×2 (`old_password` игнорируется) | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `password_change` |
 | `/password/change/done/` | `password_change_done` | — | — | — | редирект на `/profile/?tab=security` |
+| `/welcome/`, `/welcome/<шаг>/`, `/welcome/plan/` | `onboarding`, `onboarding_step`, `onboarding_plan` | вход (гость → `/login/?next=`); аккаунт из VK/Яндекса без почты → `/account/email/` | POST: ответы шага (коды проверяются по спискам профиля), название группы | ✅ всегда `request.user`: профиль и группа (`teacher=request.user`); шаг без ответов предыдущих → редирект | [problems/views_onboarding.py](../problems/views_onboarding.py) |
 | `/account/email/` | `account_email` | вход (гость → `/login/?next=`); без `MAIL_ENABLED` 404 | GET `next`, `src`; POST: почта, галочка рассылки, код, `action` | ✅ всегда `request.user`; почта пишется только после кода | [problems/views_auth.py](../problems/views_auth.py) `account_email` |
 | `/legal/mail/grant/` | `legal:mail_grant` | `login_required` + POST; без `MAIL_ENABLED` 404 | — | ✅ всегда `request.user`; без подтверждённой почты → «Почта» | [legal/views.py](../legal/views.py) `mail_grant` |
 | `/legal/mail/revoke/` | `legal:mail_revoke` | `login_required` + POST; без `MAIL_ENABLED` 404 | — | ✅ всегда `request.user`; только отметка отзыва | [legal/views.py](../legal/views.py) `mail_revoke` |

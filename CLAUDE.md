@@ -370,6 +370,15 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 квадрата приходят от клиента и только прижимаются к границам, поворот по EXIF
 применяется до обрезки ([docs/SECURITY.md](docs/SECURITY.md)).
 
+**Вход через VK ID / Яндекс ID и онбординг (29.10.2026, ветка `feat/login-onboarding-20261029`):**
+свой модуль `problems/social/` — **django-allauth НЕ ставить** (забрал бы регистрацию). Флаги
+окружения, все выключены в тестах: `SOCIAL_LOGIN_ENABLED` + `VK_ID_CLIENT_ID/SECRET`,
+`YANDEX_CLIENT_ID/SECRET` (кнопка сервиса — только при флаге и его ключах), `SOCIAL_STORE_BIRTHDATE`
+(только после ред. 3 документов), `ONBOARDING_ENABLED` (вне тестов по умолчанию `1`). Адреса возврата
+`/auth/vk/callback/`, `/auth/yandex/callback/`; онбординг `/welcome/`, шлюз
+`problems/middleware_onboarding.py` — сразу после слоя согласия. Токены не храним, склейка — только
+по почте, подтверждённой у сервиса и у нас ([docs/SECURITY.md](docs/SECURITY.md)).
+
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
 её в `problems/models*.py`, а не у себя. Исключений **три**, все записаны:
 `game.GameQuestion` — игровой пул намеренно отделён от банка, чтобы удаление

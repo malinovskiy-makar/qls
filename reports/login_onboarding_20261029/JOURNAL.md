@@ -371,3 +371,92 @@ Telegram), `config/urls.py` (+2 строки: `auth/`, `welcome/`),
   странице. Для запуска на время проверки в `C:\Users\shipu\qls\.claude\launch.json`
   (основная папка) добавлялась запись `login-onboarding`; после проверки файл
   возвращён `git checkout` — в основной папке изменений нет.
+
+---
+
+## Фаза 6. Стена ВП не переспрашивает — ПРОПУЩЕНА
+
+Условие фазы −1, пункт 6 — «нет» (в `_wall.html` сноска ещё не ред. 2). `vp/` не
+трогал. Карточка Notion «Стена ВП: не переспрашивать класс и «откуда узнали» после
+онбординга — сделать после слияния ред. 2» (`408b11c9-2bc1-811f-a528-d299306f9f2c`),
+в неё же — свести подписи источников в одно место.
+
+---
+
+## Фаза 7. Зубастость, проверки, документы, Notion
+
+**Зубастость** (всё закоммичено; по одному дефекту → тест → `git checkout -- <файл>`
+→ снова тест; скрипт в черновиках сессии):
+
+| Дефект | Файл | Тест | С дефектом | После отката |
+|---|---|---|---|---|
+| убрать проверку `state` | `problems/social/views.py` | `StateAndPkceTests.test_wrong_state_is_400_and_creates_nothing` | красный | OK |
+| склеивать по неподтверждённой почте | `problems/social/views.py` | `AutoMergeTests.test_unverified_email_here_is_not_merged` | красный | OK |
+| `birth_date` без флага | `problems/social/providers.py` | `BirthDateTests.test_flag_off_no_birth_date…` | красный | OK |
+| токен в словарь → в сессию | `problems/social/providers.py` | `NoTokensAnywhereTests.test_token_never_reaches_session_or_database` | красный | OK |
+| без проверки домена аватара | `problems/social/providers.py` | `AvatarTests` | красный | OK |
+| шлюз перехватывает POST | `problems/middleware_onboarding.py` | `GateTableTests.test_post_is_not_intercepted` | красный | OK |
+| слой онбординга раньше слоя согласия | `config/settings.py` | `GateTableTests.test_documents_screen_comes_first` | красный | OK |
+| абзац-пояснение на шаге 2 | `templates/onboarding/step.html` | `TextGuardTests.test_no_paragraphs_besides_the_instagram_note` | красный | OK |
+| прыжок через шаг | `problems/views_onboarding.py` | `StudentFlowTests.test_jump_over_a_step…` | красный | OK |
+
+Фазы 6 не было — строки про стену нет. После всех откатов `git status` чистый.
+
+**Нули:** `manage.py check` — 0; `makemigrations --check --dry-run` — No changes
+detected; `scripts/check_em_dash.py` — 0 (код 0); `ruff check` по 19 изменённым
+`.py` — чисто; `bandit -ll -r` по новым модулям — No issues (код 0).
+
+**Документы:** `docs/SECURITY-MATRIX.md` — 4 строки (`/auth/<p>/start/`,
+`/auth/<p>/callback/`, `/auth/finish/`, `/welcome/…`); `docs/SECURITY.md` — раздел
+«Вход через VK ID и Яндекс ID (29.10.2026)»; `CLAUDE.md` — абзац с флагами,
+адресами возврата и «allauth не ставить».
+
+**Notion (новые карточки «Задачи», статус «Надо», дубли искал поиском — нет):**
+1. «Стена ВП: не переспрашивать…» — Техническое (фаза 6).
+2. «Зарегистрировать приложения VK ID и Яндекс ID и выдать ключи» — Бизнес и
+   запуск, Андрей; адреса возврата, права, «телефон не запрашивать».
+3. «Заменить заглушки значков на официальные кнопки VK ID и Яндекс ID» — Дизайн.
+4. «Документы ред. 3: вход через VK ID и Яндекс ID, дата рождения — до включения
+   на бою» — Бизнес и запуск, Анич; ссылка на `405b11c9-2bc1-813b-910a-daa1430286f3`.
+5. «Профиль: показать привязанные VK ID / Яндекс ID, отвязать и задать пароль
+   аккаунту из сервиса» — Кабинеты (замечено, не делалось; открытый вопрос карточки
+   задачи про пароль).
+
+**Порядок включения на бою:**
+1. Стена → main.
+2. Эта ветка переносится на свежий main без `rebase` общих веток: новая ветка от
+   main + `merge` этой (или как скажет владелец). Перед этим `showmigrations
+   problems`: если в main у `problems` появится своя 0084+, нужна миграция-сшивка.
+3. Ред. 3 документов в main (Анич).
+4. На сервере ключи сервисов, затем `SOCIAL_LOGIN_ENABLED=1`.
+5. `ONBOARDING_ENABLED` — по умолчанию включён; выкатка **не во время тура ВП
+   13–22.11** (до заморозки 11.11 или после 22.11). Если ветка уезжает на бой в
+   окно тура — `ONBOARDING_ENABLED=0` в окружении до 23.11.
+6. `SOCIAL_STORE_BIRTHDATE=1` — только после ред. 3.
+
+**Прогоны фазы 7** (без `--parallel`, SQLite):
+- Набор из промпта + модули по `grep` (шаблоны входа/регистрации, `source_channel`,
+  `MIDDLEWARE`, `profile.html`, маркеры ИИ, doctype-сторожа) — **1 366 тестов**:
+  первый проход — 2 провала, оба на МОЮ новую корневую страницу
+  `templates/onboarding/base.html`:
+  `legal.tests.test_pages…test_every_root_template_links_to_legal` (нет ссылки на
+  документы) и `legal.tests.test_cookie_bar…test_every_counter_root_has_the_bar_and_the_gate`
+  (корней со счётчиком 14 при ожидаемых 13). Починка: в каркас онбординга
+  добавлен `_legal_footer.html`, счётчик и плашка cookie — с `metrika_private=True`,
+  как в кабинетах (там вводят город и школу); онбординг вписан в инвентаризацию
+  корней обоих тестов (как прежде экран согласия). После: эти модули + онбординг +
+  `test_signup_source` — 118 OK.
+- `vp` — **607 OK** (`skipped=1`, браузерный), код 0 — **без класса
+  `vp.tests.test_wall_poll.PollSignalTests`**: его тест шлёт процессу SIGTERM
+  (`os.kill(os.getpid(), signal.SIGTERM)`), а на Windows это убивает весь прогон
+  (код 15, итог не печатается). Тест из ветки стены (`3ea1f17a`), к этой работе
+  отношения не имеет; на Linux (CI) он, по смыслу, проходит. Не правил — сообщаю в
+  отчёте.
+
+**Чужие файлы фазы 7:** `legal/tests/test_cookie_bar.py`, `legal/tests/test_pages.py`
+(+1 корень в инвентаризации), `docs/SECURITY-MATRIX.md`, `docs/SECURITY.md`,
+`CLAUDE.md`.
+
+**Не делалось намеренно:** блок «Текущий фокус» в CLAUDE.md и запись в
+`CLAUDE_ARCHIVE.md` — в этой ветке они дали бы конфликт при слиянии со стеной и
+main; история сессии — этот журнал.

@@ -303,8 +303,9 @@ class EveryRootTemplateTests(SimpleTestCase):
         with_counter = [r for r, t in roots if "{% include '_metrika.html'" in t]
         with_bar = [r for r, t in roots if "{% include '_cookie_bar.html'" in t]
         self.assertEqual(with_counter, with_bar)
-        # 12 из инвентаризации + экран согласия, добавленный частью А.
-        self.assertEqual(len(with_counter), self.INVENTORY_ROOTS + 1)
+        # 12 из инвентаризации + экран согласия, добавленный частью А, + онбординг
+        # (`templates/onboarding/base.html`, 29.10.2026).
+        self.assertEqual(len(with_counter), self.INVENTORY_ROOTS + 2)
         base = Path(settings.BASE_DIR) / 'templates'
         gate_script = (base / '_metrika.html').read_text(encoding='utf-8')
         gate_noscript = (base / '_metrika_noscript.html').read_text(encoding='utf-8')

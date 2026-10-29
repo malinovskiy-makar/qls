@@ -134,7 +134,8 @@ class RootTemplateFooterTests(SimpleTestCase):
                 missing.append(rel)
         self.assertEqual(missing, [], 'корневой шаблон без ссылки на /legal/')
         # Инвариант: корней из отчёта - 12 (+ экран согласия); у каждого есть ссылка.
-        new_roots = {'legal/templates/legal/accept.html'}
+        new_roots = {'legal/templates/legal/accept.html',
+                     'templates/onboarding/base.html'}        # онбординг, 29.10.2026
         self.assertEqual(len(with_footer) + len(with_nav_link), self.INVENTORY_ROOTS + len(new_roots))
         self.assertEqual(set(with_nav_link), self.NAV_LINK_ONLY)
         self.assertTrue(new_roots <= set(with_footer))
