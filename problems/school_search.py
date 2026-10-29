@@ -16,9 +16,12 @@
   номера — первым, потом номер с начала, потом по названию;
 * до 8 вариантов.
 
-⚠️ ЧУЖИЕ ВВОДЫ — ТОЛЬКО ПОВТОРЁННЫЕ. Название школы из профилей другого человека
-попадает в подсказки, только если его ввели хотя бы `MIN_PEOPLE` разных людей: так
-в подсказку не утечёт случайная запись одного человека («школа, где учится Маша»).
+⚠️ ЧУЖИЕ ВВОДЫ — ТОЛЬКО ПОВТОРЁННЫЕ. Название школы из профилей других людей
+попадает в подсказки, только если его ввели хотя бы `MIN_PEOPLE` (3) разных человек,
+НЕ считая того, кто спрашивает: иначе свой профиль работал бы «подсказкой» и по
+ответу можно было бы угадать, учится ли в городе хоть кто-то в школе X (проверка
+безопасности 30.10.2026). Так в подсказку не утечёт и случайная запись одного
+человека («школа, где учится Маша»).
 """
 import json
 import re
@@ -26,7 +29,7 @@ from functools import lru_cache
 from pathlib import Path
 
 LIMIT = 8
-MIN_PEOPLE = 2
+MIN_PEOPLE = 3
 CITIES_FILE = Path(__file__).resolve().parent / 'data' / 'cities_ru.json'
 CITY_SYNONYMS = {'мск': 'москва', 'спб': 'санкт-петербург', 'питер': 'санкт-петербург',
                  'петербург': 'санкт-петербург', 'екб': 'екатеринбург', 'нск': 'новосибирск'}
@@ -153,8 +156,8 @@ def number_in_name(name):
 
 # ── Школы ──────────────────────────────────────────────────────────────────
 
-def _candidates(city):
-    """Школы города: из таблицы `School` и повторённые вводы людей."""
+def _candidates(city, asker_id=None):
+    """Школы города: из таблицы `School` и повторённые вводы других людей."""
     from django.db.models import Count
 
     from problems.models import School
@@ -167,7 +170,7 @@ def _candidates(city):
         rows[norm(school.name)] = {'value': school.name, 'number': school.number,
                                    'sub': school.kind}
     typed = (UserProfile.objects.filter(city__iexact=city.strip()).exclude(school='')
-             .values('school').annotate(people=Count('user', distinct=True))
+             .exclude(user_id=asker_id).values('school').annotate(people=Count('user', distinct=True))
              .filter(people__gte=MIN_PEOPLE))
     for row in typed:
         key = norm(row['school'])
@@ -177,7 +180,7 @@ def _candidates(city):
     return list(rows.values())
 
 
-def schools(city, query, limit=LIMIT):
+def schools(city, query, limit=LIMIT, asker_id=None):
     """Школы города по запросу: [{'value', 'label', 'number', 'sub'}]."""
     query_n, city = norm(query), (city or '').strip()
     if not query_n or not city:
@@ -186,7 +189,7 @@ def schools(city, query, limit=LIMIT):
     words = [w for w in re.findall(r'[a-zа-я]+', query_n)
              if _word_value(w) is None and w not in ('школа', 'шк', 'номер')]
     scored = []
-    for row in _candidates(city):
+    for row in _candidates(city, asker_id):
         name_n = norm(row['value'])
         has_words = all(w in name_n for w in words) if words else False
         if number is not None and row['number'] is not None:

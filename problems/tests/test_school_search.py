@@ -88,14 +88,19 @@ class SchoolSearchTests(TestCase):
         # Точный номер — первым, дальше совпадения по названию.
         self.assertEqual(self.values('лицей 1535'), ['Лицей № 1535', 'Лицей № 579'])
 
-    def test_what_people_typed_counts_only_when_repeated(self):
-        for name in ('a', 'b'):
-            user = make_user(name)
-            UserProfile.objects.filter(user=user).update(city='Омск', school='Гимназия № 117')
-        lonely = make_user('c')
+    def test_what_people_typed_counts_only_when_three_others_typed_it(self):
+        users = []
+        for name in ('a', 'b', 'c'):
+            users.append(make_user(name))
+            UserProfile.objects.filter(user=users[-1]).update(city='Омск', school='Гимназия № 117')
+        lonely = make_user('d')
         UserProfile.objects.filter(user=lonely).update(city='Омск', school='Школа где учится Маша')
         self.assertEqual(self.values('117', city='Омск'), ['Гимназия № 117'])
         self.assertEqual(self.values('маша', city='Омск'), [])
+        # Спрашивающий не считается: его собственный ввод не добирает порог.
+        self.assertEqual(school_search.schools('Омск', '117', asker_id=users[0].pk), [])
+        UserProfile.objects.filter(user=users[2]).update(school='')
+        self.assertEqual(self.values('117', city='Омск'), [])
 
 
 class SuggestApiTests(TestCase):

@@ -799,4 +799,5 @@ def schools_api(request):
     if stop:
         return stop
     return JsonResponse({'results': school_search.schools(request.GET.get('city', '')[:120],
-                                                          request.GET.get('q', '')[:80])})
+                                                          request.GET.get('q', '')[:80],
+                                                          asker_id=request.user.pk)})
