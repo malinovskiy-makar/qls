@@ -654,7 +654,9 @@ def p4_decide(q, opts, log):
         if verdict == 'retry' and not rep2:
             retry.append(it['id'])
             stats['повтор'] += 1
-            continue
+            # Повтор с effort high — только пока есть деньги Opus; итог до
+            # повтора — человеку с пометкой (`--yes` у p4-submit дошлёт повтор).
+            why = why + ['повтор_не_отправлен']
         if verdict == 'retry':
             verdict = 'human'
         stats[verdict] += 1
