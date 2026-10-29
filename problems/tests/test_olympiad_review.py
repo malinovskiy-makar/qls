@@ -334,6 +334,17 @@ class ApplyTests(_DataRoot):
         self.assertEqual(pairs[0][1]['reviewer'], ap.AUTO_REVIEWER)
 
 
+    def test_rollback_truncates_to_previous_content(self):
+        path = self.files.closed()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"item": "раньше"}\n', encoding='utf-8')
+        card = self.card()
+        _a, journal = self.run_apply([(card, _dec(card['item_id'], 'ok', pack_id='P'))])
+        self.assertEqual(len(common.read_jsonl(path)), 3)
+        ap.rollback(journal)
+        self.assertEqual(common.read_jsonl(path), [{'item': 'раньше'}])
+
+
 class OverridesTests(SimpleTestCase):
     def test_load_latest_wins_fields_accumulate(self):
         tmp = tempfile.mkdtemp()
@@ -497,3 +508,4 @@ class UpdateWholeProblemAndOverridesTests(TestCase):
         p.refresh_from_db()
         self.assertEqual(p.statement, 'Текст, исправленный человеком.')
         self.assertEqual(p.answer, '43')
+
