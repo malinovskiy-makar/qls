@@ -51,10 +51,12 @@ const MEASURE = () => {
       if (visible(t) && (t.getBoundingClientRect().width > box.width + 1 || t.scrollWidth > t.clientWidth + 1)) wideTable += 1;
     }
     if (!visible(root)) continue;
-    // вылет за край, который не прячет прокручиваемый предок (таблица, формула-блок)
+    // вылет за край, который не прячет прокручиваемый предок (таблица, формула-блок).
+    // Смотрим ВСЕХ обрезающих предков: у svg внутри формулы свой overflow:hidden,
+    // а помещается в окно уже блок формулы над ним (29.10, задача #520).
     const contained = (el) => {
       for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
-        if (getComputedStyle(a).overflowX !== 'visible') return a.getBoundingClientRect().right <= vw + 1;
+        if (getComputedStyle(a).overflowX !== 'visible' && a.getBoundingClientRect().right <= vw + 1) return true;
       }
       return false;
     };

@@ -895,6 +895,72 @@ Sonnet, страницы которых ушли Haiku.
 источника по очереди и снимает его с задачи; сетки-отметки («| | ДА | |»)
 не разбираются — остаются флагом `тест_без_ключа`.
 
+## Контур качества (сессия Q1, 29.10.2026)
+
+Решение Notion «Олимпиадные задачи идут на сайт только через контур
+качества…» (28.10). Пакет `problems/olympiad_contour/`, команда
+`olympiad_quality`. Только чтение: база открывается `mode=ro`, отчёты и
+очередь пишутся вне репозитория (`weconomics-data\quality_20261029\`).
+
+```bash
+# настройки только для чтения (локальный файл, в git не идёт):
+#   config/settings_quality_ro.py — база file:…db.sqlite3?mode=ro, MEDIA основной папки,
+#   QUALITY_CONTOUR_PREVIEW = True, ROOT_URLCONF = 'problems.olympiad_contour.urls'
+manage.py olympiad_quality check  --settings=config.settings_quality_ro            # стандарт, ~3 мин
+manage.py olympiad_quality render --settings=config.settings_quality_ro --browser \
+    --base-url http://127.0.0.1:8765,http://127.0.0.1:8766,http://127.0.0.1:8767  # отображение, ~50 мин
+manage.py olympiad_quality queue  --settings=config.settings_quality_ro            # очередь и сводка
+```
+
+**Охват.** Банк: видимые в каталоге задачи с `OlympiadRef` слагов `vp`,
+`vp-fingram`, `vp-ob`, `mosh`, `mosh-fingram` (предпринимательство — по
+`raw_meta.original_olympiad`), `vseros` плюс все id из `next_api_run_ids.txt`
+(и скрытые). Эталоны: ВП и МОШ v7.1, четыре набора финграм/бизнес v3.1,
+ВсОШ v1.
+
+**Стандарт (S1–S10)** — `standard.py`, чистые функции над «карточкой» одного
+вида для задачи банка и строки эталона (`bank.card_of`, `reference.card_of`):
+S1 условие и служебный текст (шаблоны `SERVICE_PATTERNS`), S2 метки и сумма
+баллов, S3 числа против слоя PDF (`claude_eyes.numbers`, однозначные не
+сверяются, вступление раздела теста — тоже), S4 формулы (`katex.py` +
+`scripts/olympiad_contour_katex.js` — разбор `_katex_dollars.html` и
+`splitAtDelimiters` авторендера), S5 рисунки, S6 таблицы, S7 тесты (банк —
+`testplay.game_of`, эталон — `reference_import.test_fields`), S8 решение своей
+задачи (+ ключи P4 «критерии не от этой задачи»), S9 метаданные и правило
+заголовка (`title_rule`), S10 одинаковый текст в одном событии.
+
+**Отображение.** Страница задачи прячет скрытую задачу 404, поэтому —
+служебный просмотр `/_quality/problem/<id>/` (`views.preview`): тот же
+`_problem_context` и `catalog/stol.html`, без записей, решение — партиалом
+`_help_solution.html` в колонке 392 px. Маршрут есть только в
+`problems/olympiad_contour/urls.py` (не в `config/urls.py`), просмотр сам
+отдаёт 404 без `QUALITY_CONTOUR_PREVIEW = True`. R1–R6 — по HTML ответа
+сервера, узел за узлом, как его обходит авторендер; B0–B4 — Chromium
+(`scripts/olympiad_contour_render.js`, Playwright из `node_modules`
+репозитория, браузеры уже скачаны), ширины 390 и 1280 px; одна загрузка на
+задачу, HTML сохраняется (`render_html\<id>.html.gz`), прогон докачивает
+недостающее. Контактный лист — `render_contact.html` (200 задач поровну по
+олимпиадам, снимки 390 px).
+
+**Очередь** — `queues\q1_contour.jsonl`, общий формат Q1–Q3, строка = одна
+проверка одной карточки; сверх формата `auto`, `severity`, `level`, `visible`.
+Автоисправления (`autofix.py`, `auto: true`, `confidence: 1.0`): валютный «$»
+(экранируются разделители ровно тех формул, что разбор счёл валютой), непарные
+`\left`/`\right`, пробелы в числах, HTML-сущности — каждое проверено KaTeX.
+
+⚠️ **Пакет называется `olympiad_contour`, а не `olympiad_quality`**: модуль
+`problems/olympiad_quality.py` (счёт версии в кластере дублей) уже есть, пакет
+с тем же именем его затенил бы.
+⚠️ **Таблица сайта — сама блок с прокруткой** (`stol.css`: `display:block;
+overflow-x:auto`): её ячейки «за краем окна» — не вылет. B1 считает элемент,
+только если его не обрезает прокручиваемый предок; таблица, которую надо
+листать вбок, — B4 (в «не стыдно» не мешает).
+⚠️ **Валютный «$» правится только по разбору**: правило «цифра рядом с $»
+задевает настоящие формулы (`$x+1$`, `$5x = 10$`).
+⚠️ **Автопроверки не видят чужой текст внутри условия** (#28957: в условие
+вклеено письмо «Леонид, добрый день…») — это видно только глазами, на
+контактном листе.
+
 ## Следующая олимпиада
 
 Импорт из эталона — `import_olympiad_reference` (раздел выше). Остальное
