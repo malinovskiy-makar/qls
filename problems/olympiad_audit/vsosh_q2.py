@@ -194,7 +194,7 @@ PRIMARY, SECOND = 'gpt-6.1-terra', 'claude-haiku-5-5'
 #: Оценка $ за запрос пакетом (калибровка ×0,5 скидки ×1,1 запаса) — для
 #: потолка до отправки; в журнал денег идёт настоящая цена по `usage`.
 BATCH_ITEM_USD = {'gpt-6.1-terra': 0.0047, 'claude-haiku-5-5': 0.00095,
-                  'claude-sonnet-5-5': 0.011, 'claude-opus-5-5': 0.05}
+                  'claude-sonnet-5-5': 0.011, 'claude-opus-5-5': 0.045}
 #: Запросов в пакете: у OpenAI файл ≤ 200 МБ, у Anthropic пакет ≤ 256 МБ
 #: (страница с картинкой — до ~0,8 МБ base64).
 CHUNK = {'openai': 200, 'anthropic': 200}
@@ -412,6 +412,30 @@ def p2_submit(q, opts, log):
         log('Без --yes пакеты не отправляются (только план).')
 
 
+#: OpenAI держит в очереди Batch не больше 1,35 млн токенов на модель
+#: (29.10: остальные пакеты — failed «token_limit_exceeded», без оплаты).
+#: Пакет terra в 200 стр. ≈ 1 млн токенов, проходит за 2–4 мин — поэтому по одному.
+OPENAI_INFLIGHT = 1
+
+
+def p2_pump(q, opts, log):
+    """Насос фазы 2: Haiku — все пакеты сразу; terra — по одному, следующий
+    после того, как предыдущий забран. Каждый круг — `collect`. Выход —
+    когда всё прочитано или упёрлись в потолок денег."""
+    p2_submit(q, dict(opts, models=SECOND), log)
+    while True:
+        collect(q, handlers(q), log)
+        inflight = [r for r in BatchLog(q).open_batches()
+                    if r['provider'] == 'openai' and r['phase'] == 'p2']
+        if len(inflight) < OPENAI_INFLIGHT:
+            before = len(BatchLog(q).rows())
+            p2_submit(q, dict(opts, models=PRIMARY, limit=1), log)
+            if len(BatchLog(q).rows()) == before and not BatchLog(q).open_batches():
+                log('насос: отправлять больше нечего или упёрлись в потолок — стоп')
+                break
+        time.sleep(opts.get('sleep') or 60)
+
+
 def _page_handler(q):
     def handle(model, cid, text, usd):
         key = key_of(cid)
@@ -584,11 +608,14 @@ def p4_submit(q, opts, log):
             continue
         reqs.append((cid, rc.request_params(rows[it['row']], it['full'], it['near'], q.v1,
                                             effort='high' if rnd == '2' else 'medium')))
+    # Сначала первые проходы, повторы (effort high) — на остаток потолка.
+    reqs.sort(key=lambda x: x[0].endswith('-r2'))
     log(f'Opus: позиций {len(items)} ({Counter(i["stage"] for i in items)}), к отправке {len(reqs)}, '
         f'оценка ${len(reqs) * BATCH_ITEM_USD[rc.MODEL]:.2f}')
     if opts.get('yes') and reqs:
-        # Потолок Opus внутри Claude — свой: $20 (задание Q2).
-        spent = q.ledger.spent('anthropic', 'p4') + BatchLog(q).pending_usd('anthropic')
+        # Потолок Opus внутри Claude — свой: $20 (задание Q2); в счёт — только пакеты Opus.
+        spent = q.ledger.spent('anthropic', 'p4') + q.ledger.spent('anthropic', 'p4-probe') + sum(
+            r['estimate_usd'] for r in BatchLog(q).open_batches() if r['phase'] == 'p4')
         room = 0.9 * P4_CAP - spent
         n = max(0, int(room / BATCH_ITEM_USD[rc.MODEL]))
         if n < len(reqs):
@@ -868,6 +895,61 @@ def keys_decide(q, opts, log):
     return acc, queue
 
 
+# ── Фаза 5: сборка v2 ──────────────────────────────────────────────────
+
+QUEUE_PATH = r'C:\Users\shipu\weconomics-data\quality_20261029\queues\q2_vsosh_v2.jsonl'
+
+
+def build_v2(q, cmd, opts, log):
+    """Сборка эталона v2 и все проверки фазы 5 → `digitized\\v2\\`."""
+    from problems.olympiad_audit import digitize, vsosh_quality
+    from problems.olympiad_audit import vsosh_v2 as V
+    v2_root = os.path.dirname(q.work)
+    rows = V.assemble_v2(q.v1, v2_root, log)
+    v1_rows = digitize.read_jsonl(os.path.join(q.v1, 'reference_problems_v1.jsonl'))
+    ile = V.ile_2008_rows(os.path.join(os.path.dirname(os.path.dirname(q.v1)), 'raw', 'ile', 'print',
+                                       'iloveeconomics.ru__print-all-tasks__3950.html'),
+                          os.path.join(v2_root, 'figures_v2', 'ile_2008_09'))
+    rows += ile
+    log(f'ЗЭ 2008/09 со страницы ILE: {len(ile)} заданий')
+    st4 = V.apply_recheck(rows, os.path.join(q.work, 'recheck', 'decisions.jsonl'))
+    st3 = V.apply_keys(rows, os.path.join(q.work, 'keys', 'accepted.jsonl'), v1_rows)
+    human_path = os.path.join(q.work, 'human_pages.json')
+    human = json.load(open(human_path, encoding='utf-8')) if os.path.isfile(human_path) else []
+    V.check_rows(rows, q.v1, v2_root, [h['key'] for h in human])
+    out = os.path.join(v2_root, 'reference_problems_v2.jsonl')
+    digitize.write_jsonl(out, rows)
+    kx = V.katex_check(out, os.path.join(v2_root, 'katex_v2.json'))
+    bad = {k for k, v in (kx.get('by_key') or {}).items() if v}
+    for r in rows:
+        if V.row_key(r) in bad:
+            r['check_flags'] = sorted(set(r['check_flags']) | {'katex'})
+    digitize.write_jsonl(out, rows)
+    keys = Counter(V.row_key(r) for r in rows)
+    key_queue = digitize.read_jsonl(os.path.join(q.work, 'keys', 'queue.jsonl')) \
+        if os.path.isfile(os.path.join(q.work, 'keys', 'queue.jsonl')) else []
+    queue = V.build_queue(rows, q.v1, key_queue, human, QUEUE_PATH)
+    res = {'tasks': len(rows), 'events': len({r['event_id'] for r in rows}),
+           'by_stage': dict(Counter(r['stage'] for r in rows)),
+           'v1_by_stage': dict(Counter(r['stage'] for r in v1_rows)),
+           'flags_v1': V.flag_share(v1_rows), 'flags_v2': V.flag_share(rows),
+           'flag_counts_v2': dict(Counter(f for r in rows for f in set(r['check_flags']) - V.INFO)),
+           'keys_unique': all(v == 1 for v in keys.values()),
+           'katex_errors': kx.get('errors'), 'katex_red': kx.get('red'), 'katex_fields': kx.get('fields'),
+           'test_keys_outside_options': V.test_keys_in_options(rows),
+           'figures_bad': V.figures_ok(rows, v2_root), 'recheck_applied': dict(st4), 'keys_applied': dict(st3),
+           'changed': V.changed_keys(v1_rows, rows, os.path.join(v2_root, 'changed_keys_v1_v2.csv')),
+           'queue_items': len(queue), 'queue_by_check': dict(Counter(x['check'] for x in queue)),
+           'queue_tasks': len({x['ref_key'] for x in queue})}
+    if not opts.get('no_bank'):
+        res['bank_plan'] = {f'{s}|{v}': n for (s, v), n in vsosh_quality.run_bank(
+            cmd, {'ref_file': out, 'out_dir': v2_root, 'tag': 'v2'}).items()}
+    with open(os.path.join(v2_root, 'check_v2.json'), 'w', encoding='utf-8') as fh:
+        json.dump(res, fh, ensure_ascii=False, indent=1)
+    log(json.dumps({k: v for k, v in res.items() if k not in ('figures_bad',)}, ensure_ascii=False)[:4000])
+    return res
+
+
 def run(cmd, opts):
     q = Q2(cmd.digitized)
     action = opts.get('action')
@@ -881,6 +963,10 @@ def run(cmd, opts):
         return calib_report(q, log)
     if action == 'p2-submit':
         return p2_submit(q, opts, log)
+    if action == 'build':
+        return build_v2(q, cmd, opts, log)
+    if action == 'p2-pump':
+        return p2_pump(q, opts, log)
     if action == 'p2-merge':
         return p2_merge(q, opts, log)
     if action == 'arb-submit':

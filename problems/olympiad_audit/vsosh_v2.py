@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import csv
+import re
 import json
 import os
 import subprocess
@@ -158,6 +159,128 @@ def assemble_v2(v1_root, v2_root, log):
     return out
 
 
+# ── ЗЭ 2008/09: печатная страница ILE ──────────────────────────────────
+
+ILE_2008_NOTE = 'ILE (печатная страница), официальный файл не найден'
+ILE_2008_URL = 'https://iloveeconomics.ru/print-all-tasks/3950'
+
+
+def _html_md(node, images):
+    """Кусок HTML ILE → Markdown: абзацы, переносы, списки, таблицы; формулы
+    ILE уже в `$…$` и остаются как есть; картинки — в `images` (src)."""
+    from bs4 import NavigableString
+    out = []
+
+    def inline(el):
+        parts = []
+        for ch in el.children:
+            if isinstance(ch, NavigableString):
+                parts.append(str(ch))
+            elif ch.name == 'br':
+                parts.append('\n')
+            elif ch.name == 'img':
+                # Рисунок — в поле `figures`, как у вырезок v1 (метки в тексте нет).
+                images.append(ch.get('src'))
+            elif ch.name in ('strong', 'b'):
+                parts.append(f'**{inline(ch).strip()}**')
+            elif ch.name in ('em', 'i'):
+                parts.append(f'*{inline(ch).strip()}*')
+            elif ch.name in ('sub',):
+                parts.append(f'$_{{{inline(ch).strip()}}}$')
+            elif ch.name in ('sup',):
+                parts.append(f'$^{{{inline(ch).strip()}}}$')
+            else:
+                parts.append(inline(ch))
+        return ''.join(parts)
+
+    for el in node.find_all(['p', 'ol', 'ul', 'table']):
+        if el.find_parent(['ol', 'ul', 'table']):   # вложенное — уже внутри списка/таблицы
+            continue
+        if el.name == 'p':
+            text = inline(el).replace('\xa0', ' ').strip()
+            if text:
+                out.append(text)
+        elif el.name in ('ol', 'ul'):
+            items = [inline(li).strip() for li in el.find_all('li', recursive=False)]
+            out.append('\n'.join((f'{i}. ' if el.name == 'ol' else '- ') + t
+                                 for i, t in enumerate(items, 1)))
+        else:
+            rows = [[inline(td).strip().replace('\n', ' ').replace('|', '\\|')
+                     for td in tr.find_all(['td', 'th'])] for tr in el.find_all('tr')]
+            rows = [r for r in rows if any(r)]
+            if rows:
+                width = max(len(r) for r in rows)
+                rows = [r + [''] * (width - len(r)) for r in rows]
+                out.append('\n'.join(['| ' + ' | '.join(rows[0]) + ' |',
+                                      '|' + '---|' * width] +
+                                     ['| ' + ' | '.join(r) + ' |' for r in rows[1:]]))
+    if not out:   # текст прямо в div без абзацев (две задачи 2008/09)
+        text = inline(node).replace('\xa0', ' ').strip()
+        out = [re.sub(r'\n[ \t]*\n+', '\n', text)] if text else []
+    return '\n\n'.join(out)
+
+
+def ile_2008_rows(html_path, figures_dir, fetch=True):
+    """ЗЭ 2008/09 из печатной страницы ILE → строки эталона (схема v1).
+
+    Официального файла нет: архив ЦПМ начинается с 2009/10, у rosolymp —
+    2010–2012 (сверено в Q2, 29.10). Комплекты — по разделам страницы
+    («1-й тур: задачи», «3-й тур: задачи», «Тест»); рисунки — с ILE в
+    `figures_v2\\ile_2008_09\\`. Источник помечается `ILE_2008_NOTE`."""
+    import re
+    import urllib.request
+
+    from bs4 import BeautifulSoup
+    with open(html_path, encoding='utf-8') as fh:
+        soup = BeautifulSoup(fh.read(), 'lxml')
+    rows, section = [], ''
+    os.makedirs(figures_dir, exist_ok=True)
+    # Список — до разбора: `decompose` заголовка решения иначе ломает обход.
+    for el in soup.select('h2, div.task'):
+        if el.name == 'h2':
+            section = el.get_text(' ', strip=True)
+            continue
+        head = el.find('h3').get_text(' ', strip=True)
+        m = re.match(r'\s*(\d+)\s*[.)]\s*(.*)', head)
+        tour = 'test' if 'тест' in section.lower() else (
+            'tur' + (re.search(r'(\d)', section).group(1) if re.search(r'(\d)', section) else ''))
+        imgs, sol_imgs = [], []
+        cond = el.find('div', class_='condition')
+        sol = el.find('div', class_='solution_and_answer')
+        statement = _html_md(cond, imgs) if cond else ''
+        if sol and sol.find('div', class_='title'):
+            sol.find('div', class_='title').decompose()
+        solution = _html_md(sol, sol_imgs) if sol else ''
+        figs = []
+        for kind, srcs in (('figures', imgs), ('solution_figures', sol_imgs)):
+            for src in srcs:
+                name = os.path.basename(src)
+                path = os.path.join(figures_dir, name)
+                if fetch and not os.path.isfile(path):
+                    url = 'https://iloveeconomics.ru' + src if src.startswith('/') else src
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=60) as resp, open(path, 'wb') as out:  # noqa: S310
+                        out.write(resp.read())
+                # Путь — от папки v2, как у вырезок `assemble` (`figures_v2/…`).
+                figs.append((kind, {'path': os.path.relpath(path, os.path.dirname(os.path.dirname(
+                    figures_dir))).replace(os.sep, '/'), 'caption': '', 'source': src}))
+        number = m.group(1) if m else head
+        rows.append({
+            'event_id': f'vseros-final-2008-09-ru-all-{tour}',
+            'number': ('тест-' + number) if tour == 'test' else number, 'task_variant': '',
+            'title': (m.group(2) if m else '').strip(), 'year': 2009, 'academic_year': '2008/09',
+            'stage': 'final', 'grade': 'all', 'statement_md': statement, 'parts': [],
+            'tables': [], 'figures': [f for k, f in figs if k == 'figures'],
+            'solution_figures': [f for k, f in figs if k == 'solution_figures'],
+            'solution_md': solution, 'answer': '', 'criteria_md': '', 'max_score': None,
+            'source_file': [], 'source_pages': [], 'solution_pages': [], 'criteria_pages': [],
+            'official': False, 'source': 'ile_print', 'source_note': ILE_2008_NOTE,
+            'source_urls': [ILE_2008_URL], 'region_code': 'ru', 'region_name': '', 'tour': tour,
+            'variant': 'all', 'olympiad_slug': 'vseros', 'section': section,
+            'digitized_by': {'model': 'ile_html', 'date': '2026-10-29'}, 'check_flags': []})
+    return rows
+
+
 # ── Правки фаз 3 и 4 ───────────────────────────────────────────────────
 
 def apply_recheck(rows, decisions_path):
@@ -262,15 +385,14 @@ def katex_check(path, out_path):
         return json.load(fh)
 
 
-def figures_ok(rows):
+def figures_ok(rows, v2_root):
     """Рисунки: файл есть и открывается. → [(ключ строки, путь, причина)]."""
     from PIL import Image
     bad = []
     for r in rows:
         for f in (r.get('figures') or []) + (r.get('solution_figures') or []):
             path = f.get('path') or ''
-            full = path if os.path.isabs(path) else os.path.join(
-                r'C:\Users\shipu\weconomics-data\olympiads\vsosh_20261028', path)
+            full = path if os.path.isabs(path) else os.path.join(v2_root, *path.split('/'))
             if not os.path.isfile(full):
                 bad.append((row_key(r), path, 'нет_файла'))
                 continue
@@ -304,6 +426,69 @@ def flag_share(rows):
         by[r['stage']][1] += bool(set(r.get('check_flags') or []) - INFO)
     return {s: {'tasks': by[s][0], 'flagged': by[s][1],
                 'share': round(by[s][1] / by[s][0], 3) if by[s][0] else None} for s in STAGES}
+
+
+CHECK_TEXT = {
+    'тест_без_ключа': 'у вопроса теста нет ключа; модели прочитали сетку ответов по-разному или не нашли',
+    'тест_без_вариантов': 'вопрос теста без вариантов ответа',
+    'нет_решения': 'у задачи нет решения и критериев, хотя у комплекта есть файл решений',
+    'числа_не_со_страницы': 'в условии есть числа, которых нет в текстовом слое страницы',
+    'расходится_со_слоем': 'текст заметно расходится с текстовым слоем страницы',
+    'страница_на_человека': 'две модели прочитали страницу по-разному, арбитр Sonnet не решил уверенно',
+    'katex': 'формула не разбирается KaTeX',
+    'пустое_условие': 'условие пустое', 'пункты_не_разобраны': 'пункты а), б)… не разобраны',
+    'скан_на_глаза': 'скан без текстового слоя — сверить с картинкой',
+}
+
+
+def page_images(r, index, v1_root):
+    out = []
+    for ref in (r.get('source_pages') or []) + (r.get('solution_pages') or []):
+        pdf, _, page = ref.rpartition('#p')
+        if pdf in index:
+            path = os.path.join(v1_root, *index[pdf].split('/'), f'p{page}.png')
+            if path not in out:
+                out.append(path)
+    return out[:6]
+
+
+def build_queue(rows, v1_root, key_queue, human_pages, path):
+    """Очередь людям (общий формат Q1–Q3): строка на (задание, проверка)."""
+    index = {x['pdf']: x['page_dir'] for x in digitize.read_jsonl(
+        os.path.join(v1_root, 'render_index.jsonl'))}
+    kq = {x['row']: x for x in key_queue}
+    hp = {x['key']: x for x in human_pages}
+    out = []
+    for r in rows:
+        flags = sorted(set(r.get('check_flags') or []) - INFO)
+        for check in flags:
+            current = {k: r.get(k) for k in ('statement_md', 'answer', 'solution_md', 'criteria_md')
+                       if r.get(k)}
+            proposed, conf, details = None, None, CHECK_TEXT.get(check, check)
+            if check == 'тест_без_ключа' and row_key(r) in kq:
+                x = kq[row_key(r)]
+                details += f' ({x["why"]})'
+                proposed = {'answer_by_model': {m: (v[0] if v else None)
+                                                for m, v in (x.get('replies') or {}).items()}}
+            if check == 'числа_не_со_страницы':
+                details += ': ' + ', '.join(r.get('numbers_not_on_page') or [])
+            if check == 'страница_на_человека':
+                notes = [hp[k] for k in hp if any(k.split('/')[1] in p for p in page_images(r, index, v1_root))]
+                if notes:
+                    details += '; ' + '; '.join(str(d) for n in notes for d in (n.get('differences') or []))[:600]
+                    conf = notes[0].get('confidence')
+            if r.get('q2_recheck') == 'human':
+                note = r.get('q2_recheck_note') or {}
+                details += f'; второй проход Opus: {note.get("why") or ""}'[:500]
+                conf = note.get('confidence')
+            out.append({'item_id': f'{QUEUE_SOURCE}:vseros:{row_key(r)}:{check}',
+                        'source': QUEUE_SOURCE, 'olympiad': 'vseros', 'ref_key': row_key(r),
+                        'problem_id': None, 'check': check, 'details': details,
+                        'page_images': page_images(r, index, v1_root), 'current': current,
+                        'proposed': proposed, 'confidence': conf})
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    digitize.write_jsonl(path, out)
+    return out
 
 
 def changed_keys(v1_rows, v2_rows, path):

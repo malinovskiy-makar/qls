@@ -228,13 +228,16 @@ def run_bank(cmd, opts):
     from problems.models import OlympiadRef
     from problems.olympiad_official import markup_free_key
     dz = cmd.digitized
+    # v2 (сессия Q2): свой файл эталона и свои имена отчёта — v1 не перезаписывается.
+    ref_file = opts.get('ref_file') or os.path.join(dz, 'reference_problems_v1.jsonl')
+    out_dir, tag = opts.get('out_dir') or dz, opts.get('tag') or 'v1'
     refs = list(OlympiadRef.objects.filter(olympiad_slug='vseros').values(
         'problem_id', 'source_site', 'academic_year', 'year', 'stage', 'grade', 'number',
         'event_id', 'problem__statement'))
     by = defaultdict(Counter)
     for r in refs:
         by[(r['stage'] or '?', r['academic_year'] or str(r['year'] or '?'))][r['source_site']] += 1
-    rows = digitize.read_jsonl(os.path.join(dz, 'reference_problems_v1.jsonl'))
+    rows = digitize.read_jsonl(ref_file)
     # Сопоставление по тексту внутри (этап, сезон): ключ без разметки.
     bank_by = defaultdict(list)
     for r in refs:
@@ -256,8 +259,8 @@ def run_bank(cmd, opts):
         plan[(t['stage'], verdict)] += 1
         detail.append({'event_id': t['event_id'], 'number': t['number'], 'best': round(best, 3),
                        'problem_id': pid, 'verdict': verdict})
-    digitize.write_jsonl(os.path.join(dz, 'bank_match_v1.jsonl'), detail)
-    lines = ['# ВсОШ: сверка с банком (только чтение)', '',
+    digitize.write_jsonl(os.path.join(out_dir, f'bank_match_{tag}.jsonl'), detail)
+    lines = [f'# ВсОШ {tag}: сверка с банком (только чтение)', '',
              f'Привязок `vseros` в банке: {len(refs)} '
              f'({dict(Counter(r["source_site"] for r in refs))}).', '',
              '| этап | сезон | solvehub | ile | official |', '|---|---|---|---|---|']
@@ -269,9 +272,10 @@ def run_bank(cmd, opts):
     for st in ('final', 'regional', 'municipal', 'school', 'invitational'):
         lines.append(f'| {st} | {plan[(st, "создать")]} | {plan[(st, "привязать")]} | '
                      f'{plan[(st, "сомнительно")]} |')
-    with open(os.path.join(dz, 'BANK_v1.md'), 'w', encoding='utf-8') as fh:
+    with open(os.path.join(out_dir, f'BANK_{tag}.md'), 'w', encoding='utf-8') as fh:
         fh.write('\n'.join(lines) + '\n')
     cmd._say('\n'.join(lines))
+    return plan
 
 
 _BANK_STAGE = {'final': 'final', 'заключительный': 'final', 'regional': 'regional',
