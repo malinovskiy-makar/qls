@@ -271,8 +271,11 @@ def schools(city, query, limit=LIMIT, asker_id=None):
                    'number': r['number'], 'city': r['city'], 'region': r['region'],
                    'name_n': r['name_norm']} for r in rows]
     if city:
-        known = {(c['name_n'], norm(c['city'])) for c in candidates}
-        candidates += [t for t in _typed(city, asker_id) if (t['name_n'], city_n) not in known]
+        # Сверка по показываемому названию: `name_n` у строки справочника — короткое и
+        # полное вместе, и выбранная людьми «Школа № 57» иначе встала бы второй строкой.
+        known = {(norm(c['label']), norm(c['city'])) for c in candidates}
+        candidates += [t for t in _typed(city, asker_id)
+                       if (norm(t['label']), city_n) not in known]
 
     population = _population()
     scored = []

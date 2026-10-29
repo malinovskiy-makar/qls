@@ -340,6 +340,15 @@ class NationwideSearchTests(TestCase):
         self.assertEqual(subs, {'Березовка, Пермский край', 'Березовка, Красноярский край'})
         self.assertEqual(school_search.schools('', 'школа 57')[0]['sub'], 'Москва')
 
+    def test_school_chosen_by_people_is_not_shown_twice(self):
+        School.objects.filter(city='Москва').update(name='ГБОУ Школа № 57 г. Москвы')
+        School.objects.get(city='Москва').save()           # name_norm: короткое + полное
+        for name in ('a', 'b', 'c'):
+            user = make_user(name)
+            UserProfile.objects.filter(user=user).update(city='Москва', school='Школа № 57')
+        moscow = [r for r in school_search.schools('Москва', '57') if r['city'] == 'Москва']
+        self.assertEqual(len(moscow), 1)
+
     def test_api_city_is_optional(self):
         self.client.force_login(make_user('u'))
         data = self.client.get('/welcome/api/schools/', {'q': '57'}).json()['results']
