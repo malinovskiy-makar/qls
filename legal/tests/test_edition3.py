@@ -44,10 +44,15 @@ class EditionThreeTextsTests(SimpleTestCase):
 
     def test_privacy_names_the_services_and_what_comes_from_them(self):
         text = text_of('privacy.md')
-        for fragment in ('VK ID', 'Яндекс ID', 'дата рождения', 'Дату рождения',
-                         'токен доступа', 'не сохраняется', 'ООО «ВК»', 'ООО «ЯНДЕКС»',
-                         'источники данных, а не получатели', 'идентификатор пользователя'):
+        for fragment in ('VK ID', 'Яндекс ID', 'Дату рождения', 'токен доступа',
+                         'не сохраняется', 'идентификатор пользователя'):
             self.assertIn(fragment, text, fragment)
+        # Раздел 5: сервисы входа названы источниками, а не получателями. ООО «ВК»
+        # уже стоит в строке VK Почта, поэтому смотрим именно пункт 5.7.
+        sources = next(line for line in text.splitlines() if line.startswith('5.7.'))
+        for fragment in ('VK ID (ООО «ВК»)', 'Яндекс ID (ООО «ЯНДЕКС»)',
+                         'источники данных, а не получатели', 'одноразовый код авторизации'):
+            self.assertIn(fragment, sources, fragment)
 
     def test_privacy_describes_the_mandatory_questionnaire(self):
         text = text_of('privacy.md')
@@ -71,9 +76,11 @@ class EditionThreeTextsTests(SimpleTestCase):
         text = text_of('privacy.md')
         row = next(line for line in text.splitlines()
                    if line.startswith('| Определение возраста пользователя'))
-        self.assertIn('дата рождения', row)          # данные
-        self.assertIn('VK ID или Яндекс ID', row)    # источник
-        self.assertTrue(row.rstrip().endswith('| согласие |'))   # основание
+        _empty, purpose, data, basis, _tail = [cell.strip() for cell in row.split('|')]
+        self.assertIn('раздела 9', purpose)                    # цель
+        self.assertIn('VK ID или Яндекс ID', purpose)          # источник
+        self.assertIn('дата рождения', data)                   # данные
+        self.assertEqual(basis, 'согласие')                    # основание
 
     def test_all_three_documents_are_edition_three(self):
         for name in ('privacy.md', 'consent.md', 'terms.md'):
