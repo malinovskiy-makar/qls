@@ -19,7 +19,6 @@
         {% include 'onboarding/_mark.html' %}
         <span class="ob-role-ico" aria-hidden="true">{% if tile.code == 'student' %}<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/><path d="M22 9v6"/></svg>{% else %}<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .6 3.2 2.4 3.5 5.4"/></svg>{% endif %}</span>
         <span class="k-tile__name">{{ tile.label }}</span>
-        <span class="ob-role-chips">{% for chip in tile.chips %}<span class="k-chip">{{ chip }}</span>{% endfor %}</span>
       </button>{% endfor %}
     </div>
     {% for error in form.role.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
@@ -64,7 +63,7 @@
       <label class="k-tile ob-t ob-goal ob-anim-up ob-d{{ forloop.counter }}{% if tile.wide %} is-wide{% endif %}{% if tile.on %} k-tile--on{% endif %}">
         <input type="checkbox" name="goals" value="{{ tile.code }}"{% if tile.on %} checked{% endif %}{% if tile.code == 'undecided' %} data-ob-exclusive{% endif %}>
         {% include 'onboarding/_mark.html' with sq=True %}
-        <span class="ob-plate{% if tile.draw %} ob-plate--draw{% endif %}" aria-hidden="true">{% if tile.logo %}<img src="{% static tile.logo %}" alt="">{% if tile.badges %}<span class="ob-plate-badges">{% for badge in tile.badges %}<span><img src="{% static badge %}" alt=""></span>{% endfor %}</span>{% endif %}{% elif tile.draw == 'market' %}<svg width="44" height="36" viewBox="0 0 44 36" fill="none"><path d="M5 3v29h35" stroke="var(--text3)" stroke-width="1.6" stroke-linecap="round"/><path d="M9 7c8 3 17 11 27 22" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/><path d="M9 28C18 24 26 15 36 8" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/><circle cx="22.4" cy="17.6" r="3.2" fill="var(--surface)" stroke="var(--text)" stroke-width="1.8"/></svg>{% else %}<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="16" stroke="var(--text3)" stroke-width="1.6" stroke-dasharray="3 4"/><text x="20" y="27" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="20" font-weight="700" fill="var(--accent-ink)">?</text></svg>{% endif %}</span>
+        <span class="ob-plate{% if tile.olymp %} ob-plate--olymp{% endif %}{% if tile.mark %} ob-plate--mark{% endif %}{% if tile.fan %} ob-plate--fan{% endif %}" aria-hidden="true">{% if tile.fan %}{% for src in tile.fan %}<img src="{% static src %}" alt="">{% endfor %}{% else %}<img src="{% static tile.logo %}" alt="">{% if tile.badges %}<span class="ob-plate-badges">{% for badge in tile.badges %}<span><img src="{% static badge %}" alt=""></span>{% endfor %}</span>{% endif %}{% endif %}</span>
         <span class="ob-goal-t"><span class="k-tile__name">{{ tile.label }}</span>{% if tile.note %}<span class="k-tile__note">{{ tile.note }}</span>{% endif %}</span>
       </label>{% endfor %}
     </div>

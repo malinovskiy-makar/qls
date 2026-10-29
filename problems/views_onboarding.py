@@ -72,8 +72,6 @@ OLD_STEPS = ('olympiad', 'place')
 
 ROLE_CHOICES = (('student', 'Ученик'), ('tutor', 'Преподаватель'))
 #: Три чипа на плитке роли (макет `Role.png`).
-ROLE_CHIPS = {'student': ('задачи', 'туры', 'Wecon Rush'),
-              'tutor': ('группы', 'домашки', 'PDF и TeX')}
 #: Крупная цифра на плитке класса. `none` — отдельная пилюля «Уже не школьник».
 GRADE_NUMBER = {'le7': '≤7', '8': '8', '9': '9', '10': '10', '11': '11'}
 #: Сколько столбиков «лесенки» залито у уровня.
@@ -441,7 +439,7 @@ def _role_step(request, profile):
                                        if role == 'tutor' else SignupSource.Kind.STUDENT)
             return _after(request, profile, 'role')
     chosen = request.POST.get('role') if request.method == 'POST' else _role_preset(profile)
-    tiles = [{'code': code, 'label': label, 'on': code == chosen, 'chips': ROLE_CHIPS[code]}
+    tiles = [{'code': code, 'label': label, 'on': code == chosen}
              for code, label in ROLE_CHOICES]
     return _render(request, profile, 'role', form=form, tiles=tiles)
 
@@ -476,13 +474,19 @@ def _grade_step(request, profile):
                    picked=profile.get_grade_display() if profile.grade else '')
 
 
+#: У всех пяти целей — логотип без плашки (решение владельца 29.10.2026, раунд 3):
+#: олимпиады — свои логотипы (`olymp`: в тёмной теме под ними светлая подложка,
+#: иначе чёрные буквы ВсОШ не видны), «Разобраться в экономике» — знак W
+#: Weconomics, «Пока не решил» — веер из четырёх бледных логотипов.
+_LOGOS = 'onboarding/logos/'
 GOAL_PLATES = {
-    'vsosh': {'logo': 'onboarding/logos/vsosh_econ_top.png'},
-    'listed': {'logo': 'onboarding/logos/vp_logo.png',
-               'badges': ('onboarding/logos/ranepa_mark.png', 'onboarding/logos/nes_mark.png')},
-    'international': {'logo': 'onboarding/logos/ieo_mark.png'},
-    'knowledge': {'draw': 'market'},
-    'undecided': {'draw': 'question'},
+    'vsosh': {'logo': _LOGOS + 'vsosh_econ_top.png', 'olymp': True},
+    'listed': {'logo': _LOGOS + 'vp_logo.png', 'olymp': True,
+               'badges': (_LOGOS + 'ranepa_mark.png', _LOGOS + 'nes_mark.png')},
+    'international': {'logo': _LOGOS + 'ieo_mark.png', 'olymp': True},
+    'knowledge': {'logo': _LOGOS + 'weconomics_w.svg', 'mark': True},
+    'undecided': {'fan': (_LOGOS + 'vsosh_econ_top.png', _LOGOS + 'vp_logo.png',
+                          _LOGOS + 'ieo_mark.png', _LOGOS + 'ranepa_mark.png')},
 }
 
 

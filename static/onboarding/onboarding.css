@@ -255,12 +255,10 @@ body.ob *, body.ob *::before, body.ob *::after { box-sizing: border-box; }
 /* «Кто вы?» */
 .ob-role { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .ob-role .k-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 16px;
-                   padding: 28px; min-height: 220px; border-radius: 14px; }
+                   padding: 28px; min-height: 168px; border-radius: 14px; }
 .ob-role .k-tile__name { font-size: 22px; margin: 0; }
 .ob-role-ico { width: 64px; height: 64px; border-radius: 16px; background: var(--bg);
                color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; }
-.ob-role-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
-.ob-role-chips .k-chip { background: var(--chip-bg); color: var(--chip-text); padding: 2px 10px; }
 
 /* Класс: пять плиток и отдельная пилюля «Уже не школьник». */
 .ob-grades { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
@@ -300,7 +298,7 @@ body.ob *, body.ob *::before, body.ob *::after { box-sizing: border-box; }
 .ob-sig i:nth-child(3) { height: 12px; } .ob-sig i:nth-child(4) { height: 16px; }
 .ob-sig i.on { background: var(--accent); }
 
-/* Цели: плашка с логотипом олимпиады, квадратная отметка, можно несколько. */
+/* Цели: логотип, квадратная отметка, можно несколько. */
 .ob-goals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ob-goal.k-tile { display: flex; flex-direction: row; align-items: center; gap: 16px;
                   padding: 14px 52px 14px 14px; min-height: 84px; border-radius: 12px; }
@@ -309,21 +307,32 @@ body.ob *, body.ob *::before, body.ob *::after { box-sizing: border-box; }
 .ob-goal-t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .ob-goal .k-tile__name { font-size: 16px; margin: 0; }
 .ob-goal .k-tile__note { font-size: 13px; }
-/* Плашка логотипа белая в обеих темах: это подложка знака, а не цвет сайта
-   (static/onboarding/logos/README.md). */
-.ob-plate { position: relative; width: 104px; height: 66px; flex-shrink: 0; border-radius: 12px;
-            background: #ffffff; border: 1px solid var(--border-soft); display: inline-flex;
-            align-items: center; justify-content: center; padding: 8px 10px; }
+/* Логотип БЕЗ плашки (раунд 3, решение владельца 29.10.2026): область 104×64 без
+   фона и рамки, знак вписан. ⚠️ Белую плашку не возвращать — сторож
+   problems/tests/test_onboarding_r3.py (static/onboarding/logos/README.md). */
+.ob-plate { position: relative; width: 104px; height: 64px; flex-shrink: 0; display: inline-flex;
+            align-items: center; justify-content: center; }
 .ob-plate img { max-width: 100%; max-height: 100%; object-fit: contain; display: block;
                 transition: transform var(--t-slow, .2s); }
 .ob-t:hover .ob-plate img { transform: scale(1.04); }
-.ob-plate--draw { background: var(--bg); }
 .ob-plate-badges { position: absolute; right: -8px; bottom: -8px; display: flex; }
-.ob-plate-badges span { width: 26px; height: 26px; border-radius: var(--r-pill); background: #ffffff;
+.ob-plate-badges span { width: 26px; height: 26px; border-radius: var(--r-pill); background: var(--surface);
                         border: 1px solid var(--border); display: inline-flex; align-items: center;
                         justify-content: center; padding: 3px; margin-left: -6px; }
 .ob-plate-badges img { max-height: 18px; }
-.k-tile--on .ob-plate { border-color: var(--accent-ring); }
+/* «Разобраться в экономике» — знак W Weconomics. */
+.ob-plate--mark img { width: 76px; height: 56px; }
+/* «Пока не решил» — веер из четырёх бледных логотипов. */
+.ob-plate--fan { display: block; }
+.ob-plate--fan img { position: absolute; max-height: 34px; max-width: 54px; filter: grayscale(1); opacity: .5; transition: opacity .2s; }
+.ob-plate--fan img:nth-child(1) { left: 0;    top: 6px;  max-width: 50px; }
+.ob-plate--fan img:nth-child(2) { left: 30px; top: 26px; max-width: 46px; max-height: 30px; }
+.ob-plate--fan img:nth-child(3) { left: 62px; top: 4px;  max-height: 26px; }
+.ob-plate--fan img:nth-child(4) { left: 80px; top: 30px; max-height: 26px; }
+.ob-t:hover .ob-plate--fan img { opacity: .75; transform: none; }
+/* Тёмная тема: чёрные буквы ВсОШ на тёмном не видны — только под логотипами
+   олимпиад светлая подложка. Знак W и веер — без подложки. */
+[data-theme="dark"] .ob-plate--olymp { background: var(--brand-cream); border-radius: 10px; padding: 6px; }
 
 /* Пилюли «Откуда узнали» и классы преподавателя. */
 .ob-pills { display: flex; flex-wrap: wrap; gap: 10px; }
