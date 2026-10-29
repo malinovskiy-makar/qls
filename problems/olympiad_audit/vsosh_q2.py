@@ -198,6 +198,8 @@ BATCH_ITEM_USD = {'gpt-6.1-terra': 0.0047, 'claude-haiku-5-5': 0.00095,
 #: Запросов в пакете: у OpenAI файл ≤ 200 МБ, у Anthropic пакет ≤ 256 МБ
 #: (страница с картинкой — до ~0,8 МБ base64).
 CHUNK = {'openai': 200, 'anthropic': 200}
+#: Отмена хвоста пакета OpenAI: готово ≥ 95 % и идёт дольше 20 минут.
+TAIL_SHARE, TAIL_SECONDS = 0.95, 20 * 60
 #: Объём пакета в байтах JSON (base64 картинок внутри): с запасом до 200/256 МБ.
 MAX_BATCH_BYTES = 120_000_000
 
@@ -364,6 +366,14 @@ def collect_one(q, bl, env, row, handlers, log, status):
     if row['provider'] == 'openai':
         client = _openai_client(env)
         b = client.batches.retrieve(row['batch_id'])
+        rc = b.request_counts
+        # Хвост пакета OpenAI бывает в разы дольше тела (29.10: 196 из 200 за
+        # 2 мин, последние 4 — больше часа). Долгий почти готовый пакет —
+        # отменить: готовые ответы приходят и у отменённого, остаток уйдёт заново.
+        if (b.status == 'in_progress' and rc and rc.total and rc.completed >= TAIL_SHARE * rc.total
+                and time.time() - (b.in_progress_at or b.created_at) > TAIL_SECONDS):
+            client.batches.cancel(row['batch_id'])
+            log(f'  отменён хвост {row["batch_id"]}: {rc.completed} из {rc.total} готово')
         if b.status not in ('completed', 'expired', 'failed', 'cancelled'):
             status[f'{row["model"]}:{b.status}'] += 1
             return
