@@ -747,3 +747,56 @@ def plan(request):
         'done': True,
         'seo_noindex': True,
     }))
+
+
+# ── Подсказки городов и школ (фаза 4 раунда 2) ─────────────────────────────
+
+#: Сколько запросов подсказок в минуту на человека. Поле шлёт запрос не чаще
+#: раза в 150 мс, так что живой человек упирается в потолок только при наборе
+#: без пауз дольше минуты; перебор справочника — упирается сразу.
+SUGGEST_PER_MINUTE = 120
+
+
+def _suggest_guard(request):
+    """Только вошедшим и не чаще потолка; иначе готовый отказ JSON."""
+    from django.core.cache import cache
+    from django.http import JsonResponse
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'results': [], 'error': 'login'}, status=403)
+    key = 'onb_suggest:%s:%s' % (request.user.pk, int(timezone.now().timestamp() // 60))
+    count = cache.get_or_set(key, 0, 70)
+    if count >= SUGGEST_PER_MINUTE:
+        return JsonResponse({'results': [], 'error': 'rate'}, status=429)
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, 70)
+    return None
+
+
+@require_http_methods(['GET'])
+def cities_api(request):
+    """`GET /welcome/api/cities/?q=` → `{"results": [{value, label, sub}]}`."""
+    from django.http import JsonResponse
+
+    from problems import school_search
+
+    stop = _suggest_guard(request)
+    if stop:
+        return stop
+    return JsonResponse({'results': school_search.cities(request.GET.get('q', '')[:60])})
+
+
+@require_http_methods(['GET'])
+def schools_api(request):
+    """`GET /welcome/api/schools/?city=&q=` → школы только этого города."""
+    from django.http import JsonResponse
+
+    from problems import school_search
+
+    stop = _suggest_guard(request)
+    if stop:
+        return stop
+    return JsonResponse({'results': school_search.schools(request.GET.get('city', '')[:120],
+                                                          request.GET.get('q', '')[:80])})

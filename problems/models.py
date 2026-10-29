@@ -2317,3 +2317,6 @@ from .models_mail import EmailCode  # noqa: E402,F401
 
 # Вход через VK ID и Яндекс ID (решения 29.10.2026, docs/SECURITY.md).
 from .models_social import SocialAccount  # noqa: E402,F401
+
+# Справочник школ для подсказок онбординга (раунд 2, 30.10.2026).
+from .models_schools import School  # noqa: E402,F401
