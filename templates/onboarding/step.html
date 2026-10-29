@@ -1,0 +1,65 @@
+{% extends 'onboarding/base.html' %}
+{% comment %}
+Шаг онбординга. Тексты — дословно из решения 29.10.2026; своих не добавлять.
+Подписи групп без видимого текста — только для экранного диктора (`ob-sr`).
+⚠️ Абзацев `<p>` на шагах нет, кроме сноски про Instagram: сторож в
+problems/tests/test_onboarding.py считает их.
+{% endcomment %}
+{% block main %}
+<h1 class="ob-h">{{ title }}</h1>
+<form id="ob-form" method="post" class="ob-form" novalidate data-ob-form>
+  {% csrf_token %}
+  {% if step == 'role' %}
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-sr">{{ title }}</legend>
+    {% include 'onboarding/_choices.html' with name='role' items=choices.role look='tiles' cols='ob-cols-2 ob-tiles--big' icon=True errors=form.role.errors %}
+  </fieldset>
+
+  {% elif step == 'grade' %}
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-sr">Класс</legend>
+    {% include 'onboarding/_choices.html' with name='grade' items=choices.grade look='seg' errors=form.grade.errors %}
+  </fieldset>
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-sr">Уровень</legend>
+    {% include 'onboarding/_choices.html' with name='level' items=choices.level look='tiles' cols='ob-cols-2' errors=form.level.errors %}
+  </fieldset>
+
+  {% elif step == 'olympiad' %}
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-sr">{{ title }}</legend>
+    {% include 'onboarding/_choices.html' with name='main_olympiad' items=choices.main_olympiad look='tiles' cols='ob-cols-3' errors=form.main_olympiad.errors %}
+  </fieldset>
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-cap">Откуда вы узнали о Weconomics?</legend>
+    {% include 'onboarding/_choices.html' with name='source_channel' items=choices.source_channel look='pills' errors=form.source_channel.errors %}
+  </fieldset>
+  {% include '_instagram_note.html' with note_class='ob-fine' %}
+
+  {% elif step == 'place' %}
+  <div class="ob-q">
+    <label class="ob-cap" for="ob-city">Город</label>
+    <input class="ob-input ym-disable-keys" type="text" id="ob-city" name="city" maxlength="120"
+           autocomplete="address-level2" required value="{{ form.city.value|default:'' }}">
+    {% for error in form.city.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </div>
+  <div class="ob-q">
+    <label class="ob-cap" for="ob-school">Школа</label>
+    <input class="ob-input ym-disable-keys" type="text" id="ob-school" name="school" maxlength="200"
+           autocomplete="organization" required value="{{ form.school.value|default:'' }}">
+    {% for error in form.school.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </div>
+
+  {% elif step == 'teach' %}
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-sr">{{ title }}</legend>
+    {% include 'onboarding/_choices.html' with name='teach_places' items=choices.teach_places look='tiles' cols='ob-cols-3' multi=True errors=form.teach_places.errors %}
+  </fieldset>
+  <fieldset class="ob-q" data-ob-need>
+    <legend class="ob-cap">Классы</legend>
+    {% include 'onboarding/_choices.html' with name='teach_grades' items=choices.teach_grades look='pills' multi=True errors=form.teach_grades.errors %}
+  </fieldset>
+  {% endif %}
+</form>
+{% endblock %}
+{% block bar %}{% include 'onboarding/_bar.html' %}{% endblock %}

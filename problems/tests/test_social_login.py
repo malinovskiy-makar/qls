@@ -189,6 +189,13 @@ class AutoMergeTests(SocialBase):
         self.assertEqual(SocialAccount.objects.get(uid='1001').user, a)
         self.assertEqual(int(self.client.session['_auth_user_id']), a.pk)
 
+    def test_staff_is_never_merged(self):
+        staff = make_user('admin_a', email='ivan@mail.ru', email_verified_at=timezone.now(),
+                          is_staff=True)
+        response, _network = self.callback()
+        self.assertRedirects(response, '/auth/finish/', fetch_redirect_response=False)
+        self.assertFalse(SocialAccount.objects.filter(user=staff).exists())
+
     def test_unverified_email_here_is_not_merged(self):
         a = make_user('owner_b', email='IVAN@mail.ru')         # почта не подтверждена
         response, _network = self.callback()

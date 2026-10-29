@@ -1,0 +1,40 @@
+{% extends 'onboarding/base.html' %}{% load ru %}
+{% comment %}
+«План готов» (решение 29.10.2026 «Собрали первый план»): чипы ответов, три
+карточки, «Начать». Открывается и после онбординга по /welcome/plan/.
+Дату тура не придумываем: строка «До тура N дней» — только из vp/config.py.
+{% endcomment %}
+{% block main %}
+<h1 class="ob-h">{{ title }}</h1>
+<div class="ob-chips">{% for chip in chips %}<span class="k-chip">{{ chip }}</span>{% endfor %}<a class="ob-edit" href="{% url 'onboarding_step' 'grade' %}">Изменить</a></div>
+
+<div class="ob-cards">
+  <section class="ob-card">
+    <h2 class="ob-card-h">Три задачи</h2>
+    <ul class="ob-tasks">{% for task in tasks %}
+      <li><a class="ob-task" href="{{ task.url }}">
+        <span class="ob-task-t">{{ task.title }}</span>
+        <span class="ob-task-m">{% if task.topic %}<span class="ob-topic" style="--gc: var(--map-g-{{ task.section }})"><span class="ob-dot"></span>{{ task.topic }}</span>{% endif %}{% if task.stars %}<span class="ob-stars" role="img" aria-label="сложность">{% for _ in task.stars %}★{% endfor %}</span>{% endif %}</span>
+      </a></li>{% endfor %}
+    </ul>
+  </section>
+
+  {% if vp %}
+  <section class="ob-card">
+    <h2 class="ob-card-h"><a href="{{ vp.url }}">Тренажёр {{ vp.tour }} тура «Высшей пробы»</a></h2>
+    {% if vp.days %}<div class="ob-card-sub">До тура {{ vp.days }} {{ vp.days|plural_ru:"день,дня,дней" }}</div>{% endif %}
+  </section>
+  {% else %}
+  <section class="ob-card">
+    <h2 class="ob-card-h"><a href="{% url 'olympiads:list' %}">Олимпиада</a></h2>
+  </section>
+  {% endif %}
+
+  <section class="ob-card">
+    <h2 class="ob-card-h">Вызов дня</h2>
+    <a class="k-btn k-btn--plain ob-card-btn" href="{{ daily_url }}">Сыграть</a>
+  </section>
+</div>
+
+<a class="k-btn k-btn--main ob-start" href="{{ start_url }}">Начать</a>
+{% endblock %}

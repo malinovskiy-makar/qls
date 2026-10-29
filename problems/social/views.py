@@ -205,9 +205,12 @@ def callback(request, provider):
         return redirect(target or _role_home(link.user))
 
     # Шаг 3: автосклейка — почта подтверждена и у сервиса, и у нас.
+    # ⚠️ Сотрудников и суперпользователей не склеиваем никогда: вход в админку
+    # не должен зависеть от того, кто завладел их почтой в VK или Яндексе.
     if data.get('email') and data.get('email_verified'):
         owner = email_codes.verified_user_for(data['email'])
-        if owner is not None and owner.is_active:
+        if (owner is not None and owner.is_active
+                and not owner.is_staff and not owner.is_superuser):
             try:
                 link = SocialAccount.objects.create(user=owner, provider=provider.name,
                                                     uid=data['uid'])

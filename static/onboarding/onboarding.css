@@ -1,0 +1,130 @@
+/* Онбординг /welcome/ (problems/views_onboarding.py, решения 29.10.2026).
+   Только токены `templates/_tokens.html` и детали `_kit.html` (.k-tile, .k-btn,
+   .k-chip): своих цветов здесь нет, тёмная тема приходит с токенами.
+   Сегмента и пилюль в наборе нет — они здесь, по образцу анкеты стены ВП. */
+
+*, *::before, *::after { box-sizing: border-box; }
+body.ob { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+          background: var(--bg); color: var(--text); font-family: var(--font-ui);
+          -webkit-font-smoothing: antialiased; }
+
+/* ── Шапка: знак · полоска шагов · «Выйти» ─────────────────────────────── */
+.ob-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+          gap: 16px; padding: 14px 24px; }
+.ob-logo { display: inline-flex; color: var(--text); }
+.ob-logo-mark { width: 132px; height: auto; display: block; color: var(--text); }
+.ob-progress { display: flex; gap: 6px; list-style: none; margin: 0 auto; padding: 0;
+               width: 100%; max-width: 280px; }
+.ob-progress li { flex: 1; height: 4px; border-radius: var(--r-pill);
+                  background: var(--border); }
+.ob-progress li.is-on { background: var(--accent); }
+.ob-out { margin: 0; }
+
+/* ── Середина ──────────────────────────────────────────────────────────── */
+.ob-main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto;
+           padding: 24px 24px 32px; }
+.ob-h { font-size: 30px; line-height: 1.2; font-weight: 700; margin: 12px 0 24px;
+        letter-spacing: -0.01em; }
+.ob-form { margin: 0; }
+.ob-q { border: 0; margin: 0 0 22px; padding: 0; min-width: 0; }
+.ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
+         clip: rect(0 0 0 0); white-space: nowrap; }
+.ob-cap { display: block; font-size: 14px; font-weight: 600; color: var(--text2);
+          margin: 0 0 10px; padding: 0; }
+.ob-err { margin-top: 8px; font-size: 13px; color: var(--error-ink); }
+.ob-fine { font-size: 12px; line-height: 1.45; color: var(--text3); margin: -8px 0 0; }
+
+/* Плитки: сетка из `_kit.html` (.k-tile), колонки — по шагу. */
+.ob-tiles { display: grid; gap: 10px; }
+.ob-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ob-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ob-tile { position: relative; min-height: 56px; }
+.ob-tiles--big .ob-tile { min-height: 132px; display: flex; flex-direction: column;
+                          align-items: flex-start; justify-content: flex-end; gap: 10px;
+                          padding: 18px; }
+.ob-tiles--big .k-tile__name { font-size: 17px; margin: 0; }
+.ob-ico { color: var(--text2); }
+.k-tile--on .ob-ico { color: var(--accent-ink); }
+.ob-tile:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Сегмент: один ряд кнопок, общая рамка. */
+.ob-seg { display: flex; flex-wrap: wrap; border: 1px solid var(--border);
+          border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.ob-seg .ob-opt { flex: 1 1 0; min-width: 52px; text-align: center; padding: 11px 8px;
+                  border-left: 1px solid var(--border); }
+.ob-seg .ob-opt:first-child { border-left: 0; }
+
+/* Пилюли: перенос по строкам. */
+.ob-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-pills .ob-opt { padding: 8px 14px; border: 1px solid var(--border);
+                    border-radius: var(--r-pill); background: var(--surface); }
+
+.ob-opt { position: relative; cursor: pointer; font-size: 14px; font-weight: 500;
+          color: var(--text); white-space: nowrap;
+          transition: background .12s ease, border-color .12s ease; }
+.ob-opt:hover { background: var(--surface-2); }
+.ob-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.ob-opt.is-on { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.ob-pills .ob-opt.is-on { border-color: var(--accent); }
+.ob-opt:focus-within { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.ob-input { width: 100%; font: inherit; font-size: 16px; color: var(--text);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--r); padding: 12px 14px; }
+.ob-input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ── Нижняя полоса: прилипает к низу окна ──────────────────────────────── */
+.ob-bar { position: sticky; bottom: 0; background: var(--bg);
+          border-top: 1px solid var(--border-soft); }
+.ob-bar-in { max-width: 720px; margin: 0 auto; padding: 12px 24px;
+             display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ob-next { min-width: 140px; }
+
+/* ── «Первая группа» ───────────────────────────────────────────────────── */
+.ob-later { display: inline-block; font-size: 14px; color: var(--text2);
+            text-decoration: none; }
+.ob-later:hover { color: var(--text); }
+.ob-code-card { max-width: 420px; }
+.ob-code { font-family: var(--font-mono, monospace); font-size: 34px; font-weight: 700;
+           letter-spacing: .06em; margin: 10px 0 18px; overflow-wrap: anywhere; }
+.ob-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ── «План готов» ──────────────────────────────────────────────────────── */
+.ob-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+            margin: -10px 0 24px; }
+.ob-edit { font-size: 13px; color: var(--accent-ink); text-decoration: none; margin-left: 4px; }
+.ob-edit:hover { text-decoration: underline; }
+.ob-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+            margin-bottom: 24px; }
+.ob-card { background: var(--surface); border: .5px solid var(--border);
+           border-radius: var(--r-card); padding: 16px; min-width: 0; }
+.ob-card-h { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+.ob-card-h a { color: var(--text); text-decoration: none; }
+.ob-card-h a:hover { color: var(--accent-ink); }
+.ob-card-sub { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+.ob-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ob-task { display: block; color: var(--text); text-decoration: none; font-size: 14px; }
+.ob-task:hover .ob-task-t { color: var(--accent-ink); }
+.ob-task-t { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; }
+.ob-task-m { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text2); }
+.ob-topic { display: inline-flex; align-items: center; min-width: 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+.ob-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px;
+          border-radius: 50%; background: var(--gc); flex: none; }
+.ob-stars { color: var(--amber-ink); letter-spacing: 1px; flex: none; }
+.ob-start { display: block; text-align: center; font-size: 16px; padding: 14px 20px; }
+
+/* ── Телефон: плитки в один столбец, без горизонтальной прокрутки ──────── */
+@media (max-width: 640px) {
+  .ob-top { padding: 10px 16px; gap: 10px; }
+  .ob-logo-mark { width: 104px; }
+  .ob-main { padding: 12px 16px 24px; }
+  .ob-h { font-size: 26px; }
+  .ob-cols-2, .ob-cols-3, .ob-cards { grid-template-columns: 1fr; }
+  .ob-tiles--big .ob-tile { min-height: 88px; }
+  .ob-seg .ob-opt { min-width: 44px; padding: 11px 4px; }
+  .ob-opt { white-space: normal; }
+  .ob-bar-in { padding: 10px 16px; }
+  .ob-next { min-width: 0; flex: 1; }
+}

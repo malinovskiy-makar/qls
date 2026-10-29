@@ -1,0 +1,34 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} · Weconomics</title>
+  {% include '_seo_meta.html' %}
+  {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
+  {% include '_metrika.html' %}
+  <style>
+{% include '_kit.html' %}
+  </style>
+  <link rel="stylesheet" href="{% static 'onboarding/onboarding.css' %}">
+</head>
+{% comment %}
+Каркас онбординга (problems/views_onboarding.py, решения 29.10.2026): сверху знак,
+полоска шагов без подписей и тихое «Выйти»; по центру заголовок и элементы
+управления; снизу липкая полоса «Назад» / «Дальше». Экран = заголовок +
+элементы управления: пояснительных абзацев здесь нет намеренно.
+{% endcomment %}
+<body class="ob">
+{% include '_metrika_noscript.html' %}
+<header class="ob-top">
+  <a class="ob-logo" href="/" aria-label="Weconomics">{% include '_wordmark.html' with logo_class='ob-logo-mark' %}</a>
+  {% if segments %}<ol class="ob-progress" aria-label="Шаги">{% for on in segments %}<li{% if on %} class="is-on"{% endif %}></li>{% endfor %}</ol>{% else %}<span class="ob-progress-gap"></span>{% endif %}
+  <form method="post" action="{% url 'logout' %}" class="ob-out">{% csrf_token %}<button type="submit" class="k-btn k-btn--quiet">Выйти</button></form>
+</header>
+<main class="ob-main">{% block main %}{% endblock %}</main>
+{% block bar %}{% endblock %}
+<script src="{% static 'onboarding/onboarding.js' %}" defer></script>
+{% include '_cookie_bar.html' %}
+</body>
+</html>
