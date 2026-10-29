@@ -461,3 +461,11 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - Тесты: `legal` 170 OK (было 164), `test_production_settings` + `test_signup_source` 62 OK (в них `check --deploy` с окружением джоба – 0 замечаний).
 - Зубастость: условие E003 заменено на `if False` → `test_empty_relay_is_error_e003_when_not_debug` красный; возвращено.
 - Ловушка: метки в `documents.py` – это `…` (невидимые символы); правка файла скриптом по строке «DATE_MARK = 'DATE'» не находит.
+
+### Фаза 3. Стена и бот
+- `_wall.html`: три сноски дословно из приложения E (Instagram; экран почты; экран Telegram «из ваших данных мы передаём ему только ID в Telegram»). Ссылки на Политику те же. Строка «Галочка – по желанию…» на экране `known` (без слов о Политике) не менялась.
+- `vp/bot.py`: `ready`, `ready_surveyed`, `moved` из приложения F; `_ready_text` и `tail` больше ничего не подставляют (`.format(login=…)` убран). Остальные тексты бота не менялись.
+- Старые строки поправлены в `test_wall_screens.py` и `test_wall_tg.py` (три места).
+- Новые тесты: `OnlyTelegramIdLeavesTheSiteTests` (5: подписка есть, подписки нет, «Проверить», вторая редакция «ready_surveyed», перепривязка с другого аккаунта; логин `zzlogin_marker`, почта, имя и фамилия сайта не встречаются в параметрах ни одного вызова `vp.telegram.call`, вызовов > 0) и `FootnoteTests` (5).
+- `vp.tests.test_wall_screens` + `test_wall_tg`: 70 тестов OK. `scripts/check_em_dash.py` – 0.
+- Зубастость: к тексту `ready` дописан логин → 4 теста инварианта красные; на экран Telegram возвращено «Нажимая кнопку, вы соглашаетесь» → `test_no_screen_says_you_agree_to_the_policy` красный. Оба дефекта убраны.
