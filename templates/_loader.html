@@ -1,0 +1,33 @@
+{% comment %}
+Фирменная загрузка: знак W «живой кляксой» (раунд 4, 29.10.2026). Переиспользуемый:
+`{% include '_loader.html' %}` или `{% include '_loader.html' with loader_label='Собираем план' %}`.
+
+Знак — тот же контур, что в `static/img/logo-mark.svg` (без круглой подложки: на тёмной
+теме кремовый круг спорил бы с фоном), строкой, а не <img>: нет лишнего запроса.
+Движение — только `transform`, его считает видеокарта, телефон не греется:
+- внешний слой «дышит»: масштаб 0.96 ↔ 1.04 и поворот −6° ↔ 6°, 1,6 с, ease-in-out;
+- внутренний «перетекает»: skew в 2–3°, свой период 2,3 с — фазы расходятся, и форма
+  не повторяет одно движение. SVG-фильтр (feTurbulence) отвергнут: он пересчитывается
+  на процессоре каждый кадр, на телефоне это заметно.
+`prefers-reduced-motion` — знак стоит. Цвет знака — фирменный, в обеих темах.
+
+Где подключён: экран сборки плана (`onboarding/build.html`). Остальной сайт — карточка
+Notion «Фирменная загрузка W по всему сайту».
+{% endcomment %}
+<style>
+.w-loader { display: inline-flex; flex-direction: column; align-items: center; gap: 12px; }
+.w-loader-mark { width: 96px; height: 96px; display: block;
+                 animation: w-breathe 1.6s ease-in-out infinite alternate; }
+.w-loader-mark svg { width: 100%; height: 100%; display: block; overflow: visible;
+                     animation: w-flow 2.3s ease-in-out infinite alternate; }
+.w-loader-label { font-size: 15px; font-weight: 500; color: var(--text2); }
+.w-loader-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
+               white-space: nowrap; }
+@keyframes w-breathe { from { transform: scale(.96) rotate(-6deg); }
+                       to   { transform: scale(1.04) rotate(6deg); } }
+@keyframes w-flow { from { transform: skew(-3deg, 1deg); } to { transform: skew(2deg, -2deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .w-loader-mark, .w-loader-mark svg { animation: none !important; transform: none; }
+}
+</style>
+<span class="w-loader" role="status"><span class="w-loader-mark" aria-hidden="true"><svg viewBox="489 348 460 460"><path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"/></svg></span>{% if loader_label %}<span class="w-loader-label">{{ loader_label }}</span>{% else %}<span class="w-loader-sr">Загрузка</span>{% endif %}</span>

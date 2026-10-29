@@ -453,16 +453,16 @@
     });
   }
 
-  // ── Сборка плана: строки по одной, потом заготовки карточек, потом дальше ──
+  // ── Сборка плана: строки по одной, галочка у последней — и сразу план (раунд 4:
+  //    заготовок карточек и уезда строк больше нет) ──
   function initBuild(root) {
     var build = root.querySelector('[data-ob-build]');
     if (!build) return;
     var target = build.getAttribute('data-ob-target');
     if (reduced) { location.replace(target); return; }
     var lines = build.querySelectorAll('.ob-build-lines li').length;
-    var shown = lines * 450 + 700;
-    setTimeout(function () { build.classList.add('is-leaving'); }, shown);
-    setTimeout(function () { location.replace(target); }, shown + 650);
+    // Галочка последней строки появляется на (n − 1) · 450 + 600 мс и «пружинит» 300 мс.
+    setTimeout(function () { location.replace(target); }, lines * 450 + 500);
   }
 
   function init(root) {

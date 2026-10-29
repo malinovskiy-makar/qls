@@ -428,13 +428,8 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
 /* ══ Сборка плана ════════════════════════════════════════════════════════ */
 .ob-build { flex: 1; min-height: 60vh; display: flex; flex-direction: column; align-items: center;
             justify-content: center; gap: 34px; padding: 40px 16px; }
-.ob-build-mark { width: 84px; height: 84px; border-radius: 24px; background: var(--surface);
-                 border: 1px solid var(--border); color: var(--accent); display: inline-flex;
-                 align-items: center; justify-content: center; box-shadow: var(--shadow-pop);
-                 animation: ob-up .4s both; }
-.ob-build-mark svg { animation: ob-spin 6s linear infinite; }
 .ob-build-lines { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column;
-                  gap: 16px; width: 380px; max-width: 100%; transition: transform .4s, opacity .4s; }
+                  gap: 16px; width: 380px; max-width: 100%; }
 .ob-build-lines li { display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 500;
                      opacity: 0; animation: ob-up .35s cubic-bezier(.2, .7, .2, 1) forwards;
                      animation-delay: calc(var(--i) * .45s + .2s); }
@@ -449,13 +444,6 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
 @keyframes ob-hide { to { opacity: 0; } }
 @keyframes ob-okpop { 0% { opacity: 0; transform: scale(.6); } 60% { opacity: 1; transform: scale(1.08); }
                       100% { opacity: 1; transform: scale(1); } }
-.ob-build-ghost { display: grid; grid-template-columns: repeat(3, 180px); gap: 14px; }
-.ob-build-ghost span { height: 92px; border-radius: var(--r-panel); background: var(--surface);
-                       border: 1px solid var(--border); opacity: 0; }
-.ob-build.is-leaving .ob-build-lines { transform: translateY(-24px); opacity: 0; }
-.ob-build.is-leaving .ob-build-ghost span { animation: ob-up .4s cubic-bezier(.2, .7, .2, 1) forwards; }
-.ob-build.is-leaving .ob-build-ghost span:nth-child(2) { animation-delay: .08s; }
-.ob-build.is-leaving .ob-build-ghost span:nth-child(3) { animation-delay: .16s; }
 .ob-build-skip { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .ob-build-skip:focus { position: static; width: auto; height: auto; clip: auto; }
 
@@ -552,7 +540,6 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
     width: 100%; height: 52px; justify-content: center; font-size: 16px; }
   .ob-main > .ob-fine { padding: 16px 16px 12px; }
   .ob-code { font-size: 22px; }
-  .ob-build-ghost { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   .pl { padding: 20px 16px 0; }
   .pl-head .pl-start { display: none; }
   .pl-grid { grid-template-columns: 1fr; }
@@ -567,7 +554,7 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
   body.ob *, body.ob *::before, body.ob *::after,
   body.au *, body.au *::before, body.au *::after {
     animation: none !important; transition: none !important; }
-  .ob-build-lines li, .ob-build-ghost span { opacity: 1; }
+  .ob-build-lines li { opacity: 1; }
   .ob-bi-spin { display: none; }
   .ob-bi-ok { opacity: 1; }
   .ob-mark svg { stroke-dashoffset: 0; }
