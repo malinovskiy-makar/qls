@@ -73,6 +73,7 @@ EXPECTED = {
     'd.result_no_hscroll', 'd.result.contrast_light', 'd.result.contrast_dark', 'd.result_theme_toggle',
     'd.review_chain_30_rows', 'd.review_tests_14_cards', 'd.review_link_broken_named',
     'd.review_five_practice_buttons', 'd.review_share_button', 'd.comparison_shown',
+    'd.review_chip_17_opens_its_panel', 'd.review_chip_17_pressed',
     'd.comparison_marker_inside_scale', 'd.practice_form_opens', 'd.practice_wrong_gives_reference',
     'd.practice_reference_was_not_on_page', 'd.practice_right_says_right', 'd.practice_choice_is_checked',
     'd.practice_score_unchanged', 'd.practice_says_it_does_not_count',
