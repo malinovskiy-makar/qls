@@ -909,23 +909,24 @@ def keys_decide(q, opts, log):
         os.path.join(q.v1, 'reference_problems_v1.jsonl'), encoding='utf-8'))}
     acc, queue, why = [], [], Counter()
     for ev in events:
-        # Второе мнение — Gemini; где OpenRouter упёрся в лимит ключа (29.10,
-        # 18 комплектов) — Claude Sonnet: тоже другое семейство, чем GPT.
+        # Второе мнение — Gemini; где OpenRouter упёрся в лимит ключа (29.10:
+        # 18 комплектов первого прохода) — Claude Sonnet, во втором проходе
+        # (87 комплектов) — Claude Haiku: другое семейство, чем GPT.
         models, replies = [], []
-        for group in (('gpt-6.1-terra',), ('google/gemini-4-argon', 'claude-sonnet-5-5')):
-            for m in group:
-                # Второй проход (все страницы файлов ответов) старше первого.
-                rec = None
-                for fold in (keys_folder(q, 2), folder):
-                    rec = rec or vv.read_record(os.path.join(fold, m.replace('/', '__'),
-                                                             ev['event_id'] + '.json'))
-                if rec:
-                    models.append(m)
-                    replies.append(vsosh_keys.parse_reply(rec['text']))
+        for group in (('gpt-6.1-terra',),
+                      ('google/gemini-4-argon', 'claude-sonnet-5-5', 'claude-haiku-5-5')):
+            found = None
+            # Второй проход (все страницы файлов ответов) старше первого — у любой модели группы.
+            for fold in (keys_folder(q, 2), folder):
+                for m in group:
+                    rec = vv.read_record(os.path.join(fold, m.replace('/', '__'), ev['event_id'] + '.json'))
+                    if rec:
+                        found = (m, rec)
+                        break
+                if found:
                     break
-            else:
-                models.append(group[0])
-                replies.append({})
+            models.append(found[0] if found else group[0])
+            replies.append(vsosh_keys.parse_reply(found[1]['text']) if found else {})
         tests = [rows[k] for k in ev['rows']]
         for i, (r, ans, reason) in enumerate(vsosh_keys.decide(tests, replies[0], replies[1]), 1):
             k = _key_row_id(r)
