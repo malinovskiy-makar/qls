@@ -79,11 +79,30 @@ def _error_page(request, text, *, status=400, link=None):
     }, status=status)
 
 
+class NotConfigured(Exception):
+    """Флаг включён, а ключа сервиса нет или он заглушка (`demo`)."""
+
+    def __init__(self, provider):
+        super().__init__(provider.name)
+        self.provider = provider
+
+
 def _provider_or_404(name):
+    """Включённый сервис. Флаг выключен или сервис неизвестен — 404; флаг включён,
+    а ключ не настоящий — `NotConfigured` (своя страница вместо чужой ошибки)."""
     provider = providers.get(name)
-    if provider is None:
+    if provider is not None:
+        return provider
+    known = providers.known(name)
+    if known is None or not settings.SOCIAL_LOGIN_ENABLED:
         raise Http404
-    return provider
+    raise NotConfigured(known)
+
+
+def _not_configured_page(request, provider):
+    """Прямой заход на сервис без ключа: наша страница, а не «400» сервиса."""
+    return _error_page(request, 'Вход через %s пока не настроен' % provider.title,
+                       status=503)
 
 
 def _redirect_uri(request, provider):
@@ -136,7 +155,10 @@ def _set_avatar(user, url):
 
 @require_GET
 def start(request, provider):
-    provider = _provider_or_404(provider)
+    try:
+        provider = _provider_or_404(provider)
+    except NotConfigured as missing:
+        return _not_configured_page(request, missing.provider)
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)          # 86 знаков: PKCE просит 43–128
     request.session[FLOW_KEY] = {
@@ -151,7 +173,10 @@ def start(request, provider):
 
 @require_GET
 def callback(request, provider):
-    provider = _provider_or_404(provider)
+    try:
+        provider = _provider_or_404(provider)
+    except NotConfigured as missing:
+        return _not_configured_page(request, missing.provider)
     wait = ratelimit.check(SCOPE, request, None)
     if wait:
         return _error_page(request, _fail_text(provider), status=429)

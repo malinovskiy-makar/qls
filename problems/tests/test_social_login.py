@@ -23,10 +23,13 @@ from problems.social import providers
 from problems.tests.factories import make_user
 
 TOKEN = 'zz_token_marker'
+#: Ключи вида настоящих: у VK ID номер приложения, у Яндекса 32 шестнадцатеричных знака.
+VK_KEY = '51234567'
+YA_KEY = '0123456789abcdef0123456789abcdef'
 
 SOCIAL_ON = dict(SOCIAL_LOGIN_ENABLED=True,
-                 VK_ID_CLIENT_ID='vk-app', VK_ID_CLIENT_SECRET='',
-                 YANDEX_CLIENT_ID='ya-app', YANDEX_CLIENT_SECRET='ya-secret',
+                 VK_ID_CLIENT_ID=VK_KEY, VK_ID_CLIENT_SECRET='',
+                 YANDEX_CLIENT_ID=YA_KEY, YANDEX_CLIENT_SECRET='ya-secret',
                  MAIL_ENABLED=True, ONBOARDING_ENABLED=False,
                  SOCIAL_STORE_BIRTHDATE=False)
 
@@ -114,7 +117,7 @@ class StateAndPkceTests(SocialBase):
 
     def test_pkce_challenge_matches_the_verifier_sent_on_exchange(self):
         location, query = self.start()
-        self.assertTrue(location.startswith('https://id.vk.com/authorize?'))
+        self.assertTrue(location.startswith('https://id.vk.ru/authorize?'))
         self.assertEqual(query['code_challenge_method'], ['S256'])
         self.assertEqual(query['scope'], ['vkid.personal_info email'])
         network = FakeNetwork()
@@ -122,7 +125,7 @@ class StateAndPkceTests(SocialBase):
             self.client.get('/auth/vk/callback/',
                             {'code': 'code-1', 'device_id': 'dev-1', 'state': query['state'][0]})
         url, sent, _headers = network.calls[0]
-        self.assertEqual(url, 'https://id.vk.com/oauth2/auth')
+        self.assertEqual(url, 'https://id.vk.ru/oauth2/auth')
         self.assertEqual(sent['device_id'], 'dev-1')
         self.assertEqual(providers.code_challenge(sent['code_verifier']),
                          query['code_challenge'][0])
@@ -396,15 +399,79 @@ class FlagTests(TestCase):
         self.assertEqual(self.client.get('/auth/vk/start/').status_code, 404)
         self.assertEqual(self.client.get('/auth/yandex/callback/').status_code, 404)
 
-    @override_settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID='vk-app')
+    @override_settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID=VK_KEY)
     def test_button_only_for_a_service_with_keys(self):
         for page in ('/login/?next=/vp/x/', '/register/?next=/vp/x/'):
             response = self.client.get(page)
             self.assertContains(response, 'href="/auth/vk/start/?next=/vp/x/"')
             self.assertNotContains(response, '/auth/yandex/start/')
             self.assertContains(response, '>или<')
-        self.assertEqual(self.client.get('/auth/yandex/start/').status_code, 404)
+        response = self.client.get('/auth/yandex/start/')
+        self.assertContains(response, 'Вход через Яндекс ID пока не настроен', status_code=503)
 
     def test_unknown_provider_is_404(self):
-        with self.settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID='x'):
+        with self.settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID=VK_KEY):
             self.assertEqual(self.client.get('/auth/google/start/').status_code, 404)
+
+
+class KeyCheckTests(TestCase):
+    """Раунд 2: ключ-заглушка (`demo`) — это «не настроено». Кнопки нет, а прямой
+    заход на сервис — наша страница, а не «400 Неизвестное приложение» Яндекса."""
+
+    def test_placeholder_or_malformed_key_hides_the_button(self):
+        for vk, ya in (('demo', 'demo'), ('', ''), ('vk-app', 'ya-app'),
+                       (' DEMO ', 'test'), ('12ab', '0123')):
+            with self.settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID=vk,
+                               YANDEX_CLIENT_ID=ya):
+                self.assertEqual(providers.enabled(), [], (vk, ya))
+                for page in ('/login/', '/register/'):
+                    response = self.client.get(page)
+                    self.assertNotContains(response, '/auth/vk/start/')
+                    self.assertNotContains(response, '/auth/yandex/start/')
+
+    def test_direct_start_without_a_real_key_is_our_page(self):
+        with self.settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID='demo',
+                           YANDEX_CLIENT_ID='demo'):
+            for name, title in (('vk', 'VK ID'), ('yandex', 'Яндекс ID')):
+                for step in ('start', 'callback'):
+                    response = self.client.get('/auth/%s/%s/' % (name, step))
+                    self.assertContains(response, 'Вход через %s пока не настроен' % title,
+                                        status_code=503)
+                    self.assertNotIn('Location', response)       # к сервису не уводим
+
+    def test_real_looking_keys_show_both_buttons(self):
+        with self.settings(SOCIAL_LOGIN_ENABLED=True, VK_ID_CLIENT_ID=VK_KEY,
+                           YANDEX_CLIENT_ID=YA_KEY):
+            self.assertEqual([p.name for p in providers.enabled()], ['yandex', 'vk'])
+
+
+@override_settings(**SOCIAL_ON)
+class OfficialParamsTests(TestCase):
+    """Параметры сверены с документацией VK ID (id.vk.ru, api-description):
+    `state` — [a-zA-Z0-9_-] не короче 32, `code_verifier` — те же знаки, 43–128;
+    обмен кода — все семь обязательных полей."""
+
+    def test_state_and_verifier_follow_vk_rules(self):
+        import re
+        location = self.client.get('/auth/vk/start/')['Location']
+        query = parse_qs(urlsplit(location).query)
+        state = query['state'][0]
+        verifier = self.client.session['social_flow']['verifier']
+        self.assertRegex(state, r'^[A-Za-z0-9_-]{32,}$')
+        self.assertTrue(re.fullmatch(r'[A-Za-z0-9_-]{43,128}', verifier))
+        for name in ('response_type', 'client_id', 'redirect_uri', 'state',
+                     'code_challenge', 'code_challenge_method'):
+            self.assertIn(name, query)
+
+    def test_vk_exchange_sends_every_required_field(self):
+        location = self.client.get('/auth/vk/start/')['Location']
+        state = parse_qs(urlsplit(location).query)['state'][0]
+        network = FakeNetwork()
+        with mock.patch.object(providers, '_request', network):
+            self.client.get('/auth/vk/callback/',
+                            {'code': 'c1', 'device_id': 'd1', 'state': state})
+        _url, sent, _headers = network.calls[0]
+        for name in ('grant_type', 'code_verifier', 'redirect_uri', 'code',
+                     'client_id', 'device_id', 'state'):
+            self.assertTrue(sent.get(name), name)
+        self.assertEqual(sent['client_id'], VK_KEY)

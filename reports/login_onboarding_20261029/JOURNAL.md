@@ -524,3 +524,65 @@ main; история сессии — этот журнал.
 
 Есть: встроенный браузер приложения и Playwright. Снимки — в
 `reports/login_onboarding_20261029/shots_r2/`.
+
+## Р2 · Фаза 1. VK ID и Яндекс ID
+
+### Диагностика (что открылось)
+
+- **Яндекс** — https://yandex.ru/dev/id/doc/ru/codes/code-url открылась. Адрес
+  `https://oauth.yandex.ru/authorize`, параметры `response_type=code`, `client_id`,
+  `redirect_uri` (точное совпадение с настройкой), `scope`, `state`,
+  `code_challenge`/`code_challenge_method=S256`; обмен `POST oauth.yandex.ru/token`:
+  `grant_type`, `code`, `client_id`, `code_verifier`, `client_secret` при PKCE не
+  обязателен. **Наш код совпадает пункт в пункт.**
+- **«400 неизвестное приложение» = подставной `client_id`: ДА.** Документация: на
+  ненайденное/заблокированное приложение — `invalid_client`. Живой запрос
+  `oauth.yandex.ru/authorize?client_id=demo` без входа в Яндекс — 302 на паспорт
+  (`retpath` с тем же `client_id=demo`), после входа владелец видел страницу 400.
+- **VK ID** — `id.vk.com/about/business/go/docs/...` загрузчику НЕ открылась;
+  документация переехала на **id.vk.ru** и открылась:
+  `.../vk-id/connection/api-integration/api-description` и
+  `.../vk-id/connection/create-application`. Сверено: authorize — `response_type,
+  client_id, redirect_uri, state, code_challenge, code_challenge_method=S256`
+  (+ `scope`); возврат — `code, state, device_id`; обмен `POST /oauth2/auth` —
+  ровно семь обязательных `grant_type, code_verifier, redirect_uri, code, client_id,
+  device_id, state`; `user_info` — `POST client_id + access_token`; `state` —
+  `[a-zA-Z0-9_-]`, ≥ 32; `code_verifier` — те же знаки, 43–128. **Наш код
+  совпадает** (`token_urlsafe(32)` → 43 знака, `token_urlsafe(64)` → 86).
+- **«Ошибка загрузки» VK = подставной `client_id` (+ VPN): ДА.** Живой запрос
+  `id.vk.com/authorize?client_id=demo` → в странице `"client_id is missing"`
+  (`invalid_request`): у VK номер приложения только цифрами. С выдуманным числом —
+  `"app is deleted"` (`invalid_client`).
+- **VK ID и `http://localhost`:** документация «Создание приложения»: «Доверенный
+  redirect URL пропишите с http и без порта — http://localhost»; https — только на
+  443; «Другие порты временно не поддерживаются»; `127.0.0.1` не упомянут. ⇒ на
+  `127.0.0.1:8010` VK не проверить, только `runserver localhost:80` (записано в
+  `docs/SOCIAL_KEYS.md`). Яндекс принимает любой адрес из списка приложения.
+- `id.vk.com` и `id.vk.ru` отвечают одинаково (проверено запросом к обоим) —
+  перешли на `id.vk.ru`, как в актуальной документации.
+
+### Что исправлено
+
+- `problems/social/providers.py`: VK — `id.vk.ru` (authorize, token, user_info);
+  `Provider.configured` — ключ не пустой, не заглушка (`demo`, `test`, …) и нужного
+  вида (VK `[0-9]{4,12}`, Яндекс `[0-9a-fA-F]{32}`); `enabled` = флаг + `configured`;
+  порядок кнопок — Яндекс, затем VK (как в макете).
+- `problems/social/views.py`: флаг включён, а ключ не настоящий → на `/start/` и
+  `/callback/` наша страница «Вход через VK ID пока не настроен» (503), к сервису не
+  уводим. Флаг выключен или сервис неизвестен — 404, как было.
+- Официальные значки: `static/social/yandex.svg` — знак (круг + буква) из официальной
+  кнопки `personal-button-null.svg` документации Яндекс ID без изменений (вырезан
+  `viewBox`); `static/social/vk.svg` — белый знак 28×28 из официального образца кнопки
+  VK ID. Отрисовка официальной кнопки Яндекса проверена в Chrome: «Войти с Яндекс ID».
+  Источники и правила — `static/social/README.md`.
+- `templates/social/_buttons.html`: кнопки во всю ширину, одна под другой, 44 px;
+  Яндекс — чёрная, VK — `#0077FF`; тексты «Войти с Яндекс ID» / «Войти с VK ID».
+- `docs/SOCIAL_KEYS.md` — пошагово: Яндекс, VK ID, PowerShell, `.env`, что должно
+  получиться, почему не работало.
+
+**Тесты:** `test_social_login` — 39 OK (новые: `KeyCheckTests` ×3 — заглушки и
+кривые ключи прячут кнопку, прямой заход — наша страница 503, настоящие ключи —
+обе кнопки в порядке макета; `OfficialParamsTests` ×2 — знаки `state`/`verifier` и
+семь полей обмена VK). Старые тесты переведены на ключи настоящего вида.
+
+**Живая проверка (п. 5):** настоящих ключей в окружении и `.env` нет — пропущена.

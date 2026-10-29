@@ -15,15 +15,23 @@
 `requests` в боевых зависимостях нет. Адреса сервисов зашиты константами и все
 `https://` — схему из данных запроса `urlopen` не получает никогда.
 
-Адреса и поля сверены 29.10.2026: Яндекс — с официальной документацией
-(yandex.ru/dev/id/doc); VK ID — по описанию OAuth 2.1 в промпте и открытым
-библиотекам (официальная страница id.vk.com не открылась загрузчику). Живой
-вход проверяется после выдачи ключей (карточка Notion).
+Адреса и поля сверены с официальной документацией (раунд 2, 30.10.2026):
+Яндекс — yandex.ru/dev/id/doc/ru/codes/code-url; VK ID — id.vk.ru/about/business/
+go/docs/ru/vkid/latest/vk-id/connection/api-integration/api-description (документация
+VK ID переехала с id.vk.com на id.vk.ru; оба хоста отвечают одинаково, берём новый).
+Подробности и как получить ключи — docs/SOCIAL_KEYS.md.
+
+⚠️ КЛЮЧ-ЗАГЛУШКА — ЭТО «НЕ НАСТРОЕНО», А НЕ «ВКЛЮЧЕНО». С `client_id=demo` Яндекс
+отвечает своей страницей «400 Неизвестное приложение», VK ID — «client_id is
+missing» (раунд 1, ручная проверка владельца). Поэтому кнопка видна, только если
+ключ похож на настоящий: у VK ID это номер приложения (цифры), у Яндекса — 32
+шестнадцатеричных знака.
 """
 import base64
 import hashlib
 import json
 import logging
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,6 +41,9 @@ from datetime import date
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+#: Ключи-заглушки из ручных проверок: с ними сервис отвечает чужой ошибкой.
+PLACEHOLDER_KEYS = frozenset({'demo', 'test', 'changeme', 'change-me', 'xxx', 'todo', 'none'})
 
 #: Ожидание ответа сервиса (промпт: 10 с).
 HTTP_TIMEOUT = 10
@@ -93,6 +104,8 @@ class Provider:
     trust_email: bool
     client_id_setting: str
     client_secret_setting: str
+    #: Каким бывает настоящий `client_id` сервиса (регулярное выражение целиком).
+    client_id_pattern: str = r'.+'
     #: Право на дату рождения: просим его, только пока дату разрешено хранить.
     birthday_scope: str = ''
 
@@ -105,8 +118,15 @@ class Provider:
         return getattr(settings, self.client_secret_setting, '') or ''
 
     @property
+    def configured(self):
+        """Ключ задан и похож на настоящий (не пустой, не `demo`, нужного вида)."""
+        client_id = self.client_id.strip()
+        return bool(client_id and client_id.lower() not in PLACEHOLDER_KEYS
+                    and re.fullmatch(self.client_id_pattern, client_id))
+
+    @property
     def enabled(self):
-        return bool(settings.SOCIAL_LOGIN_ENABLED and self.client_id)
+        return bool(settings.SOCIAL_LOGIN_ENABLED and self.configured)
 
     def request_scope(self):
         scopes = self.scope.split()
@@ -132,8 +152,8 @@ class Provider:
 
 
 class VKProvider(Provider):
-    TOKEN_URL = 'https://id.vk.com/oauth2/auth'
-    USER_INFO_URL = 'https://id.vk.com/oauth2/user_info'
+    TOKEN_URL = 'https://id.vk.ru/oauth2/auth'
+    USER_INFO_URL = 'https://id.vk.ru/oauth2/user_info'
 
     def fetch_profile(self, params, verifier, redirect_uri, state):
         token = _request(self.TOKEN_URL, data={
@@ -199,17 +219,18 @@ class YandexProvider(Provider):
         }
 
 
-# Телефон не запрашиваем ни у кого (решение 08.10.2026).
+# Телефон не запрашиваем ни у кого (решение 08.10.2026). Порядок — порядок кнопок.
 PROVIDERS = {
-    'vk': VKProvider(
-        name='vk', title='VK ID', authorize_url='https://id.vk.com/authorize',
-        scope='vkid.personal_info email', trust_email=True,
-        client_id_setting='VK_ID_CLIENT_ID', client_secret_setting='VK_ID_CLIENT_SECRET'),
     'yandex': YandexProvider(
         name='yandex', title='Яндекс ID', authorize_url='https://oauth.yandex.ru/authorize',
         scope='login:info login:email login:avatar', trust_email=True,
         client_id_setting='YANDEX_CLIENT_ID', client_secret_setting='YANDEX_CLIENT_SECRET',
-        birthday_scope='login:birthday'),
+        client_id_pattern=r'[0-9a-fA-F]{32}', birthday_scope='login:birthday'),
+    'vk': VKProvider(
+        name='vk', title='VK ID', authorize_url='https://id.vk.ru/authorize',
+        scope='vkid.personal_info email', trust_email=True,
+        client_id_setting='VK_ID_CLIENT_ID', client_secret_setting='VK_ID_CLIENT_SECRET',
+        client_id_pattern=r'[0-9]{4,12}'),
 }
 
 
@@ -219,8 +240,13 @@ def get(name):
     return provider if provider is not None and provider.enabled else None
 
 
+def known(name):
+    """Сервис по коду, даже без ключей, — для страницы «пока не настроен»."""
+    return PROVIDERS.get(name)
+
+
 def enabled():
-    """Включённые сервисы в порядке кнопок: VK ID, Яндекс ID."""
+    """Включённые сервисы в порядке кнопок макета: Яндекс ID, затем VK ID."""
     return [provider for provider in PROVIDERS.values() if provider.enabled]
 
 

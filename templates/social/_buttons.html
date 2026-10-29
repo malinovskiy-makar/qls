@@ -1,31 +1,37 @@
 {% load static social_tags %}{% social_providers as providers %}{% if providers %}
 {% comment %}
-Кнопки входа через VK ID и Яндекс ID (решения 29.10.2026). Вставляется ОДНОЙ
-строкой в начало формы на `registration/login.html` и `registration/register.html`;
-стили свои, рядом, чтобы вёрстку страниц Анича не трогать.
-Кнопка сервиса видна, только если `SOCIAL_LOGIN_ENABLED` и ключи этого сервиса
-заданы; без них блока нет вовсе. Значки — заглушки `static/social/*.svg` до
-официального набора сервисов.
+Кнопки входа через Яндекс ID и VK ID (решения 29.10.2026, раунд 2 — по макету
+`docs/design/onboarding_r2/shots/Main.png`): во всю ширину карточки, одна под
+другой, высота 44, под ними «или». Вид — по правилам сервисов, источники значков и
+правила — `static/social/README.md`. Цвета — цвета сервисов, не токены сайта:
+под тёмную тему их не перекрашивают.
+Кнопка сервиса видна, только если `SOCIAL_LOGIN_ENABLED` и ключ сервиса настоящий
+(не пустой и не `demo`, `problems/social/providers.py`); без них блока нет вовсе.
+⚠️ Текст кнопок не менять: оба сервиса это запрещают.
 {% endcomment %}
 <style>
-.social-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-              gap: 8px; margin-bottom: 18px; }
-.social-btn { display: flex; align-items: center; justify-content: center; gap: 8px;
-              min-height: 44px; padding: 10px 12px; border: 1px solid var(--border);
-              border-radius: var(--r, 8px); background: var(--surface); color: var(--text);
-              font: inherit; font-size: 14px; font-weight: 600; text-decoration: none;
-              transition: border-color .12s ease, background .12s ease; }
-.social-btn:hover { border-color: var(--text3); background: var(--surface-2); }
-.social-btn img { width: 20px; height: 20px; flex-shrink: 0; }
-.social-or { display: flex; align-items: center; gap: 12px; margin: 0 0 18px;
+.social-row { display: flex; flex-direction: column; gap: 10px; }
+.social-btn { display: flex; align-items: center; justify-content: center; gap: 10px;
+              height: 44px; padding: 0 16px; border: 0; border-radius: 10px;
+              font-family: -apple-system, system-ui, "Helvetica Neue", Roboto, sans-serif;
+              font-size: 15px; font-weight: 600; line-height: 1; text-decoration: none;
+              transition: opacity .1s ease-out, transform .1s ease-out; }
+.social-btn:hover { opacity: .8; }
+.social-btn:active { opacity: .7; transform: scale(.97); }
+.social-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.social-btn--yandex { background: #000000; color: #ffffff; }
+.social-btn--vk { background: #0077ff; color: #ffffff; }
+.social-btn img { flex-shrink: 0; display: block; }
+.social-or { display: flex; align-items: center; gap: 14px; margin: 2px 0;
              font-size: 13px; color: var(--text3); }
 .social-or::before, .social-or::after { content: ''; flex: 1;
-                                        border-top: 1px solid var(--border); }
+                                        border-top: 1px dashed var(--border); }
+@media (prefers-reduced-motion: reduce) { .social-btn { transition: none; } }
 </style>
 <div class="social-row">{% for provider in providers %}
-  <a class="social-btn" href="{% url 'social_start' provider.name %}{% if next %}?next={{ next|urlencode }}{% endif %}">
-    <img src="{% static 'social/'|add:provider.name|add:'.svg' %}" alt="" width="20" height="20">
-    <span>{{ provider.title }}</span>
+  <a class="social-btn social-btn--{{ provider.name }}" href="{% url 'social_start' provider.name %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+    <img src="{% static 'social/'|add:provider.name|add:'.svg' %}" alt=""{% if provider.name == 'vk' %} width="28" height="28"{% else %} width="24" height="24"{% endif %}>
+    <span>Войти с {{ provider.title }}</span>
   </a>{% endfor %}
 </div>
 <div class="social-or">или</div>
