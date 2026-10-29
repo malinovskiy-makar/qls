@@ -293,6 +293,9 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
   Команда проверена дважды на живом сайте, а не написана по памяти.
 - Бэкапы: ежедневно 03:20 МСК, 30 копий, восстановление проверено.
   Внешнего хранилища пока нет — копии у того же провайдера.
+- Бот стены ходит в Telegram через обратный SSH-туннель, который открывает посредник за рубежом:
+  `TELEGRAM_API_BASE=https://api.telegram.org:18443`, в `web` и `tgbot` `extra_hosts: api.telegram.org:host-gateway`
+  (на хосте `172.17.0.1:18443` – сквозной TLS до Telegram). [deploy/tg_relay/README.md](deploy/tg_relay/README.md).
 - Смысловой поиск выключен флагом `SEMANTIC_SEARCH_ENABLED=0`:
   [ADR 0012](docs/adr/0012-semantic-search-flag-off-in-prod.md).
 - В базе smoke-набор 505 задач, не весь корпус.

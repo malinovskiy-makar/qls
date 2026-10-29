@@ -145,8 +145,10 @@ ssh -T git@github.com     # «Hi malinovskiy-makar/qls! You've successfully auth
 
 Зачем: с российских серверов Telegram недоступен в обе стороны (28.10.2026 с этого сервера
 `curl https://api.telegram.org/` – timeout). Вебхук Telegram до нас не дойдёт, поэтому бот сам
-спрашивает Telegram – через свой сервер-посредник за рубежом (`TELEGRAM_API_BASE`,
-[tg_relay](../deploy/tg_relay/README.md)). Только исходящие запросы, порт не открывается.
+спрашивает Telegram – через свой сервер-посредник за рубежом, обратным SSH-туннелем (`172.17.0.1:18443`
+на хосте – сквозной TLS до `api.telegram.org`; `TELEGRAM_API_BASE=https://api.telegram.org:18443`, в `web` и
+`tgbot` `extra_hosts: api.telegram.org:host-gateway`; [tg_relay](../deploy/tg_relay/README.md)). Только
+исходящие запросы, наружу порт не открывается.
 
 ```bash
 cd /srv/weconomics/app/deploy
@@ -355,7 +357,7 @@ docker compose -f deploy/docker-compose.loadtest.yml down
 | `GUNICORN_WORKERS` | `4` |
 | `YANDEX_METRIKA_ID` | номер счётчика Метрики, только цифры; на площадке dev — пусто ([ADR 0133](adr/0133-yandex-metrika-and-signup-source.md)) |
 | `LEGAL_CONTACT_EMAIL`, `LEGAL_DOCS_DATE` | почта для обращений по данным и дата редакции документов («15 октября 2026 г.»); **обязательны**, пусто = `manage.py check` падает с `legal.E001` и контейнер `web` не стартует |
-| `LEGAL_TG_RELAY` | хостер и страна сервера-посредника Telegram («Example Hosting B.V., Нидерланды»), метка `[ПОСРЕДНИК]` документов; **обязательна**, пусто = `legal.E003` |
+| `LEGAL_TG_RELAY` | хостер и страна сервера-посредника Telegram («VDSina (SERVERS TECH FZCO, ОАЭ), Нидерланды»), метка `[ПОСРЕДНИК]` документов; **обязательна**, пусто = `legal.E003` |
 | `BACKUP_S3_*` | внешнее хранилище копий, пока пусто |
 
 ⚠️ **`DATABASE_URL` и `REDIS_URL` живут ТОЛЬКО в `.env`.** Раньше

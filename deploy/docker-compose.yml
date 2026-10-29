@@ -96,6 +96,12 @@ services:
     # для одной строки подключения: environment перебивает env_file, поэтому
     # правка .env не давала бы никакого эффекта, а причину искали бы долго.
     # Теперь строки живут только в /srv/weconomics/.env.
+    # ⚠️ TELEGRAM: имя api.telegram.org внутри контейнера указывает на шлюз хоста
+    # (172.17.0.1), где слушает обратный SSH-туннель до посредника за рубежом
+    # (deploy/tg_relay/README.md). Имя остаётся настоящим, поэтому сертификат и SNI
+    # совпадают; порт задаёт TELEGRAM_API_BASE=https://api.telegram.org:18443.
+    extra_hosts:
+      - "api.telegram.org:host-gateway"
     volumes:
       # Тома монтируются И СЮДА, И В nginx: web их наполняет, nginx отдаёт.
       - static:/app/staticfiles
@@ -177,6 +183,10 @@ services:
     profiles: ["tgbot"]
     env_file:
       - /srv/weconomics/.env
+    # ⚠️ Как у web: api.telegram.org → шлюз хоста, где слушает обратный SSH-туннель
+    # (deploy/tg_relay/README.md).
+    extra_hosts:
+      - "api.telegram.org:host-gateway"
     entrypoint: ["/app/deploy/entrypoint-tgbot.sh"]
     depends_on:
       postgres:
