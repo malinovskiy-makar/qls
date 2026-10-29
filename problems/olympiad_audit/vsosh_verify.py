@@ -291,8 +291,11 @@ def call_with_retry(model, body, env, tries=4):
         try:
             return call(model, body, env)
         except urllib.error.HTTPError as exc:
-            if exc.code not in (408, 409, 429, 500, 502, 503, 504, 529) or attempt == tries - 1:
-                raise RuntimeError(f'HTTP {exc.code}: {exc.read()[:300]!r}') from exc
+            body = exc.read()[:300]
+            # 429 «insufficient_quota» — кончился баланс: повтор не поможет.
+            if exc.code not in (408, 409, 429, 500, 502, 503, 504, 529) or attempt == tries - 1 \
+                    or b'insufficient_quota' in body:
+                raise RuntimeError(f'HTTP {exc.code}: {body!r}') from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError, RuntimeError):
             if attempt == tries - 1:
                 raise
@@ -570,8 +573,12 @@ def run_pages(model, keys, jobs, folder, env, ledger, phase, workers=6, effort='
     prov = provider_of(model.split(':')[0]) if ':' in model else provider_of(model)
     todo = [k for k in keys if not (read_record(rec_path(folder, model, k)) or {}).get('status') == 'ok']
     stats = Counter()
+    stop = threading.Event()
 
     def one(key):
+        if stop.is_set():
+            stats['стоп_баланс'] += 1
+            return
         if not ledger.allow(prov, 0.05):
             stats['стоп_потолок'] += 1
             return
@@ -581,6 +588,10 @@ def run_pages(model, keys, jobs, folder, env, ledger, phase, workers=6, effort='
         except Exception as exc:  # noqa: BLE001 — сбой одной страницы не роняет прогон
             stats['ошибка'] += 1
             log(f'  {model} {key}: {str(exc)[:200]}')
+            # Ошибка баланса — не повторять по кругу (решение владельца 29.10).
+            if re.search(r'insufficient_quota|billing|credit balance|exceeded your current quota',
+                         str(exc), re.I):
+                stop.set()
             return
         ledger.add(model=model, provider=prov, phase=phase, key=key, usd=round(usd, 6),
                    tin=tin, tout=tout, seconds=round(time.time() - t0, 1))

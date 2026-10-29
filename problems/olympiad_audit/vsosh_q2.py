@@ -462,6 +462,23 @@ def p2_pump(q, opts, log):
         time.sleep(opts.get('sleep') or 60)
 
 
+def p2_sync(q, opts, log):
+    """Дочитка terra синхронно (29.10: очередь OpenAI Batch встала — пакет
+    больше часа без единого ответа). Сначала страницы условий, потом решений:
+    на кого не хватит денег, те пойдут запасным путём Haiku + слой."""
+    pending = BatchLog(q).pending_ids('p2', PRIMARY)
+    keys = [k for k in p2_keys(q, opts) if custom_id(k) not in pending]
+    keys.sort(key=lambda k: q.jobs[k].kind in ('solutions', 'criteria'))
+    todo = [k for k in keys if (vv.read_record(vv.rec_path(pages_dir(q), PRIMARY, k)) or {})
+            .get('status') != 'ok']
+    log(f'terra синхронно: к чтению {len(todo)} стр., оценка ${len(todo) * 0.0085:.2f}')
+    if not opts.get('yes'):
+        return log('Без --yes вызовов нет (только план).')
+    stats = vv.run_pages(PRIMARY, todo, q.jobs, pages_dir(q), vv.load_env(), q.ledger,
+                         phase='p2-sync', workers=opts.get('workers') or 8, log=log)
+    log(f'terra синхронно: {stats}; OpenAI всего ${q.ledger.spent("openai"):.2f}')
+
+
 def _page_handler(q):
     def handle(model, cid, text, usd):
         key = key_of(cid)
@@ -1025,6 +1042,8 @@ def run(cmd, opts):
         return p2_submit(q, opts, log)
     if action == 'build':
         return build_v2(q, cmd, opts, log)
+    if action == 'p2-sync':
+        return p2_sync(q, opts, log)
     if action == 'p2-pump':
         return p2_pump(q, opts, log)
     if action == 'p2-merge':
