@@ -798,6 +798,7 @@ from . import admin_platform  # noqa: E402,F401
 # ── Коды подтверждения почты (docs/MAIL.md) ─────────────────────────────────
 
 from .models_mail import EmailCode  # noqa: E402
+from .models_schools import SchoolSyncRun  # noqa: E402
 
 
 @admin.register(EmailCode)
@@ -822,4 +823,19 @@ class EmailCodeAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SchoolSyncRun)
+class SchoolSyncRunAdmin(admin.ModelAdmin):
+    """Журнал `manage.py sync_schools` (раунд 3, 29.10.2026): только смотреть."""
+
+    list_display = ('started_at', 'status', 'source', 'total', 'added', 'changed', 'deactivated')
+    list_filter = ('status',)
+    readonly_fields = [f.name for f in SchoolSyncRun._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False

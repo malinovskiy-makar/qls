@@ -80,12 +80,14 @@
       <label class="ob-label" for="ob-city">Город</label>
       <div class="ob-ac" data-ac="{{ cities_url }}">
         <input class="k-input ob-input ym-disable-keys" type="text" id="ob-city" name="city" maxlength="120"
-               autocomplete="off" required value="{{ form.city.value|default:'' }}">
+               autocomplete="off" value="{{ form.city.value|default:'' }}">
         <span class="ob-ac-done" hidden aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
       </div>
       {% for error in form.city.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
     </div>
-    <div class="ob-field ob-anim-up ob-d2" data-ob-school>
+    {% comment %}Школа не зависит от города (раунд 3): поле видно сразу, подсказки — по всей
+    стране, город из поля выше только ставит свои школы первыми.{% endcomment %}
+    <div class="ob-field ob-anim-up ob-d2">
       <label class="ob-label" for="ob-school">Школа</label>
       <div class="ob-ac" data-ac="{{ schools_url }}" data-ac-city="ob-city" data-ac-numbers>
         <input class="k-input ob-input ym-disable-keys" type="text" id="ob-school" name="school" maxlength="200"

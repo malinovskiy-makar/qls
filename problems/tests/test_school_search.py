@@ -73,15 +73,23 @@ class SchoolSearchTests(TestCase):
         return [row['value'] for row in school_search.schools(city, query)]
 
     def test_57_first_then_by_prefix(self):
-        self.assertEqual(self.values('57'), ['Школа № 57', 'Школа № 571', 'Лицей № 579'])
+        # Раунд 3: школы своего города первыми, дальше остальные (казанская № 57).
+        self.assertEqual(self.values('57'), ['Школа № 57', 'Школа № 571', 'Лицей № 579',
+                                             'Школа № 57'])
+        self.assertEqual([r['sub'] for r in school_search.schools('Москва', '57')],
+                         ['Москва', 'Москва', 'Москва', 'Казань'])
 
     def test_words_find_the_same_school(self):
         for query in ('пятьдесят седьмая', 'школа 57', '№57', '57-я'):
             self.assertEqual(self.values(query)[0], 'Школа № 57', query)
 
-    def test_only_the_chosen_city(self):
-        self.assertEqual(self.values('57', city='Казань'), ['Школа № 57'])
-        self.assertEqual(self.values('57', city='Омск'), [])
+    def test_chosen_city_only_goes_first(self):
+        # Раунд 3 (решение владельца 29.10.2026): школа не зависит от города — подсказки
+        # по всей стране, город из поля только ставит свои школы первыми.
+        rows = school_search.schools('Казань', '57')
+        self.assertEqual((rows[0]['value'], rows[0]['city']), ('Школа № 57', 'Казань'))
+        self.assertEqual({r['city'] for r in rows}, {'Казань', 'Москва'})
+        self.assertEqual(len(school_search.schools('Омск', '57')), 4)
 
     def test_by_name(self):
         self.assertEqual(self.values('интеллектуал'), ['Школа «Интеллектуал»'])

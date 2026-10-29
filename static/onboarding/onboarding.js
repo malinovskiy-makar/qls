@@ -298,10 +298,14 @@
     input.setAttribute('aria-controls', listId);
     var done = box.querySelector('.ob-ac-done');
     var cityInput = box.hasAttribute('data-ac-city') ? document.getElementById(box.getAttribute('data-ac-city')) : null;
-    var timer = null, items = [], active = -1, seq = 0;
+    // Поле с открытым списком поднимается над соседями (раунд 3): иначе поле ниже
+    // рисовалось поверх списка, и щелчок попадал в него, а не в вариант.
+    var field = box.closest('.ob-field');
+    var timer = null, items = [], rows = [], active = -1, seq = 0, pressing = false;
 
     function close() {
       list.hidden = true; box.classList.remove('is-open');
+      if (field) field.classList.remove('is-ac-open');
       input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant');
       active = -1;
     }
@@ -317,12 +321,31 @@
       span.appendChild(document.createTextNode(text.slice(at + q.length)));
       return span;
     }
-    function choose(value) {
+    function choose(value, row) {
       input.value = value;
       close();
       if (done) done.hidden = false;
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      // Выбрал школу, а «Город» пуст — город из записи школы.
+      if (cityInput && row && row.city && !cityInput.value.trim()) {
+        cityInput.value = row.city;
+        var cityDone = cityInput.parentNode.querySelector('.ob-ac-done');
+        if (cityDone) cityDone.hidden = false;
+        cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       box.dispatchEvent(new CustomEvent('ob-chosen', { bubbles: true }));
+    }
+    function pick(index) { if (index >= 0 && index < items.length) choose(items[index], rows[index]); }
+    // Список целиком в видимой части окна: на телефоне его не закрывают ни липкая
+    // «Дальше», ни экранная клавиатура (visualViewport).
+    function keepVisible() {
+      var view = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      var next = document.querySelector('.ob-next-wrap');
+      var cover = next && getComputedStyle(next).position === 'sticky' ? next.offsetHeight : 0;
+      var bottom = list.getBoundingClientRect().bottom;
+      var top = input.getBoundingClientRect().top;
+      var over = bottom - (view - cover - 8);
+      if (over > 0) window.scrollBy(0, Math.min(over, Math.max(0, top - 8)));
     }
     function highlight(index) {
       var options = list.querySelectorAll('.ob-opt');
@@ -342,23 +365,45 @@
         li.id = listId + '-' + i;
         li.setAttribute('role', 'option');
         if (r.number) { var num = document.createElement('span'); num.className = 'ob-opt-num'; num.textContent = r.number; li.appendChild(num); }
-        li.appendChild(mark(r.label || r.value, query));
-        if (r.sub) { var sub = document.createElement('span'); sub.className = 'ob-opt-sub'; sub.textContent = r.sub; li.appendChild(sub); }
-        li.addEventListener('mousedown', function (e) { e.preventDefault(); choose(r.value); });
+        var main = document.createElement('span');
+        main.className = 'ob-opt-main';
+        var name = mark(r.label || r.value, query);
+        name.className = 'ob-opt-name' + (r.full ? ' ob-opt-name--full' : '');
+        main.appendChild(name);
+        // Вторая строка серым: регион у города, город (и регион) у школы.
+        if (r.sub) { var sub = document.createElement('span'); sub.className = 'ob-opt-sub'; sub.textContent = r.sub; main.appendChild(sub); }
+        li.appendChild(main);
+        li.setAttribute('data-i', i);
         list.appendChild(li);
       });
+      rows = results.slice();
       var own = document.createElement('li');
       own.className = 'ob-opt ob-opt--own';
       own.id = listId + '-own';
       own.setAttribute('role', 'option');
       own.textContent = 'Нет в списке – оставить «' + query.trim() + '»';
-      own.addEventListener('mousedown', function (e) { e.preventDefault(); choose(query.trim()); });
+      own.setAttribute('data-i', results.length);
       list.appendChild(own);
       items.push(query.trim());
+      rows.push(null);
       list.hidden = false; box.classList.add('is-open');
+      if (field) field.classList.add('is-ac-open');
       input.setAttribute('aria-expanded', 'true');
-      highlight(results.length ? 0 : -1);
+      highlight(0);
+      keepVisible();
     }
+    // Выбор — по pointerdown с preventDefault (раунд 3): поле не теряет фокус, и
+    // `blur` не закрывает список раньше выбора. Мышь выбирает сразу; палец — по
+    // отпусканию (click), чтобы длинный список можно было листать, не выбирая.
+    function optionAt(target) { var li = target.closest ? target.closest('.ob-opt') : null; return li ? +li.getAttribute('data-i') : -1; }
+    list.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      pressing = true;
+      if (e.pointerType === 'mouse' && e.button === 0) pick(optionAt(e.target));
+    });
+    list.addEventListener('click', function (e) { if (!list.hidden) pick(optionAt(e.target)); });
+    document.addEventListener('pointerup', function () { setTimeout(function () { pressing = false; }, 0); });
+    document.addEventListener('pointercancel', function () { pressing = false; });
     function ask() {
       var query = input.value;
       if (!query.trim()) { close(); return; }
@@ -371,7 +416,11 @@
         .catch(function () {});
     }
     input.addEventListener('input', function (e) {
-      if (e.isTrusted !== false && done) done.hidden = true;
+      // Своё `input` из choose() (оживить «Дальше», подставить город) — не ввод
+      // человека: на него список не открываем (иначе он открывался заново с «Нет в
+      // списке – оставить «Москва»» и накрывал поле ниже).
+      if (e.isTrusted === false) return;
+      if (done) done.hidden = true;
       clearTimeout(timer);
       timer = setTimeout(ask, 150);
     });
@@ -380,25 +429,15 @@
       var count = list.querySelectorAll('.ob-opt').length;
       if (e.key === 'ArrowDown') { e.preventDefault(); highlight((active + 1) % count); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); highlight((active - 1 + count) % count); }
-      else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(items[active]); }
+      else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(active); }
+      else if (e.key === 'Tab' && active >= 0) { pick(active); }
       else if (e.key === 'Escape') { close(); }
     });
-    input.addEventListener('blur', function () { setTimeout(close, 120); });
+    // Закрытие по уходу из поля — только если указатель не держит список.
+    input.addEventListener('blur', function () {
+      setTimeout(function () { if (!pressing && !list.matches(':hover')) close(); }, 120);
+    });
     if (done && input.value.trim()) done.hidden = false;
-  }
-
-  function initSchool(form) {
-    var school = form.querySelector('[data-ob-school]');
-    var city = form.querySelector('#ob-city');
-    if (!school || !city || city.value.trim()) return;
-    school.hidden = true;
-    function reveal() {
-      if (!city.value.trim() || !school.hidden) return;
-      school.hidden = false;
-      school.classList.add('ob-anim-up');
-    }
-    form.addEventListener('ob-chosen', function (e) { if (e.target.contains(city)) { reveal(); var s = school.querySelector('input'); if (s) s.focus(); } });
-    city.addEventListener('change', reveal);
   }
 
   // ── «Скопировать» код приглашения ─────────────────────────────────────
@@ -429,7 +468,6 @@
   function init(root) {
     root.querySelectorAll('form[data-ob-multi]').forEach(initMulti);
     root.querySelectorAll('.ob-ac[data-ac]').forEach(initSuggest);
-    root.querySelectorAll('form.ob-school').forEach(initSchool);
     initCopy(root);
     initBuild(root);
   }

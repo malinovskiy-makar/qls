@@ -1216,6 +1216,57 @@ docker volume rm weconomics_media_restore_test
 
 ---
 
+## Справочник школ: синхронизация с реестром (`sync_schools`)
+
+Раунд 3 входа и онбординга (29.10.2026, решение владельца). Подсказки «Школа» на шаге
+онбординга работают по своей таблице `problems.School` — мгновенно и без внешних
+сервисов в момент ввода. Свежесть даёт еженедельная синхронизация с реестром
+аккредитованных организаций Рособрнадзора (открытые данные, набор `7701537808-RAOO`).
+Код: `problems/school_registry.py` (разбор), `problems/school_sync.py` (скачать, сравнить,
+обновить), команда `sync_schools`; журнал запусков — `problems.SchoolSyncRun` (админка
+«Синхронизации школ»).
+
+- Источник — постоянная ссылка на свежий архив
+  `https://isga.obrnadzor.gov.ru/api/spa/accredreestr/opendata/filezip` (ZIP ≈ 350 МБ,
+  XML ≈ 1 ГБ внутри). Сначала заголовки: имя `data-YYYYMMDD-…zip` и размер; совпали с
+  последней удачной синхронизацией — не качает.
+- Новые школы добавляет, изменённые правит (ключ — идентификатор организации в реестре,
+  запасной — ИНН + КПП), исчезнувшие **выключает** (`is_active=False`), не удаляет.
+  Одной транзакцией: при любом сбое таблица как была, код выхода ненулевой.
+- Предохранитель: в файле меньше половины от действующих школ — файл считается битым.
+- Память — около 110 МБ на разбор (замер 29.10.2026), временный файл удаляется сам.
+- У сервера российский адрес и нет VPN — `isga.obrnadzor.gov.ru` с него открывается.
+
+**Таймер НЕ установлен на сервере сам**: файлы лежат в `deploy/systemd/`, включает владелец.
+
+```bash
+cd /srv/weconomics/app/deploy
+
+# 1. Первая заливка (после выкатки ветки с миграцией problems/0087): сухой прогон, потом
+#    настоящий. Сухой качает и разбирает, но ничего не пишет.
+docker compose exec web python manage.py sync_schools --dry-run
+docker compose exec web python manage.py sync_schools
+
+# 2. Таймер раз в неделю (понедельник 05:30 МСК).
+sudo cp /srv/weconomics/app/deploy/systemd/weconomics-schools.service /etc/systemd/system/
+sudo cp /srv/weconomics/app/deploy/systemd/weconomics-schools.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weconomics-schools.timer
+
+# 3. Проверить.
+systemctl list-timers weconomics-schools.timer
+sudo journalctl -u weconomics-schools.service -n 30
+```
+
+Ожидается после первой заливки: «школ в файле ≈ 42 000, добавлено ≈ 42 000»; повторный
+запуск в тот же день — «Файл не изменился с прошлого раза — не качаю».
+
+Если реестр не скачивается (сайт Рособрнадзора недоступен): скачать архив по ссылке выше
+в браузере, положить в смонтированную папку и залить
+`docker compose exec web python manage.py sync_schools --file /path/data-….zip`.
+
+---
+
 ## Сроки хранения данных и удаление по запросу
 
 Часть Б правового контура (09.10.2026). Исполняет Политику обработки ПДн, разделы 7 и 8.

@@ -20,7 +20,10 @@
 @keyframes ob-drop  { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes ob-grow  { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 120px; } }
 
-.ob-anim-up { animation: ob-up .4s cubic-bezier(.2, .7, .2, 1) both; }
+/* ⚠️ `backwards`, а не `both` (раунд 3): с `both` конечный `transform` оставался на
+   элементе навсегда, каждое поле становилось отдельным слоем, и поле «Школа»
+   рисовалось поверх списка города (щелчок попадал в него, а не в вариант). */
+.ob-anim-up { animation: ob-up .4s cubic-bezier(.2, .7, .2, 1) backwards; }
 .ob-d1 { animation-delay: .06s; } .ob-d2 { animation-delay: .12s; }
 .ob-d3 { animation-delay: .18s; } .ob-d4 { animation-delay: .24s; }
 .ob-d5 { animation-delay: .30s; } .ob-d6 { animation-delay: .36s; }
@@ -366,7 +369,9 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
 .ob-later { height: 48px; padding: 0 18px; }
 .ob-sr-form { display: none; }
 
-/* Подсказки города и школы. */
+/* Подсказки города и школы. Поле с открытым списком — над соседними полями и над
+   липкой «Дальше» на телефоне (у неё z-index 4). */
+.ob-field.is-ac-open { position: relative; z-index: 30; }
 .ob-ac { position: relative; }
 .ob-ac.is-open .ob-input { background: var(--surface); border-color: var(--focus);
                            box-shadow: 0 0 0 3px var(--focus-ring); }
@@ -376,13 +381,16 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
 .ob-dd { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; margin: 0;
          padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border);
          border-radius: var(--r-card); box-shadow: var(--shadow-pop); display: flex;
-         flex-direction: column; animation: ob-drop .16s ease-out both; max-height: 360px; overflow-y: auto; }
+         flex-direction: column; animation: ob-drop .16s ease-out both; max-height: 320px; overflow-y: auto;
+         overscroll-behavior: contain; }
 .ob-dd[hidden] { display: none; }
 .ob-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r);
           font-size: 15px; color: var(--text); cursor: pointer; }
 .ob-opt.is-hi { background: var(--accent-tint); }
 .ob-opt mark { background: transparent; color: inherit; font-weight: 700; }
-.ob-opt-sub { margin-left: auto; padding-left: 12px; font-size: 13px; color: var(--text3); white-space: nowrap; }
+.ob-opt-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ob-opt-name--full { font-size: 13px; line-height: 1.35; }
+.ob-opt-sub { font-size: 13px; color: var(--text3); }
 .ob-opt-num { min-width: 44px; height: 26px; padding: 0 8px; border-radius: var(--r-sm);
               background: var(--chip-bg); font-size: 13px; font-weight: 600; color: var(--text2);
               display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }

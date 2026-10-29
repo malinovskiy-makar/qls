@@ -1,0 +1,16 @@
+[Unit]
+Description=Справочник школ weconomics ← реестр Рособрнадзора (sync_schools)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Все команды docker compose – только из каталога deploy (docs/SERVER.md).
+WorkingDirectory=/srv/weconomics/app/deploy
+# -T: у юнита нет терминала. Команда сама проверяет, изменился ли файл реестра с прошлого
+# раза (имя с датой и размер), и качает ≈ 350 МБ, только если изменился. При любом сбое
+# таблица школ не трогается, код выхода ненулевой (виден в systemctl status).
+# Временный файл – во временной папке контейнера, удаляется в любом случае.
+ExecStart=/usr/bin/docker compose exec -T web python manage.py sync_schools
+# Нужен docker, поэтому root, как у юнита резервной копии.
+User=root

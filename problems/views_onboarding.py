@@ -119,8 +119,31 @@ class GoalsForm(forms.Form):
 
 
 class SchoolForm(forms.Form):
-    city = forms.CharField(max_length=120)
+    """Город и школа независимы (раунд 3): школа может быть из другого города.
+
+    Город пуст, а школа — ровно одна школа справочника (по названию из подсказки) —
+    город берётся из её записи. Так же делает скрипт при выборе подсказки; здесь —
+    на случай, если скрипт не сработал.
+    """
+
+    city = forms.CharField(max_length=120, required=False)
     school = forms.CharField(max_length=200)
+
+    def clean(self):
+        data = super().clean()
+        if data.get('school') and not (data.get('city') or '').strip():
+            from django.db.models import Q
+
+            from problems.models import School
+            name = data['school'].strip()
+            cities = set(School.objects.filter(is_active=True).filter(
+                Q(short_name__iexact=name) | Q(short_name='', name__iexact=name))
+                .exclude(city='').values_list('city', flat=True)[:2])
+            if len(cities) == 1:
+                data['city'] = cities.pop()
+            else:
+                self.add_error('city', 'Укажите город.')
+        return data
 
 
 class SourceForm(forms.Form):
@@ -794,7 +817,8 @@ def cities_api(request):
 
 @require_http_methods(['GET'])
 def schools_api(request):
-    """`GET /welcome/api/schools/?city=&q=` → школы только этого города."""
+    """`GET /welcome/api/schools/?q=&city=` → школы по всей стране; `city` необязателен
+    и влияет только на порядок (школы этого города — первыми)."""
     from django.http import JsonResponse
 
     from problems import school_search

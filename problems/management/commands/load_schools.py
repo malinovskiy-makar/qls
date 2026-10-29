@@ -3,6 +3,12 @@
 
     manage.py load_schools <файл.csv>            # сухой прогон: только счётчики
     manage.py load_schools <файл.csv> --apply    # записать
+    manage.py load_schools --format raoo <файл.zip|.xml> [--apply]   # реестр Рособрнадзора
+
+Формат `raoo` (раунд 3, 29.10.2026) — выгрузка реестра аккредитованных организаций
+как есть (ZIP или XML внутри). Тот же разборщик и тот же движок, что у
+`manage.py sync_schools` (`problems/school_registry.py`, `problems/school_sync.py`):
+ключ — идентификатор организации в реестре, исчезнувшие выключаются, а не удаляются.
 
 Файл — CSV в UTF-8 с заголовком. Обязательны `name` и `city`; по желанию
 `short_name`, `number`, `kind` (например «ГБОУ»), `region`. Номер, если колонки нет
@@ -19,6 +25,7 @@ import csv
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from problems import school_sync
 from problems.models import School
 from problems.school_search import number_in_name
 
@@ -31,8 +38,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('path')
         parser.add_argument('--apply', action='store_true', help='записать (без флага — сухой прогон)')
+        parser.add_argument('--format', choices=('csv', 'raoo'), default='csv',
+                            help='csv — свой CSV; raoo — выгрузка реестра Рособрнадзора')
 
-    def handle(self, path, apply=False, **options):
+    def handle(self, path, apply=False, format='csv', **options):
+        if format == 'raoo':
+            return self._raoo(path, apply)
         try:
             with open(path, encoding='utf-8-sig', newline='') as handle:
                 rows = list(csv.DictReader(handle))
@@ -55,7 +66,8 @@ class Command(BaseCommand):
                 values = {'short_name': (row.get('short_name') or '').strip()[:200],
                           'kind': (row.get('kind') or '').strip()[:40], 'number': number}
                 region = (row.get('region') or '').strip()[:200]
-                school = School.objects.filter(name=name, city=city, region=region).first()
+                school = School.objects.filter(name=name, city=city, region=region,
+                                               registry_id='').first()
                 if school is None:
                     created += 1
                     if apply:
@@ -77,3 +89,15 @@ class Command(BaseCommand):
                                                                        same, skipped))
         self.stdout.write('Школ в справочнике: было %d, стало %d%s' % (
             before, after, '' if apply else ' (сухой прогон, ничего не записано; --apply пишет)'))
+
+    def _raoo(self, path, apply):
+        before = School.objects.filter(is_active=True).count()
+        try:
+            counts = school_sync.apply_rows(school_sync.read_rows(path), apply=apply)
+        except school_sync.SyncError as error:
+            raise CommandError('Реестр не загружен, таблица не тронута: %s' % error)
+        self.stdout.write('Школ в файле: %d · новых: %d · изменено: %d · выключено: %d' % (
+            counts['total'], counts['added'], counts['changed'], counts['deactivated']))
+        self.stdout.write('Действующих школ в справочнике: было %d, стало %d%s' % (
+            before, School.objects.filter(is_active=True).count(),
+            '' if apply else ' (сухой прогон, ничего не записано; --apply пишет)'))
