@@ -1,0 +1,16 @@
+{% extends 'registration/register.html' %}
+{% comment %}
+Отказ входа через сервис: ошибка сервиса, устаревший `state`, «уже привязан к
+другому аккаунту». Наследует страницу регистрации целиком и меняет только
+карточку — как экраны почты (см. комментарий у блока `card` там).
+{% endcomment %}
+{% block title %}Вход · Weconomics{% endblock %}
+{% block card %}<div class="login-card">
+  <div class="login-logo">
+    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
+  </div>
+  <h1>{{ text }}</h1>
+  <a class="btn-login social-err-btn" href="{{ link_url }}">{{ link_label }}</a>
+  <style>.social-err-btn { display: block; text-align: center; text-decoration: none;
+                           margin-top: 24px; }</style>
+</div>{% endblock %}

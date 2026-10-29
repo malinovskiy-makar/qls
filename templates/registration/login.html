@@ -63,6 +63,7 @@
   {% endif %}{% if mail_enabled %}{% for message in messages %}
   <div class="error-list{% if message.level_tag == 'success' %} error-list--ok{% endif %}">{{ message }}</div>{% endfor %}{% endif %}
 
+  {% include 'social/_buttons.html' %}
   <form method="post">
     {% csrf_token %}
     {% if next %}

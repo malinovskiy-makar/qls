@@ -932,6 +932,31 @@ TELEGRAM_CHANNEL = (('' if _TESTING else os.environ.get('TELEGRAM_CHANNEL', '').
 TELEGRAM_API_BASE = (('' if _TESTING else os.environ.get('TELEGRAM_API_BASE', '').strip())
                      or 'https://api.telegram.org')
 
+# ─── Вход через VK ID и Яндекс ID, онбординг (решения 29.10.2026) ──────────
+# docs/SECURITY.md, «Вход через VK ID и Яндекс ID». Свой модуль problems/social/,
+# django-allauth НЕ ставим: он забрал бы регистрацию себе.
+# Кнопка сервиса видна, только если флаг включён И ключи этого сервиса заданы.
+# ⚠️ Под тестами всё обнулено, как у Telegram: настоящие ключи из .env не
+# должны попасть ни в один тест; новые тесты подставляют своё сами.
+SOCIAL_LOGIN_ENABLED = (not _TESTING) and (
+    os.environ.get('SOCIAL_LOGIN_ENABLED', '0').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+VK_ID_CLIENT_ID = '' if _TESTING else os.environ.get('VK_ID_CLIENT_ID', '').strip()
+VK_ID_CLIENT_SECRET = '' if _TESTING else os.environ.get('VK_ID_CLIENT_SECRET', '').strip()
+YANDEX_CLIENT_ID = '' if _TESTING else os.environ.get('YANDEX_CLIENT_ID', '').strip()
+YANDEX_CLIENT_SECRET = '' if _TESTING else os.environ.get('YANDEX_CLIENT_SECRET', '').strip()
+# Дата рождения от сервиса пишется в профиль, только когда она внесена в
+# документы (ред. 3, решение 29.10.2026). До этого не попадает даже в сессию.
+SOCIAL_STORE_BIRTHDATE = (not _TESTING) and (
+    os.environ.get('SOCIAL_STORE_BIRTHDATE', '0').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+# Обязательный онбординг (problems/middleware_onboarding.py). В тестах выключен
+# (новые тесты включают явно), иначе включён. ⚠️ В settings_production.py НЕ
+# переопределяется; выкатка не во время тура ВП 13–22.11 (решение 29.10.2026).
+ONBOARDING_ENABLED = (
+    os.environ.get('ONBOARDING_ENABLED', '0' if _TESTING else '1').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+
 # ─── Сроки хранения данных (часть Б правового контура, 09.10.2026) ──────────
 #
 # Политика обработки ПДн, раздел 7: фотографии и файлы решений, диалоги с

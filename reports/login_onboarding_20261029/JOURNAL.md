@@ -149,3 +149,90 @@
 **Чужие файлы, правленные точечно:** `problems/models.py` (+1 импорт),
 `problems/models_platform.py` (поля и варианты), `problems/tests/profile_markers.py`,
 `problems/templates/platform/profile.html` (+1 строка сноски).
+
+---
+
+## Фаза 2. Вход через VK ID и Яндекс ID
+
+**Файлы (новые):** `problems/social/{__init__,providers,views,urls}.py`,
+`problems/templatetags/social_tags.py`, `templates/social/{_buttons,finish,error}.html`,
+`static/social/{vk,yandex}.svg` (заглушки с комментарием «заменить на значок из
+официального набора»), `problems/tests/test_social_login.py`.
+Заготовки онбординга для URL (`problems/views_onboarding.py`,
+`problems/urls_onboarding.py`) — наполняются в фазе 3.
+
+**Чужие файлы, точечно:** `config/settings.py` (блок флагов и ключей после
+Telegram), `config/urls.py` (+2 строки: `auth/`, `welcome/`),
+`templates/registration/login.html` и `register.html` — **ровно по одной строке**
+`{% include 'social/_buttons.html' %}` над формой (`git diff --stat`: 1 insertion
+в каждом).
+
+**Как устроено:**
+- Сервисы — `providers.py`, единый словарь `{uid, first_name, last_name, email,
+  email_verified, birth_date, avatar_url}`; токен живёт только внутри
+  `fetch_profile`. HTTP — `urllib.request`, таймаут 10 с, адреса — константы
+  `https://`.
+- PKCE S256 у обоих; `state` 32 байта, `code_verifier` 86 знаков, поток в сессии
+  10 минут и одноразовый (забирается при возврате).
+- Порядок возврата — по промпту (известный uid → вход; вошёл → привязка, чужой
+  uid → «Этот VK ID уже привязан к другому аккаунту»; автосклейка только
+  «подтверждена там И подтверждена у нас»; иначе `social_pending` 30 минут без
+  токенов → `/auth/finish/`).
+- «Почти готово»: инициалы, строки `Имя · Почта (маска) · Дата рождения
+  (только при флаге) · Фото`, **две** галочки Анича теми же шаблонами
+  (`legal/_agree_label.html` уже несёт «18+ либо с согласия родителя»,
+  `legal/_mail_label.html` — только при `MAIL_ENABLED`), «Продолжить», «Это не я».
+  Создание — одной транзакцией; логин `econ_` + 6 знаков `[a-z0-9]`, пароль
+  непригодный; почта подтверждена и свободна → `attach_verified_email`;
+  `consent.grant` с источником `register`; `record_signup`; вход явным
+  `EmailOrUsernameBackend`.
+- После создания: без подтверждённой почты и при `MAIL_ENABLED` →
+  `/account/email/?next=<онбординг>`; иначе онбординг с `next` (при выключенном
+  онбординге — `next` или прежний `/profile/?welcome=1`).
+- Аватар: только `https://` и хост из белого списка (точное имя или поддомен),
+  без переадресаций, 5 с, ≤ 3 МБ, дальше существующий `AvatarForm` (квадрат JPEG
+  256). Любая ошибка — молча.
+- Частота: возвраты — scope `social` (промахи по адресу), создание — scope
+  `register`, как у регистрации.
+
+**Расхождения с ожидаемым (не стоп):**
+- Официальная документация VK ID (`id.vk.com/about/business/go/docs`) не
+  открылась загрузчику; адреса и поля VK взяты из промпта и сверены с открытыми
+  библиотеками (PKCE обязателен, `device_id` приходит в адресе возврата и нужен
+  при обмене, `user_info` — POST `client_id` + `access_token`). Живой вход
+  проверяется после выдачи ключей.
+- Яндекс сверен с yandex.ru/dev/id/doc: всё как в промпте; при PKCE
+  `client_secret` не обязателен (шлём, если задан). Неполная дата («0000-12-23»)
+  отбрасывается. Права Яндекса: `login:info login:email login:avatar`, плюс
+  `login:birthday` — **только при `SOCIAL_STORE_BIRTHDATE=1`** (без флага дату
+  не просим и не кладём даже в сессию).
+- Аватар на «Почти готово» — инициалы, не картинка сервиса: политика `img-src`
+  (`config/security_headers.py`) пускает только свои адреса, а картинка встаёт в
+  профиль сразу после регистрации.
+- Отказы (`state`, ошибка сервиса, «Отмена» у сервиса, чужой uid) — страница
+  `social/error.html` со статусом 400 (429 при запрете частоты), без 500.
+
+**Границы доступа (ресурс × кто × действие):**
+
+| Ресурс | Аноним | Вошедший | Закрыто тестом |
+|---|---|---|---|
+| `/auth/<p>/start/` при выключенном флаге или без ключей | 404 | 404 | да (`FlagTests`) |
+| `/auth/<p>/callback/` с чужим/устаревшим `state` | 400, аккаунтов 0 | 400 | да |
+| callback, uid привязан к A | вход в A | если это не A — отказ | да (оба) |
+| callback, почта подтверждена у A | вход в A | — | да |
+| callback, почта у A НЕ подтверждена | экран, A не тронут | — | да |
+| `/auth/finish/` без `social_pending` | → `/login/` | → профиль | кодом |
+| `/auth/finish/` POST без согласия | 200 с ошибкой, аккаунтов 0 | — | да |
+| `next` чужого хоста | отброшен | отброшен | да |
+
+Владелец объекта нигде не берётся из запроса: привязка к вошедшему — только
+`request.user`, к чужому — только по подтверждённой почте.
+
+**Тесты:** `test_social_login` (33) + `test_social_models` (4) — 37 OK. Девять
+пунктов промпта: 1 `test_wrong_state…`; 2 `test_pkce…`; 3 `test_known_uid…`; 4 —
+`AutoMergeTests` (4 строки таблицы); 5 `test_without_consent…`,
+`test_with_consent…`; 6 `BirthDateTests`; 7 `NoTokensAnywhereTests`; 8
+`AvatarTests`; 9 `FlagTests`.
+Соседи: `test_register_email`, `test_auth_hardening`, `test_accounts`,
+`test_profile_account_tab`, `test_signup_source`, `test_production_settings`,
+`legal` — 346 OK, код 0. `ruff` чисто, `bandit -ll` — 0, `check_em_dash` — 0.

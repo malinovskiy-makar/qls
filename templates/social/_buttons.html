@@ -1,0 +1,32 @@
+{% load static social_tags %}{% social_providers as providers %}{% if providers %}
+{% comment %}
+Кнопки входа через VK ID и Яндекс ID (решения 29.10.2026). Вставляется ОДНОЙ
+строкой в начало формы на `registration/login.html` и `registration/register.html`;
+стили свои, рядом, чтобы вёрстку страниц Анича не трогать.
+Кнопка сервиса видна, только если `SOCIAL_LOGIN_ENABLED` и ключи этого сервиса
+заданы; без них блока нет вовсе. Значки — заглушки `static/social/*.svg` до
+официального набора сервисов.
+{% endcomment %}
+<style>
+.social-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+              gap: 8px; margin-bottom: 18px; }
+.social-btn { display: flex; align-items: center; justify-content: center; gap: 8px;
+              min-height: 44px; padding: 10px 12px; border: 1px solid var(--border);
+              border-radius: var(--r, 8px); background: var(--surface); color: var(--text);
+              font: inherit; font-size: 14px; font-weight: 600; text-decoration: none;
+              transition: border-color .12s ease, background .12s ease; }
+.social-btn:hover { border-color: var(--text3); background: var(--surface-2); }
+.social-btn img { width: 20px; height: 20px; flex-shrink: 0; }
+.social-or { display: flex; align-items: center; gap: 12px; margin: 0 0 18px;
+             font-size: 13px; color: var(--text3); }
+.social-or::before, .social-or::after { content: ''; flex: 1;
+                                        border-top: 1px solid var(--border); }
+</style>
+<div class="social-row">{% for provider in providers %}
+  <a class="social-btn" href="{% url 'social_start' provider.name %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+    <img src="{% static 'social/'|add:provider.name|add:'.svg' %}" alt="" width="20" height="20">
+    <span>{{ provider.title }}</span>
+  </a>{% endfor %}
+</div>
+<div class="social-or">или</div>
+{% endif %}

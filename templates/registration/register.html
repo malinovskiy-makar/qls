@@ -58,6 +58,7 @@
   это имя и фамилия. Пароль Вебвизор не пишет и сам; класс там — чтобы
   правило читалось одинаково для всех полей формы.
   {% endcomment %}
+  {% include 'social/_buttons.html' %}
   <form method="post" novalidate>
     {% csrf_token %}
     {% comment %}

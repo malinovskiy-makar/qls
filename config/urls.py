@@ -53,6 +53,10 @@ urlpatterns = [
     path('password/forgot/code/', views_auth.password_forgot_code,
          name='password_forgot_code'),
     path('account/email/', views_auth.account_email, name='account_email'),
+    # Вход через VK ID / Яндекс ID и онбординг (решения 29.10.2026). Без
+    # SOCIAL_LOGIN_ENABLED и ключей сервиса `auth/<сервис>/…` отвечает 404.
+    path('auth/', include('problems.social.urls')),
+    path('welcome/', include('problems.urls_onboarding')),
     # ⚠️ ВЫХОД ВЕДЁТ НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
     # нажал «Выйти» — он закончил, а не собирается войти снова. Главная
     # открыта гостям. Метод только POST: так решил Django 5, и шапка шлёт
