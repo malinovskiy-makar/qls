@@ -41,12 +41,16 @@ body.au { display: flex; flex-direction: column; align-items: stretch;
           justify-content: flex-start; min-height: 100vh; padding: 0; }
 body.au > .site-version { align-self: stretch; }
 body.au { --legal-foot-left: 16px; }
-.au-top { height: 56px; flex-shrink: 0; display: flex; align-items: center; padding: 0 32px; }
-.au-top-mark { height: 32px; width: auto; display: block; color: var(--text); }
-@media (max-width: 760px) { .au-top { height: 52px; padding: 0 16px; } }
+/* Полоса с логотипом (раунд 4). На широком экране лежит поверх фона, своей высоты не
+   берёт: логотип слева вверху, карточка справа, левая колонка по центру высоты — они
+   не пересекаются, а 52 px нужны регистрации, чтобы влезть в окно 1536×730. */
+body.au { position: relative; }
+.au-top { position: absolute; top: 0; left: 0; z-index: 2; height: 68px; display: flex;
+          align-items: center; padding: 0 40px; }
+@media (max-width: 760px) { .au-top { position: static; flex-shrink: 0; height: 56px; padding: 0 16px; } }
 .au-main { flex: 1; display: flex; align-items: center; justify-content: center;
            gap: 88px; width: 100%; max-width: 1180px; margin: 0 auto;
-           padding: 48px 32px 40px; }
+           padding: 4px 32px; }
 .au-main--single { gap: 0; }
 
 /* Левая колонка: заголовок и пункты (вход) или шаги (регистрация). */
@@ -69,13 +73,15 @@ body.au { --legal-foot-left: 16px; }
 .au-steps li.is-now .au-step-n { background: var(--accent); border-color: var(--accent);
                                  color: var(--on-accent); }
 
-/* Карточка формы 420 px, мягкая тень. */
-.au-card { flex: 0 0 420px; width: 420px; max-width: 100%; background: var(--surface);
-           border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px;
-           box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 16px; }
+/* Карточка формы 500 px, мягкая тень (раунд 4: была 420 — шире, чтобы тексты галочек
+   легли в меньшее число строк и регистрация влезла в окно 1440×778 без прокрутки;
+   вход той же ширины, чтобы вкладки не прыгали). Отступы внутри — 12 px. */
+.au-card { flex: 0 0 500px; width: 500px; max-width: 100%; background: var(--surface);
+           border: 1px solid var(--border); border-radius: 14px; padding: 20px 32px;
+           box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 12px; }
 .au-card--single { flex-basis: 440px; width: 440px; }
 .au-card--wide { flex-basis: 520px; width: 520px; }
-.au-card-h { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.25; color: var(--text); }
+.au-card-h { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.25; color: var(--text); }
 .au-sub { margin-top: 6px; font-size: 14px; color: var(--text2); overflow-wrap: anywhere; }
 .au-sub a, .au-switch-line a, .au-forgot { color: var(--accent-ink); }
 .au-card .error-list { margin: 0; }
@@ -92,7 +98,7 @@ body.au { --legal-foot-left: 16px; }
 .au-seg-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Поля. */
-.au-form { display: flex; flex-direction: column; gap: 14px; margin: 0; }
+.au-form { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .au-field { display: flex; flex-direction: column; gap: 6px; }
 .au-label { display: block; margin: 0; font-size: 13px; font-weight: 500; color: var(--text2); }
 .au-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -111,7 +117,7 @@ body.au { --legal-foot-left: 16px; }
           cursor: pointer; }
 .au-eye[hidden] { display: none; }
 .au-eye:hover, .au-eye[aria-pressed="true"] { color: var(--text); background: var(--chip-bg); }
-.au .consent { font-size: 13.5px; line-height: 1.5; margin: 0; }
+.au .consent { font-size: 13px; line-height: 1.45; margin: 0; }
 .au .consent input[type="checkbox"] { width: 18px; height: 18px; margin-top: 1px;
                                        accent-color: var(--accent); cursor: pointer; }
 .au-submit { width: 100%; height: 48px; font-size: 15px; font-weight: 600; }
