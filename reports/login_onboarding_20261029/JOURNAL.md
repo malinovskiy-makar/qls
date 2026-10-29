@@ -858,3 +858,67 @@ JSON `{"results": [...]}`; гость — 403; потолок 120 запросо
 контакта стена не спрашивает ни класс, ни источник».
 
 Карточка Notion — в «Готово» (фаза 8).
+
+## Р2 · Фаза 8. Зубастость, прогоны, документы, Notion
+
+**Зубастость** — по одному дефекту на новый тест, тест, `git checkout` файла, снова
+тест (скрипт в черновиках сессии). 12/12 краснеют, после откатов `git status` пуст:
+
+| у нового человека «Ученик» выбран заранее | `problems/views_onboarding.py` | `problems.tests.test_onboarding.StudentFlowTests.test_new_person_sees_nothing_preselected` | красный | OK |
+| «не школьник» не пропускает шаг 4 | `problems/views_onboarding.py` | `problems.tests.test_onboarding.StudentFlowTests.test_not_a_pupil_skips_the_school_step` | красный | OK |
+| «пятьдесят седьмая» не разбирается | `problems/school_search.py` | `problems.tests.test_school_search.NumberWordsTests` | красный (вставлен вручную: строка в скрипте не совпала) | OK |
+| подвал внутри фиксированной полосы | `static/onboarding/onboarding.css` | `problems.tests.test_onboarding.FooterTests` | красный | OK |
+| регистрация снова показывает role | `problems/forms_accounts.py` | `problems.tests.test_register_email.RegisterWithEmailTests.test_form_is_email_and_password_only` | красный | OK |
+| кнопка сервиса с ключом demo | `problems/social/providers.py` | `problems.tests.test_social_login.KeyCheckTests` | красный | OK |
+| «Пока не решил» сохраняется вместе с другой целью | `problems/views_onboarding.py` | `problems.tests.test_onboarding.StudentFlowTests.test_undecided_does_not_go_with_another_goal` | красный | OK |
+| «Другое» без «Другое» всё равно пишет текст | `problems/views_onboarding.py` | `problems.tests.test_onboarding.StudentFlowTests.test_other_source_keeps_the_text` | красный | OK |
+| свой профиль добирает порог подсказок школ | `problems/school_search.py` | `problems.tests.test_school_search.SchoolSearchTests` | красный | OK |
+| стена берёт класс из формы, а не из профиля | `vp/views_wall.py` | `vp.tests.test_wall_onboarding.WallAsksOnlyTheUnknownTests.test_known_grade_and_source_leave_one_question` | красный | OK |
+| логин регистрации берётся из формы | `problems/views_auth.py` | `problems.tests.test_register_email.RegisterWithEmailTests.test_right_code_creates_verified_account_with_mail_consent` | красный | OK |
+| шаг «Почта» не появляется у старого аккаунта | `problems/views_onboarding.py` | `problems.tests.test_onboarding.EmailStepTests.test_old_account_without_email_gets_the_step_last` | красный | OK |
+
+**Прогон** (без `--parallel`, SQLite): `legal`, весь `vp` (кроме
+`vp.tests.test_wall_poll.PollSignalTests`: шлёт процессу SIGTERM и на Windows убивает весь
+прогон — остальные классы файла прогнаны поимённо), `test_register_email`,
+`test_auth_hardening`, `test_accounts`, `test_profile_account_tab`, `test_signup_source`,
+`test_production_settings`, новые (`test_onboarding`, `test_onboarding_gate`,
+`test_social_login`, `test_social_models`, `test_school_search`, `test_wall_onboarding`),
+сторожа шаблонов/ПДн и всё, что нашёл `grep` по изменённым шаблонам и полям
+(`test_beta_smoke`, `test_email_codes`, `test_fb_button_style`, `test_feedback`,
+`test_obzor_nav`, `test_password_reset_code`, `test_print_sheet`, `test_r15_builder`,
+`test_track`, `legal.test_erase_user`, `catalog.test_attempts`, `test_chat_api`,
+`test_guest_solutions`, `test_seo`, `config.test_nav`, `game.test_duel_page`,
+`test_final_screen`, `test_wecon_texts`) — **1 459 тестов за 20,6 мин, 1 падение,
+skipped=1** (браузерный): `vp.tests.test_wall_screens.SurveyTests.test_grade_is_preselected_from_profile`
+— старая правда «класс из профиля выбран заранее»; по карточке стены известный класс
+теперь не спрашивается вовсе. Тест переписан под новую правду
+(`test_grade_from_profile_is_not_asked_again`) + добавлен
+`test_grade_is_preselected_from_the_variant_when_profile_is_empty` (предвыбор по
+варианту остался). Перепрогон `test_wall_screens` + `test_wall_onboarding` — 43 OK;
+`test_security_headers` (обход матрицы) — 15 OK.
+
+**Нули:** `manage.py check` — 0; `makemigrations --check --dry-run` — No changes detected;
+`check_em_dash.py` — 0 (код 0); `ruff check` по 42 изменённым `.py` — All checks passed;
+`bandit -ll` по новым и изменённым модулям — No issues identified.
+
+**Документы:** `docs/SOCIAL_KEYS.md` (новый), `static/social/README.md`,
+`static/onboarding/logos/README.md`, `problems/data/README.md`, `docs/SECURITY.md`
+(раздел «Раунд 2»), `docs/SECURITY-MATRIX.md` (+2 строки), `CLAUDE.md` (абзац входа).
+Блок «Текущий фокус» и `CLAUDE_ARCHIVE.md` не трогал — как и в раунде 1, чтобы не
+было конфликтов со стеной и main.
+
+**Служебное:** для проверки в браузере в `C:\Users\shipu\qls\.claude\launch.json`
+(основная папка) временно добавлялась запись `login-r2` (порт 8017); после проверки
+файл возвращён `git checkout`. Тестовые аккаунты (`r2new`, `r2tutor`, `r2grad`,
+`kostya_econ`, `econ_vk0001`, пароль `Ochen-Dlinnyi-Parol-77`) и 5 школ Москвы — в
+`db.sqlite3` worktree, не на бою.
+
+**Notion (записано):**
+- «Решения», 4 новые (30.10): старые аккаунты и шаг «Почта»; логотип из партиала;
+  источник городов и школ и лицензия; правило автоперехода.
+- «Задачи»: новая «Загрузить реестр школ для подсказок онбординга» (Техническое, Надо);
+  «Стена ВП: не переспрашивать…» → Готово; «Заменить заглушки значков…» → Готово;
+  комментарий в «Зарегистрировать приложения VK ID и Яндекс ID» (localhost:80, SOCIAL_KEYS.md);
+  главная задача `408b11c9-…ab62e` — итог раунда 2 в «Заметки», «На проверке».
+- Не записано как решение (лимит «больше 5 карточек — после показа владельцу»):
+  «при `ONBOARDING_ENABLED=0` роль остаётся на регистрации» — вынесено в отчёт.

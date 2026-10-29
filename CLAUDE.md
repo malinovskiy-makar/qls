@@ -378,6 +378,13 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 `/auth/vk/callback/`, `/auth/yandex/callback/`; онбординг `/welcome/`, шлюз
 `problems/middleware_onboarding.py` — сразу после слоя согласия. Токены не храним, склейка — только
 по почте, подтверждённой у сервиса и у нас ([docs/SECURITY.md](docs/SECURITY.md)).
+Раунд 2 (30.10): ключ-заглушка (`demo`, не тот вид) = «не настроено» — кнопки нет, `/auth/<p>/start/`
+показывает свою страницу; как получить ключи — [docs/SOCIAL_KEYS.md](docs/SOCIAL_KEYS.md) (VK ID локально —
+только `localhost:80`). Регистрация = почта + пароль, логин `econ_`+6 знаков (`problems/usernames.py`).
+Онбординг по макету `docs/design/onboarding_r2/`: шаги `role → grade → goals → school → source →
+[email] → build → plan` (`UserProfile.goals`, `source_other`, миграции 0085–0086), стили и скрипт —
+`static/onboarding/`. Подсказки городов и школ — `problems/school_search.py`, данные и лицензия —
+`problems/data/README.md`, справочник школ — `manage.py load_schools <csv> [--apply]`.
 
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
 её в `problems/models*.py`, а не у себя. Исключений **три**, все записаны:

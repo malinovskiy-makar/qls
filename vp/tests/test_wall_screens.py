@@ -259,11 +259,19 @@ class SurveyTests(ScreenCase):
         other.profile.refresh_from_db()
         self.assertEqual(other.profile.grade, '9')
 
-    def test_grade_is_preselected_from_profile(self):
+    def test_grade_from_profile_is_not_asked_again(self):
+        # Раунд 2 входа (30.10.2026): класс 9–11 из профиля стена не переспрашивает —
+        # вопроса нет, а сохранится класс профиля (vp/tests/test_wall_onboarding.py).
         UserProfile.objects.update_or_create(user=self.user, defaults={'grade': '11'})
         self.contact()
-        self.assertIn('name="grade" value="11" required checked', self.page())
-        self.assertNotIn('name="tour2_status" value="passed" required checked', self.page())
+        html = self.page()
+        self.assertNotIn('name="grade"', html)
+        self.assertIn('name="tour2_status"', html)
+        self.assertNotIn('name="tour2_status" value="passed" required checked', html)
+
+    def test_grade_is_preselected_from_the_variant_when_profile_is_empty(self):
+        self.contact()
+        self.assertIn('name="grade" value="10" required checked', self.page())
 
     def test_second_variant_after_survey_has_no_wall(self):
         self.contact()
