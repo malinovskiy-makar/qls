@@ -42,6 +42,23 @@ FAKE_ENV = {
     'REDIS_URL': 'redis://127.0.0.1:6379',
 }
 
+# Стена тренажёра ВП (vp.W001): на бою оба её пути включены, и `check --deploy`
+# обязан быть чистым именно в таком окружении. Токен, ник бота, секрет вебхука
+# и полный набор почты (иначе mail.E001) — подставные, как в джобе
+# `deploy-check` (.github/workflows/ci.yml): настройки только читаются, никто
+# никуда не подключается. Секрет вебхука — только `A-Za-z0-9_-`. Менять оба
+# места вместе; без этого словаря проверка краснеет по вине заглушки, а не
+# настроек.
+WALL_ENV = {
+    'TELEGRAM_BOT_TOKEN': '000000:ci-dummy-token',
+    'TELEGRAM_BOT_USERNAME': 'ci_dummy_bot',
+    'TELEGRAM_WEBHOOK_SECRET': 'ci-dummy-webhook-secret_0123456789',
+    'MAIL_ENABLED': '1',
+    'EMAIL_HOST': 'smtp.example.org',
+    'EMAIL_HOST_USER': 'ci-dummy-user',
+    'EMAIL_HOST_PASSWORD': 'ci-dummy-password',
+}
+
 
 MODULE = 'config.settings_production'
 
@@ -230,7 +247,7 @@ class DeployCheckTests(unittest.TestCase):
     SSL-редирект, и остальные тесты после этого проверяли бы не тот сайт.
     """
 
-    def test_check_deploy_is_clean(self):
+    def _check_deploy(self, wall_env):
         import subprocess
         import sys
         from pathlib import Path
@@ -238,6 +255,13 @@ class DeployCheckTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         env = dict(os.environ)
         env.update(FAKE_ENV)
+        # ⚠️ Пути стены задаёт только тест, и недостающие — ПУСТОЙ строкой, а не
+        # удалением: `config/settings.py` читает `.env` через `setdefault`, и
+        # удалённую переменную подставил бы файл разработчика (токен из него
+        # сделал бы «без токена» зелёным). Пустая явная строка файл перебивает.
+        env.update({key: '' for key in WALL_ENV})
+        env.update(wall_env)
+        env['VP_WALL_ENABLED'] = '1'   # как на бою; из шелла и `.env` не берём
         env.pop('DJANGO_DEBUG', None)
         # Второй слой защиты рядом с первым (команды рендера обязаны сами
         # восстанавливать переменную) — дочерний check --deploy не должен
@@ -252,12 +276,14 @@ class DeployCheckTests(unittest.TestCase):
         # в cp1251, и текст превращается в «РѕР±С‹С‡РЅС‹Р№».
         env['PYTHONIOENCODING'] = 'utf-8'
 
-        result = subprocess.run(
+        return subprocess.run(
             [sys.executable, 'manage.py', 'check', '--deploy',
              '--settings=config.settings_production'],
             cwd=str(root), env=env, capture_output=True,
             encoding='utf-8', errors='replace', timeout=180)
 
+    def test_check_deploy_is_clean(self):
+        result = self._check_deploy(WALL_ENV)
         output = (result.stdout or '') + (result.returncode and
                                           (result.stderr or '') or '')
         self.assertEqual(
@@ -265,6 +291,16 @@ class DeployCheckTests(unittest.TestCase):
             'check --deploy вернул %s:\n%s\n%s'
             % (result.returncode, result.stdout, result.stderr))
         self.assertIn('System check identified no issues', output)
+
+    def test_check_deploy_warns_when_wall_token_is_missing(self):
+        """Без токена бота боевые настройки обязаны предупредить (`vp.W001`):
+        иначе выкатка без бота выглядела бы чистой, а ученики упёрлись бы в стену."""
+        env = {k: v for k, v in WALL_ENV.items() if k != 'TELEGRAM_BOT_TOKEN'}
+        result = self._check_deploy(env)
+        output = (result.stdout or '') + (result.stderr or '')
+        self.assertEqual(result.returncode, 0, output)
+        self.assertIn('vp.W001', output)
+        self.assertIn('TELEGRAM_BOT_TOKEN', output)
 
 
 class NginxDoesNotDuplicateDjangoHeadersTests(unittest.TestCase):

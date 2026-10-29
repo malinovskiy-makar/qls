@@ -471,25 +471,35 @@ class WebvisorTests(TestCase):
         self.assertIn('<table class="gb-table ym-hide-content">', html)
         self._assert_logins_hidden(html, ['igrok_dnya'])
 
-    def test_vp_landing_board_is_hidden(self):
-        from vp.tests.helpers import make_published
+    # Раздел «Высшая проба» показывает только 2 тур (`VISIBLE_TOURS = (2,)`), поэтому
+    # варианты здесь — демоверсия 2 тура: у вариантов 1 тура посадочная пуста.
+
+    def _vp_demo_with_attempts(self, *users):
+        from vp import models as vp_models
+        from vp.tests.helpers import load_demo
         from vp.tests.test_board import _attempt
-        variant = make_published('wv-board')
-        _attempt(variant, User.objects.create_user('vp_igrok', password=PASSWORD),
-                 score=80, seconds=1200)
+        load_demo('10')
+        variant = vp_models.VPVariant.objects.get(grade_band='10')
+        for user, score, seconds in users:
+            _attempt(variant, user, score=score, seconds=seconds)
+        return variant
+
+    def test_vp_landing_board_is_hidden(self):
+        other = User.objects.create_user('vp_igrok', password=PASSWORD)
         me = self._login('vp_ya', 'student')
-        _attempt(variant, me, score=60, seconds=1500)
+        self._vp_demo_with_attempts((other, 80, 1200), (me, 60, 1500))
         html = self.client.get(reverse('vp:index')).content.decode()
-        self.assertIn('class="vp-land-rows ym-hide-content"', html)
+        # Класс проверяем по смыслу: у 2 тура вкладки, и к нему добавляется `is-nocls`.
+        blocks = re.findall(r'<div class="([^"]*\bvp-land-rows\b[^"]*)">', html)
+        self.assertTrue(blocks, 'нет блока строк таблицы лучших попыток')
+        for classes in blocks:
+            self.assertIn('ym-hide-content', classes.split())
         self.assertIn('Лучшие попытки', recorded_text(html))
         self._assert_logins_hidden(html, ['vp_igrok', 'vp_ya'])
 
     def test_vp_my_attempts_list_is_hidden_header_and_tabs_stay(self):
-        from vp.tests.helpers import make_published
-        from vp.tests.test_board import _attempt
-        variant = make_published('wv-my')
         me = self._login('vp_moi', 'student')
-        _attempt(variant, me, score=70, seconds=1300)
+        variant = self._vp_demo_with_attempts((me, 70, 1300))
         html = self.client.get(reverse('vp:my')).content.decode()
         recorded = recorded_text(html)
         # Список с баллами и местами скрыт…
