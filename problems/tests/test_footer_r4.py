@@ -140,3 +140,13 @@ class NoSiteNavTests(TestCase):
             self.assertNotIn(SITE_NAV, html, url)
             self.assertNotIn(FOOTER, html, url)
             self.assertIn('id="cookie-bar"', html, url)
+
+
+class AuthLogoOnPhoneTests(TestCase):
+    """Обход р4 нашёл: на узком экране правило онбординга `.ob-logo { display: none }`
+    прятало и логотип в полосе входа — полоса оставалась пустой."""
+
+    def test_logo_is_shown_on_a_narrow_screen(self):
+        css = (Path(settings.BASE_DIR) / 'static/onboarding/onboarding.css').read_text(encoding='utf-8')
+        narrow = css.split('@media (max-width: 760px) {\n  .au-top', 1)[1].split('\n}', 1)[0]
+        self.assertIn('.au-top .ob-logo { display: inline-flex; }', narrow)
