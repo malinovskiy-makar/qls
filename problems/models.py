@@ -2314,3 +2314,6 @@ from .models_legal import ConsentRecord, ErasureLog  # noqa: E402,F401
 
 # Коды подтверждения почты (docs/MAIL.md, 26.10.2026).
 from .models_mail import EmailCode  # noqa: E402,F401
+
+# Вход через VK ID и Яндекс ID (решения 29.10.2026, docs/SECURITY.md).
+from .models_social import SocialAccount  # noqa: E402,F401

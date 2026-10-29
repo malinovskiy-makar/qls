@@ -109,3 +109,43 @@
 - Варианты «откуда узнали» стена держит у себя (`VPWall.SOURCE_CHOICES`);
   импорт подписей в стену — правка `vp/`, а она разрешена только в фазе 6.
   Пока 8 подписей дублируются в профиле и стене; свести — вместе с фазой 6.
+
+---
+
+## Фаза 1. Данные
+
+- `problems/models_social.py` — `SocialAccount` ровно по промпту (`provider`,
+  `uid`, `created_user`, `created_at`, `last_login_at`, уникальность
+  `social_provider_uid_unique`); подключён одной строкой в конце
+  `problems/models.py`.
+- `UserProfile`: `onboarded_at`, `main_olympiad` (6 вариантов в порядке
+  промпта, `MAIN_OLYMPIADS`), `teach_places` (`TEACH_PLACES`), `teach_grades`
+  (`TEACH_GRADES` = 5…11) — списки JSON, как `olympiad_history`; `birth_date` с
+  комментарием про `SOCIAL_STORE_BIRTHDATE` и ред. 3.
+- `SourceChannel` приведён к 8 кодам стены, тот же порядок и подписи. Старые 5
+  кодов входят в 8 — **данные не переводятся**, строк к переводу 0 (на копии
+  рабочей базы все 26 профилей с пустым источником). Тест сверяет список с
+  `VPWall.SOURCE_CHOICES` — расхождение покраснеет. Импорт подписей в стену —
+  правка `vp/`, ждёт фазы 6.
+- **Миграция `problems/0084_login_onboarding`** (одна; лист цепочки на ветке
+  стены — 0083; на `main` лист — 0081, у стены 0082–0083 свои; при переносе на
+  свежий main сшивка не нужна, если в main не появится своя 0082+ у `problems`).
+- `problems/tests/profile_markers.py`: `birth_date`, `main_olympiad`,
+  `teach_places`, `teach_grades` + их имена и подписи в `FORBIDDEN`.
+- Сноска про Instagram — общий `templates/_instagram_note.html`; поставлена в
+  профиль под «Откуда вы узнали» (там теперь виден «Instagram*»).
+
+**Проверки (свидетельства):**
+- `makemigrations problems -n login_onboarding` → 0084 (6 операций + модель).
+- `migrate` с нуля на пустой SQLite worktree — код 0; `migrate problems 0083`
+  (откат) — OK; снова вперёд — OK; `makemigrations --check --dry-run` → `No
+  changes detected`.
+- Путь обновления: копия рабочей `db.sqlite3` (1,3 ГБ) → `migrate` код 0,
+  применились 0079–0084 `problems` и 0004–0005 `vp`. Копия удалена.
+- Тесты: `problems.tests.test_social_models` (4), `legal.tests.test_erase_user`,
+  `catalog.tests.test_chat_api`, `catalog.tests.test_attempts` (сторожа P0) — 38
+  OK; `test_profile_account_tab`, `test_accounts`, `test_beta_smoke` — 80 OK.
+
+**Чужие файлы, правленные точечно:** `problems/models.py` (+1 импорт),
+`problems/models_platform.py` (поля и варианты), `problems/tests/profile_markers.py`,
+`problems/templates/platform/profile.html` (+1 строка сноски).

@@ -708,6 +708,7 @@
       </div>
       <div class="pf-field">
         {% include 'platform/_pf_dd.html' with field=form.source_channel label='Откуда вы узнали о Weconomics' kind='single' %}
+        {% include '_instagram_note.html' with note_class='pf-hint pf-hint--block' %}
       </div>
       <div class="pf-field">
         <label class="pf-label" for="{{ form.goal.id_for_label }}">Цель на ближайший учебный год</label>

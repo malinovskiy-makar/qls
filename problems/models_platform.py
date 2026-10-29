@@ -105,11 +105,40 @@ class UserProfile(models.Model):
         GT6 = 'gt6', 'Больше 6'
 
     class SourceChannel(models.TextChoices):
+        """«Откуда узнали» — ОДИН список на сайт (решение 29.10.2026).
+
+        Те же 8 кодов, тот же порядок и те же подписи, что у анкеты стены ВП
+        (`vp.models.VPWall.SOURCE_CHOICES`). Прежние пять кодов вошли в восьмёрку
+        как есть, переводить данные не пришлось; поменялись подписи.
+        ⚠️ «Instagram*» без сноски про Meta не показывать нигде.
+        """
         TELEGRAM = 'telegram', 'Telegram-канал'
-        TEACHER = 'teacher', 'Преподаватель'
-        FRIEND = 'friend', 'Друг'
-        SEARCH = 'search', 'Поиск в интернете'
+        TIKTOK = 'tiktok', 'TikTok'
+        INSTAGRAM = 'instagram', 'Instagram*'
+        VK = 'vk', 'ВКонтакте'
+        FRIEND = 'friend', 'Друг или одноклассник'
+        TEACHER = 'teacher', 'Учитель'
+        SEARCH = 'search', 'Поиск'
         OTHER = 'other', 'Другое'
+
+    # Главная олимпиада — ответ онбординга (решение 29.10.2026). Коды `vsosh`
+    # нет в OLYMPIAD_HISTORY (там ВсОШ по этапам), остальные совпадают по смыслу.
+    MAIN_OLYMPIADS = (
+        ('vsosh', 'ВсОШ'),
+        ('hse', 'Высшая проба'),
+        ('mosh', 'МОШ'),
+        ('listed', 'Другие перечневые'),
+        ('ieo', 'IEO'),
+        ('undecided', 'Пока не решил'),
+    )
+    # Ветка преподавателя в онбординге: где и кого учит. Списки кодов, как
+    # `olympiad_history`.
+    TEACH_PLACES = (
+        ('school', 'В школе'),
+        ('circle', 'Кружок или онлайн-школа'),
+        ('private', 'Частные занятия'),
+    )
+    TEACH_GRADES = tuple((str(n), str(n)) for n in range(5, 12))
 
     # Множественный выбор хранится списком кодов (JSONField). Допустимые
     # коды — здесь, и форма, и выгрузка читают отсюда.
@@ -199,6 +228,20 @@ class UserProfile(models.Model):
     # Ник без «@»; нормализует форма (`clean_telegram`). P0: в модель ИИ не
     # уходит, как все поля профиля — сторож `problems/tests/profile_markers.py`.
     telegram = models.CharField('Telegram', max_length=32, blank=True, default='')
+
+    # ── Онбординг (решения 29.10.2026, problems/views_onboarding.py) ────────
+    # В базе всё необязательно; обязательность — в шагах онбординга.
+    # Пустой `onboarded_at` — шлюз (problems/middleware_onboarding.py) ведёт
+    # человека на /welcome/, пока анкета не пройдена.
+    onboarded_at = models.DateTimeField('Онбординг пройден', null=True, blank=True)
+    main_olympiad = models.CharField('Главная олимпиада', max_length=16, blank=True,
+                                     default='', choices=MAIN_OLYMPIADS)
+    teach_places = models.JSONField('Где учит', default=list, blank=True)
+    teach_grades = models.JSONField('Классы учеников', default=list, blank=True)
+    # Заполняется только из VK ID / Яндекс ID и только при SOCIAL_STORE_BIRTHDATE=1 —
+    # после ред. 3 документов. Решение 29.10. P0: в модель ИИ не уходит, как все
+    # поля профиля — сторож `problems/tests/profile_markers.py`.
+    birth_date = models.DateField('Дата рождения', null=True, blank=True)
 
     # ⚠️ ПЕРВОЕ ПОЛЕ С ФАЙЛОМ В ПРОЕКТЕ. Что кладётся — решает НЕ загрузчик:
     # форма пересжимает картинку Pillow в JPEG 256×256 и сама задаёт имя
