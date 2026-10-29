@@ -22,7 +22,7 @@ class RequisitesTests(SimpleTestCase):
         self.assertEqual(legal['operator_inn'], '662333547172')
         self.assertEqual(legal['operator_status'], 'плательщик налога на профессиональный доход')
         self.assertEqual(legal['telegram'], 'weconomics_ru')
-        self.assertEqual(legal['docs_version'], '1')  # фаза 4 поднимет до '2'
+        self.assertEqual(legal['docs_version'], '2')
 
     def test_no_private_data_in_the_public_repository(self):
         """Репозиторий публичный: ни домашнего адреса, ни телефона, ни почты в коде."""
@@ -50,7 +50,7 @@ class RequisitesTests(SimpleTestCase):
         несут свою настоящую дату: после смены `LEGAL_DOCS_DATE` они не должны
         ложно показать «Редакция 1 от <новая дата>».
         """
-        current = '2'   # фаза 4 свяжет это с settings.LEGAL['docs_version']
+        current = settings.LEGAL['docs_version']
         expected = {
             'privacy.md': 'Редакция %s от [ДАТА]' % current,
             'consent.md': 'Редакция %s от [ДАТА]' % current,

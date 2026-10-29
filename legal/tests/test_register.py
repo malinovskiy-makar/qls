@@ -2,6 +2,7 @@
 """Фаза 3: регистрация пишет согласие в той же транзакции, что и пользователя."""
 from unittest import mock
 
+from django.conf import settings
 from django.test import TestCase
 
 from problems.models_legal import ConsentRecord
@@ -19,7 +20,7 @@ class RegisterConsentTests(TestCase):
         records = ConsentRecord.objects.filter(user=user)
         self.assertEqual(records.count(), 1)
         record = records.get()
-        self.assertEqual((record.kind, record.source, record.version), ('pd', 'register', '1'))
+        self.assertEqual((record.kind, record.source, record.version), ('pd', 'register', settings.LEGAL['docs_version']))
         self.assertIsNone(record.revoked_at)
 
     def test_without_the_checkbox_nothing_is_created(self):

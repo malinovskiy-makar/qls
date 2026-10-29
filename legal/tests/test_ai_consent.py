@@ -131,7 +131,7 @@ class AiConsentTests(TestCase):
 
     def test_old_edition_of_the_ai_consent_is_not_enough(self):
         consent.grant(self.user, AI, ConsentRecord.Source.CHAT)
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '2'}):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
             consent.grant(self.user, PD, ConsentRecord.Source.GATE)
             self.assertEqual(self._chat().status_code, 403)
 
@@ -159,7 +159,7 @@ class AiConsentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['ok'])
         record = ConsentRecord.objects.get(user=self.user, kind=AI)
-        self.assertEqual((record.source, record.version), ('chat', '1'))
+        self.assertEqual((record.source, record.version), ('chat', settings.LEGAL['docs_version']))
         with mock.patch('catalog.chat.answer', return_value='ok'):
             self.assertEqual(self._chat().status_code, 200)
 
