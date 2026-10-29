@@ -469,3 +469,18 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - Новые тесты: `OnlyTelegramIdLeavesTheSiteTests` (5: подписка есть, подписки нет, «Проверить», вторая редакция «ready_surveyed», перепривязка с другого аккаунта; логин `zzlogin_marker`, почта, имя и фамилия сайта не встречаются в параметрах ни одного вызова `vp.telegram.call`, вызовов > 0) и `FootnoteTests` (5).
 - `vp.tests.test_wall_screens` + `test_wall_tg`: 70 тестов OK. `scripts/check_em_dash.py` – 0.
 - Зубастость: к тексту `ready` дописан логин → 4 теста инварианта красные; на экран Telegram возвращено «Нажимая кнопку, вы соглашаетесь» → `test_no_screen_says_you_agree_to_the_policy` красный. Оба дефекта убраны.
+
+### Фаза 4. Номер редакции 2
+- `LEGAL['docs_version'] = '2'` (комментарий «ред. 2 от 29.10.2026: почта, рассылка, стена ВП и Telegram»).
+- Прежние тесты `legal`, которые «поднимали» версию до 2/3 и ждали записи '1', сдвинуты (3/4, текущая версия берётся из настроек); `test_requisites` связан с `docs_version`.
+- Новые тесты `legal/tests/test_edition2.py` (4): принявший ред. 1 → экран согласия, после «Принимаю» запись '2', старая закрыта (`superseded_at`), второй раз экран не появляется; запись рассылки ред. 1 остаётся действующей (`wants_mail` True, не закрыта); одно согласие на рассылку не вызывает экран.
+- `manage.py test legal`: 174 OK (было 164 в начале сессии).
+- Зубастость: `wants_mail` временно требует текущую редакцию (`has_current`) → красные 3 теста (2 новых + `test_raising_docs_version_does_not_unsubscribe`); возвращено.
+- ⚠️ Побочный эффект, решение владельца: согласие на помощника ИИ (`Kind.AI`) тоже сверяется с `docs_version` (`has_current`), а текст `consent_ai.md` не менялся. После выкатки все, кто его давал, при первом обращении к помощнику увидят запрос согласия заново. Либо оставить, либо развязать (как `wants_mail`).
+
+### Фаза 5. Проверки
+- `manage.py test legal vp problems.tests.test_production_settings problems.tests.test_signup_source problems.tests.test_register_email problems.tests.test_account_email problems.tests.test_password_reset_code`: 901 тест OK (skipped=1), 107 с (в начале для `legal vp` было 769).
+- Добавлен `DeployCheckTests.test_check_deploy_fails_without_tg_relay_host` (дочерний процесс `check --deploy` без `LEGAL_TG_RELAY` → `legal.E003`); с окружением джоба `check --deploy` чист.
+- `manage.py check` – 0; `scripts/check_em_dash.py` – 0; `ruff check` по изменённым `.py` – чисто.
+- Notion: 405b11c9… – «Заметки» + статус «На проверке»; 407b11c9… – комментарий.
+- Ветка не запушена: `git push origin feat/vp-wall-20261029`.
