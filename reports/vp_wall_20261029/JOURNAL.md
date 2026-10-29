@@ -435,3 +435,21 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - Карточка WebvisorTests (407b11c9-…-bc18): «Готово», комментарий с коммитом `d1e4e16a`.
 - Новые «Надо / Техническое»: окружение мака без rapidfuzz, bm25s, pymorphy3, openai (32 ошибки); `test_tree_walk` в worktree внутри `.claude/worktrees`. Комментарий в 3ceb11c9 (calc2 40,375 px).
 - Ветка НЕ запушена после этой сессии (коммиты `d1e4e16a`, `b7484c2c` и этот): `git push origin feat/vp-wall-20261029`. В main ничего не сливалось, main не трогался.
+
+## Документы ред. 2
+
+### Фаза −1. Сверка (29.10.2026)
+- Ветка `feat/vp-wall-20261029`, дерево чистое, `HEAD` = `origin/...` = `ca37030d`.
+- В `legal/texts/` семь файлов, везде «Редакция 1 от [ДАТА]»; `docs_version == '1'`; `[ПОСРЕДНИК]` нигде нет.
+- `vp/bot.py`: `ready` / `ready_surveyed` / `moved` содержат `{login}` (старые тексты, не PREMAIN).
+- `_wall.html`: две «Нажимая кнопку, вы соглашаетесь с» (строки 85 и 172) и одна сноска Instagram (61).
+- Базовый прогон `manage.py test legal vp`: 769 тестов, OK (skipped=1), 93 с.
+
+### Фаза 1. Тексты документов
+- `consent.md`, `privacy.md`, `terms.md`, `consent_mail.md` – дословно из приложений A–D.
+- `consent_ai.md`, `cookies.md`, `recommendations.md`: «Редакция 1 от 20.10.2026».
+- Согласие на рассылку без пометки «ЧЕРНОВИК» (`legal/documents.py`, `docs/MAIL.md`).
+- Согласие на рассылку остаётся «Редакция 1» (так в приложении D), хотя `docs_version` станет 2: оно живёт своей редакцией и от `docs_version` не зависит.
+- Тесты: `test_requisites` (маркер редакции по документам), `test_pages` (дата у изменённых из настройки, у трёх неизменённых – 20.10.2026, получатели, пункт 3.4). Пока ожидание «Редакция 2» зашито литералом; фаза 4 свяжет его с `docs_version`.
+- `manage.py test legal`: 164 теста, OK.
+- Зубастость: `[ДАТА]` обратно в `cookies.md` → красные 3 теста (`..._stay_untouched_by_substitution`, `..._keep_their_own_date`, `..._right_edition_marker`); возвращено.
