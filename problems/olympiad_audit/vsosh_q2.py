@@ -14,6 +14,7 @@ import re
 import os
 import statistics
 import subprocess
+import time
 from collections import Counter
 
 from problems.olympiad_audit import transcribe
@@ -185,6 +186,469 @@ def calib_report(q, log):
         fh.write('\n'.join(lines) + '\n')
     log('\n'.join(lines))
     return out
+
+
+# ── Пакеты: OpenAI Batch и Anthropic Message Batches ───────────────────
+
+PRIMARY, SECOND = 'gpt-6.1-terra', 'claude-haiku-5-5'
+#: Оценка $ за запрос пакетом (калибровка ×0,5 скидки ×1,1 запаса) — для
+#: потолка до отправки; в журнал денег идёт настоящая цена по `usage`.
+BATCH_ITEM_USD = {'gpt-6.1-terra': 0.0047, 'claude-haiku-5-5': 0.00095,
+                  'claude-sonnet-5-5': 0.011, 'claude-opus-5-5': 0.05}
+#: Запросов в пакете: у OpenAI файл ≤ 200 МБ, у Anthropic пакет ≤ 256 МБ
+#: (страница с картинкой — до ~0,8 МБ base64).
+CHUNK = {'openai': 200, 'anthropic': 200}
+#: Объём пакета в байтах JSON (base64 картинок внутри): с запасом до 200/256 МБ.
+MAX_BATCH_BYTES = 120_000_000
+
+
+def custom_id(key):
+    return key.replace('/', '__')
+
+
+def key_of(cid):
+    return cid.replace('__', '/')
+
+
+class BatchLog:
+    """Журнал пакетов `batches\\ledger.jsonl`: что отправлено, что забрано."""
+
+    def __init__(self, q):
+        self.q = q
+        self.dir = os.path.join(q.work, 'batches')
+        os.makedirs(self.dir, exist_ok=True)
+        self.path = os.path.join(self.dir, 'ledger.jsonl')
+
+    def rows(self):
+        if not os.path.isfile(self.path):
+            return []
+        with open(self.path, encoding='utf-8') as fh:
+            return [json.loads(x) for x in fh if x.strip()]
+
+    def add(self, **rec):
+        with open(self.path, 'a', encoding='utf-8') as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + '\n')
+
+    def open_batches(self):
+        done = {r['batch_id'] for r in self.rows() if r.get('kind') == 'collected'}
+        return [r for r in self.rows() if r.get('kind') == 'submitted' and r['batch_id'] not in done]
+
+    def pending_usd(self, provider):
+        return sum(r['estimate_usd'] for r in self.open_batches() if r['provider'] == provider)
+
+    def pending_ids(self, phase, model):
+        return {cid for r in self.open_batches() if r['phase'] == phase and r['model'] == model
+                for cid in r['ids']}
+
+
+def _openai_client(env):
+    import openai
+    return openai.OpenAI(api_key=env['OPENAI_API_KEY'], max_retries=5)
+
+
+def submit(q, phase, model, items, log, limit=None):
+    """Отправить пакеты: items — [(custom_id, тело запроса)] (тело — как для
+    синхронного вызова). Перед каждым пакетом — потолок поставщика с учётом
+    ещё не забранных пакетов. → число отправленных запросов."""
+    from problems.olympiad_audit import vsosh_digitize
+    bl, env = BatchLog(q), vv.load_env()
+    prov = vv.provider_of(model)
+    sent, chunks = 0, 0
+    # Пакет режется и по числу запросов, и по объёму: 200 позиций Opus по
+    # 5 картинок — больше 256 МБ, сервер рвёт соединение (29.10).
+    parts, cur, cur_bytes = [], [], 0
+    for item in items:
+        size = len(json.dumps(item[1], ensure_ascii=False))
+        if cur and (len(cur) >= CHUNK[prov] or cur_bytes + size > MAX_BATCH_BYTES):
+            parts.append(cur)
+            cur, cur_bytes = [], 0
+        cur.append(item)
+        cur_bytes += size
+    if cur:
+        parts.append(cur)
+    for i, part in enumerate(parts):
+        est = round(len(part) * BATCH_ITEM_USD[model], 3)
+        if not q.ledger.allow(prov, est + bl.pending_usd(prov)):
+            log(f'стоп {model}: пакет поднял бы расход {prov} выше 90 % потолка')
+            break
+        if prov == 'openai':
+            tmp = os.path.join(bl.dir, f'tmp_{phase}_{i}.jsonl')
+            with open(tmp, 'w', encoding='utf-8') as fh:
+                for cid, body in part:
+                    fh.write(json.dumps({'custom_id': cid, 'method': 'POST',
+                                         'url': '/v1/chat/completions', 'body': body},
+                                        ensure_ascii=False) + '\n')
+            client = _openai_client(env)
+            with open(tmp, 'rb') as fh:
+                f = client.files.create(file=fh, purpose='batch')
+            batch = client.batches.create(input_file_id=f.id, endpoint='/v1/chat/completions',
+                                          completion_window='24h')
+            os.remove(tmp)
+        else:
+            client = vsosh_digitize.claude_client()
+            for attempt in range(3):
+                try:
+                    batch = client.messages.batches.create(
+                        requests=[{'custom_id': cid, 'params': body} for cid, body in part])
+                    break
+                except Exception as exc:  # noqa: BLE001 — обрыв связи: подождать и повторить
+                    if attempt == 2:
+                        raise
+                    log(f'  повтор отправки {phase}/{model}: {str(exc)[:120]}')
+                    time.sleep(30 * (attempt + 1))
+        bl.add(kind='submitted', phase=phase, model=model, provider=prov, batch_id=batch.id,
+               n=len(part), estimate_usd=est, ids=[cid for cid, _b in part], ts=round(time.time()))
+        log(f'  отправлен {phase}/{model}: {batch.id}, {len(part)} запросов, оценка ${est}')
+        sent += len(part)
+        chunks += 1
+        if limit and chunks >= limit:
+            break
+    return sent
+
+
+def _openai_results(client, b):
+    """Строки результата OpenAI Batch → (custom_id, ok, текст, вход, выход)."""
+    for fid in (b.output_file_id, b.error_file_id):
+        if not fid:
+            continue
+        for line in client.files.content(fid).text.splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            resp = r.get('response') or {}
+            body = resp.get('body') or {}
+            if resp.get('status_code') == 200 and body.get('choices'):
+                u = body.get('usage') or {}
+                yield (r['custom_id'], True, body['choices'][0]['message'].get('content') or '',
+                       u.get('prompt_tokens', 0), u.get('completion_tokens', 0))
+            else:
+                yield r['custom_id'], False, json.dumps(r.get('error') or body)[:300], 0, 0
+
+
+def _anthropic_results(client, batch_id):
+    for res in client.messages.batches.results(batch_id):
+        if res.result.type != 'succeeded':
+            yield res.custom_id, False, res.result.type, 0, 0
+            continue
+        msg = res.result.message
+        u = msg.usage
+        tin = (u.input_tokens or 0) + 1.25 * (u.cache_creation_input_tokens or 0) \
+            + 0.1 * (u.cache_read_input_tokens or 0)
+        yield (res.custom_id, True, ''.join(getattr(x, 'text', '') for x in msg.content
+                                            if x.type == 'text'), tin, u.output_tokens or 0)
+
+
+def collect(q, handlers, log):
+    """Забрать готовые пакеты: результат запроса → `handlers[phase](model,
+    custom_id, текст, $)`; расход пакета — одной строкой в журнал денег."""
+    from problems.olympiad_audit import vsosh_digitize
+    bl, env = BatchLog(q), vv.load_env()
+    status = Counter()
+    for row in bl.open_batches():
+        if row['provider'] == 'openai':
+            client = _openai_client(env)
+            b = client.batches.retrieve(row['batch_id'])
+            if b.status not in ('completed', 'expired', 'failed', 'cancelled'):
+                status[f'{row["model"]}:{b.status}'] += 1
+                continue
+            results = _openai_results(client, b) if b.status != 'failed' else iter(())
+            if b.status == 'failed':
+                log(f'  пакет {row["batch_id"]} failed: {str(b.errors)[:300]}')
+        else:
+            client = vsosh_digitize.claude_client()
+            b = client.messages.batches.retrieve(row['batch_id'])
+            if b.processing_status != 'ended':
+                status[f'{row["model"]}:{b.processing_status}'] += 1
+                continue
+            results = _anthropic_results(client, row['batch_id'])
+        usd, ok, bad = 0.0, 0, 0
+        for cid, good, text, tin, tout in results:
+            if not good:
+                bad += 1
+                continue
+            cost = vv.call_usd(row['model'], tin, tout, batch=True)
+            usd += cost
+            ok += 1
+            handlers[row['phase']](row['model'], cid, text, cost)
+        q.ledger.add(model=row['model'], phase=row['phase'], batch=row['batch_id'],
+                     usd=round(usd, 4), ok=ok, failed=bad)
+        bl.add(kind='collected', batch_id=row['batch_id'], ok=ok, failed=bad, usd=round(usd, 4))
+        status[f'{row["model"]}:забран'] += 1
+        log(f'  забран {row["phase"]}/{row["model"]} {row["batch_id"]}: ok {ok}, сбоев {bad}, ${usd:.3f}')
+    return dict(status)
+
+
+# ── Фаза 2: регионы ────────────────────────────────────────────────────
+
+def pages_dir(q):
+    return os.path.join(q.work, 'pages')
+
+
+def p2_keys(q, opts):
+    keys = q.todo_keys()
+    if opts.get('pages_file'):
+        with open(opts['pages_file'], encoding='utf-8') as fh:
+            wanted = {x.strip() for x in fh if x.strip()}
+        keys = [k for k in keys if k in wanted]
+    return keys
+
+
+def p2_submit(q, opts, log):
+    models = (opts.get('models') or f'{PRIMARY},{SECOND}').split(',')
+    keys = p2_keys(q, opts)
+    for model in models:
+        pending = BatchLog(q).pending_ids('p2', model)
+        todo = [k for k in keys if custom_id(k) not in pending and (vv.read_record(
+            vv.rec_path(pages_dir(q), model, k)) or {}).get('status') != 'ok']
+        log(f'{model}: страниц {len(keys)}, к отправке {len(todo)}, '
+            f'оценка ${len(todo) * BATCH_ITEM_USD[model]:.2f}')
+        if not opts.get('yes') or not todo:
+            continue
+        items = []
+        for k in todo:
+            body = vv.body_for(model, q.jobs[k])
+            if vv.provider_of(model) == 'anthropic':
+                body.pop('stream', None)
+            items.append((custom_id(k), body))
+            if len(items) >= CHUNK[vv.provider_of(model)] * (opts.get('limit') or 10 ** 6):
+                break
+        submit(q, 'p2', model, items, log, limit=opts.get('limit'))
+    if not opts.get('yes'):
+        log('Без --yes пакеты не отправляются (только план).')
+
+
+def _page_handler(q):
+    def handle(model, cid, text, usd):
+        key = key_of(cid)
+        rec = vv.make_record(key, text, model, usd)
+        vv.write_record(vv.rec_path(pages_dir(q), model, key), rec)
+    return handle
+
+
+def handlers(q):
+    return {'p2': _page_handler(q), 'arb': _arb_handler(q), 'p4': _p4_handler(q)}
+
+
+def pages_v2_dir(q):
+    return os.path.join(os.path.dirname(q.work), 'pages_v2')
+
+
+def write_v2(q, key, rec, read_by):
+    page_dir, _, page = key.rpartition('/p')
+    path = os.path.join(pages_v2_dir(q), page_dir.split('/')[-1], f'p{page}.json')
+    vv.write_record(path, dict(rec, read_by=read_by))
+
+
+def arb_reply(q, key, rnd):
+    return vv.read_record(os.path.join(q.work, 'arbiter', vv.ARBITER_MODEL,
+                                       f'{custom_id(key)}-r{rnd}.json'))
+
+
+def p2_merge(q, opts, log):
+    """Сведение: согласие → основная версия; рассудил слой → его выбор;
+    иначе — арбитр (ответ уже есть → правило приёма P2; нет — в список
+    `arbiter_todo.json`). Итог страницы — `pages_v2\\<sha16>\\pN.json` с полем
+    `read_by` (кто прочитал и как решено). Сводка — `merge_p2.json`."""
+    stats, todo_arb, human = Counter(), [], []
+    for k in p2_keys(q, opts):
+        job = q.jobs[k]
+        a = vv.read_record(vv.rec_path(pages_dir(q), PRIMARY, k))
+        b = vv.read_record(vv.rec_path(pages_dir(q), SECOND, k))
+        if not a or not b or a.get('status') != 'ok' and b.get('status') != 'ok':
+            stats['ждёт_чтения'] += 1
+            continue
+        base = {'primary': PRIMARY, 'second': SECOND}
+        ok, why = vv.agree(a, b, job.kind)
+        if ok:
+            write_v2(q, k, a, dict(base, decision='согласие'))
+            stats['согласие'] += 1
+            continue
+        tb = vv.layer_tiebreak(a, b, job, why)
+        if tb:
+            write_v2(q, k, a if tb == 'A' else b, dict(base, decision=f'слой_{tb}', why=why))
+            stats[f'слой_{tb}'] += 1
+            continue
+        verdict, rec = None, None
+        for rnd in ('2', '1'):
+            reply = arb_reply(q, k, rnd)
+            if reply:
+                verdict, rec, reasons, data = vv.judge_arbiter(reply['text'], job, a, b)
+                break
+        if verdict is None:
+            todo_arb.append({'key': k, 'why': why, 'round': '1'})
+            stats['к_арбитру'] += 1
+            write_v2(q, k, a, dict(base, decision='ждёт_арбитра', why=why))
+            continue
+        if verdict == 'retry' and rnd == '1':
+            todo_arb.append({'key': k, 'why': why, 'round': '2'})
+            stats['арбитр_повтор'] += 1
+            write_v2(q, k, a, dict(base, decision='ждёт_арбитра', why=why))
+            continue
+        if verdict.startswith('accept_'):
+            write_v2(q, k, rec, dict(base, decision='арбитр_' + verdict[7:], why=why,
+                                     arbiter=vv.ARBITER_MODEL, evidence=data.get('evidence'),
+                                     confidence=data.get('confidence')))
+            stats['арбитр_' + verdict[7:]] += 1
+            continue
+        # Человеку: в эталон идёт основная версия с пометкой, страница — в очередь.
+        write_v2(q, k, a if a.get('status') == 'ok' else b,
+                 dict(base, decision='человеку', why=why, arbiter=vv.ARBITER_MODEL,
+                      reasons=reasons, differences=data.get('differences'),
+                      confidence=data.get('confidence'), needs_human=True))
+        human.append({'key': k, 'why': why, 'reasons': reasons,
+                      'differences': data.get('differences'), 'confidence': data.get('confidence')})
+        stats['человеку'] += 1
+    for name, data in (('arbiter_todo.json', todo_arb), ('human_pages.json', human)):
+        with open(os.path.join(q.work, name), 'w', encoding='utf-8') as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=1)
+    with open(os.path.join(q.work, 'merge_p2.json'), 'w', encoding='utf-8') as fh:
+        json.dump(dict(stats), fh, ensure_ascii=False, indent=1)
+    log(f'сведение: {dict(stats)}')
+    return stats
+
+
+def arb_submit(q, opts, log):
+    """Расхождения → пакеты Sonnet (раунд 1 — effort medium, раунд 2 — high)."""
+    with open(os.path.join(q.work, 'arbiter_todo.json'), encoding='utf-8') as fh:
+        todo = json.load(fh)
+    pending = BatchLog(q).pending_ids('arb', vv.ARBITER_MODEL)
+    items = []
+    for t in todo:
+        cid = f'{custom_id(t["key"])}-r{t["round"]}'
+        if cid in pending or arb_reply(q, t['key'], t['round']):
+            continue
+        a = vv.read_record(vv.rec_path(pages_dir(q), PRIMARY, t['key']))
+        b = vv.read_record(vv.rec_path(pages_dir(q), SECOND, t['key']))
+        items.append((cid, vv.arbiter_params(q.jobs[t['key']], a, b, t['why'],
+                                             effort='high' if t['round'] == '2' else 'medium')))
+    log(f'к арбитру: {len(items)}, оценка ${len(items) * BATCH_ITEM_USD[vv.ARBITER_MODEL]:.2f}')
+    if opts.get('yes') and items:
+        submit(q, 'arb', vv.ARBITER_MODEL, items, log, limit=opts.get('limit'))
+
+
+def _arb_handler(q):
+    def handle(model, cid, text, usd):
+        base, _, rnd = cid.rpartition('-r')
+        path = os.path.join(q.work, 'arbiter', model, cid + '.json')
+        vv.write_record(path, {'key': key_of(base), 'round': rnd, 'model': model,
+                               'text': text, 'usd': usd})
+    return handle
+
+
+# ── Фаза 4: второй проход Opus по флагам ЗЭ/РЭ ─────────────────────────
+
+def _row_id(r):
+    import hashlib
+    raw = f"{r['event_id']}|{r['number']}|{r.get('task_variant', '')}"
+    return hashlib.sha1(raw.encode('utf-8'), usedforsecurity=False).hexdigest()[:20]
+
+
+def p4_items(q):
+    from problems.olympiad_audit import vsosh_recheck as rc
+    rows = [json.loads(x) for x in open(os.path.join(q.v1, 'reference_problems_v1.jsonl'),
+                                         encoding='utf-8')]
+    files = {e['event_id']: e for e in (json.loads(x) for x in open(
+        os.path.join(q.v1, 'events_files.jsonl'), encoding='utf-8'))}
+    index = {x['pdf']: x['page_dir'] for x in (json.loads(y) for y in open(
+        os.path.join(q.v1, 'render_index.jsonl'), encoding='utf-8'))}
+    # Порядок: сначала флаги текста и формул, «нет_решения» — в конце (дороже и чаще ложный).
+    prio = {'числа_не_со_страницы': 0, 'расходится_со_слоем': 0, 'пустое_условие': 0, 'katex': 0,
+            'тест_без_вариантов': 1, 'пункты_не_разобраны': 1, 'скан_на_глаза': 1,
+            'расхождение_с_ILE': 1, 'рисунок_плохая_вырезка': 2, 'рисунок_лишний_текст': 2,
+            'нет_решения': 3}
+    out = []
+    for r in rows:
+        if not rc.needs_recheck(r):
+            continue
+        full, near = rc.item_pages(r, files.get(r['event_id'], {}), index, q.jobs)
+        out.append({'id': _row_id(r), 'row': _key_row_id(r), 'stage': r['stage'],
+                    'flags': rc.item_flags(r), 'full': full, 'near': near,
+                    'prio': min(prio.get(f, 2) for f in rc.item_flags(r) if f not in rc.SKIP_ONLY)})
+    out.sort(key=lambda x: (x['prio'], x['row']))
+    return out, {_key_row_id(r): r for r in rows}
+
+
+def p4_reply(q, item_id, rnd):
+    return vv.read_record(os.path.join(q.work, 'recheck', f'{item_id}-r{rnd}.json'))
+
+
+def p4_submit(q, opts, log):
+    from problems.olympiad_audit import vsosh_recheck as rc
+    items, rows = p4_items(q)
+    retry = set()
+    path = os.path.join(q.work, 'recheck_retry.json')
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as fh:
+            retry = set(json.load(fh))
+    pending = BatchLog(q).pending_ids('p4', rc.MODEL)
+    reqs = []
+    for it in items:
+        rnd = '2' if it['id'] in retry else '1'
+        cid = f'{it["id"]}-r{rnd}'
+        if cid in pending or p4_reply(q, it['id'], rnd):
+            continue
+        reqs.append((cid, rc.request_params(rows[it['row']], it['full'], it['near'], q.v1,
+                                            effort='high' if rnd == '2' else 'medium')))
+    log(f'Opus: позиций {len(items)} ({Counter(i["stage"] for i in items)}), к отправке {len(reqs)}, '
+        f'оценка ${len(reqs) * BATCH_ITEM_USD[rc.MODEL]:.2f}')
+    if opts.get('yes') and reqs:
+        # Потолок Opus внутри Claude — свой: $20 (задание Q2).
+        spent = q.ledger.spent('anthropic', 'p4') + BatchLog(q).pending_usd('anthropic')
+        room = 0.9 * P4_CAP - spent
+        n = max(0, int(room / BATCH_ITEM_USD[rc.MODEL]))
+        if n < len(reqs):
+            log(f'по потолку Opus ${P4_CAP} отправляю {n} из {len(reqs)}')
+        submit(q, 'p4', rc.MODEL, reqs[:n], log, limit=opts.get('limit'))
+
+
+#: Потолок второго прохода Opus, $ (задание Q2).
+P4_CAP = 20.0
+
+
+def _p4_handler(q):
+    def handle(model, cid, text, usd):
+        vv.write_record(os.path.join(q.work, 'recheck', cid + '.json'),
+                        {'id': cid.rpartition('-r')[0], 'round': cid.rpartition('-r')[2],
+                         'model': model, 'text': text, 'usd': usd})
+    return handle
+
+
+def p4_decide(q, opts, log):
+    """Ответы Opus → `recheck\\decisions.jsonl` (keep / fix / human / retry)."""
+    from problems.olympiad_audit import vsosh_recheck as rc
+    items, rows = p4_items(q)
+    out, retry, stats = [], [], Counter()
+    for it in items:
+        r = rows[it['row']]
+        layers = [q.jobs[f'{pd}/p{p}'].layer for pd, p in it['full'] + it['near']
+                  if f'{pd}/p{p}' in q.jobs]
+        rep2, rep1 = p4_reply(q, it['id'], '2'), p4_reply(q, it['id'], '1')
+        rep = rep2 or rep1
+        if not rep:
+            stats['нет_ответа'] += 1
+            continue
+        verdict, fixes, why, data = rc.judge(rep['text'], r, layers)
+        if verdict == 'retry' and not rep2:
+            retry.append(it['id'])
+            stats['повтор'] += 1
+            continue
+        if verdict == 'retry':
+            verdict = 'human'
+        stats[verdict] += 1
+        out.append({'id': it['id'], 'row': it['row'], 'stage': it['stage'], 'flags': it['flags'],
+                    'verdict': verdict, 'fixes': fixes, 'reasons': why,
+                    'evidence': data.get('evidence'), 'why': data.get('why'),
+                    'confidence': data.get('confidence'),
+                    'pages': [os.path.join(q.v1, pd, f'p{p}.png') for pd, p in it['full']]})
+    folder = os.path.join(q.work, 'recheck')
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, 'decisions.jsonl'), 'w', encoding='utf-8') as fh:
+        for x in out:
+            fh.write(json.dumps(x, ensure_ascii=False) + '\n')
+    with open(os.path.join(q.work, 'recheck_retry.json'), 'w', encoding='utf-8') as fh:
+        json.dump(retry, fh)
+    log(f'Opus: {dict(stats)}')
+    return stats
 
 
 # ── Фаза 3: ключи-сетки ────────────────────────────────────────────────
@@ -370,6 +834,18 @@ def run(cmd, opts):
         return calib_run(q, opts, log)
     if action == 'calib-report':
         return calib_report(q, log)
+    if action == 'p2-submit':
+        return p2_submit(q, opts, log)
+    if action == 'p2-merge':
+        return p2_merge(q, opts, log)
+    if action == 'arb-submit':
+        return arb_submit(q, opts, log)
+    if action == 'p4-submit':
+        return p4_submit(q, opts, log)
+    if action == 'p4-decide':
+        return p4_decide(q, opts, log)
+    if action == 'collect':
+        return log(str(collect(q, handlers(q), log)))
     if action == 'keys-prepare':
         return keys_prepare(q, log)
     if action == 'keys':

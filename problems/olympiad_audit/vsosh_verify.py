@@ -44,8 +44,9 @@ PRICES = {
 #: Пакетные API (OpenAI Batch, Anthropic Message Batches, `:batch` у OpenRouter) — вдвое дешевле.
 BATCH_DISCOUNT = 0.5
 
-#: Потолки сессии Q2 по поставщикам, $ (задание Q2, 29.10).
-CAPS = {'anthropic': 35.0, 'openai': 25.0, 'openrouter': 35.0, 'glm': 3.0}
+#: Потолки сессии Q2 по поставщикам, $ (задание Q2, 29.10; после сметы
+#: калибровки владелец выбрал вариант A: OpenAI 25 → 38, Claude 35 → 42).
+CAPS = {'anthropic': 42.0, 'openai': 38.0, 'openrouter': 35.0, 'glm': 3.0}
 #: Доля потолка, после которой новые вызовы не отправляются.
 CAP_SHARE = 0.9
 
