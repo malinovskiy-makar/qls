@@ -46,6 +46,39 @@ class ScreenCase(TestCase):
 
 
 @BOTH
+class FootnoteTests(ScreenCase):
+    """Сноски стены информационные: с Политикой не «соглашаются» (согласие – отдельным документом)."""
+
+    def test_no_screen_says_you_agree_to_the_policy(self):
+        self.assertNotIn('соглашаетесь', self.page())
+        self.contact()
+        self.assertNotIn('соглашаетесь', self.page())
+
+    def test_telegram_screen_says_only_the_id_is_passed(self):
+        html = self.page()
+        self.assertIn('из ваших данных мы передаём ему только ID в Telegram', html)
+        self.assertIn('Telegram – иностранный сервис', html)
+        self.assertIn('Подробнее – в <a class="vp-link"', html)
+
+    def test_mail_screen_footnote(self):
+        html = self.page('email')
+        self.assertIn('Галочка – по желанию: без неё на почту приходят только коды. '
+                      'Как мы обращаемся с почтой – в <a class="vp-link"', html)
+
+    def test_instagram_footnote_is_the_exact_wording(self):
+        self.contact()
+        html = self.page()
+        self.assertIn('* Instagram принадлежит компании Meta, которая признана экстремистской '
+                      'организацией и запрещена в России.', html)
+        self.assertNotIn('признанной экстремистской', html)
+
+    def test_footnote_links_open_the_policy_in_a_new_tab(self):
+        html = self.page()
+        self.assertIn('href="/legal/privacy/" target="_blank" rel="noopener">'
+                      'Политике обработки персональных данных</a>', html)
+
+
+@BOTH
 class ScreenTableTests(ScreenCase):
     def test_contact_default_is_screen_01(self):
         html = self.page()
@@ -53,7 +86,7 @@ class ScreenTableTests(ScreenCase):
         self.assertIn('Тренажёр бесплатный. Взамен просим подписку на наш канал', html)
         self.assertIn('Вернитесь сюда – страница обновится сама.', html)
         self.assertIn('После «Старт» в боте обновите эту страницу.', html)
-        self.assertIn('Мы храним номер вашего аккаунта в Telegram', html)
+        self.assertIn('Мы сохраним ID и ник вашего Telegram', html)
         self.assertIn('Подтвердить почтой', html)
         self.assertNotIn('Бот пришлёт разбор', html)
 

@@ -58,7 +58,7 @@
         {% endfor %}
       </div>
     </fieldset>
-    <p class="vp-gate-fine">* Instagram принадлежит компании Meta, признанной экстремистской и запрещённой в России.</p>
+    <p class="vp-gate-fine">* Instagram принадлежит компании Meta, которая признана экстремистской организацией и запрещена в России.</p>
     <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Начать вариант</button>
     <p class="vp-wall-meta">{% if wall.with_timer %}Таймер на {{ wall.minutes_word }} запустится сразу. {% endif %}Анкету спрашиваем один раз.</p>
   </form>
@@ -82,7 +82,7 @@
     <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Отправить код</button>
   </form>
   {% if wall.paths.tg %}<p class="vp-wall-alt">Telegram всё-таки работает? <a class="vp-link" href="{{ wall.urls.tg_screen }}">Подключить Telegram</a></p>{% endif %}
-  <p class="vp-gate-fine">Нажимая кнопку, вы соглашаетесь с <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политикой обработки персональных данных</a>. Галочка – по желанию: без неё на почту приходят только коды.</p>
+  <p class="vp-gate-fine">Галочка – по желанию: без неё на почту приходят только коды. Как мы обращаемся с почтой – в <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политике обработки персональных данных</a>.</p>
 
   {% elif wall.screen == 'known' %}
   {# 04b: почта уже подтверждена — один клик, без кода. #}
@@ -169,7 +169,7 @@
       </form>
     </div>
     {% if wall.mail_link %}<p class="vp-wall-alt">Telegram не открывается? <a class="vp-link" href="{{ wall.urls.email_screen }}">Подтвердить почтой</a></p>{% endif %}
-    <p class="vp-gate-fine">Нажимая кнопку, вы соглашаетесь с <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политикой обработки персональных данных</a>. Мы храним номер вашего аккаунта в Telegram, чтобы проверить подписку и чтобы бот мог вам написать.</p>
+    <p class="vp-gate-fine">Мы сохраним ID и ник вашего Telegram, чтобы проверить подписку и чтобы бот мог вам ответить. Telegram – иностранный сервис: из ваших данных мы передаём ему только ID в Telegram. Подробнее – в <a class="vp-link" href="{% url 'legal:document' 'privacy' %}" target="_blank" rel="noopener">Политике обработки персональных данных</a>.</p>
   </section>
   <section class="vp-wall-screen" data-screen="waiting" data-poll="{{ wall.urls.state }}"{% if wall.screen != 'waiting' %} hidden{% endif %}>
     <h2>Бот открылся в Telegram</h2>

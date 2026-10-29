@@ -207,7 +207,8 @@ class BotTests(TgCase):
         self.assertEqual((link.tg_user_id, link.tg_username, link.subscribed), (777, 'ivan_econ', True))
         self.assertEqual(VPWall.objects.get(user=self.user).contact_via, 'tg')
         self.assertIsNotNone(VPTelegramToken.objects.get().used_at)
-        self.assertIn('Готово: подписка есть, аккаунт «ivan_site» привязан к сайту.', self.fake.texts()[-1])
+        self.assertIn('Готово: подписка есть, Telegram привязан к вашему аккаунту на сайте.',
+                      self.fake.texts()[-1])
 
     def test_same_or_old_code_is_expired(self):
         code = self.link_code()
@@ -266,7 +267,8 @@ class BotTests(TgCase):
         self.hook(self.start_update(self.link_code(client=client)))
         self.assertEqual(VPTelegramLink.objects.get(tg_user_id=777).user, friend)
         self.assertEqual(VPWall.objects.get(user=self.user).contact_via, 'tg')
-        self.assertIn('теперь он привязан к «friend_b»', self.fake.texts()[-1])
+        self.assertIn('теперь он привязан к аккаунту, с которого вы нажали «Подключить Telegram»',
+                      self.fake.texts()[-1])
 
     def test_check_failure_leaves_no_contact_and_says_so(self):
         self.fake.fail = True
@@ -285,6 +287,73 @@ class BotTests(TgCase):
         self.hook({'update_id': 9002, 'message': {'text': '/start abc', 'chat': {'id': -5, 'type': 'group'},
                                                   'from': {'id': 5}}})
         self.assertEqual(len(self.fake.calls), before)
+
+
+class OnlyTelegramIdLeavesTheSiteTests(TgCase):
+    """Инвариант: из данных сайта в Telegram уходит только ID в Telegram.
+
+    Ни логина, ни почты, ни имени и фамилии пользователя сайта в параметрах
+    запросов бота нет – ни в одном сценарии. Логин в тестах нарочно приметный:
+    случайное совпадение исключено.
+    """
+    LOGIN = 'zzlogin_marker'
+    EMAIL = 'zzmail_marker@example.org'
+    FIRST, LAST = 'Зоя', 'Маркерова'
+
+    def site_user(self, login=None, email=None):
+        user = User.objects.create_user(
+            login or self.LOGIN, email=email or self.EMAIL, password='p12345',
+            first_name=self.FIRST, last_name=self.LAST)
+        user.email_verified_at = timezone.now()
+        user.save(update_fields=['email_verified_at'])
+        client = Client()
+        client.force_login(user)
+        return user, client
+
+    def assertNothingFromTheSite(self, *extra):
+        self.assertGreater(len(self.fake.calls), 0)
+        blob = json.dumps([params for _, params in self.fake.calls],
+                          ensure_ascii=False, default=str)
+        for secret in (self.LOGIN, self.EMAIL, self.FIRST, self.LAST) + extra:
+            self.assertNotIn(secret, blob)
+
+    def test_start_with_subscription(self):
+        _, client = self.site_user()
+        self.hook(self.start_update(self.link_code(client=client)))
+        self.assertIn('Готово', self.fake.texts()[-1])
+        self.assertNothingFromTheSite()
+
+    def test_start_without_subscription(self):
+        self.fake.status = 'left'
+        _, client = self.site_user()
+        self.hook(self.start_update(self.link_code(client=client)))
+        self.assertIn('Подписки на', self.fake.texts()[-1])
+        self.assertNothingFromTheSite()
+
+    def test_check_button_in_the_bot(self):
+        self.fake.status = 'left'
+        _, client = self.site_user()
+        self.hook(self.start_update(self.link_code(client=client)))
+        self.fake.status = 'member'
+        self.hook(self.check_update())
+        self.assertIn('Готово', self.fake.texts()[-1])
+        self.assertNothingFromTheSite()
+
+    def test_surveyed_user_gets_the_second_ready_text(self):
+        user, client = self.site_user()
+        VPWall.objects.update_or_create(user=user, defaults={'survey_at': timezone.now()})
+        self.hook(self.start_update(self.link_code(client=client)))
+        self.assertIn('можно начинать вариант', self.fake.texts()[-1])
+        self.assertNothingFromTheSite()
+
+    def test_telegram_moves_from_another_account(self):
+        _, first_client = self.site_user()
+        self.hook(self.start_update(self.link_code(client=first_client)))
+        other_login, other_mail = 'zzother_marker', 'zzother_marker@example.org'
+        _, second_client = self.site_user(login=other_login, email=other_mail)
+        self.hook(self.start_update(self.link_code(client=second_client)))
+        self.assertIn('раньше был привязан к другому аккаунту', self.fake.texts()[-1])
+        self.assertNothingFromTheSite(other_login, other_mail)
 
 
 class StateTests(TgCase):
