@@ -1042,3 +1042,22 @@ http://localhost/login/» (проверено curl). Дальше «Разреш
 
 (Первый прогон `--base http://localhost` дал «VK: нет связи (URLError)» — тот самый
 обрыв TLS; после добавления повтора — «готов».)
+
+## Р3 · Фаза 2. Вход и регистрация: тексты и «Забыли пароль?»
+
+- `templates/registration/login.html`: заголовок «Олимпиадная экономика <em>в одном
+  месте</em>» — без тире; «Забыли пароль?» перенесена ПОД поле пароля (`au-forgot
+  au-forgot--under`), над полем — только подпись «Пароль» (обёртка `au-label-row` у
+  пароля убрана). Обе ветки ссылки (почта → `/password/forgot/`, без почты → Telegram)
+  сохранены.
+- `templates/registration/register.html`: «Настройте сайт <em>под себя за минуту</em>».
+- `static/onboarding/onboarding.css`: `.au-forgot--under { align-self: flex-end;
+  margin-top: 2px }` — 6 px промежутка `.au-field` + 2 = 8 px от поля; 13 px и
+  `--accent-ink` — прежние правила `.au-forgot`. Кнопки не трогал.
+- Снимки: `shots_r3/login_1280.png`, `login_390.png`, `register_1280.png` — ссылка под
+  полем справа на обеих ширинах.
+
+**Тесты:** новый `problems.tests.test_auth_texts_r3` — 4 (заголовок входа точно и без
+«экономика –/—/-» при почте и без; подпись → поле → ссылка, между подписью и полем
+ссылки нет; заголовок регистрации; стиль 8 px / вправо / 13 px / акцент). Вместе с
+`test_register_email`, `test_auth_hardening`, `test_accounts` — **107 OK**.

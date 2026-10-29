@@ -26,7 +26,7 @@
 {% include '_nav.html' %}
 <main class="au-main">
   <section class="au-pitch" aria-label="Что есть на сайте">
-    <h1 class="au-pitch-h ob-anim-up">Олимпиадная экономика – <em>в одном месте</em></h1>
+    <h1 class="au-pitch-h ob-anim-up">Олимпиадная экономика <em>в одном месте</em></h1>
     <ul class="au-points">
       {% if pitch.tasks %}<li class="ob-anim-up ob-d1"><span class="au-point-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h6M8 11h6"/></svg></span>{{ pitch.tasks }} из олимпиад и сборников</li>{% endif %}
       <li class="ob-anim-up ob-d2"><span class="au-point-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>Поиск по смыслу</li>
@@ -63,16 +63,15 @@
                value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus>
       </div>
       <div class="au-field">
-        <div class="au-label-row">
-          <label class="au-label" for="id_password">Пароль</label>
-          {% comment %}
-          «Забыли пароль?» с почтой — сброс кодом из письма; без почты — к живому
-          человеку в Telegram (решение владельца 04.09.2026): форма «введите почту»
-          без писем никому ничего не пришлёт.
-          {% endcomment %}
-          {% if mail_enabled %}<a class="au-forgot" href="/password/forgot/">Забыли пароль?</a>{% else %}<a class="au-forgot" href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Забыли пароль?</a>{% endif %}
-        </div>
+        <label class="au-label" for="id_password">Пароль</label>
         {% include 'registration/_password.html' with name='password' input_id='id_password' autocomplete='current-password' %}
+        {% comment %}
+        «Забыли пароль?» — ПОД полем, прижата вправо (раунд 3, правка владельца): над
+        полем только подпись. С почтой — сброс кодом из письма; без почты — к живому
+        человеку в Telegram (решение владельца 04.09.2026): форма «введите почту»
+        без писем никому ничего не пришлёт.
+        {% endcomment %}
+        {% if mail_enabled %}<a class="au-forgot au-forgot--under" href="/password/forgot/">Забыли пароль?</a>{% else %}<a class="au-forgot au-forgot--under" href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Забыли пароль?</a>{% endif %}
       </div>
       <button type="submit" class="k-btn k-btn--main au-submit">Войти</button>
     </form>
