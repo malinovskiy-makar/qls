@@ -11,8 +11,8 @@ from legal import checks as legal_checks
 from legal import documents
 
 MAIL = '@'.join(('office', 'example.org'))   # адрес собран, а не записан: в репозитории писем нет
-FILLED = {**settings.LEGAL, 'contact_email': MAIL, 'docs_date': '15 октября 2026 г.'}
-EMPTY = {**settings.LEGAL, 'contact_email': '', 'docs_date': ''}
+FILLED = {**settings.LEGAL, 'contact_email': MAIL, 'docs_date': '15 октября 2026 г.', 'tg_relay': ''}
+EMPTY = {**settings.LEGAL, 'contact_email': '', 'docs_date': '', 'tg_relay': ''}
 
 
 class RequisitesTests(SimpleTestCase):
@@ -102,6 +102,19 @@ class CheckTests(SimpleTestCase):
         found = [m for m in legal_checks.legal_requisites_filled(None) if m.id == 'legal.E002']
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].level, checks.ERROR)
+
+    @override_settings(DEBUG=False, LEGAL_ENFORCEMENT_ENABLED=True, LEGAL=FILLED)
+    def test_empty_relay_is_error_e003_when_not_debug(self):
+        found = [m for m in legal_checks.legal_requisites_filled(None) if m.id == 'legal.E003']
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].level, checks.ERROR)
+        self.assertIn('LEGAL_TG_RELAY', found[0].hint)
+
+    @override_settings(DEBUG=False, LEGAL_ENFORCEMENT_ENABLED=True,
+                       LEGAL={**FILLED, 'tg_relay': 'Example Hosting B.V., Нидерланды'})
+    def test_filled_relay_passes(self):
+        found = [m for m in legal_checks.legal_requisites_filled(None) if m.id == 'legal.E003']
+        self.assertEqual(found, [])
 
     @override_settings(DEBUG=True, LEGAL_ENFORCEMENT_ENABLED=True, LEGAL=EMPTY)
     def test_debug_is_not_blocked(self):

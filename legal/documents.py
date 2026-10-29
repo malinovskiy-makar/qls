@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Шесть документов: загрузка Markdown, подстановка реквизитов, превращение в HTML.
+"""Семь документов: загрузка Markdown, подстановка реквизитов, превращение в HTML.
 
 ⚠️ ТЕКСТЫ ДОКУМЕНТОВ ЛЕЖАТ В `legal/texts/*.md` ДОСЛОВНО, КАК ИХ УТВЕРДИЛ
 ВЛАДЕЛЕЦ. Реквизиты подставляются ПРИ ПОКАЗЕ из настроек, а не правкой файлов:
-в файлах стоят метки `[ПОЧТА]` и `[ДАТА]`. Пока значение пусто, на месте метки
+в файлах стоят три метки: `[ПОЧТА]`, `[ДАТА]` и `[ПОСРЕДНИК]`. Пока значение пусто, на месте метки
 виден заметный `[не заполнено]`, а не пустота.
 
 ⚠️ HTML внутри Markdown выключен (`html: False`): тексты наши, но проверенный
@@ -25,6 +25,8 @@ TEXTS_DIR = Path(__file__).resolve().parent / 'texts'
 
 MAIL_MARK = 'MAIL'
 DATE_MARK = 'DATE'
+RELAY_MARK = '\ue000RELAY\ue001'
+RELAY_MAX_LEN = 200
 MISSING = '[не заполнено]'
 
 EMAIL_RE = re.compile(r'^[^@\s<>"\']+@[^@\s<>"\']+\.[^@\s<>"\']+$')
@@ -97,6 +99,7 @@ def _rendered_skeleton(filename, mtime_ns):
     """HTML документа с метками вместо реквизитов (разбирается один раз на правку файла)."""
     source = (TEXTS_DIR / filename).read_text(encoding='utf-8')
     source = source.replace('[ПОЧТА]', MAIL_MARK).replace('[ДАТА]', DATE_MARK)
+    source = source.replace('[ПОСРЕДНИК]', RELAY_MARK)
     html = _renderer().render(source)
     # Широкая таблица прокручивается внутри себя, а не растягивает страницу.
     html = html.replace('<table>', '<div class="lg-table"><table>').replace(
@@ -123,8 +126,22 @@ def date_html(date=None):
     return escape(date) if date else missing_span()
 
 
+def relay_html(relay=None):
+    """Хостер и страна посредника Telegram, либо заглушка.
+
+    Длинное значение или с переводом строки не показываем: это поле для одной
+    короткой фразы, остальное — ошибка в окружении.
+    """
+    relay = settings.LEGAL.get('tg_relay', '') if relay is None else relay
+    relay = (relay or '').strip()
+    if not relay or len(relay) > RELAY_MAX_LEN or '\n' in relay or '\r' in relay:
+        return missing_span()
+    return escape(relay)
+
+
 def render(document):
     """Готовый HTML документа с подставленными реквизитами."""
     skeleton = _rendered_skeleton(document.filename, document.path.stat().st_mtime_ns)
     html = skeleton.replace(MAIL_MARK, mail_html()).replace(DATE_MARK, date_html())
+    html = html.replace(RELAY_MARK, relay_html())
     return mark_safe(html)  # noqa: S308 — разбор без html, подстановки экранированы

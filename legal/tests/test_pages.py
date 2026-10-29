@@ -10,8 +10,9 @@ from django.urls import reverse
 from legal import documents
 
 MAIL = '@'.join(('office', 'example.org'))   # адрес собран, а не записан: в репозитории писем нет
-FILLED = {**settings.LEGAL, 'contact_email': MAIL, 'docs_date': '15 октября 2026 г.'}
-EMPTY = {**settings.LEGAL, 'contact_email': '', 'docs_date': ''}
+FILLED = {**settings.LEGAL, 'contact_email': MAIL, 'docs_date': '15 октября 2026 г.',
+          'tg_relay': 'Example Hosting B.V., Нидерланды'}
+EMPTY = {**settings.LEGAL, 'contact_email': '', 'docs_date': '', 'tg_relay': ''}
 
 URLS = ['/legal/', '/legal/privacy/', '/legal/consent/', '/legal/consent-ai/',
         '/legal/cookies/', '/legal/terms/', '/legal/recommendations/']
@@ -69,6 +70,31 @@ class PublicPagesTests(TestCase):
             html = self.client.get('/legal/%s/' % slug).content.decode('utf-8')
             self.assertIn('Редакция 1 от 20.10.2026', html, slug)
             self.assertNotIn('29 октября 2026 г.', html, slug)
+
+    @override_settings(LEGAL={**FILLED, 'tg_relay': 'Example Hosting B.V., Нидерланды'})
+    def test_relay_label_is_substituted(self):
+        for slug in ('privacy', 'consent'):
+            html = self.client.get('/legal/%s/' % slug).content.decode('utf-8')
+            self.assertIn('Example Hosting B.V., Нидерланды', html, slug)
+            self.assertNotIn('[ПОСРЕДНИК]', html, slug)
+            self.assertNotIn('class="lg-missing"', html, slug)
+
+    @override_settings(LEGAL={**FILLED, 'tg_relay': ''})
+    def test_empty_relay_shows_the_stub(self):
+        html = self.client.get('/legal/privacy/').content.decode('utf-8')
+        self.assertIn('за пределами России: <span class="lg-missing">[не заполнено]</span>', html)
+        self.assertNotIn('[ПОСРЕДНИК]', html)
+
+    @override_settings(LEGAL={**FILLED, 'tg_relay': '<b>X</b> & Y'})
+    def test_relay_value_is_escaped(self):
+        html = self.client.get('/legal/privacy/').content.decode('utf-8')
+        self.assertIn('&lt;b&gt;X&lt;/b&gt; &amp; Y', html)
+        self.assertNotIn('<b>X</b>', html)
+
+    def test_relay_value_with_a_newline_or_too_long_is_the_stub(self):
+        self.assertIn('lg-missing', documents.relay_html('Хостер\nстрана'))
+        self.assertIn('lg-missing', documents.relay_html('x' * 201))
+        self.assertEqual(documents.relay_html('x' * 200), 'x' * 200)
 
     def test_privacy_and_consent_name_the_recipients(self):
         for slug in ('privacy', 'consent'):

@@ -272,6 +272,7 @@ class DeployCheckTests(unittest.TestCase):
         # в репозитории писем нет.
         env['LEGAL_CONTACT_EMAIL'] = '@'.join(('ci', 'example.org'))
         env['LEGAL_DOCS_DATE'] = '15 октября 2026 г.'
+        env['LEGAL_TG_RELAY'] = 'Example Hosting B.V., Нидерланды'
         # ⚠️ Вывод команды по-русски: без явной кодировки Windows отдаёт его
         # в cp1251, и текст превращается в «РѕР±С‹С‡РЅС‹Р№».
         env['PYTHONIOENCODING'] = 'utf-8'

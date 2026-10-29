@@ -656,6 +656,10 @@ LEGAL = {
     'contact_email': os.environ.get('LEGAL_CONTACT_EMAIL', '').strip(),
     # Строка вида «15 октября 2026 г.».
     'docs_date': os.environ.get('LEGAL_DOCS_DATE', '').strip(),
+    # Хостер и страна сервера-посредника Telegram (deploy/tg_relay/README.md),
+    # например «Example Hosting B.V., Нидерланды»; появится, когда Андрей
+    # арендует сервер. Подставляется в метку [ПОСРЕДНИК] документов.
+    'tg_relay': os.environ.get('LEGAL_TG_RELAY', '').strip(),
     # Номер редакции документов. Менять ТОЛЬКО вместе с текстами: от него
     # зависит, у кого сайт снова спросит согласие.
     'docs_version': '1',
