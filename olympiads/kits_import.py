@@ -207,7 +207,8 @@ class Report:
         self.summary_db = {}
         self.lists = {'olympiads_created': [], 'stages_created': [],
                       'placeholder_cleared': [], 'hidden_kits': [],
-                      'absent_kits': [], 'errors': []}
+                      'absent_kits': [], 'errors': [],
+                      'legacy_kits': []}
 
     def add(self, name, n=1):
         self.counts[name] += n
@@ -463,6 +464,35 @@ def mark_absent(seen_kit_ids, slugs, report):
     stale.update(absent_in_last_import=True)
     report.add('kits_marked_absent', len(ids))
     report.lists['absent_kits'].extend(ids)
+
+
+def hide_legacy_kits(report):
+    """Скрыть прежние комплекты (`kit_key` пуст) — решение владельца 30.10.
+
+    Прежние 12 ВсОШ не связываются с пакетными (однозначной пары нет, связывать
+    руками — гадать) и не удаляются: пакет даёт настоящие версии тех же туров.
+    Только `visibility='hidden'`; `OlympiadRef` и всё остальное не трогаем.
+    Вернуть обратно одной строкой:
+
+        OlympiadVariant.objects.filter(kit_key__isnull=True).update(
+            visibility='published')
+
+    Идемпотентно: уже скрытые в счёт «скрыто сейчас» не идут.
+    """
+    legacy = OlympiadVariant.objects.filter(kit_key__isnull=True)\
+        .select_related('olympiad', 'stage').order_by('id')
+    rows = []
+    for variant in legacy:
+        rows.append({
+            'id': variant.pk, 'name': str(variant), 'grade': variant.grade,
+            'ref_event_id': variant.ref_event_id,
+            'was_hidden': variant.visibility == OlympiadVariant.Visibility.HIDDEN,
+        })
+    now = legacy.exclude(visibility=OlympiadVariant.Visibility.HIDDEN)\
+        .update(visibility=OlympiadVariant.Visibility.HIDDEN)
+    report.add('legacy_kits_total', len(rows))
+    report.add('legacy_kits_hidden_now', now)
+    report.lists['legacy_kits'] = rows
 
 
 def existing_overlaps(kits):

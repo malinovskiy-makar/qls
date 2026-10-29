@@ -35,6 +35,10 @@ class Command(BaseCommand):
                             help='Сухой прогон (по умолчанию и так он).')
         parser.add_argument('--apply', action='store_true',
                             help='Записать в базу.')
+        parser.add_argument('--hide-legacy-kits', action='store_true',
+                            help='Скрыть прежние комплекты без kit_key '
+                                 '(ничего не удаляет). В сухом прогоне '
+                                 'только показывает.')
         parser.add_argument('--files', action='store_true',
                             help='Скопировать PDF в MEDIA_ROOT (с --apply; '
                                  'без него — только проверка).')
@@ -59,6 +63,8 @@ class Command(BaseCommand):
             ki.mark_absent([d['kit_id'] for _, d in kits], slugs, report)
             report.summary_db = ki.database_summary(
                 [d['kit_id'] for _, d in kits])
+            if options['hide_legacy_kits']:
+                ki.hide_legacy_kits(report)
             if options['files']:
                 ki.copy_files(kits, root, str(settings.MEDIA_ROOT), report,
                               apply)
@@ -90,7 +96,13 @@ class Command(BaseCommand):
                     key, ', '.join(report.lists[key])))
         for line in report.lists['errors'][:20]:
             self.stdout.write(self.style.WARNING('  ' + line))
-        if overlaps:
+        if report.lists['legacy_kits']:
+            self.stdout.write('Прежние комплекты (без kit_key) — скрыты{}:'.format(
+                '' if apply else ' (только показ, ничего не записано)'))
+            for row in report.lists['legacy_kits']:
+                self.stdout.write('  #{id} {name} кл.{grade} {ref_event_id}'
+                                  .format(**row))
+        elif overlaps:
             self.stdout.write('Прежние комплекты (без kit_key), НЕ тронуты:')
             for row in overlaps:
                 self.stdout.write(
