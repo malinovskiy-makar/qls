@@ -499,7 +499,9 @@ def p2_merge(q, opts, log):
             stats['к_арбитру'] += 1
             write_v2(q, k, a, dict(base, decision='ждёт_арбитра', why=why))
             continue
-        if verdict == 'retry' and rnd == '1':
+        # Второй круг (промпт «по содержанию», 29.10) — и для «человеку» первого:
+        # первый промпт отдавал людям страницы, где версии различались одной разметкой.
+        if verdict in ('retry', 'human') and rnd == '1' and opts.get('round') != 'final':
             todo_arb.append({'key': k, 'why': why, 'round': '2'})
             stats['арбитр_повтор'] += 1
             write_v2(q, k, a, dict(base, decision='ждёт_арбитра', why=why))
@@ -543,8 +545,7 @@ def arb_submit(q, opts, log):
             continue
         a = vv.read_record(vv.rec_path(pages_dir(q), PRIMARY, t['key']))
         b = vv.read_record(vv.rec_path(pages_dir(q), SECOND, t['key']))
-        items.append((cid, vv.arbiter_params(q.jobs[t['key']], a, b, t['why'],
-                                             effort='high' if t['round'] == '2' else 'medium')))
+        items.append((cid, vv.arbiter_params(q.jobs[t['key']], a, b, t['why'], effort='medium')))
     log(f'к арбитру: {len(items)}, оценка ${len(items) * BATCH_ITEM_USD[vv.ARBITER_MODEL]:.2f}')
     if opts.get('yes') and items:
         submit(q, 'arb', vv.ARBITER_MODEL, items, log, limit=opts.get('limit'))
