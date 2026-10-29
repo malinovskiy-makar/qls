@@ -123,6 +123,9 @@ MIDDLEWARE = [
     # Блокирующий экран согласия для вошедших без записи текущей редакции
     # документов (legal/middleware.py). Стоит после сессий и входа.
     'legal.middleware.ConsentGateMiddleware',
+    # Обязательный онбординг (problems/middleware_onboarding.py) — СРАЗУ ПОСЛЕ
+    # согласия: сначала документы, потом анкета. Выключатель ONBOARDING_ENABLED.
+    'problems.middleware_onboarding.OnboardingGateMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
