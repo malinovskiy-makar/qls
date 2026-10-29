@@ -101,7 +101,9 @@ class RegistryParserTests(SimpleTestCase):
 
     def test_director_and_contacts_are_not_kept(self):
         rows = school_registry.read_bytes(SAMPLE)
-        text = repr(rows)
+        # И итоговые поля школы, и сырые записи разборщика: ФИО и контакты не читаются вовсе.
+        raw = list(school_registry.iter_raoo(io.BytesIO(SAMPLE)))
+        text = repr(rows) + repr(raw)
         for secret in ('Иванова', 'dir@school.ru'):
             self.assertNotIn(secret, text)
 
