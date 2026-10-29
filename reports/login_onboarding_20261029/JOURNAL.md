@@ -1635,3 +1635,70 @@ SVG-фильтров; на шагах онбординга у `<body>` нет `d
 Контраст: карточки и плитки онбординга лежат на своём непрозрачном фоне поверх узора (снимки
 `student_4_goals_1440_dark.png` и соседи); заголовки шагов стоят прямо на фоне с узором —
 узор бледный (`--bg-pattern-alpha` .10 / .15 в тёмной), текст читается в обеих темах.
+
+## Р4 · Фаза 6. Зубастость, прогоны, Notion
+
+### Зубастость
+
+Скрипт — `reports/login_onboarding_20261029/teeth_r4.py` (дефект → тест → `git checkout` файла →
+тест снова), после коммита фазы 5, пачками по 5, без серверов (серверы обхода остановлены).
+Многострочные образцы — через `newline=''` с заменой на CRLF, если файл в CRLF.
+
+| # | Дефект | Тест | С дефектом | После отката |
+|---|---|---|---|---|
+| 0 | шапка сайта вернулась на `/register/` | `test_footer_r4.NoSiteNavTests.test_login_register_and_their_children_have_only_the_logo_bar` | красный | OK |
+| 1 | подвал вернулся на шаг онбординга | `test_onboarding.FooterTests.test_no_footer_on_the_steps` | красный | OK |
+| 2 | на 1440×778 у регистрации снова прокрутка (карточка 420) | `test_auth_fit_browser` (Playwright) | красный | OK |
+| 3 | повтор обмена VK после HTTP 400 | `test_social_r4…test_http_400_is_not_repeated_and_the_reason_is_logged` | красный | OK |
+| 4 | таймаут VK без повтора | `test_social_r4…test_timeout_then_success_is_one_retry_and_a_login` | красный | OK |
+| 5 | три пустых квадрата вернулись | `test_onboarding_r4.BuildScreenTests.test_no_ghost_cards_and_no_spark` | красный | OK |
+| 6 | подвал вернулся в каталог | `test_footer_r4.FooterPagesTests.test_footer_is_gone_everywhere_else` | красный | OK |
+| 7 | подвал пропал с главной | `test_footer_r4.FooterPagesTests.test_footer_is_on_home_profile_legal_login_register` | красный | OK |
+| 8 | подвал пропал с профиля | то же | красный | OK |
+| 9 | окно cookie пропало со страницы задачи | `test_footer_r4.FooterPagesTests.test_cookie_window_is_on_every_page` | красный | OK |
+| 10 | второй возврат с тем же `state` снова меняет код | `test_social_r4.SameReturnTwiceTests.test_second_request_while_the_first_waits_gets_busy_page` | красный | OK |
+| 11 | таймаут показывается как «не ответил» | `test_social_r4…test_timeout_twice_is_the_slow_page` | красный | OK |
+| 12 | ожидание снова 10 с, настройка не читается | `test_social_r4…test_default_wait_is_20_seconds` | красный | OK |
+| 13 | узор на шагах онбординга снова выключен | `test_onboarding_r4.PatternTests` | красный | OK |
+| 14 | 12+ снова зашит в подвал | `test_footer_r4.FooterTemplatesTests.test_age_mark_is_its_own_partial` | красный | OK |
+| 15 | логотип входа на телефоне снова спрятан | `test_footer_r4.AuthLogoOnPhoneTests` | красный | OK |
+| 16 | W не дышит | `test_onboarding_r4.LoaderPartialTests.test_breathes_with_the_numbers_from_the_brief` | красный | OK |
+| 17 | у калькулятора снова полоса в 30 px | `legal…FooterRenderTests.test_calculator_takes_the_whole_window_under_the_header` | красный | OK |
+
+**18 из 18 красные с дефектом, все зелёные после отката.** `git status` после — чистый.
+
+### «Нули» (переменные окна владельца сняты)
+
+- `manage.py check` — `System check identified no issues (0 silenced)`;
+- `makemigrations --check --dry-run` — `No changes detected`;
+- `scripts/check_em_dash.py templates problems catalog calc2 game` — 0 в 0 файлах;
+- `ruff check` по Python-файлам, тронутым с `fcd4465a`, — `All checks passed!`;
+- `bandit -ll` по ним же (без тестов) — находок нет (только предупреждения bandit о
+  слове `https` в комментариях `# nosec`).
+
+### Прогон (без `--parallel`, переменные окна владельца сняты)
+
+`test_social_login`, `test_social_r3`, `test_social_r4`, `test_social_models`, `test_onboarding`,
+`test_onboarding_r3`, `test_onboarding_r4`, `test_onboarding_gate`, `test_auth_texts_r3`,
+`test_register_email`, `test_footer_r4`, `test_auth_fit_browser`, `test_school_search`,
+`test_schools_r3`, сторожа шаблонов (`test_template_hygiene`, `test_signup_source`,
+`test_print_sheet`, `test_design_canon`, `legal`, `config`, `catalog.test_stol_polish`,
+`test_no_slop`, `test_stol_bg_pattern`, `test_stol_map`, `game.test_round`, `test_wecon_texts`):
+**708 тестов за 513,8 с, 707 OK, skipped=4, 1 падение, общий код возврата 1.**
+
+Падение одно и то же, что в фазе 2: `test_design_canon.CanonBrowserChecks.test_canon` —
+`ERR_MODULE_NOT_FOUND: Cannot find package 'playwright'` у раннера `calc2/tests/canon_checks.mjs`.
+Node-пакета `playwright` нет ни в worktree, ни в основной папке; правки раунда 4 тут ни при
+чём (Python-Playwright есть, им шли фазы 3 и 5). Лечится `npm install` в рабочей папке.
+
+### Notion
+
+- «Задачи»: «Проверить: подвал только на главной и в профиле, знак 12+» (Бизнес и запуск,
+  Надо, Анич); «Фирменная загрузка W по всему сайту» (Дизайн, Надо) — со списком мест.
+- «Решения»: в «Подвал с документами — только на главной…» дописаны список страниц и
+  тронутые строки (само решение не дублировалось).
+- Главная задача `408b11c9-2bc1-8192-8f1e-c815380ab62e` — итог раундов 3 и 4 в «Заметки»,
+  статус «На проверке».
+- ADR — `docs/adr/0169-site-footer-only-where-documents-are-needed.md`.
+
+Пуш не делался.
