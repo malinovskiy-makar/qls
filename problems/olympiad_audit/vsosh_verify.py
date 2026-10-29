@@ -350,9 +350,11 @@ def numbers(text):
     return Counter(n for n in (_norm_num(x) for x in _NUM_RE.findall(t)) if n is not None)
 
 
-#: Вариант ответа — строка с меткой («а)», «(b)», «1.», «- 2)»); голый пункт
-#: списка не считается: модели по-разному режут решения на пункты.
-_OPTION_LINE = re.compile(r'(?m)^\s*(?:[-*+]\s+)?(?:\*\*)?\(?(?:[а-еa-eА-ЕA-E]|[1-9])[.)]')
+#: Метка варианта «1)», «а)», «(b)» где угодно в тексте: «1) Да. 2) Нет.» в
+#: одну строку и в две — одно и то же (фаза 2, 29.10: 214 из 607 «расхождений»
+#: для арбитра были такой разметкой). Метки с точкой («4.1.», «5.») не
+#: считаются — это чаще номера вопросов, чем варианты.
+_OPTION_LABEL = re.compile(r'(?<![\w(])\(?(?:[а-еa-eА-ЕA-E]|[1-9])\)')
 _TABLE_ROW = re.compile(r'(?m)^\s*\|(?![\s|:-]*$).*\|\s*$')
 _WORD3 = re.compile(r'[а-яёa-z]{3,}')
 
@@ -368,7 +370,7 @@ def structure(blocks):
         if b['type'] == 'task' and num and (not tasks or tasks[-1] != num):
             tasks.append(num)
     text = content_text(blocks)
-    return {'numbers': tasks, 'options': len(_OPTION_LINE.findall(text)),
+    return {'numbers': tasks, 'options': len(_OPTION_LABEL.findall(text.replace('**', ''))),
             'table_rows': len(_TABLE_ROW.findall(text)),
             'figures': sum(1 for b in blocks if b['type'] == 'figure')}
 
