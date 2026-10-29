@@ -121,10 +121,12 @@ class RegistrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(User.objects.filter(username='novichok').exists())
 
-    def test_passwords_must_match(self):
-        response = self._post(password2=NEW_PASSWORD)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(User.objects.filter(username='novichok').exists())
+    def test_single_password_is_still_validated(self):
+        # Раунд 2: «Пароль ещё раз» убран (есть глаз); валидаторы Django — на одном поле.
+        for bad in ('short', 'novichok12345'):
+            response = self._post(password1=bad)
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(User.objects.filter(username='novichok').exists())
 
     def test_consent_is_required(self):
         data = {'username': 'novichok', 'password1': GOOD_PASSWORD,

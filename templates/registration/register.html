@@ -8,169 +8,118 @@
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
   {% include '_metrika.html' %}
-  {% include 'registration/_auth_style.html' %}{% block extra_head %}{% endblock %}
+  {% include 'registration/_auth_style.html' %}
+  <style>
+{% include '_kit.html' %}
+  </style>
+  <link rel="stylesheet" href="{% static 'onboarding/onboarding.css' %}">{% block extra_head %}{% endblock %}
 </head>
-<body>
+{% comment %}
+Регистрация и экраны почты/сервисов — раунд 2 (29.10.2026), по макету
+`docs/design/onboarding_r2/shots/Register.png`: шапка сайта, фон-узор (`_tokens.html`),
+слева заголовок и три шага, справа карточка 420 px; подвал с документами в потоке.
+Регистрация = почта + пароль (решение владельца 29.10.2026): ни роли, ни повтора
+пароля, ни подзаголовка, ни подсказки под полем. Без почты (`MAIL_ENABLED=0`) —
+логин и пароль.
+
+Блоки title, extra_head и card — для экранов почты (docs/MAIL.md) и сервисов: шаг
+кода регистрации, сброс пароля, «Почти готово», ошибки входа наследуют эту страницу
+целиком, меняя только середину. Своих корневых шаблонов у них нет намеренно:
+сторожа `legal/tests/test_cookie_bar.py` и `problems/tests/test_signup_source.py`
+считают каждый шаблон с doctype страницей сайта со счётчиком.
+{% endcomment %}
+<body class="au">
 {% include '_metrika_noscript.html' %}
-<div class="auth-corner">
-  {% comment %}
-  Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
-  вход, а пожаловаться ему больше нечем. Класс `--onpage` — потому что фон
-  тут светлый, а не графитовая полоса шапки.
-  {% endcomment %}
-  <button type="button" class="fb-btn fb-btn--onpage"
-          aria-label="Проблема или предложение">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
-    </svg>
-    <span class="fb-btn-text">Проблема или предложение</span>
-  </button>
-  {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
-</div>
+{% include '_nav.html' %}
+<main class="au-main{% block main_class %}{% endblock %}">{% block card %}
+  <section class="au-pitch" aria-label="Как устроен вход">
+    <h1 class="au-pitch-h ob-anim-up">Минута – и сайт <em>подстроится под вас</em></h1>
+    <ol class="au-steps">
+      <li class="is-now ob-anim-up ob-d1"><span class="au-step-n">1</span>Аккаунт</li>
+      <li class="ob-anim-up ob-d2"><span class="au-step-n">2</span>Пять вопросов о вас</li>
+      <li class="ob-anim-up ob-d3"><span class="au-step-n">3</span>Первый план</li>
+    </ol>
+  </section>
 
-{% block card %}{% comment %}
-Блоки title, extra_head и card — для экранов почты (docs/MAIL.md): шаг кода
-регистрации и сброс пароля наследуют эту страницу целиком, меняя только
-карточку. Своих корневых шаблонов у них нет намеренно: сторожа
-`legal/tests/test_cookie_bar.py` и `problems/tests/test_signup_source.py`
-считают каждый шаблон с doctype страницей сайта со счётчиком. Сами теги
-блоков в разметку ничего не выводят.
-{% endcomment %}<div class="login-card">
-  <div class="login-logo">
-    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
-  </div>
-  <h1>Создать аккаунт</h1>
-  <p class="login-sub">{% if mail_enabled %}Логин, почта и пароль{% else %}Логин и пароль: больше ничего не нужно{% endif %}</p>
+  <div class="au-card ob-anim-up">
+    {% include 'registration/_auth_switch.html' with mode='register' %}
+    <h2 class="au-card-h">Создать аккаунт</h2>
 
-  {% if rate_limited %}
-  <div class="error-list">
-    Слишком много регистраций с этого адреса. Попробуйте позже.
-  </div>
-  {% elif form.non_field_errors %}
-  <div class="error-list">{{ form.non_field_errors|join:' ' }}</div>
-  {% endif %}{% if mail_enabled %}{% for message in messages %}
-  <div class="error-list">{{ message }}</div>{% endfor %}{% endif %}
+    {% if rate_limited %}
+    <div class="error-list" role="alert">Слишком много регистраций с этого адреса. Попробуйте позже.</div>
+    {% elif form.non_field_errors %}
+    <div class="error-list" role="alert">{{ form.non_field_errors|join:' ' }}</div>
+    {% endif %}{% if mail_enabled %}{% for message in messages %}
+    <div class="error-list" role="alert">{{ message }}</div>{% endfor %}{% endif %}
 
-  {% comment %}
-  ⚠️ `ym-disable-keys` на КАЖДОМ поле ввода — Вебвизор Метрики пишет ввод
-  звёздочками (ADR 0133). Часть регистрирующихся — дети, и логин нередко
-  это имя и фамилия. Пароль Вебвизор не пишет и сам; класс там — чтобы
-  правило читалось одинаково для всех полей формы.
-  {% endcomment %}
-  {% include 'social/_buttons.html' %}
-  <form method="post" novalidate>
-    {% csrf_token %}
+    {% include 'social/_buttons.html' %}
     {% comment %}
-    Куда вернуть после регистрации. Заполняется, только когда человека сюда
-    привели с конкретной страницы (тренажёр ВП со своего варианта); адрес уже
-    проверен сервером на «свой», чужой сюда не доедет.
+    ⚠️ `ym-disable-keys` на КАЖДОМ поле ввода — Вебвизор Метрики пишет ввод
+    звёздочками (ADR 0133). Часть регистрирующихся — дети.
     {% endcomment %}
-    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-
-    <div class="form-group">
-      <label for="{{ form.username.id_for_label }}">Логин</label>
-      <input type="text" name="username" id="{{ form.username.id_for_label }}"
-             class="ym-disable-keys"
-             value="{{ form.username.value|default:'' }}"
-             autocomplete="username" autofocus>
-      <div class="field-hint">
-        Им вы входите, и он же виден на сайте, пока не заполнено имя.
+    <form method="post" class="au-form" novalidate>
+      {% csrf_token %}
+      {% comment %}
+      Куда вернуть после регистрации. Заполняется, только когда человека сюда
+      привели с конкретной страницы (тренажёр ВП со своего варианта); адрес уже
+      проверен сервером на «свой», чужой сюда не доедет.
+      {% endcomment %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      {% if mail_enabled %}
+      <div class="au-field">
+        <label class="au-label" for="id_email">Почта</label>
+        <input type="email" name="email" id="id_email" class="k-input au-input ym-disable-keys"
+               inputmode="email" value="{{ form.email.value|default:'' }}" autocomplete="email" autofocus>
+        {% for error in form.email.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
       </div>
-      {% for error in form.username.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>{% if mail_enabled %}
-
-    {% comment %}
-    Почта (docs/MAIL.md): на неё придёт код, аккаунт появится только после
-    кода. Занятую подтверждённую почту форма называет честно и ведёт на вход
-    и на сброс пароля — ссылки собирает сервер (`RegisterWithEmailForm`).
-    {% endcomment %}
-    <div class="form-group">
-      <label for="{{ form.email.id_for_label }}">Почта</label>
-      <input type="email" name="email" id="{{ form.email.id_for_label }}"
-             class="ym-disable-keys" inputmode="email"
-             value="{{ form.email.value|default:'' }}"
-             autocomplete="email">
-      <div class="field-hint">{{ form.email.help_text }}</div>
-      {% for error in form.email.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>{% endif %}
-
-    <div class="form-group">
-      <label for="{{ form.password1.id_for_label }}">Пароль</label>
-      <input type="password" name="password1" id="{{ form.password1.id_for_label }}"
-             class="ym-disable-keys" autocomplete="new-password">
-      {% for error in form.password1.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>
-
-    <div class="form-group">
-      <label for="{{ form.password2.id_for_label }}">Пароль ещё раз</label>
-      <input type="password" name="password2" id="{{ form.password2.id_for_label }}"
-             class="ym-disable-keys" autocomplete="new-password">
-      {% for error in form.password2.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>
-
-    {% comment %}
-    Роль выбирается ОДИН раз и меняет права: ученик видит занятия, учитель —
-    группы. Плитками, а не списком: вариантов два, и оба надо видеть сразу.
-    {% endcomment %}
-    <div class="form-group">
-      <label>Кто вы</label>
-      <div class="role-tiles">
-        {% for value, label in form.fields.role.choices %}
-        <label>
-          <input type="radio" name="role" value="{{ value }}"
-                 {% if form.role.value == value %}checked{% elif not form.role.value and value == 'student' %}checked{% endif %}>
-          <span>{{ label }}</span>
-        </label>
-        {% endfor %}
+      {% else %}
+      <div class="au-field">
+        <label class="au-label" for="id_username">Логин</label>
+        <input type="text" name="username" id="id_username" class="k-input au-input ym-disable-keys"
+               value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus>
+        {% for error in form.username.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
       </div>
-      {% for error in form.role.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>
+      {% endif %}
+      <div class="au-field">
+        <label class="au-label" for="id_password1">Пароль</label>
+        {% include 'registration/_password.html' with name='password1' input_id='id_password1' autocomplete='new-password' placeholder='от 10 знаков' %}
+        {% for error in form.password1.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
 
-    <div class="form-group">
+      {% if form.fields.role %}
+      {% comment %}
+      Роль — только когда онбординг выключен аварийным флагом (`ONBOARDING_ENABLED=0`):
+      тогда спросить её больше негде (`RegisterForm`). Обычно роль выбирают на «Кто вы?».
+      {% endcomment %}
+      <div class="au-field">
+        <span class="au-label">Кто вы</span>
+        <div class="role-tiles">{% for value, label in form.fields.role.choices %}
+          <label><input type="radio" name="role" value="{{ value }}"{% if form.role.value == value %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
+        </div>
+        {% for error in form.role.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
+      {% endif %}
       <label class="consent">
-        <input type="checkbox" name="consent"
-               {% if form.consent.value %}checked{% endif %}>
+        <input type="checkbox" name="consent"{% if form.consent.value %} checked{% endif %}>
         <span>{% include 'legal/_agree_label.html' %}</span>
       </label>
-      {% for error in form.consent.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>{% if mail_enabled %}
-
-    {% comment %}
-    ⚠️ Галочка рассылки НИКОГДА не отмечена заранее (ст. 18 закона «О рекламе»):
-    `checked` ставится, только если человек сам её отметил и форма вернулась.
-    {% endcomment %}
-    <div class="form-group">
+      {% for error in form.consent.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      {% if mail_enabled %}
+      {% comment %}
+      ⚠️ Галочка рассылки НИКОГДА не отмечена заранее (ст. 18 закона «О рекламе»):
+      `checked` ставится, только если человек сам её отметил и форма вернулась.
+      {% endcomment %}
       <label class="consent">
-        <input type="checkbox" name="mail_consent"
-               {% if form.mail_consent.value %}checked{% endif %}>
+        <input type="checkbox" name="mail_consent"{% if form.mail_consent.value %} checked{% endif %}>
         <span>{% include 'legal/_mail_label.html' %}</span>
       </label>
-    </div>{% endif %}
+      {% endif %}
+      <button type="submit" class="k-btn k-btn--main au-submit">Создать аккаунт</button>
+    </form>
 
-    <button type="submit" class="btn-login">Создать аккаунт</button>
-  </form>
-
-  <div class="auth-foot">
-    Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a><br>
-    Забыли пароль?
-    {% if mail_enabled %}<a href="/password/forgot/">Восстановить по почте</a>{% else %}<a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>{% endif %}
+    <p class="au-switch-line">Уже есть аккаунт? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти</a></p>
   </div>
-
-  <a class="back-link" href="/">← На главную</a>
-</div>{% endblock %}
+{% endblock %}</main>
 
 {% comment %}
 Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
@@ -178,6 +127,7 @@
 здесь — снимок экрана снимается на клиенте, в момент нажатия.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+<script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' %}
 {% include '_site_version.html' %}
 {% include '_legal_footer.html' %}

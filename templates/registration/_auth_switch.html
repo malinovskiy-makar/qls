@@ -1,0 +1,8 @@
+{% comment %}
+Переключатель «Вход | Регистрация» в карточке (макет раунда 2, Main/Register).
+Это две ссылки, а не вкладки: у каждой своя страница и свой адрес. `next` едет
+следом, чтобы тренажёр ВП получил человека обратно. Параметр: mode.
+{% endcomment %}<nav class="au-seg" aria-label="Вход или регистрация">
+  <a class="au-seg-item{% if mode == 'login' %} is-on{% endif %}" href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}"{% if mode == 'login' %} aria-current="page"{% endif %}>Вход</a>
+  <a class="au-seg-item{% if mode == 'register' %} is-on{% endif %}" href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}"{% if mode == 'register' %} aria-current="page"{% endif %}>Регистрация</a>
+</nav>

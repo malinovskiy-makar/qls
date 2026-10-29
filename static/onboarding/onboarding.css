@@ -1,130 +1,167 @@
-/* Онбординг /welcome/ (problems/views_onboarding.py, решения 29.10.2026).
-   Только токены `templates/_tokens.html` и детали `_kit.html` (.k-tile, .k-btn,
-   .k-chip): своих цветов здесь нет, тёмная тема приходит с токенами.
-   Сегмента и пилюль в наборе нет — они здесь, по образцу анкеты стены ВП. */
+/* Вход, регистрация и онбординг — раунд 2 (29.10.2026), по макету
+   docs/design/onboarding_r2/ (снимки shots/*.png, кадры анимаций w2.css).
+   Цвета — только токены `templates/_tokens.html`, поэтому тёмная тема приходит сама.
+   Детали набора — `templates/_kit.html` (.k-btn, .k-tile, .k-input, .k-chip); здесь
+   только раскладка экранов и то, чего в наборе нет. Классы макета `w-*` — образец,
+   свои имена: `au-*` (вход), `ob-*` (онбординг), `pl-*` (план). */
 
-*, *::before, *::after { box-sizing: border-box; }
-body.ob { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-          background: var(--bg); color: var(--text); font-family: var(--font-ui);
-          -webkit-font-smoothing: antialiased; }
+/* ── Движение (кадры из макета w2.css под своими именами) ───────────────── */
+@keyframes ob-in    { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes ob-in-back { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes ob-out   { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-28px); } }
+@keyframes ob-out-back { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(28px); } }
+@keyframes ob-up    { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes ob-fade  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ob-shrink { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.94); } }
+@keyframes ob-pop   { 0% { transform: scale(.97); } 60% { transform: scale(1.01); } 100% { transform: scale(1); } }
+@keyframes ob-tick  { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes ob-flash { 0% { background: var(--accent-tint); } 100% { background: transparent; } }
+@keyframes ob-spin  { to { transform: rotate(360deg); } }
+@keyframes ob-drop  { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes ob-grow  { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 120px; } }
 
-/* ── Шапка: знак · полоска шагов · «Выйти» ─────────────────────────────── */
-.ob-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-          gap: 16px; padding: 14px 24px; }
-.ob-logo { display: inline-flex; color: var(--text); }
-.ob-logo-mark { width: 132px; height: auto; display: block; color: var(--text); }
-.ob-progress { display: flex; gap: 6px; list-style: none; margin: 0 auto; padding: 0;
-               width: 100%; max-width: 280px; }
-.ob-progress li { flex: 1; height: 4px; border-radius: var(--r-pill);
-                  background: var(--border); }
-.ob-progress li.is-on { background: var(--accent); }
-.ob-out { margin: 0; }
+.ob-anim-up { animation: ob-up .4s cubic-bezier(.2, .7, .2, 1) both; }
+.ob-d1 { animation-delay: .06s; } .ob-d2 { animation-delay: .12s; }
+.ob-d3 { animation-delay: .18s; } .ob-d4 { animation-delay: .24s; }
+.ob-d5 { animation-delay: .30s; } .ob-d6 { animation-delay: .36s; }
 
-/* ── Середина ──────────────────────────────────────────────────────────── */
-.ob-main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto;
-           padding: 24px 24px 32px; }
-.ob-h { font-size: 30px; line-height: 1.2; font-weight: 700; margin: 12px 0 24px;
-        letter-spacing: -0.01em; }
-.ob-form { margin: 0; }
-.ob-q { border: 0; margin: 0 0 22px; padding: 0; min-width: 0; }
-.ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
-         clip: rect(0 0 0 0); white-space: nowrap; }
-.ob-cap { display: block; font-size: 14px; font-weight: 600; color: var(--text2);
-          margin: 0 0 10px; padding: 0; }
-.ob-err { margin-top: 8px; font-size: 13px; color: var(--error-ink); }
-.ob-fine { font-size: 12px; line-height: 1.45; color: var(--text3); margin: -8px 0 0; }
+/* Только для экранного диктора. */
+.ob-sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+         clip: rect(0 0 0 0); white-space: nowrap; margin: 0; padding: 0; border: 0; }
 
-/* Плитки: сетка из `_kit.html` (.k-tile), колонки — по шагу. */
-.ob-tiles { display: grid; gap: 10px; }
-.ob-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.ob-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.ob-tile { position: relative; min-height: 56px; }
-.ob-tiles--big .ob-tile { min-height: 132px; display: flex; flex-direction: column;
-                          align-items: flex-start; justify-content: flex-end; gap: 10px;
-                          padding: 18px; }
-.ob-tiles--big .k-tile__name { font-size: 17px; margin: 0; }
-.ob-ico { color: var(--text2); }
-.k-tile--on .ob-ico { color: var(--accent-ink); }
-.ob-tile:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* ══ Вход и регистрация (`body.au`) ════════════════════════════════════════ */
+/* Страница: шапка сайта (`_nav.html`) → середина → подвал с документами в потоке.
+   `_auth_style.html` центрирует тело для старых экранов (экран согласия); здесь
+   тело — колонка во всю ширину. */
+body.au { display: flex; flex-direction: column; align-items: stretch;
+          justify-content: flex-start; min-height: 100vh; padding: 0; }
+body.au > .site-version { align-self: stretch; }
+body.au { --legal-foot-left: 16px; }
+.au-main { flex: 1; display: flex; align-items: center; justify-content: center;
+           gap: 88px; width: 100%; max-width: 1180px; margin: 0 auto;
+           padding: 48px 32px 40px; }
+.au-main--single { gap: 0; }
 
-/* Сегмент: один ряд кнопок, общая рамка. */
-.ob-seg { display: flex; flex-wrap: wrap; border: 1px solid var(--border);
-          border-radius: var(--r); background: var(--surface); overflow: hidden; }
-.ob-seg .ob-opt { flex: 1 1 0; min-width: 52px; text-align: center; padding: 11px 8px;
-                  border-left: 1px solid var(--border); }
-.ob-seg .ob-opt:first-child { border-left: 0; }
+/* Левая колонка: заголовок и пункты (вход) или шаги (регистрация). */
+.au-pitch { flex: 0 1 470px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.au-pitch-h { margin: 0; font-size: 40px; font-weight: 600; line-height: 1.15;
+              letter-spacing: -.015em; color: var(--text); }
+.au-pitch-h em { font-style: normal; color: var(--accent-ink); }
+.au-points, .au-steps { list-style: none; margin: 0; padding: 0; display: flex;
+                        flex-direction: column; gap: 14px; }
+.au-points li { display: flex; gap: 14px; align-items: center; font-size: 15.5px; font-weight: 500; }
+.au-point-ico { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--r-card);
+                background: var(--surface); border: var(--line, 1px) solid var(--border);
+                display: inline-flex; align-items: center; justify-content: center;
+                color: var(--accent-ink); }
+.au-steps li { display: flex; gap: 14px; align-items: center; font-size: 16px; font-weight: 600; }
+.au-step-n { width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-pill);
+             background: var(--surface); border: 1px solid var(--border); color: var(--text2);
+             display: inline-flex; align-items: center; justify-content: center;
+             font-size: 14px; font-weight: 600; }
+.au-steps li.is-now .au-step-n { background: var(--accent); border-color: var(--accent);
+                                 color: var(--on-accent); }
 
-/* Пилюли: перенос по строкам. */
-.ob-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-.ob-pills .ob-opt { padding: 8px 14px; border: 1px solid var(--border);
-                    border-radius: var(--r-pill); background: var(--surface); }
+/* Карточка формы 420 px, мягкая тень. */
+.au-card { flex: 0 0 420px; width: 420px; max-width: 100%; background: var(--surface);
+           border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px;
+           box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 16px; }
+.au-card--single { flex-basis: 440px; width: 440px; }
+.au-card--wide { flex-basis: 520px; width: 520px; }
+.au-card-h { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.25; color: var(--text); }
+.au-sub { margin-top: 6px; font-size: 14px; color: var(--text2); overflow-wrap: anywhere; }
+.au-sub a, .au-switch-line a, .au-forgot { color: var(--accent-ink); }
+.au-card .error-list { margin: 0; }
 
-.ob-opt { position: relative; cursor: pointer; font-size: 14px; font-weight: 500;
-          color: var(--text); white-space: nowrap;
-          transition: background .12s ease, border-color .12s ease; }
-.ob-opt:hover { background: var(--surface-2); }
-.ob-opt input { position: absolute; opacity: 0; pointer-events: none; }
-.ob-opt.is-on { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
-.ob-pills .ob-opt.is-on { border-color: var(--accent); }
-.ob-opt:focus-within { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* Переключатель «Вход | Регистрация». */
+.au-seg { display: flex; padding: 3px; border-radius: var(--r-pill);
+          background: var(--surface-2); border: 1px solid var(--border); }
+.au-seg-item { flex: 1 1 0; height: 36px; display: inline-flex; align-items: center;
+               justify-content: center; border-radius: var(--r-pill); font-size: 14px;
+               font-weight: 600; color: var(--text2); text-decoration: none;
+               transition: background var(--t, .12s), color var(--t, .12s); }
+.au-seg-item:hover { color: var(--text); }
+.au-seg-item.is-on { background: var(--accent); color: var(--on-accent); }
+.au-seg-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.ob-input { width: 100%; font: inherit; font-size: 16px; color: var(--text);
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: var(--r); padding: 12px 14px; }
-.ob-input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Поля. */
+.au-form { display: flex; flex-direction: column; gap: 14px; margin: 0; }
+.au-field { display: flex; flex-direction: column; gap: 6px; }
+.au-label { display: block; margin: 0; font-size: 13px; font-weight: 500; color: var(--text2); }
+.au-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.au-forgot { font-size: 13px; }
+.au .au-input { height: 44px; font-size: 15px; padding: 0 12px; border-radius: var(--r);
+                border-width: 1px; box-shadow: none; }
+.au .au-input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring);
+                      background: var(--surface); }
+.au-pw { position: relative; }
+.au-pw .au-input { padding-right: 46px; }
+.au-eye { position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+          width: 34px; height: 34px; border: 0; border-radius: var(--r); background: transparent;
+          color: var(--text3); display: inline-flex; align-items: center; justify-content: center;
+          cursor: pointer; }
+.au-eye[hidden] { display: none; }
+.au-eye:hover, .au-eye[aria-pressed="true"] { color: var(--text); background: var(--chip-bg); }
+.au .consent { font-size: 13.5px; line-height: 1.5; margin: 0; }
+.au .consent input[type="checkbox"] { width: 18px; height: 18px; margin-top: 1px;
+                                       accent-color: var(--accent); cursor: pointer; }
+.au-submit { width: 100%; height: 48px; font-size: 15px; font-weight: 600; }
+.au-switch-line { margin: 0; text-align: center; font-size: 14px; color: var(--text2); }
+.au-switch-line a { font-weight: 600; }
+.au-row { display: flex; align-items: center; gap: 12px; }
+.au-row .au-submit { flex: 1; }
+.au-alt { height: 48px; padding: 0 18px; }
 
-/* ── Нижняя полоса: прилипает к низу окна ──────────────────────────────── */
-.ob-bar { position: sticky; bottom: 0; background: var(--bg);
-          border-top: 1px solid var(--border-soft); }
-.ob-bar-in { max-width: 720px; margin: 0 auto; padding: 12px 24px;
-             display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.ob-next { min-width: 140px; }
+/* «Код из письма»: значок-плитка и шесть ячеек. */
+.au-badge { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-tint);
+            color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; }
+.au-cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.au-cell { width: 100%; height: 56px; padding: 0; text-align: center; font: inherit;
+           font-size: 24px; font-weight: 600; color: var(--text); background: var(--surface);
+           border: 1px solid var(--border); border-radius: var(--r-card);
+           font-variant-numeric: tabular-nums; caret-color: var(--accent); }
+.au-cell:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.au-cell.is-filled { animation: ob-pop .2s ease-out; }
+.au-resend-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0; }
+.au-resend { font: inherit; font-size: 13px; color: var(--text2); background: none; border: 0;
+             padding: 0; cursor: pointer; text-align: left; }
+.au-resend:not(:disabled) { color: var(--accent-ink); text-decoration: underline; }
+.au-resend:disabled { cursor: default; }
 
-/* ── «Первая группа» ───────────────────────────────────────────────────── */
-.ob-later { display: inline-block; font-size: 14px; color: var(--text2);
-            text-decoration: none; }
-.ob-later:hover { color: var(--text); }
-.ob-code-card { max-width: 420px; }
-.ob-code { font-family: var(--font-mono, monospace); font-size: 34px; font-weight: 700;
-           letter-spacing: .06em; margin: 10px 0 18px; overflow-wrap: anywhere; }
-.ob-row { display: flex; flex-wrap: wrap; gap: 10px; }
+/* «Почти готово»: кто вошёл и что передал сервис. */
+.au-who { display: flex; align-items: center; gap: 16px; }
+.au-ava { width: 56px; height: 56px; flex-shrink: 0; border-radius: var(--r-pill);
+          background: var(--accent-tint); color: var(--accent-ink); display: inline-flex;
+          align-items: center; justify-content: center; font-size: 20px; font-weight: 600; }
+.au-who-k { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 2px; }
+.au-facts { margin: 0; padding: 12px 16px; border-radius: var(--r-card);
+            background: var(--surface-2); border: 1px solid var(--border);
+            display: flex; flex-direction: column; gap: 8px; }
+.au-fact { display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 14px; }
+.au-fact dt { display: flex; align-items: center; gap: 8px; color: var(--text2); }
+.au-fact dt svg { color: var(--green); flex-shrink: 0; }
+.au-fact dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.au-chip { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill);
+           border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text2); }
 
-/* ── «План готов» ──────────────────────────────────────────────────────── */
-.ob-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-            margin: -10px 0 24px; }
-.ob-edit { font-size: 13px; color: var(--accent-ink); text-decoration: none; margin-left: 4px; }
-.ob-edit:hover { text-decoration: underline; }
-.ob-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
-            margin-bottom: 24px; }
-.ob-card { background: var(--surface); border: .5px solid var(--border);
-           border-radius: var(--r-card); padding: 16px; min-width: 0; }
-.ob-card-h { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
-.ob-card-h a { color: var(--text); text-decoration: none; }
-.ob-card-h a:hover { color: var(--accent-ink); }
-.ob-card-sub { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
-.ob-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.ob-task { display: block; color: var(--text); text-decoration: none; font-size: 14px; }
-.ob-task:hover .ob-task-t { color: var(--accent-ink); }
-.ob-task-t { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis;
-             white-space: nowrap; }
-.ob-task-m { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text2); }
-.ob-topic { display: inline-flex; align-items: center; min-width: 0; overflow: hidden;
-            text-overflow: ellipsis; white-space: nowrap; }
-.ob-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px;
-          border-radius: 50%; background: var(--gc); flex: none; }
-.ob-stars { color: var(--amber-ink); letter-spacing: 1px; flex: none; }
-.ob-start { display: block; text-align: center; font-size: 16px; padding: 14px 20px; }
+/* Старые экраны внутри новой страницы (сброс пароля кодом): своя карточка без
+   повторного логотипа — логотип уже в шапке сайта. */
+.au-main > .login-card { flex: 0 0 440px; width: 440px; max-width: 100%; margin: 0;
+                         border-radius: 14px; box-shadow: var(--shadow-pop); padding: 28px 32px; }
+.au-main > .login-card .login-logo,
+.au-main > .login-card .back-link { display: none; }
 
-/* ── Телефон: плитки в один столбец, без горизонтальной прокрутки ──────── */
-@media (max-width: 640px) {
-  .ob-top { padding: 10px 16px; gap: 10px; }
-  .ob-logo-mark { width: 104px; }
-  .ob-main { padding: 12px 16px 24px; }
-  .ob-h { font-size: 26px; }
-  .ob-cols-2, .ob-cols-3, .ob-cards { grid-template-columns: 1fr; }
-  .ob-tiles--big .ob-tile { min-height: 88px; }
-  .ob-seg .ob-opt { min-width: 44px; padding: 11px 4px; }
-  .ob-opt { white-space: normal; }
-  .ob-bar-in { padding: 10px 16px; }
-  .ob-next { min-width: 0; flex: 1; }
+/* Телефон: левой колонки нет, карточка без рамки на всю ширину, поля 16 px. */
+@media (max-width: 900px) {
+  .au-main { gap: 40px; padding: 32px 24px; }
+  .au-pitch-h { font-size: 32px; }
+}
+@media (max-width: 760px) {
+  .au-main { display: block; padding: 20px 16px 28px; }
+  .au-pitch, .au-seg { display: none; }
+  .au-card, .au-card--single, .au-card--wide, .au-main > .login-card {
+    width: 100%; flex: none; padding: 0; border: 0; box-shadow: none; background: transparent; }
+  .au-card-h { font-size: 26px; }
+  .au-fact { grid-template-columns: 1fr; gap: 2px; }
+  .au-row { flex-direction: column-reverse; align-items: stretch; }
 }

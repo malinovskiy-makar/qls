@@ -1,56 +1,46 @@
 {% extends 'registration/register.html' %}
 {% comment %}
-«Почти готово» — первый вход через VK ID / Яндекс ID (решения 29.10.2026).
-Экран = заголовок + элементы управления: строки того, что передал сервис, без
-пояснений; галочки — те же шаблоны, что на регистрации почтой.
+«Почти готово» — первый вход через VK ID / Яндекс ID (решения 29.10.2026), вид —
+макет раунда 2 `Consent.png`. Экран = заголовок + элементы управления: строки того,
+что передал сервис, без пояснений; галочки — те же шаблоны, что на регистрации почтой.
 Аватар — инициалы: картинку с сервиса страница не грузит (политика `img-src`
 пускает только свои адреса), а в профиль она встаёт после регистрации.
 {% endcomment %}
 {% block title %}Почти готово · Weconomics{% endblock %}
-{% block card %}<div class="login-card">
-  <style>
-  .sf-ava { width: 64px; height: 64px; border-radius: 50%; display: flex;
-            align-items: center; justify-content: center; margin-bottom: 16px;
-            background: var(--accent-tint); color: var(--accent-ink);
-            font-size: 22px; font-weight: 700; }
-  .sf-rows { margin: 18px 0 22px; border-top: 1px solid var(--border); }
-  .sf-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0;
-            border-bottom: 1px solid var(--border); font-size: 14px; }
-  .sf-row dt { color: var(--text2); }
-  .sf-row dd { font-weight: 500; text-align: right; overflow-wrap: anywhere; }
-  .sf-alt { display: block; text-align: center; margin-top: 14px; font-size: 13px;
-            color: var(--text2); text-decoration: none; }
-  .sf-alt:hover { color: var(--text); }
-  </style>
-  <div class="sf-ava" aria-hidden="true">{{ initials }}</div>
-  <h1>Почти готово{% if first_name %}, {{ first_name }}{% endif %}</h1>
+{% block main_class %} au-main--single{% endblock %}
+{% block card %}<div class="au-card au-card--wide ob-anim-up">
+  <div class="au-who">
+    <span class="au-ava" aria-hidden="true">{{ initials }}</span>
+    <div>
+      <div class="au-who-k">Вход через {{ provider.title }}</div>
+      <h1 class="au-card-h">Почти готово{% if first_name %}, {{ first_name }}{% endif %}</h1>
+    </div>
+  </div>
 
   {% if rate_limited %}
-  <div class="error-list">Слишком много регистраций с этого адреса. Попробуйте позже.</div>
+  <div class="error-list" role="alert">Слишком много регистраций с этого адреса. Попробуйте позже.</div>
   {% endif %}
 
-  <dl class="sf-rows">{% for label, value in rows %}
-    <div class="sf-row"><dt>{{ label }}</dt><dd class="ym-hide-content">{{ value }}</dd></div>{% endfor %}
+  <dl class="au-facts">{% for label, value in rows %}
+    <div class="au-fact"><dt><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>{{ label }}</dt><dd class="ym-hide-content">{{ value }}</dd></div>{% endfor %}
   </dl>
 
-  <form method="post" novalidate>
+  <form method="post" class="au-form" novalidate>
     {% csrf_token %}
-    <div class="form-group">
-      <label class="consent">
-        <input type="checkbox" name="consent"{% if form.consent.value %} checked{% endif %}>
-        <span>{% include 'legal/_agree_label.html' %}</span>
-      </label>
-      {% for error in form.consent.errors %}
-      <div class="field-error">{{ error }}</div>
-      {% endfor %}
-    </div>{% if mail_enabled %}
-    <div class="form-group">
-      <label class="consent">
-        <input type="checkbox" name="mail_consent"{% if form.mail_consent.value %} checked{% endif %}>
-        <span>{% include 'legal/_mail_label.html' %}</span>
-      </label>
-    </div>{% endif %}
-    <button type="submit" class="btn-login">Продолжить</button>
+    <label class="consent">
+      <input type="checkbox" name="consent"{% if form.consent.value %} checked{% endif %}>
+      <span>{% include 'legal/_agree_label.html' %}</span>
+    </label>
+    {% for error in form.consent.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    {% if mail_enabled %}
+    <label class="consent">
+      <input type="checkbox" name="mail_consent"{% if form.mail_consent.value %} checked{% endif %}>
+      <span>{% include 'legal/_mail_label.html' %}</span>
+    </label>
+    {% endif %}
+    <div class="au-row">
+      <button type="submit" class="k-btn k-btn--main au-submit">Продолжить</button>
+      <a class="k-btn k-btn--quiet au-alt" href="{% url 'social_finish' %}?cancel=1">Это не я</a>
+    </div>
   </form>
-  <a class="sf-alt" href="{% url 'social_finish' %}?cancel=1">Это не я</a>
 </div>{% endblock %}

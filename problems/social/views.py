@@ -25,7 +25,6 @@
 """
 import logging
 import secrets
-import string
 import time
 from urllib.parse import urlencode
 
@@ -47,6 +46,7 @@ from problems.models import SocialAccount, User
 from problems.models_legal import ConsentRecord
 from problems.models_platform import SignupSource, UserProfile
 from problems.redirects import safe_next
+from problems.usernames import free_username
 from problems.views_auth import DEFAULT_NEXT, REGISTER_SCOPE, _account_email_url
 
 from . import providers
@@ -63,8 +63,6 @@ FLOW_TTL = 10 * 60
 PENDING_KEY = 'social_pending'
 PENDING_TTL = 30 * 60
 
-USERNAME_PREFIX = 'econ_'
-USERNAME_ALPHABET = string.ascii_lowercase + string.digits
 
 
 def _fail_text(provider):
@@ -277,12 +275,7 @@ def _initials(pending):
     return ''.join(letters).upper() or '?'
 
 
-def _free_username():
-    for _attempt in range(50):
-        name = USERNAME_PREFIX + ''.join(secrets.choice(USERNAME_ALPHABET) for _ in range(6))
-        if not User.objects.filter(username__iexact=name).exists():
-            return name
-    raise RuntimeError('не удалось подобрать свободный логин')
+_free_username = free_username        # общий с регистрацией почтой (problems/usernames.py)
 
 
 def _create_account(pending, form):
@@ -353,7 +346,8 @@ def finish(request):
                                    multiplier=1)
             login(request, user, backend=LOGIN_BACKEND)
             consent.remember_in_session(request)
-            signup_source.record_signup(request, user, SignupSource.Kind.STUDENT)
+            signup_source.record_signup(request, user, SignupSource.Kind.STUDENT,
+                                        defer_goal=settings.ONBOARDING_ENABLED)
             _set_avatar(user, pending.get('avatar_url'))
 
             next_url = after_signup_url(pending.get('next') or '')

@@ -214,7 +214,11 @@ class FirstTouchMiddleware:
         return response
 
 
-def record_signup(request, user, kind):
+#: Регистрация прошла, а роль ещё не выбрана (онбординг): цель Метрики ждёт шага «Кто вы?».
+GOAL_PENDING_KEY = 'signup_goal_pending'
+
+
+def record_signup(request, user, kind, *, defer_goal=False):
     """Источник для нового аккаунта и цель Метрики на следующую страницу.
 
     ⚠️ НЕБЛОКИРУЮЩАЯ, как журнал учебных событий: аналитика не имеет права
@@ -237,9 +241,34 @@ def record_signup(request, user, kind):
                          'регистрация не тронута', user.pk, kind)
     # Цель откладываем, только если счётчик вообще стоит: иначе флаг лежал бы
     # в сессии без дела и выстрелил бы позже, когда номер появится.
+    if defer_goal:
+        # Роль выбирают в онбординге (раунд 2): вид и цель — там, `confirm_role`.
+        request.session[GOAL_PENDING_KEY] = True
+        return
+    _queue_goal(request, kind)
+
+
+def _queue_goal(request, kind):
     if settings.YANDEX_METRIKA_ID and kind in GOAL_BY_KIND:
         request.session[GOAL_SESSION_KEY] = {'name': GOAL_BY_KIND[kind],
                                              'token': secrets.token_hex(8)}
+
+
+def confirm_role(request, user, kind):
+    """Шаг «Кто вы?» после свежей регистрации: уточнить вид и отправить цель.
+
+    Срабатывает ОДИН раз — пока в сессии лежит отметка свежей регистрации.
+    Старый аккаунт, проходящий онбординг, источник и цели не трогает.
+    """
+    from problems.models_platform import SignupSource
+
+    if not request.session.pop(GOAL_PENDING_KEY, False):
+        return
+    try:
+        SignupSource.objects.filter(user=user).update(signup_kind=kind)
+    except Exception:
+        logger.exception('Вид регистрации не уточнён (user=%s)', user.pk)
+    _queue_goal(request, kind)
 
 
 def pop_goal(request):

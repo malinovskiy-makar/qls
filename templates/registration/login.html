@@ -10,96 +10,76 @@
   {% include '_metrika.html' %}
   {% include 'registration/_auth_style.html' %}{% if mail_enabled %}
   {% include 'registration/_mail_style.html' %}{% endif %}
+  <style>
+{% include '_kit.html' %}
+  </style>
+  <link rel="stylesheet" href="{% static 'onboarding/onboarding.css' %}">
 </head>
-<body>
+{% comment %}
+Вход — раунд 2 (29.10.2026), по макету `docs/design/onboarding_r2/shots/Main.png`:
+шапка сайта, фон-узор, слева заголовок и три пункта, справа карточка. Логика входа
+(`RoleBasedLoginView`, `EmailOrUsernameBackend`) не менялась: поле принимает и
+почту, и логин, поэтому старые аккаунты с логином входят как раньше.
+{% endcomment %}
+<body class="au">
 {% include '_metrika_noscript.html' %}
-<div class="auth-corner">
-  {% comment %}
-  Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
-  вход, а пожаловаться ему больше нечем. Класс `--onpage` — потому что фон
-  тут светлый, а не графитовая полоса шапки.
-  {% endcomment %}
-  <button type="button" class="fb-btn fb-btn--onpage"
-          aria-label="Проблема или предложение">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
-    </svg>
-    <span class="fb-btn-text">Проблема или предложение</span>
-  </button>
-  {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
-</div>
+{% include '_nav.html' %}
+<main class="au-main">
+  <section class="au-pitch" aria-label="Что есть на сайте">
+    <h1 class="au-pitch-h ob-anim-up">Олимпиадная экономика – <em>в одном месте</em></h1>
+    <ul class="au-points">
+      {% if pitch.tasks %}<li class="ob-anim-up ob-d1"><span class="au-point-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h6M8 11h6"/></svg></span>{{ pitch.tasks }} из олимпиад и сборников</li>{% endif %}
+      <li class="ob-anim-up ob-d2"><span class="au-point-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>Поиск по смыслу</li>
+      {% if pitch.tour %}<li class="ob-anim-up ob-d3"><span class="au-point-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M10 2h4"/></svg></span>Тренажёр «Высшей пробы»: {{ pitch.tour }}</li>{% endif %}
+    </ul>
+  </section>
 
-<div class="login-card">
-  {% comment %}
-  ⚠️ ЗДЕСЬ ГОТОВЫЙ ЛОГО-ЗАМОК ЦЕЛИКОМ, А НЕ «ЗНАК ПЛЮС СЛОВО ШРИФТОМ».
-  Сравнили оба варианта на экране (reports/shots/…/login_variants.png).
-  Пара «круглый знак + слово, набранное Montserrat» даёт на карточке ДВЕ
-  разные буквы W: нарисованную в кружке и наборную рядом — глаз читает это
-  как два знака одного бренда, поставленные рядом по ошибке. Плюс тонкая
-  обводка круга на 36 px растворяется. Замок `logo-medium.svg` — один
-  объект, буква W в нём и есть фирменный росчерк.
-  {% endcomment %}
-  <div class="login-logo">
-    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
+  <div class="au-card ob-anim-up">
+    {% include 'registration/_auth_switch.html' with mode='login' %}
+    <h2 class="au-card-h">Войти в Weconomics</h2>
+
+    {% comment %}
+    ⚠️ Текст ошибки НЕ берётся из формы, и это осознанно: Django различает
+    «нет такого пользователя» и «пароль не тот», а показывать эту разницу
+    нельзя — по ней составляют список существующих аккаунтов.
+    Сообщение про ожидание — отдельная ветка: оно не про учётную запись, а
+    про частоту попыток, и одинаково для любого введённого имени.
+    {% endcomment %}
+    {% if lock_message %}
+    <div class="error-list" role="alert">{{ lock_message }}</div>
+    {% elif form.errors %}
+    <div class="error-list" role="alert">Неверный логин или пароль. Попробуйте ещё раз.</div>
+    {% endif %}{% if mail_enabled %}{% for message in messages %}
+    <div class="error-list{% if message.level_tag == 'success' %} error-list--ok{% endif %}" role="status">{{ message }}</div>{% endfor %}{% endif %}
+
+    {% include 'social/_buttons.html' %}
+    <form method="post" class="au-form">
+      {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      <div class="au-field">
+        <label class="au-label" for="id_username">{% if mail_enabled %}Почта или логин{% else %}Логин{% endif %}</label>
+        {% comment %}Вебвизор пишет ввод звёздочками (ADR 0133), как на регистрации.{% endcomment %}
+        <input type="text" id="id_username" name="username" class="k-input au-input ym-disable-keys"
+               value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus>
+      </div>
+      <div class="au-field">
+        <div class="au-label-row">
+          <label class="au-label" for="id_password">Пароль</label>
+          {% comment %}
+          «Забыли пароль?» с почтой — сброс кодом из письма; без почты — к живому
+          человеку в Telegram (решение владельца 04.09.2026): форма «введите почту»
+          без писем никому ничего не пришлёт.
+          {% endcomment %}
+          {% if mail_enabled %}<a class="au-forgot" href="/password/forgot/">Забыли пароль?</a>{% else %}<a class="au-forgot" href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Забыли пароль?</a>{% endif %}
+        </div>
+        {% include 'registration/_password.html' with name='password' input_id='id_password' autocomplete='current-password' %}
+      </div>
+      <button type="submit" class="k-btn k-btn--main au-submit">Войти</button>
+    </form>
+
+    <p class="au-switch-line">Нет аккаунта? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Создать</a></p>
   </div>
-  <h1>Войти</h1>
-  <p class="login-sub">{% if mail_enabled %}Введите логин или почту и пароль{% else %}Введите логин и пароль{% endif %}</p>
-
-  {% comment %}
-  ⚠️ Текст ошибки НЕ берётся из формы, и это осознанно: Django различает
-  «нет такого пользователя» и «пароль не тот», а показывать эту разницу
-  нельзя — по ней составляют список существующих аккаунтов.
-
-  Сообщение про ожидание — отдельная ветка: оно не про учётную запись, а
-  про частоту попыток, и одинаково для любого введённого имени.
-  {% endcomment %}
-  {% if lock_message %}
-  <div class="error-list">{{ lock_message }}</div>
-  {% elif form.errors %}
-  <div class="error-list">
-    Неверный логин или пароль. Попробуйте ещё раз.
-  </div>
-  {% endif %}{% if mail_enabled %}{% for message in messages %}
-  <div class="error-list{% if message.level_tag == 'success' %} error-list--ok{% endif %}">{{ message }}</div>{% endfor %}{% endif %}
-
-  {% include 'social/_buttons.html' %}
-  <form method="post">
-    {% csrf_token %}
-    {% if next %}
-    <input type="hidden" name="next" value="{{ next }}">
-    {% endif %}
-    <div class="form-group">
-      <label for="id_username">{% if mail_enabled %}Логин или почта{% else %}Логин{% endif %}</label>
-      {% comment %}Вебвизор пишет ввод звёздочками (ADR 0133), как на регистрации.{% endcomment %}
-      <input type="text" id="id_username" name="username" class="ym-disable-keys"
-             value="{{ form.username.value|default:'' }}"
-             autocomplete="username" autofocus>
-    </div>
-    <div class="form-group">
-      <label for="id_password">Пароль</label>
-      <input type="password" id="id_password" name="password" class="ym-disable-keys"
-             autocomplete="current-password">
-    </div>
-    <button type="submit" class="btn-login">Войти</button>
-  </form>
-
-  {% comment %}
-  ⚠️ «ЗАБЫЛИ ПАРОЛЬ» ВЕДЁТ К ЖИВОМУ ЧЕЛОВЕКУ, А НЕ НА ПОЧТУ. Почты у нас
-  нет и подтверждать её нечем (решение владельца 04.09.2026): пароль
-  сбрасывает владелец через админку. Честная ссылка на переписку лучше
-  формы «введите почту», которая никому ничего не пришлёт.
-  {% endcomment %}
-  <div class="auth-foot">
-    Нет аккаунта? <a href="{% url 'register' %}">Создать аккаунт</a><br>
-    Забыли пароль?
-    {% if mail_enabled %}<a href="/password/forgot/">Восстановить по почте</a><br>
-    Нет почты в аккаунте?
-    {% endif %}<a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
-  </div>
-
-  <a class="back-link" href="/">← На главную</a>
-</div>
+</main>
 
 {% comment %}
 Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
@@ -107,6 +87,7 @@
 здесь — снимок экрана снимается на клиенте, в момент нажатия.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+<script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' %}
 {% include '_site_version.html' %}
 {% include '_legal_footer.html' %}

@@ -31,9 +31,10 @@ class RegisterWithEmailTests(TestCase):
     def setUp(self):
         cache.clear()
 
+    # Раунд 2 (решение 29.10.2026): регистрация = почта + пароль. Логина, роли и
+    # повтора пароля в форме нет: логин придумывает сайт, роль спрашивает онбординг.
     def step1(self, **overrides):
-        data = {'username': 'masha', 'email': 'Masha@Mail.RU', 'password1': PASSWORD,
-                'password2': PASSWORD, 'role': 'student', 'consent': 'on'}
+        data = {'email': 'Masha@Mail.RU', 'password1': PASSWORD, 'consent': 'on'}
         data.update(overrides)
         return self.client.post('/register/', {k: v for k, v in data.items() if v is not None})
 
@@ -80,8 +81,8 @@ class RegisterWithEmailTests(TestCase):
         self.step1(mail_consent='on', next='/vp/')
         response = self.confirm(code_of(django_mail.outbox[0]))
         self.assertRedirects(response, '/vp/', fetch_redirect_response=False)
-        user = User.objects.get(username='masha')
-        self.assertEqual(user.email, 'masha@mail.ru')
+        user = User.objects.get(email='masha@mail.ru')
+        self.assertRegex(user.username, r'^econ_[a-z0-9]{6}$')
         self.assertIsNotNone(user.email_verified_at)
         self.assertTrue(user.check_password(PASSWORD))
         self.assertEqual(user.profile.role, 'student')
@@ -93,12 +94,14 @@ class RegisterWithEmailTests(TestCase):
         self.assertEqual(self.client.session.get('_auth_user_id'), str(user.pk))
         self.assertNotIn(PENDING_KEY, self.client.session)
 
+    @override_settings(ONBOARDING_ENABLED=True)
     def test_right_code_without_mail_consent_and_default_target(self):
+        # Подложенная `role=tutor` ничего не значит: роль выбирают в онбординге.
         self.step1(role='tutor')
         response = self.confirm(code_of(django_mail.outbox[0]))
         self.assertRedirects(response, '/profile/?welcome=1', fetch_redirect_response=False)
-        user = User.objects.get(username='masha')
-        self.assertEqual(user.profile.role, 'tutor')
+        user = User.objects.get(email='masha@mail.ru')
+        self.assertEqual(user.profile.role, 'student')
         self.assertEqual(ConsentRecord.objects.filter(user=user, kind=ConsentRecord.Kind.MAIL).count(), 0)
         self.assertEqual(ConsentRecord.objects.filter(user=user, kind=ConsentRecord.Kind.PD).count(), 1)
 
@@ -123,18 +126,33 @@ class RegisterWithEmailTests(TestCase):
         self.step1()
         response = self.confirm(code_of(django_mail.outbox[0]))
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(User.objects.get(username='masha').email_verified_at)
+        new = User.objects.exclude(username='old').get(email='masha@mail.ru')
+        self.assertTrue(new.email_verified_at)
+        self.assertIsNone(User.objects.get(username='old').email_verified_at)
 
-    # 7
-    def test_username_taken_between_steps(self):
+    # 7. Раунд 2: логин придумывает сайт, занять его между шагами нельзя; гонка
+    # осталась за почтой — её успели подтвердить другим аккаунтом.
+    def test_email_taken_between_steps(self):
         self.step1()
-        User.objects.create_user('Masha', password=PASSWORD)
+        other = User.objects.create_user('other', email='masha@mail.ru', password=PASSWORD,
+                                         email_verified_at=timezone.now())
         response = self.confirm(code_of(django_mail.outbox[0]))
         self.assertRedirects(response, '/register/', fetch_redirect_response=False)
-        self.assertFalse(User.objects.filter(email='masha@mail.ru').exists())
-        self.assertEqual(User.objects.filter(username__iexact='masha').count(), 1)
+        self.assertEqual(list(User.objects.filter(email='masha@mail.ru')), [other])
+        self.assertNotIn(PENDING_KEY, self.client.session)
         page = self.client.get('/register/')
-        self.assertContains(page, 'Этот логин успели занять. Начните регистрацию заново.')
+        self.assertContains(page, 'Эта почта уже привязана к аккаунту. Войдите или '
+                                  'восстановите пароль.')
+
+    def test_generated_username_is_free_and_never_taken_twice(self):
+        from unittest import mock
+        User.objects.create_user('econ_aaaaaa', password=PASSWORD)
+        self.step1()
+        names = iter('aaaaaabbbbbb')
+        fake = mock.Mock(choice=lambda _alphabet: next(names))
+        with mock.patch('problems.usernames.secrets', fake):
+            self.confirm(code_of(django_mail.outbox[0]))
+        self.assertEqual(User.objects.get(email='masha@mail.ru').username, 'econ_bbbbbb')
 
     # 8
     def test_pending_older_than_30_minutes_is_dropped(self):
@@ -176,13 +194,11 @@ class RegisterWithEmailTests(TestCase):
         self.assertEqual(self.confirm(new).status_code, 302)
 
     def test_change_email_returns_to_filled_form(self):
-        self.step1(mail_consent='on', role='tutor', next='/vp/')
+        self.step1(mail_consent='on', next='/vp/')
         html = self.client.get('/register/?edit=1').content.decode()
-        self.assertIn('value="masha"', html)
         self.assertIn('value="masha@mail.ru"', html)
         self.assertIn('name="next" value="/vp/"', html)
         self.assertRegex(html, r'name="mail_consent"\s+checked')
-        self.assertRegex(html, r'value="tutor"\s+checked')
         self.assertNotIn(PASSWORD, html)
 
     def test_wait_with_same_address_goes_to_confirm(self):
@@ -191,10 +207,29 @@ class RegisterWithEmailTests(TestCase):
         self.assertRedirects(response, '/register/confirm/', fetch_redirect_response=False)
         self.assertEqual(len(django_mail.outbox), 1)
 
-    # 11
-    def test_at_sign_in_new_username_is_refused(self):
-        response = self.step1(username='masha@mail.ru')
-        self.assertContains(response, 'В логине не может быть @: для почты есть отдельное поле.')
+    # 11. Раунд 2: логина в форме нет; подложенный (хоть с «@») не попадает в аккаунт,
+    # логин — `econ_` + 6 знаков, «@» в нём не бывает.
+    def test_username_is_generated_not_taken_from_the_form(self):
+        self.step1(username='masha@mail.ru')
+        self.confirm(code_of(django_mail.outbox[0]))
+        user = User.objects.get(email='masha@mail.ru')
+        self.assertRegex(user.username, r'^econ_[a-z0-9]{6}$')
+
+    @override_settings(ONBOARDING_ENABLED=True)
+    def test_form_is_email_and_password_only(self):
+        html = self.client.get('/register/').content.decode()
+        for absent in ('name="role"', 'name="password2"', 'name="username"',
+                       'Им вы входите', 'Пароль ещё раз', 'Логин, почта и пароль'):
+            self.assertNotIn(absent, html)
+        for present in ('name="email"', 'name="password1"', 'name="consent"',
+                        'data-pw-eye', 'Создать аккаунт'):
+            self.assertIn(present, html)
+
+    def test_password_validators_still_apply_to_the_single_field(self):
+        response = self.step1(password1='12345')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'field-error')
+        self.step1(email='masha@mail.ru', password1='masha@mail.ru1')
         self.assertEqual(len(django_mail.outbox), 0)
 
     def test_at_sign_in_profile_username(self):
@@ -251,29 +286,51 @@ class LoginWithEmailTests(TestCase):
 
     def test_login_screen_mentions_email_and_reset(self):
         page = self.client.get('/login/')
-        self.assertContains(page, 'Логин или почта')
+        self.assertContains(page, 'Почта или логин')
         self.assertContains(page, 'href="/password/forgot/"')
-        self.assertContains(page, 'Нет почты в аккаунте?')
+        # Раунд 2: на входе одна ссылка «Забыли пароль?»; кому без почты — в Telegram
+        # ведёт сама страница сброса.
+        self.assertContains(self.client.get('/password/forgot/'), 'Нет почты в аккаунте?')
+
+    def test_old_account_logs_in_by_username_in_the_email_or_login_field(self):
+        user = User.objects.create_user('kostya_econ', password=PASSWORD)
+        page = self.client.get('/login/')
+        self.assertContains(page, 'for="id_username">Почта или логин</label>')
+        self.login('kostya_econ')
+        self.assertEqual(self.client.session.get('_auth_user_id'), str(user.pk))
 
 
 @override_settings(MAIL_ENABLED=False)
 class MailDisabledRegistrationTests(TestCase):
     # 12
+    @override_settings(ONBOARDING_ENABLED=True)
     def test_old_one_step_registration(self):
         html = self.client.get('/register/').content.decode()
         self.assertNotIn('name="email"', html)
         self.assertNotIn('mail_consent', html)
+        for absent in ('name="role"', 'name="password2"', 'Им вы входите',
+                       'Логин и пароль: больше ничего не нужно', 'Пароль ещё раз'):
+            self.assertNotIn(absent, html)
+        self.assertIn('name="username"', html)
         response = self.client.post('/register/', {
-            'username': 'petya', 'password1': PASSWORD, 'password2': PASSWORD,
-            'role': 'student', 'consent': 'on'})
+            'username': 'petya', 'password1': PASSWORD, 'consent': 'on'})
         self.assertRedirects(response, '/profile/?welcome=1', fetch_redirect_response=False)
         self.assertTrue(User.objects.filter(username='petya', email='').exists())
+        self.assertEqual(User.objects.get(username='petya').profile.role, 'student')
         self.assertEqual(len(django_mail.outbox), 0)
+
+    def test_without_onboarding_the_role_stays_on_the_form(self):
+        # Аварийный выключатель онбординга: роль спросить больше негде.
+        html = self.client.get('/register/').content.decode()
+        self.assertIn('name="role"', html)
+        self.client.post('/register/', {'username': 'prepod', 'password1': PASSWORD,
+                                        'role': 'tutor', 'consent': 'on'})
+        self.assertEqual(User.objects.get(username='prepod').role, 'teacher')
 
     def test_confirm_page_does_not_exist(self):
         self.assertEqual(self.client.get('/register/confirm/').status_code, 404)
 
     def test_login_screen_is_the_old_one(self):
         page = self.client.get('/login/')
-        self.assertNotContains(page, 'Логин или почта')
+        self.assertNotContains(page, 'Почта или логин')
         self.assertNotContains(page, '/password/forgot/')

@@ -1,44 +1,37 @@
 {% extends 'registration/register.html' %}
 {% comment %}
-Шаг 2 регистрации (docs/MAIL.md). Аккаунта ещё нет: он появится, когда код
-сойдётся. Почта на экране — та, что человек ввёл сам; её видит только он.
+Шаг 2 регистрации (docs/MAIL.md), вид — макет раунда 2 `Code.png`. Аккаунта ещё
+нет: он появится, когда код сойдётся. Почта на экране — та, что человек ввёл сам.
+Логика Анича не менялась: одно поле `code`. Скрипт (`static/onboarding/onboarding.js`)
+рисует поверх него шесть ячеек: вставка всего кода заполняет все, после шестой
+цифры форма отправляется сама. Без скрипта — обычное поле.
 {% endcomment %}
 {% block title %}Подтвердите почту · Weconomics{% endblock %}
 {% block extra_head %}
   {% include 'registration/_mail_style.html' %}{% endblock %}
-{% block card %}<div class="login-card">
-  <div class="login-logo">
-    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
+{% block main_class %} au-main--single{% endblock %}
+{% block card %}<div class="au-card au-card--single ob-anim-up">
+  <span class="au-badge" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+  <div>
+    <h1 class="au-card-h">Код из письма</h1>
+    <div class="au-sub"><span class="ym-hide-content">{{ email }}</span> · <a href="/register/?edit=1">изменить</a></div>
   </div>
-  <h1>Подтвердите почту</h1>
-  <p class="mail-lead">Мы отправили код на <b class="ym-hide-content">{{ email }}</b>. Письмо может идти пару минут, загляните в папку «Спам».</p>
 
-  {% if error %}<div class="error-list">{{ error }}</div>{% endif %}
+  {% if error %}<div class="error-list" role="alert">{{ error }}</div>{% endif %}
   {% for message in messages %}
-  <div class="error-list{% if message.level_tag == 'success' or message.level_tag == 'info' %} error-list--ok{% endif %}">{{ message }}</div>
+  <div class="error-list{% if message.level_tag == 'success' or message.level_tag == 'info' %} error-list--ok{% endif %}" role="status">{{ message }}</div>
   {% endfor %}
 
-  <form method="post" novalidate>
+  <form method="post" class="au-form" id="code-form" novalidate>
     {% csrf_token %}
-    <div class="form-group">
-      <label for="id_code">Код из письма</label>
-      <input type="text" name="code" id="id_code" class="code-input ym-disable-keys"
-             inputmode="numeric" autocomplete="one-time-code" maxlength="12" autofocus>
-    </div>
-    <button type="submit" class="btn-login">Подтвердить</button>
+    <label class="au-label ob-sr" for="id_code">Код из письма</label>
+    <input type="text" name="code" id="id_code" class="k-input au-input code-input ym-disable-keys"
+           inputmode="numeric" autocomplete="one-time-code" maxlength="12" autofocus data-code-cells="6">
   </form>
-
-  <form method="post" class="mail-resend">
+  <form method="post" class="au-resend-row">
     {% csrf_token %}
-    {% include 'registration/_resend_button.html' with wait=resend_wait %}
+    {% include 'registration/_resend_button.html' with wait=resend_wait btn_class='au-resend' %}
+    <a class="au-forgot" href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Нет письма?</a>
   </form>
-
-  <div class="mail-links"><a href="/register/?edit=1">Изменить почту</a></div>
-
-  <div class="auth-foot">
-    Код не приходит?
-    <a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
-  </div>
-
-  <a class="back-link" href="/">← На главную</a>
+  <button type="submit" form="code-form" class="k-btn k-btn--main au-submit">Подтвердить</button>
 </div>{% endblock %}

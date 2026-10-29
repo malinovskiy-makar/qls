@@ -1,0 +1,61 @@
+{% extends 'registration/register.html' %}
+{% comment %}
+«Осталась почта» — та же страница `/account/email/` (problems/views_auth.py::account_email),
+но в виде экрана входа (макет раунда 2 `NeedEmail.png`), а не кабинета. Показывается:
+- аккаунту из VK ID / Яндекс ID без подтверждённой почты (`needs_service_email`);
+- старому аккаунту с шага онбординга «Добавьте почту» (`src=onb`).
+Два состояния, как у страницы «Почта»: адрес → код из письма. Логика Анича та же.
+⚠️ Галочки рассылки здесь нет: её ставили на «Почти готово» или в профиле. Поэтому
+текущее согласие едет скрытым полем — иначе сохранение адреса отозвало бы его.
+{% endcomment %}
+{% block title %}Почта · Weconomics{% endblock %}
+{% block extra_head %}
+  {% include 'registration/_mail_style.html' %}{% endblock %}
+{% block main_class %} au-main--single{% endblock %}
+{% block card %}<div class="au-card au-card--single ob-anim-up">
+  {% if pending %}
+  <span class="au-badge" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+  <div>
+    <h1 class="au-card-h">Код из письма</h1>
+    <div class="au-sub"><span class="ym-hide-content">{{ pending.email }}</span> · <a href="{{ change_url }}">изменить</a></div>
+  </div>
+  {% if error %}<div class="error-list" role="alert">{{ error }}</div>{% endif %}
+  {% for message in messages %}
+  <div class="error-list{% if message.level_tag == 'success' or message.level_tag == 'info' %} error-list--ok{% endif %}" role="status">{{ message }}</div>
+  {% endfor %}
+  <form method="post" class="au-form" id="code-form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="code">
+    <label class="au-label ob-sr" for="id_code">Код из письма</label>
+    <input type="text" name="code" id="id_code" class="k-input au-input code-input ym-disable-keys"
+           inputmode="numeric" autocomplete="one-time-code" maxlength="12" autofocus data-code-cells="6">
+  </form>
+  <form method="post" class="au-resend-row">
+    {% csrf_token %}
+    {% include 'registration/_resend_button.html' with wait=resend_wait btn_class='au-resend' %}
+    <a class="au-forgot" href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Нет письма?</a>
+  </form>
+  <button type="submit" form="code-form" class="k-btn k-btn--main au-submit">Подтвердить</button>
+  {% else %}
+  {% if service %}<span class="au-chip ym-hide-content">{{ service }}{% if display_name %} · {{ display_name }}{% endif %}</span>{% endif %}
+  <div>
+    <h1 class="au-card-h">{% if service %}Осталась почта{% else %}Добавьте почту{% endif %}</h1>
+    {% if service %}<div class="au-sub">{{ service }} её не передал.</div>{% endif %}
+  </div>
+  <form method="post" class="au-form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% if src %}<input type="hidden" name="src" value="{{ src }}">{% endif %}
+    {% if form.mail_consent.value %}<input type="hidden" name="mail_consent" value="on">{% endif %}
+    {% for e in form.non_field_errors %}<div class="error-list" role="alert">{{ e }}</div>{% endfor %}
+    <div class="au-field">
+      <label class="au-label" for="id_email">Почта</label>
+      <input type="email" name="email" id="id_email" class="k-input au-input ym-disable-keys"
+             inputmode="email" autocomplete="email" autofocus value="{{ form.email.value|default:'' }}">
+      {% for e in form.email.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+    </div>
+    <button type="submit" class="k-btn k-btn--main au-submit">Получить код</button>
+  </form>
+  {% endif %}
+</div>{% endblock %}

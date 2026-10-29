@@ -579,7 +579,7 @@ class WebvisorMaskingTests(TestCase):
 
     def test_register_and_login_inputs_are_masked(self):
         register = self.client.get(LANDING).content.decode()
-        for name in ('username', 'password1', 'password2'):
+        for name in ('username', 'password1'):           # «Пароль ещё раз» убран (раунд 2)
             self.assertIn('ym-disable-keys', self._input(register, name))
         login = self.client.get('/login/').content.decode()
         for name in ('username', 'password'):

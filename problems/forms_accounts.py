@@ -32,24 +32,15 @@ AVATAR_QUALITY = 85
 
 
 class RegisterForm(UserCreationForm):
-    """Регистрация: логин, пароль дважды, роль и согласие.
+    """Регистрация при ВЫКЛЮЧЕННОЙ почте (`MAIL_ENABLED=0`): логин, пароль, согласие.
 
-    Это форма при ВЫКЛЮЧЕННОЙ почте (`MAIL_ENABLED=0`). Решение 04.09.2026
-    «почты нет» пересмотрено 26.10.2026: регистрация — почта + пароль, почта
-    подтверждается кодом (`RegisterWithEmailForm` ниже, docs/MAIL.md).
+    Раунд 2 (решение владельца 29.10.2026 «почта + пароль»): без выбора роли — её
+    спрашивает онбординг, до него профиль ученический; без «Пароль ещё раз» — у поля
+    пароля есть кнопка-глаз. Пароль по-прежнему проверяют и хешируют формы Django
+    (`UserCreationForm`): поле второго пароля просто убрано, а проверка валидаторами
+    перенесена на первое (`_post_clean`).
     """
 
-    ROLE_CHOICES = (
-        ('student', 'Я ученик'),
-        ('tutor', 'Я преподаватель'),
-    )
-
-    role = forms.ChoiceField(
-        label='Кто вы',
-        choices=ROLE_CHOICES,
-        initial='student',
-        widget=forms.RadioSelect,
-    )
     consent = forms.BooleanField(
         # Текст с тремя ссылками рисует `legal/_agree_label.html`; здесь только
         # подпись поля для служебных мест (админка, сообщения формы).
@@ -62,15 +53,34 @@ class RegisterForm(UserCreationForm):
         model = User
         fields = ('username',)
 
+    ROLE_CHOICES = (
+        ('student', 'Я ученик'),
+        ('tutor', 'Я преподаватель'),
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['username'].label = 'Логин'
-        self.fields['username'].help_text = (
-            'Им вы входите, и он же виден на сайте, пока не заполнено имя.')
+        del self.fields['password2']
+        # ⚠️ РОЛЬ — ТОЛЬКО ПРИ ВЫКЛЮЧЕННОМ ОНБОРДИНГЕ. `ONBOARDING_ENABLED=0` — аварийный
+        # выключатель (тур ВП, решение 29.10.2026): без онбординга роль спросить негде,
+        # и преподаватель не смог бы зарегистрироваться преподавателем.
+        from django.conf import settings
+        if not settings.ONBOARDING_ENABLED:
+            self.fields['role'] = forms.ChoiceField(
+                label='Кто вы', choices=self.ROLE_CHOICES, initial='student',
+                required=False, widget=forms.RadioSelect)
         self.fields['password1'].label = 'Пароль'
-        self.fields['password2'].label = 'Пароль ещё раз'
+        if 'username' in self.fields:
+            self.fields['username'].label = 'Логин'
+            self.fields['username'].help_text = ''
         for field in self.fields.values():
             field.widget.attrs.setdefault('autocomplete', 'off')
+
+    def _post_clean(self):
+        # Валидаторы пароля (длина 10, распространённые, похожесть на логин и
+        # почту) — на единственное поле пароля. Сравнивать с повтором нечего.
+        forms.ModelForm._post_clean(self)
+        self.validate_password_for_user(self.instance, 'password1')
 
     def clean_username(self):
         """⚠️ ЗАНЯТЫЙ ЛОГИН НАЗЫВАЕТСЯ ЧЕСТНО, И ЭТО НЕ ОПЛОШНОСТЬ.
@@ -91,15 +101,17 @@ AT_IN_USERNAME = 'В логине не может быть @: для почты 
 
 
 class RegisterWithEmailForm(RegisterForm):
-    """Регистрация с почтой (решение владельца 26.10.2026, docs/MAIL.md).
+    """Регистрация с почтой (решение владельца 26.10.2026, docs/MAIL.md):
+    почта и пароль, больше ничего (раунд 2, 29.10.2026).
 
-    Форма только проверяет поля: аккаунт она НЕ создаёт. Создаёт его шаг
-    подтверждения кода (`RegisterConfirmView`), когда почта доказана.
+    Логина в форме нет: его придумывает сайт (`problems/usernames.py`) в момент
+    создания аккаунта, сменить можно в профиле. Форма только проверяет поля:
+    аккаунт она НЕ создаёт. Создаёт его шаг подтверждения кода
+    (`RegisterConfirmView`), когда почта доказана.
     """
 
     email = forms.EmailField(
         label='Почта', max_length=254,
-        help_text='На неё придёт код подтверждения. Другие пользователи её не видят.',
         error_messages={'required': 'Укажите почту: на неё придёт код подтверждения.',
                         'invalid': 'Это не похоже на адрес почты.'})
     # ⚠️ НИКОГДА НЕ ОТМЕЧЕНА ЗАРАНЕЕ (ст. 18 закона «О рекламе»). Подпись со
@@ -108,11 +120,12 @@ class RegisterWithEmailForm(RegisterForm):
         label='Присылать письма о новых тренажёрах, разборах и олимпиадах',
         required=False, initial=False)
 
-    def clean_username(self):
-        username = super().clean_username()
-        if '@' in username:
-            raise forms.ValidationError(AT_IN_USERNAME)
-        return username
+    class Meta(RegisterForm.Meta):
+        fields = ()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.order_fields(['email', 'password1', 'consent', 'mail_consent'])
 
     def clean_email(self):
         from .email_codes import normalize_email, verified_user_for
@@ -122,6 +135,8 @@ class RegisterWithEmailForm(RegisterForm):
                 'Эта почта уже привязана к аккаунту. <a href="{}">Войдите</a> или '
                 '<a href="{}">восстановите пароль</a>.',
                 reverse('login'), '/password/forgot/'))
+        # Для проверки «пароль не похож на почту» (`UserAttributeSimilarityValidator`).
+        self.instance.email = email
         return email
 
 

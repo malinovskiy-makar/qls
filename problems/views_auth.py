@@ -29,6 +29,7 @@ Django, а не наша: `ModelBackend` при несуществующем и�
 """
 import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.hashers import make_password
@@ -48,6 +49,7 @@ from problems.forms_accounts import RegisterForm, RegisterWithEmailForm
 from problems.models import User
 from problems.models_platform import SignupSource, UserProfile
 from problems.redirects import safe_next
+from problems.usernames import free_username
 
 #: Каким бэкендом считается вход сразу после регистрации. Бэкендов два
 #: (`problems/auth_backends.py`), и без явного имени `login()` откажется.
@@ -97,6 +99,53 @@ def admin_login(request, extra_context=None):
     return response
 
 
+#: Сколько держать в кэше число задач для экрана входа: считать его на каждый
+#: заход дорого, а точность до задачи здесь не нужна.
+PITCH_CACHE_SECONDS = 60 * 60
+MONTHS_GENITIVE = ('января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля',
+                   'августа', 'сентября', 'октября', 'ноября', 'декабря')
+
+
+def _tour_phrase(today=None):
+    """«2 тур 13–22 ноября» из `vp/config.py`, пока тур не прошёл; иначе пусто."""
+    from vp import config as vp_config
+
+    kind, value = vp_config.TOUR_DATES.get(vp_config.CURRENT_TOUR, (None, None))
+    if not value:
+        return ''
+    first, last = value[0], value[-1]
+    if last < (today or timezone.localdate()):
+        return ''
+    if first.month == last.month:
+        days = '%d–%d %s' % (first.day, last.day, MONTHS_GENITIVE[last.month - 1])
+    else:
+        days = '%d %s – %d %s' % (first.day, MONTHS_GENITIVE[first.month - 1],
+                                  last.day, MONTHS_GENITIVE[last.month - 1])
+    return '%d тур %s' % (vp_config.CURRENT_TOUR, days)
+
+
+def auth_pitch():
+    """Левая колонка экрана входа (макет раунда 2): только правдивые цифры.
+
+    Число задач — видимые в каталоге (тот же шлюз, что у каталога), дата тура —
+    из `vp/config.py`. Нет данных — строки нет.
+    """
+    from django.core.cache import cache
+
+    from catalog.filters import base_queryset
+    from problems.templatetags.ru import plural_ru
+
+    count = cache.get('auth_pitch_tasks')
+    if count is None:
+        count = base_queryset('catalog').count()
+        cache.set('auth_pitch_tasks', count, PITCH_CACHE_SECONDS)
+    tasks = ''
+    if count:
+        tasks = '%s %s' % ('{:,}'.format(count).replace(',', ' '),
+                           plural_ru(count, 'задача,задачи,задач'))
+    return {'tasks': tasks, 'tour': _tour_phrase()}
+
+
 class RoleBasedLoginView(LoginView):
     """Вход с ограничением частоты и разводкой по ролям."""
 
@@ -104,8 +153,9 @@ class RoleBasedLoginView(LoginView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # С почтой экран говорит «Логин или почта» и ведёт на сброс по коду.
+        # С почтой экран говорит «Почта или логин» и ведёт на сброс по коду.
         context['mail_enabled'] = email_codes.mail_enabled()
+        context['pitch'] = auth_pitch()
         return context
 
     def _ident(self):
@@ -173,15 +223,21 @@ PENDING_KEY = 'pending_registration'
 PENDING_TTL = 30 * 60
 #: Куда уходит зарегистрировавшийся, если пришёл без `next`.
 DEFAULT_NEXT = '/profile/?welcome=1'
+#: Роль профиля до онбординга: выбирает её сам человек на `/welcome/`.
+DEFAULT_ROLE = 'student'
 
 
 class RegisterView(FormView):
-    """Регистрация. Роль выбирает сам человек.
+    """Регистрация (раунд 2, решение владельца 29.10.2026: «почта + пароль»).
+
+    Роли в форме нет: её спрашивает онбординг (`/welcome/`), а до него профиль
+    ученический — `UserProfile.role = student`, как у входа через сервисы.
 
     Почта выключена (`MAIL_ENABLED=0`): логин и пароль, аккаунт создаётся
     сразу; «Забыли пароль» — через Telegram.
 
-    Почта включена (решение владельца 26.10.2026, docs/MAIL.md): это ШАГ 1 из
+    Почта включена (решение владельца 26.10.2026, docs/MAIL.md): почта и пароль,
+    логин придумывает сайт (`problems/usernames.py`). Это ШАГ 1 из
     двух. Аккаунт здесь НЕ создаётся: анкета (с хешем пароля, открытого пароля
     в сессии нет) ложится в сессию, на почту уходит код, а аккаунт создаёт
     шаг 2 — `RegisterConfirmView`, когда почта доказана.
@@ -209,9 +265,8 @@ class RegisterView(FormView):
         # «Изменить почту» со второго шага: форма заполнена всем, кроме пароля.
         if (email_codes.mail_enabled() and pending
                 and self.request.method == 'GET' and self.request.GET.get('edit')):
-            initial.update(username=pending['username'], email=pending['email'],
-                           role=pending['role'], mail_consent=pending['mail_consent'],
-                           consent=True)
+            initial.update(email=pending['email'], mail_consent=pending['mail_consent'],
+                           role=pending.get('role') or DEFAULT_ROLE, consent=True)
         return initial
 
     def dispatch(self, request, *args, **kwargs):
@@ -252,9 +307,9 @@ class RegisterView(FormView):
         with transaction.atomic():
             user = form.save()
 
-            # Профиль с выбранной ролью. `UserProfile.save()` сам подтянет
-            # старое поле `User.role` через существующее соответствие.
-            profile_role = form.cleaned_data['role']
+            # Профиль ученический до онбординга, там человек выберет роль сам.
+            # `UserProfile.save()` подтянет старое поле `User.role`.
+            profile_role = form.cleaned_data.get('role') or DEFAULT_ROLE
             UserProfile.objects.update_or_create(
                 user=user, defaults={'role': profile_role})
             consent.grant(user, ConsentRecord.Kind.PD, ConsentRecord.Source.REGISTER)
@@ -268,12 +323,11 @@ class RegisterView(FormView):
         email = data['email']
         previous = self.request.session.get(PENDING_KEY) or {}
         pending = {
-            'username': data['username'],
             'email': email,
             # ⚠️ ТОЛЬКО ХЕШ: открытый пароль в сессию (а значит, в Redis и в
             # базу сессий) не попадает никогда.
             'password_hash': make_password(data['password1']),
-            'role': data['role'],
+            'role': data.get('role') or DEFAULT_ROLE,
             'mail_consent': bool(data.get('mail_consent')),
             'next': self._next(),
             'started_at': time.time(),
@@ -309,7 +363,10 @@ def finish_signup(request, user, profile_role, target):
     # занятия уже после регистрации (`student:join_group`).
     kind = (SignupSource.Kind.TEACHER if profile_role == 'tutor'
             else SignupSource.Kind.STUDENT)
-    signup_source.record_signup(request, user, kind)
+    # Раунд 2: при онбординге роль ещё не выбрана — вид уточнит и цель Метрики
+    # отправит шаг «Кто вы?» (`signup_source.confirm_role`).
+    signup_source.record_signup(request, user, kind,
+                                defer_goal=settings.ONBOARDING_ENABLED)
     return redirect(target)
 
 
@@ -374,33 +431,31 @@ class RegisterConfirmView(View):
             messages.error(request, str(taken))
             return redirect('register')
         pending = request.session.pop(PENDING_KEY)
-        return finish_signup(request, user, pending['role'],
+        return finish_signup(request, user, pending.get('role') or DEFAULT_ROLE,
                              pending.get('next') or DEFAULT_NEXT)
 
     def _create_account(self):
         pending = self.pending
         try:
             with transaction.atomic():
-                if User.objects.filter(username__iexact=pending['username']).exists():
-                    raise _Taken('Этот логин успели занять. Начните регистрацию заново.')
                 if email_codes.verified_user_for(pending['email']) is not None:
                     raise _Taken('Эта почта уже привязана к аккаунту. Войдите или '
                                  'восстановите пароль.')
-                user = User(username=pending['username'], email=pending['email'],
+                # Логин придумывает сайт (раунд 2): `econ_` + 6 знаков, свободный.
+                user = User(username=free_username(), email=pending['email'],
                             email_verified_at=timezone.now(),
                             password=pending['password_hash'])
                 user.save()
-                # Профиль с выбранной ролью. `UserProfile.save()` сам подтянет
-                # старое поле `User.role` через существующее соответствие.
+                # Профиль ученический до онбординга (роль выбирают там).
                 UserProfile.objects.update_or_create(
-                    user=user, defaults={'role': pending['role']})
+                    user=user, defaults={'role': pending.get('role') or DEFAULT_ROLE})
                 consent.grant(user, ConsentRecord.Kind.PD, ConsentRecord.Source.REGISTER)
                 if pending.get('mail_consent'):
                     consent.grant(user, ConsentRecord.Kind.MAIL,
                                   ConsentRecord.Source.REGISTER)
         except IntegrityError:
-            # Тот же логин или почту записали параллельно, в ту же секунду.
-            raise _Taken('Этот логин успели занять. Начните регистрацию заново.')
+            # Ту же почту (или тот же случайный логин) записали параллельно, в ту же секунду.
+            raise _Taken('Не получилось создать аккаунт. Начните регистрацию заново.')
         return user
 
 
@@ -557,7 +612,9 @@ def account_email(request):
         return redirect_to_login(request.get_full_path(), '/login/')
     user = request.user
     target = safe_next(request)
-    src = 'vp' if (request.POST.get('src') or request.GET.get('src')) == 'vp' else ''
+    src = request.POST.get('src') or request.GET.get('src') or ''
+    if src not in ('vp', 'onb'):
+        src = ''
     pending = request.session.get(EMAIL_CHANGE_KEY)
 
     class EmailForm(forms.Form):
@@ -633,7 +690,8 @@ def account_email(request):
 
     if pending:
         target, src = pending.get('next') or '', pending.get('src') or ''
-    return render(request, 'platform/account_email.html', {
+    template, extra = _account_email_look(user, src)
+    return render(request, template, dict(extra, **{
         'form': form,
         'pending': pending,
         'error': error,
@@ -645,4 +703,25 @@ def account_email(request):
         'src': src,
         'change_url': _account_email_url(target, src) + ('&' if (target or src) else '?') + 'change=1',
         'seo_noindex': True,
-    })
+    }))
+
+
+def _account_email_look(user, src):
+    """Вид страницы «Почта»: кабинетный или экран входа (раунд 2).
+
+    Экран входа «Осталась почта» (`registration/need_email.html`) — аккаунту из
+    VK ID / Яндекс ID без подтверждённой почты и старому аккаунту с шага
+    онбординга «Добавьте почту» (`src=onb`). Логика страницы одна и та же.
+    """
+    from problems.views_onboarding import needs_service_email
+
+    if needs_service_email(user):
+        link = user.social_accounts.filter(created_user=True).order_by('pk').first()
+        from problems.social.providers import PROVIDERS
+        provider = PROVIDERS.get(link.provider) if link else None
+        name = ' '.join(p for p in (user.first_name, user.last_name) if p)
+        return 'registration/need_email.html', {
+            'service': provider.title if provider else '', 'display_name': name}
+    if src == 'onb':
+        return 'registration/need_email.html', {'service': ''}
+    return 'platform/account_email.html', {}
