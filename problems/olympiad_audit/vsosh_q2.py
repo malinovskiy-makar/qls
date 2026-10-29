@@ -422,7 +422,8 @@ def p2_pump(q, opts, log):
     """Насос фазы 2: Haiku — все пакеты сразу; terra — по одному, следующий
     после того, как предыдущий забран. Каждый круг — `collect`. Выход —
     когда всё прочитано или упёрлись в потолок денег."""
-    p2_submit(q, dict(opts, models=SECOND), log)
+    if (opts.get('models') or '') != PRIMARY:   # `--models gpt-6.1-terra` — Haiku шлёт другой процесс
+        p2_submit(q, dict(opts, models=SECOND), log)
     while True:
         collect(q, handlers(q), log)
         inflight = [r for r in BatchLog(q).open_batches()
