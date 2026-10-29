@@ -387,7 +387,11 @@ def compare_numbers(blocks):
     text = '\n'.join(str(b.get(k) or '') for b in blocks
                      if b['type'] not in ('footer', 'noise', 'header')
                      for k in ('text', 'answer', 'caption'))
-    return set(numbers(_LIST_LABEL.sub(' ', text)))
+    # Номер и баллы блока — тоже в множество: «Задача 3 (20 баллов)» одна
+    # модель пишет в текст, другая — в поля `number`/`points`.
+    meta = ' '.join(str(b.get(k)) for b in blocks if b['type'] not in ('footer', 'noise', 'header')
+                    for k in ('number', 'points', 'title') if b.get(k) not in (None, ''))
+    return set(numbers(_LIST_LABEL.sub(' ', text) + ' ' + meta))
 
 
 def content_text(blocks):

@@ -190,3 +190,179 @@ class KeyGridTests(SimpleTestCase):
         self.assertEqual(got, {'q1': (('3',), 0.9), 'q2': (None, 0.2)})
         self.assertEqual(K.answer_text(('1', '3'), K.options(self.ROWS[0]['statement_md'])), '1), 3)')
         self.assertEqual(K.answer_text(('нет',), K.options(self.ROWS[2]['statement_md'])), 'Нет')
+
+
+class AgreeRefinedTests(SimpleTestCase):
+    """Правило сведения после калибровки арбитра (29.10): разметка блоков,
+    поле answer и метки списков расхождением не считаются."""
+
+    def test_answer_field_and_metadata_ignored(self):
+        a = rec(task('3', 'Найдите цену, если $Q = 100 - 2P$.', 20),
+                {'type': 'solution', 'number': '3', 'text': 'Цена $P = 25$.', 'answer': '25'})
+        b = rec({'type': 'task', 'number': '3',
+                 'text': 'Задача 3 (20 баллов). Найдите цену, если $Q = 100 - 2P$.'},
+                {'type': 'criteria', 'number': '3', 'text': 'Цена $P = 25$.'})
+        self.assertEqual(vv.agree(a, b, 'tasks'), (True, []))
+
+    def test_list_labels_not_numbers(self):
+        a = rec(task('1', 'Вопрос\n\n1) 300\n2) 500'))
+        b = rec(task('1', 'Вопрос\n\na) 300\nb) 500'))
+        self.assertEqual(vv.agree(a, b), (True, []))
+
+    def test_solution_page_ignores_task_numbers(self):
+        a = rec(task('7', 'Решение: $Q = 40$'))
+        b = rec({'type': 'criteria', 'number': '7', 'text': 'Решение: $Q = 40$'})
+        self.assertFalse(vv.agree(a, b, 'tasks')[0])
+        self.assertTrue(vv.agree(a, b, 'solutions')[0])
+
+    def test_real_number_loss_still_disagrees(self):
+        a = rec(task('1', 'Выручка 138 000 руб., прибыль 275 руб.'))
+        b = rec(task('1', 'Выручка 138 000 руб.'))
+        self.assertEqual(vv.agree(a, b)[1], ['числа'])
+
+    def test_empty_page_vs_content_disagrees(self):
+        self.assertFalse(vv.agree(rec(), rec(task('3', 'ЗАДАЧА 3')), 'tasks')[0])
+
+
+class LayerTiebreakTests(SimpleTestCase):
+    def test_layer_picks_version_with_page_numbers(self):
+        a = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 5 рублей.'))
+        b = rec(task('1', 'Спрос $Q_d = 100 - 2P$, налог 6 рублей.'))
+        why = vv.agree(a, b)[1]
+        self.assertEqual(vv.layer_tiebreak(a, b, page(), why), 'A')
+        self.assertEqual(vv.layer_tiebreak(b, a, page(), why), 'B')
+
+    def test_layer_cannot_decide_structure_or_scan(self):
+        a = rec(task('1', 'Спрос $Q_d = 100 - 2P$'))
+        b = rec(task('1', 'Спрос $Q_d = 100 - 3P$'))
+        self.assertIsNone(vv.layer_tiebreak(a, b, page(), ['числа', 'варианты']))
+        self.assertIsNone(vv.layer_tiebreak(a, b, page(layer=''), ['числа']))
+
+    def test_both_off_page_goes_to_arbiter(self):
+        a = rec(task('1', 'налог 7 рублей'))
+        b = rec(task('1', 'налог 8 рублей'))
+        self.assertIsNone(vv.layer_tiebreak(a, b, page(), ['числа']))
+
+
+class RecheckRuleTests(SimpleTestCase):
+    """Фаза 4: правило приёма решения Opus (как P2)."""
+
+    from problems.olympiad_audit import vsosh_recheck as RC
+    ROW = {'statement_md': 'Спрос на товар задан функцией Qd = 100 - 2P. Найдите равновесную цену.',
+           'answer': ''}
+
+    def reply(self, **kw):
+        return json.dumps(dict({'decision': 'keep', 'evidence': 'Спрос на товар задан функцией',
+                                'confidence': 0.95}, **kw), ensure_ascii=False)
+
+    def test_keep_and_fix_accepted(self):
+        self.assertEqual(self.RC.judge(self.reply(), self.ROW, [LAYER])[0], 'keep')
+        v, fixes, _w, _d = self.RC.judge(self.reply(decision='fix', fixes={'answer': '0,5'}),
+                                          self.ROW, [LAYER])
+        self.assertEqual((v, fixes), ('fix', {'answer': '0,5'}))
+
+    def test_fix_with_foreign_number_or_truncation_rejected(self):
+        v, _f, why, _d = self.RC.judge(self.reply(decision='fix', fixes={'answer': '42'}),
+                                        self.ROW, [LAYER])
+        self.assertEqual(v, 'human')
+        self.assertIn('числа_не_со_страницы:answer', why)
+        v, _f, why, _d = self.RC.judge(self.reply(decision='fix', fixes={'statement_md': 'Спрос.'}),
+                                        self.ROW, [LAYER])
+        self.assertIn('урезание_условия', why)
+
+    def test_unknown_field_dropped_and_retry_band(self):
+        v, _f, why, _d = self.RC.judge(self.reply(decision='fix', fixes={'event_id': 'x'}),
+                                        self.ROW, [LAYER])
+        self.assertIn('правка_пустая', why)
+        self.assertEqual(self.RC.judge(self.reply(confidence=0.8), self.ROW, [LAYER])[0], 'retry')
+        self.assertEqual(self.RC.judge(self.reply(evidence='чужая цитата про Лаффера'),
+                                       self.ROW, [LAYER])[0], 'human')
+
+    def test_needs_recheck_scope(self):
+        rc = self.RC
+        self.assertTrue(rc.needs_recheck({'stage': 'final', 'check_flags': ['нет_решения']}))
+        self.assertFalse(rc.needs_recheck({'stage': 'final', 'check_flags': ['тест_без_ключа']}))
+        self.assertFalse(rc.needs_recheck({'stage': 'municipal', 'check_flags': ['нет_решения']}))
+        self.assertTrue(rc.needs_recheck({'stage': 'regional', 'check_flags': [],
+                                          'math_star_unescaped': 1}))
+
+
+class ApplyV2Tests(SimpleTestCase):
+    from problems.olympiad_audit import vsosh_v2 as V
+
+    def row(self, **kw):
+        return dict({'event_id': 'e', 'number': 'тест-1', 'task_variant': '', 'stage': 'municipal',
+                     'statement_md': 'Вопрос\n\n1) да\n2) нет', 'answer': ''}, **kw)
+
+    def test_keys_applied_only_to_same_question(self):
+        with tempfile.TemporaryDirectory() as d:
+            acc = os.path.join(d, 'a.jsonl')
+            with open(acc, 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps({'row': 'e|тест-1|', 'answer': '2)', 'models': ['a', 'b']}) + '\n')
+                fh.write(json.dumps({'row': 'e|тест-2|', 'answer': '1)', 'models': ['a', 'b']}) + '\n')
+            v1 = [self.row(), self.row(number='тест-2')]
+            v2 = [self.row(), self.row(number='тест-2',
+                                       statement_md='Совсем другой вопрос после пересборки')]
+            st = self.V.apply_keys(v2, acc, v1)
+            self.assertEqual(v2[0]['answer'], '2)')
+            self.assertEqual(v2[1]['answer'], '')
+            self.assertEqual(dict(st), {'ключ': 1, 'строка_сдвинулась': 1})
+
+    def test_recheck_fix_and_keep(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'd.jsonl')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps({'row': 'e|1|', 'verdict': 'fix', 'fixes': {'answer': '25'}}) + '\n')
+                fh.write(json.dumps({'row': 'e|2|', 'verdict': 'keep'}) + '\n')
+            rows = [self.row(number='1'), self.row(number='2')]
+            self.V.apply_recheck(rows, p)
+            self.assertEqual((rows[0]['answer'], rows[0]['q2_fixed_fields']), ('25', ['answer']))
+            self.assertEqual(rows[1]['q2_recheck'], 'keep')
+
+    def test_key_grid_invariant(self):
+        rows = [self.row(answer='2)', answer_from_key_grid=['a', 'b']),
+                self.row(number='тест-2', answer='5)', answer_from_key_grid=['a', 'b'])]
+        self.assertEqual(self.V.test_keys_in_options(rows), ['e|тест-2|'])
+
+    def test_queue_item_format(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'render_index.jsonl'), 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps({'pdf': 'x.pdf', 'page_dir': 'pages/ab'}) + '\n')
+            r = self.row(check_flags=['тест_без_ключа', 'ключа_нет_в_источнике'],
+                         source_pages=['x.pdf#p2'])
+            out = self.V.build_queue([r], d, [{'row': 'e|тест-1|', 'why': 'модели_разошлись',
+                                               'replies': {'m1': [['1'], 0.9], 'm2': [['2'], 0.9]}}],
+                                     [], os.path.join(d, 'q', 'q.jsonl'))
+            self.assertEqual(len(out), 1)
+            x = out[0]
+            self.assertEqual(x['item_id'], 'q2_vsosh_v2:vseros:e|тест-1|:тест_без_ключа')
+            self.assertEqual(set(x), {'item_id', 'source', 'olympiad', 'ref_key', 'problem_id', 'check',
+                                      'details', 'page_images', 'current', 'proposed', 'confidence'})
+            self.assertTrue(x['page_images'][0].endswith(os.path.join('pages', 'ab', 'p2.png')))
+            self.assertEqual(x['proposed'], {'answer_by_model': {'m1': ['1'], 'm2': ['2']}})
+
+
+class Ile2008Tests(SimpleTestCase):
+    HTML = ('<html><body><h2>1-й тур: задачи</h2>'
+            '<div class="task"><h3>1. Простая задача</h3><div class="condition"><div class="tex2jax">'
+            '<p>Спрос $Q = 100 - P$.</p><ul><li>а) цена</li><li>б) объём</li></ul></div></div>'
+            '<div class="solution_and_answer"><div class="title">Решение</div>'
+            '<p>Ответ: $P = 50$.</p></div></div>'
+            '<h2>Тест</h2><div class="task"><h3>1. Вопрос</h3><div class="condition">'
+            '<div class="tex2jax">Что выбрать?<br/>1)50 кг<br/>2)60 кг</div></div></div></body></html>')
+
+    def test_rows_and_source_note(self):
+        from problems.olympiad_audit import vsosh_v2 as V
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'p.html')
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(self.HTML)
+            rows = V.ile_2008_rows(path, os.path.join(d, 'v2', 'figures_v2', 'ile'), fetch=False)
+        self.assertEqual([(r['event_id'], r['number']) for r in rows],
+                         [('vseros-final-2008-09-ru-all-tur1', '1'),
+                          ('vseros-final-2008-09-ru-all-test', 'тест-1')])
+        self.assertEqual(rows[0]['statement_md'], 'Спрос $Q = 100 - P$.\n\n- а) цена\n- б) объём')
+        self.assertEqual(rows[0]['solution_md'], 'Ответ: $P = 50$.')
+        self.assertEqual(rows[1]['statement_md'], 'Что выбрать?\n1)50 кг\n2)60 кг')
+        self.assertEqual(rows[0]['source_note'], 'ILE (печатная страница), официальный файл не найден')
+        self.assertFalse(rows[0]['official'])
