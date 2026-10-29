@@ -210,8 +210,6 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
         data = self.run_runner()
         self.assertNotIn('error', data, data.get('error'))
         self.assertEqual(set(data['checks']), EXPECTED)
-        # Запас высоты героя посадочной виден в логе CI и когда проверка зелёная (margin, px).
-        print('VP landing hero:', data['checks']['d.landing_hero_not_clipped']['detail'])
         failed = {k: v['detail'] for k, v in data['checks'].items() if not v['ok']}
         self.assertFalse(failed, 'браузерные проверки ВП:\n'
                          + json.dumps(failed, ensure_ascii=False, indent=1)[:6000])

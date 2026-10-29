@@ -647,18 +647,6 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px;
 }
 
-/* ⚠️ ГЕРОЙ НА 1440×800 ДОЛЖЕН ВЛЕЗАТЬ С ЗАПАСОМ. Высоту герою даёт сетка (остаток окна), а у героя
-   `overflow: hidden`: не хватило места – срезается низ. Запас нужен, потому что высота содержимого
-   зависит от шрифтов ОС: цепочка змейки набрана моноширинным системным шрифтом и на Linux (CI)
-   переносится на вторую строку – там содержимое выше на ~21 px, чем на Windows. Вертикаль ужата на
-   ~47 px, текст, шрифты и ширины не тронуты. Держит `d.landing_hero_not_clipped` (в detail – margin). */
-@media (min-width: 1100px) {
-  .vp-land-hero { padding-top: 14px; padding-bottom: 14px; gap: 8px; }
-  .vp-land-comp { gap: 4px; }
-  .vp-land-snake { gap: 5px; }
-  .vp-land-snake p { line-height: 1.35; }
-}
-
 /* Зона B — таблица лучших попыток */
 .vp-land-board { display: flex; flex-direction: column; min-height: 0; padding: 16px 20px 14px; }
 .vp-land-bt {

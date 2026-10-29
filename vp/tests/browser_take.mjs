@@ -217,15 +217,7 @@ try {
     return hero.scrollHeight <= hero.clientHeight;
   }), await lp.evaluate(() => {
     const hero = document.querySelector('.vp-land-hero');
-    // margin – запас по высоте. scrollHeight не бывает меньше clientHeight, поэтому запас считаем по
-    // естественной высоте содержимого: на миг снимаем нажим сетки (высота героя = высота содержимого).
-    const st = document.createElement('style');
-    st.textContent = '.vp-land-hero{align-self:start !important;height:max-content !important;min-height:0 !important}';
-    document.head.appendChild(st);
-    const natural = hero.clientHeight;
-    st.remove();
-    return { scrollHeight: hero.scrollHeight, clientHeight: hero.clientHeight, naturalHeight: natural,
-      margin: hero.clientHeight - natural };
+    return { scrollHeight: hero.scrollHeight, clientHeight: hero.clientHeight };
   }));
   check('d.landing_nav_item_is_active', await lp.evaluate(() => {
     // Подпись — первый текстовый узел: метка NEW у пункта лежит в <span>, и `textContent` был бы «Тренажёр ВПNEW».
