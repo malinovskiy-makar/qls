@@ -20,6 +20,18 @@ def current_version():
     return settings.LEGAL['docs_version']
 
 
+def version_for(kind):
+    """Номер редакции, на которой сверяется и пишется согласие этого вида.
+
+    Согласие на помощника живёт своей редакцией (`ai_version`, документ
+    `consent_ai.md`): правка Политики не должна спрашивать его заново.
+    Остальные виды идут за `docs_version`.
+    """
+    if kind == ConsentRecord.Kind.AI:
+        return settings.LEGAL['ai_version']
+    return current_version()
+
+
 def enforcement_enabled():
     return bool(getattr(settings, 'LEGAL_ENFORCEMENT_ENABLED', True))
 
@@ -34,9 +46,9 @@ def active_record(user, kind):
 
 
 def has_current(user, kind):
-    """Есть действующая запись ТЕКУЩЕЙ редакции документов."""
+    """Есть действующая запись ТЕКУЩЕЙ редакции документа этого вида (`version_for`)."""
     record = active_record(user, kind)
-    return bool(record and record.version == current_version())
+    return bool(record and record.version == version_for(kind))
 
 
 def wants_mail(user):
@@ -57,7 +69,7 @@ def grant(user, kind, source):
     запись СТАРОЙ редакции закрывается (`superseded_at`) и заменяется новой,
     в одной транзакции, чтобы пара не осталась без действующей записи.
     """
-    version = current_version()
+    version = version_for(kind)
     for _attempt in range(2):
         try:
             with transaction.atomic():

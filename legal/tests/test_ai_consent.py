@@ -131,9 +131,28 @@ class AiConsentTests(TestCase):
 
     def test_old_edition_of_the_ai_consent_is_not_enough(self):
         consent.grant(self.user, AI, ConsentRecord.Source.CHAT)
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
-            consent.grant(self.user, PD, ConsentRecord.Source.GATE)
+        with override_settings(LEGAL={**settings.LEGAL, 'ai_version': '2'}):
+            self.assertFalse(consent.has_current(self.user, AI))
             self.assertEqual(self._chat().status_code, 403)
+
+    def test_edition_one_ai_consent_survives_docs_edition_two(self):
+        """Правка Политики (docs_version) не спрашивает согласие на помощника заново."""
+        record = ConsentRecord.objects.create(
+            user=self.user, kind=AI, version='1', source=ConsentRecord.Source.CHAT)
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '2', 'ai_version': '1'}):
+            self.assertTrue(consent.has_current(self.user, AI))
+            consent.grant(self.user, PD, ConsentRecord.Source.GATE)
+            with mock.patch('catalog.chat.answer', return_value='ok'):
+                self.assertEqual(self._chat().status_code, 200)
+        record.refresh_from_db()
+        self.assertIsNone(record.superseded_at)
+        self.assertIsNone(record.revoked_at)
+
+    def test_new_ai_record_gets_the_ai_edition_not_the_docs_one(self):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '7', 'ai_version': '3'}):
+            record = consent.grant(self.user, AI, ConsentRecord.Source.CHAT)
+            self.assertEqual(record.version, '3')
+            self.assertEqual(consent.grant(self.user, PD, ConsentRecord.Source.GATE).version, '7')
 
     def test_pd_consent_alone_does_not_open_the_assistant(self):
         self.assertTrue(consent.has_current(self.user, PD))
@@ -159,7 +178,7 @@ class AiConsentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['ok'])
         record = ConsentRecord.objects.get(user=self.user, kind=AI)
-        self.assertEqual((record.source, record.version), ('chat', settings.LEGAL['docs_version']))
+        self.assertEqual((record.source, record.version), ('chat', settings.LEGAL['ai_version']))
         with mock.patch('catalog.chat.answer', return_value='ok'):
             self.assertEqual(self._chat().status_code, 200)
 

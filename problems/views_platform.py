@@ -140,13 +140,13 @@ def _ai_consent_record(user):
     """Действующее согласие на помощника ТЕКУЩЕЙ редакции или None.
 
     Запись старой редакции не считается: помощник попросит согласие заново
-    (`legal.consent.has_current`), и профиль обязан говорить то же самое.
+    (`legal.consent.has_current`, редакция `ai_version`), и профиль обязан говорить то же самое.
     """
     from legal import consent
     from problems.models_legal import ConsentRecord
 
     record = consent.active_record(user, ConsentRecord.Kind.AI)
-    return record if record and record.version == consent.current_version() else None
+    return record if record and record.version == consent.version_for(ConsentRecord.Kind.AI) else None
 
 
 @login_required(login_url='/login/')

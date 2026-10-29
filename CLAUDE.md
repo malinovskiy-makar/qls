@@ -407,7 +407,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 ДОСЛОВНО в `legal/texts/*.md`; реквизиты подставляются при показе из `settings.LEGAL` (почта и дата —
 только из `LEGAL_CONTACT_EMAIL` / `LEGAL_DOCS_DATE`; при `DEBUG=False` и пустых значениях
 `manage.py check` падает с `legal.E001`). Согласие — `ConsentRecord`, ВСЕ чтения и записи только через
-`legal/consent.py`; вид `pd` (документы) и `ai` (помощник и Сингапур). Блокирующий экран —
+`legal/consent.py`; вид `pd` (документы) и `ai` (помощник и Сингапур); редакции раздельные: `LEGAL['docs_version']` (pd, рассылка) и своя `LEGAL['ai_version']` (только `consent_ai.md`). Блокирующий экран —
 `legal.middleware.ConsentGateMiddleware` (в сессии `legal_pd_version`, чтобы не ходить в базу на
 каждой странице) + `legal/ws.py` для сокетов дуэли; всё, что отправляет данные человека модели,
 закрыто `@legal.guards.ai_consent_required` (403, код `ai_consent_required`). ⚠️ В прогоне тестов
