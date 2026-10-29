@@ -37,6 +37,7 @@ PRICES = {
     'claude-sonnet-5-5': (2.00, 10.00),
     'claude-opus-5-5': (4.00, 20.00),
     'claude-haiku-5-5': (0.10, 0.50),
+    'glm-5.3-flash': (0.15, 0.50),
     'google/gemini-4-argon': (2.00, 10.00),
     'qwen/qwen3.8-max-prime': (4.00, 12.00),
 }
@@ -239,6 +240,13 @@ def call(model, body, env, timeout=300):
         u = d.get('usage') or {}
         return (d['choices'][0]['message'].get('content') or '', u.get('prompt_tokens', 0),
                 u.get('completion_tokens', 0), float(u.get('cost') or 0))
+    if prov == 'glm':
+        d = _post('https://api.z.ai/api/paas/v4/chat/completions',
+                  {'authorization': 'Bearer ' + env['GLM_API_KEY']}, body, timeout)
+        u = d.get('usage') or {}
+        tin, tout = u.get('prompt_tokens', 0), u.get('completion_tokens', 0)
+        return (d['choices'][0]['message'].get('content') or '', tin, tout,
+                call_usd(model, tin, tout))
     if prov == 'anthropic':
         headers = {'x-api-key': env['ANTHROPIC_API_KEY'], 'anthropic-version': '2023-06-01'}
         if env.get('ANTHROPIC_WORKSPACE_ID'):
@@ -252,8 +260,21 @@ def call(model, body, env, timeout=300):
     raise ValueError(model)
 
 
+def glm_body(model, job, max_tokens=12000):
+    """GLM-5.3-Flash (Z.AI): как у P4 `ocr.py` — рассуждение low."""
+    mt, data = image_b64(job.png)
+    return {'model': model, 'max_tokens': max_tokens, 'thinking': {'type': 'enabled'},
+            'reasoning_effort': 'low',
+            'messages': [{'role': 'system', 'content': system_prompt()},
+                         {'role': 'user', 'content': [
+                             {'type': 'image_url', 'image_url': {'url': f'data:{mt};base64,{data}'}},
+                             {'type': 'text', 'text': user_text(job)}]}]}
+
+
 def body_for(model, job, effort='low'):
     prov = provider_of(model)
+    if prov == 'glm':
+        return glm_body(model, job)
     if prov == 'openai':
         return openai_body(model, job, effort)
     if prov == 'openrouter':
@@ -323,22 +344,29 @@ def numbers(text):
     TeX-запятая «49{,}9» и «1\\,000» — одно число; «1 000 000» — одно;
     метка варианта не склеивается с числом («2) 500» — два числа)."""
     t = (text or '').replace('{,}', ',').replace('{.}', '.')
-    t = re.sub(r'(?<=\d)\\[,;! ](?=\d{3}\b)', '', t)
-    t = re.sub(r'(?<=\d)[ \u00a0\u202f](?=\d{3}(?!\d)(?![.,)]\s))', '', t)
+    t = re.sub(r'(?<=\d)(?:\\[,;:! ]|~|\\thinspace\s?)(?=\d{3}(?!\d))', '', t)
+    t = re.sub(r'(?<=\d)[ \u00a0\u202f](?=\d{3}(?!\d))', '', t)
     return Counter(n for n in (_norm_num(x) for x in _NUM_RE.findall(t)) if n is not None)
 
 
-_OPTION_LINE = re.compile(r'(?m)^\s*(?:[-*+]\s+|\(?[а-еa-eА-ЕA-E][.)]\s+|[1-9][.)]\s+)\S')
+#: Вариант ответа — строка с меткой («а)», «(b)», «1.», «- 2)»); голый пункт
+#: списка не считается: модели по-разному режут решения на пункты.
+_OPTION_LINE = re.compile(r'(?m)^\s*(?:[-*+]\s+)?(?:\*\*)?\(?(?:[а-еa-eА-ЕA-E]|[1-9])[.)]')
 _TABLE_ROW = re.compile(r'(?m)^\s*\|(?![\s|:-]*$).*\|\s*$')
 _WORD3 = re.compile(r'[а-яёa-z]{3,}')
 
 
 def structure(blocks):
-    """Структура страницы: номера заданий (по порядку), варианты, строки таблиц, рисунки."""
-    tasks = [str(b.get('number') or '').strip() for b in blocks
-             if b['type'] in ('task', 'solution', 'criteria') and str(b.get('number') or '').strip()]
-    text = '\n'.join(str(b.get('text') or '') for b in blocks
-                     if b['type'] not in ('footer', 'noise', 'header'))
+    """Структура страницы: номера условий заданий по порядку (без повторов
+    подряд — продолжение задания), варианты, строки таблиц, рисунки. Номера
+    блоков решений и критериев не сравниваются: модели по-разному режут
+    файл «вопрос — решение» на блоки, а текст при этом одинаков."""
+    tasks = []
+    for b in blocks:
+        num = re.sub(r'(?i)^(?:задача|задание|вопрос)\s*№?\s*', '', str(b.get('number') or '')).strip(' .')
+        if b['type'] == 'task' and num and (not tasks or tasks[-1] != num):
+            tasks.append(num)
+    text = content_text(blocks)
     return {'numbers': tasks, 'options': len(_OPTION_LINE.findall(text)),
             'table_rows': len(_TABLE_ROW.findall(text)),
             'figures': sum(1 for b in blocks if b['type'] == 'figure')}
@@ -346,6 +374,30 @@ def structure(blocks):
 
 def body_text(blocks):
     return transcribe.transcript_text(blocks)
+
+
+_LIST_LABEL = re.compile(r'(?m)^\s*(?:[-*+]\s+)?(?:\*\*)?\(?\d{1,2}[.)](?=\s|\*)')
+
+
+def compare_numbers(blocks):
+    """Числа для сведения двух версий: МНОЖЕСТВО чисел текста, ответа и
+    подписей, без меток списков («3)», «5. Задачи»). Множество, а не
+    мультимножество: число из текста модели по-разному повторяют в `answer`."""
+    text = '\n'.join(str(b.get(k) or '') for b in blocks
+                     if b['type'] not in ('footer', 'noise', 'header')
+                     for k in ('text', 'answer', 'caption'))
+    return set(numbers(_LIST_LABEL.sub(' ', text)))
+
+
+def content_text(blocks):
+    """Только текст страницы (text, caption) — без полей-меток
+    `number`/`points`/`title` и без `answer`: одна модель пишет «Задача 3
+    (20 баллов)» в текст, другая — в поля; в `answer` одна кладёт номер
+    варианта, другая — его полный текст (калибровка арбитра 29.10: 15 из 16
+    «расхождений» были такими, текст страницы совпадал)."""
+    return '\n'.join(str(b.get(k) or '') for b in blocks
+                     if b['type'] not in ('footer', 'noise', 'header')
+                     for k in ('text', 'caption'))
 
 
 def page_metrics(rec, job):
@@ -378,7 +430,7 @@ def page_metrics(rec, job):
 
 # ── Сведение двух мнений ───────────────────────────────────────────────
 
-def agree(rec_a, rec_b):
+def agree(rec_a, rec_b, kind='tasks'):
     """Совпали ли две расшифровки «по числам и структуре» (правило Q2, как P2):
     одинаковое мультимножество чисел текста, одинаковые номера заданий по
     порядку, число вариантов и строк таблиц. → (bool, причины расхождения)."""
@@ -387,11 +439,14 @@ def agree(rec_a, rec_b):
     why = []
     if (rec_a or {}).get('status') != 'ok' or (rec_b or {}).get('status') != 'ok':
         return False, ['нет_ответа']
-    na, nb = numbers(body_text(ba)), numbers(body_text(bb))
-    if na != nb:
+    if compare_numbers(ba) != compare_numbers(bb):
         why.append('числа')
     sa, sb = structure(ba), structure(bb)
-    for k in ('numbers', 'options', 'table_rows', 'figures'):
+    # Номера условий сравниваются только на странице условий: в файле
+    # решений «задание или критерий» — выбор разметки, а не текста.
+    fields = ('numbers', 'options', 'table_rows', 'figures') if kind not in (
+        'solutions', 'criteria') else ('options', 'table_rows', 'figures')
+    for k in fields:
         if sa[k] != sb[k]:
             why.append({'numbers': 'номера', 'options': 'варианты', 'table_rows': 'таблицы',
                         'figures': 'рисунки'}[k])
@@ -527,6 +582,43 @@ def run_pages(model, keys, jobs, folder, env, ledger, phase, workers=6, effort='
     with ThreadPoolExecutor(workers) as ex:
         list(ex.map(one, todo))
     return dict(stats)
+
+
+def layer_check(rec, job):
+    """Числа версии против текстового слоя страницы → (недостающие, лишние):
+    числа слоя (без колонтитулов) — должны быть у версии; числа версии —
+    должны быть во всём слое страницы или в шапке."""
+    blocks = transcribe.clean_blocks((rec or {}).get('blocks'))
+    got = set(numbers(content_text(blocks)))
+    want = set(numbers(transcribe.layer_body(job.layer, job.footers, job.page)))
+    full = set(numbers(job.layer)) | set(numbers(transcribe.transcript_text(blocks, header=True)))
+    return sorted(want - got), sorted(got - full)
+
+
+def layer_tiebreak(rec_a, rec_b, job, why):
+    """Расхождение ТОЛЬКО в числах, у страницы есть текстовый слой: если одна
+    версия со слоем сходится полностью (ни одного недостающего и лишнего
+    числа), а другая — нет, слой рассудил: → 'A' / 'B'. Иначе None (арбитру).
+    Слой здесь мерило, не источник: текст берётся из версии модели целиком."""
+    if why != ['числа'] or not job.has_layer:
+        return None
+    ba = transcribe.clean_blocks((rec_a or {}).get('blocks'))
+    bb = transcribe.clean_blocks((rec_b or {}).get('blocks'))
+    na, nb = compare_numbers(ba), compare_numbers(bb)
+    body = set(numbers(transcribe.layer_body(job.layer, job.footers, job.page)))
+    full = set(numbers(job.layer))
+    only_a, only_b = na - nb, nb - na
+
+    def wins(mine, theirs):
+        # Каждое число победителя, которого нет у соперника, есть в теле
+        # слоя (соперник его потерял); каждое число соперника, которого нет
+        # у победителя, отсутствует во всём слое (выдумка или ошибка чтения).
+        return mine <= body and not (theirs & full) and bool(mine or theirs)
+    a_wins = wins(only_a, only_b)
+    b_wins = wins(only_b, only_a)
+    if a_wins != b_wins:
+        return 'A' if a_wins else 'B'
+    return None
 
 
 # ── Арбитр расхождений (Claude Sonnet) ─────────────────────────────────

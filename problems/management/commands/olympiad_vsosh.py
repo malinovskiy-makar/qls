@@ -62,7 +62,8 @@ class Command(BaseCommand):
         step = opts['step']
         if step == 'q2':
             from problems.olympiad_audit import vsosh_q2
-            return vsosh_q2.run(self, opts)
+            vsosh_q2.run(self, opts)
+            return None
         if step in ('transcribe', 'batches', 'claude', 'assemble', 'ile', 'check', 'review',
                     'bank'):
             from problems.olympiad_audit import vsosh_digitize

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import statistics
 import subprocess
@@ -186,6 +187,178 @@ def calib_report(q, log):
     return out
 
 
+# ── Фаза 3: ключи-сетки ────────────────────────────────────────────────
+
+def _key_row_id(r):
+    return f"{r['event_id']}|{r['number']}|{r.get('task_variant', '')}"
+
+
+_KEY_HINT = re.compile(r'ответ\w* на тест|ключ|бланк ответ|ответы|ответ:|правильный ответ|верный ответ')
+_TEST_HINT = re.compile(r'тест|вопрос')
+
+
+def key_pages(q, ev, limit=8):
+    """Страницы файлов ответов комплекта, где стоит ключ теста: по расшифровке
+    P3 (таблица, «ответы/ключ», «тест/вопрос»); не нашлось — первые страницы
+    файлов ответов. → [путь png]."""
+    scored = []
+    for key in ('solution_files', 'criteria_files', 'task_files'):
+        for f in ev.get(key) or []:
+            if key == 'task_files' and f.get('source_kind') != 'tasks+solutions':
+                continue
+            for p in range(1, int(f.get('pages') or 0) + 1):
+                k = f"{f['page_dir']}/p{p}"
+                rec = vv.read_record(q.p3_claude_path(k)) or vv.read_record(
+                    os.path.join(q.v1, f['page_dir'], f'p{p}.json')) or {}
+                text = json.dumps(rec.get('blocks') or [], ensure_ascii=False).lower()
+                src = text + (q.jobs[k].layer.lower() if k in q.jobs else '')
+                score = (('|' in text) + 2 * bool(_KEY_HINT.search(src))
+                         + bool(_TEST_HINT.search(src)) - (p > 3))
+                scored.append((score, key != 'task_files', -p,
+                               os.path.join(q.v1, f['page_dir'], f'p{p}.png')))
+    scored.sort(reverse=True)
+    best = [x for x in scored if x[0] >= 2][:limit] or scored[:2]
+    # Порядок страниц файла: ключ «вопрос — решение — ответ» идёт подряд.
+    order = {x[3]: i for i, x in enumerate(sorted(scored, key=lambda x: (not x[1], x[3])))}
+    return sorted((x[3] for x in best), key=order.get)
+
+
+def _test_order(r):
+    tail = str(r['number'])[5:]
+    return int(tail) if tail.isdigit() else 0
+
+
+def keys_prepare(q, log):
+    from problems.olympiad_audit import vsosh_keys
+    rows = [json.loads(x) for x in open(os.path.join(q.v1, 'reference_problems_v1.jsonl'),
+                                         encoding='utf-8')]
+    files = {e['event_id']: e for e in (json.loads(x) for x in open(
+        os.path.join(q.v1, 'events_files.jsonl'), encoding='utf-8'))}
+    by_ev = {}
+    for r in rows:
+        if str(r.get('number', '')).startswith('тест'):
+            by_ev.setdefault(r['event_id'], []).append(r)
+    need = sorted({r['event_id'] for r in rows if 'тест_без_ключа' in (r.get('check_flags') or [])})
+    out = []
+    for eid in need:
+        tests = sorted(by_ev[eid], key=_test_order)
+        out.append({'event_id': eid, 'pages': key_pages(q, files[eid]),
+                    'rows': [_key_row_id(r) for r in tests],
+                    'need': [_key_row_id(r) for r in tests
+                             if 'тест_без_ключа' in (r.get('check_flags') or [])],
+                    'questions': vsosh_keys.question_list(tests)})
+    folder = os.path.join(q.work, 'keys')
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, 'events.json'), 'w', encoding='utf-8') as fh:
+        json.dump(out, fh, ensure_ascii=False, indent=1)
+    log(f'комплектов {len(out)}, вопросов без ключа {sum(len(e["need"]) for e in out)}, '
+        f'страниц ключа {sum(len(e["pages"]) for e in out)}')
+    return out
+
+
+KEY_MODELS = 'google/gemini-4-argon,gpt-6.1-terra'
+
+
+def key_body(model, ev):
+    from problems.olympiad_audit import vsosh_keys
+    imgs = [vv.image_b64(path) for path in ev['pages']]
+    text = ('Комплект: ' + ev['event_id'] + '.\nВопросы теста:\n'
+            + json.dumps(ev['questions'], ensure_ascii=False))
+    prov = vv.provider_of(model)
+    if prov == 'anthropic':
+        return {'model': model, 'max_tokens': 8000, 'output_config': {'effort': 'medium'},
+                'system': vsosh_keys.KEY_SYSTEM,
+                'messages': [{'role': 'user', 'content': [
+                    {'type': 'image', 'source': {'type': 'base64', 'media_type': mt, 'data': d}}
+                    for mt, d in imgs] + [{'type': 'text', 'text': text}]}]}
+    extra = {'detail': 'high'} if prov == 'openai' else {}
+    parts = [{'type': 'image_url', 'image_url': dict({'url': f'data:{mt};base64,{d}'}, **extra)}
+             for mt, d in imgs] + [{'type': 'text', 'text': text}]
+    body = {'model': model, 'response_format': {'type': 'json_object'},
+            'messages': [{'role': 'system', 'content': vsosh_keys.KEY_SYSTEM},
+                         {'role': 'user', 'content': parts}]}
+    if prov == 'openai':
+        body.update(max_completion_tokens=12000, reasoning_effort='medium')
+    else:
+        body.update(max_tokens=12000, usage={'include': True}, reasoning={'effort': 'medium'})
+    return body
+
+
+def keys_run(q, opts, log):
+    """Ключи двумя моделями (синхронно: ~200 комплектов). `--limit` — первые N."""
+    from concurrent.futures import ThreadPoolExecutor
+    folder = os.path.join(q.work, 'keys')
+    with open(os.path.join(folder, 'events.json'), encoding='utf-8') as fh:
+        events = json.load(fh)
+    if opts.get('pages_file'):   # калибровка: только комплекты из файла
+        with open(opts['pages_file'], encoding='utf-8') as fh:
+            wanted = {x.strip() for x in fh if x.strip()}
+        events = [e for e in events if e['event_id'] in wanted]
+    if opts.get('limit'):
+        events = events[:opts['limit']]
+    models = (opts.get('models') or KEY_MODELS).split(',')
+    log(f'комплектов {len(events)}, модели {models}')
+    if not opts.get('yes'):
+        return log('Без --yes вызовов нет (только план).')
+    env = vv.load_env()
+
+    def one(arg):
+        model, ev = arg
+        path = os.path.join(folder, model.replace('/', '__'), ev['event_id'] + '.json')
+        if os.path.isfile(path):
+            return
+        prov = vv.provider_of(model)
+        if not q.ledger.allow(prov, 0.1):
+            return log(f'стоп: потолок {prov}')
+        try:
+            text, tin, tout, usd = vv.call_with_retry(model, key_body(model, ev), env)
+        except Exception as exc:  # noqa: BLE001 — сбой комплекта не роняет прогон
+            return log(f'  {model} {ev["event_id"]}: {str(exc)[:200]}')
+        q.ledger.add(model=model, phase='keys', key=ev['event_id'], usd=round(usd, 6),
+                     tin=tin, tout=tout)
+        vv.write_record(path, {'event_id': ev['event_id'], 'model': model, 'text': text, 'usd': usd})
+
+    with ThreadPoolExecutor(opts.get('workers') or 6) as ex:
+        list(ex.map(one, [(m, e) for e in events for m in models]))
+    log(f'потрачено фазой ключей: ${q.ledger.spent(phase="keys"):.3f}')
+
+
+def keys_decide(q, opts, log):
+    """Сведение двух моделей → keys/accepted.jsonl и очередь keys/queue.jsonl."""
+    from problems.olympiad_audit import vsosh_keys
+    folder = os.path.join(q.work, 'keys')
+    with open(os.path.join(folder, 'events.json'), encoding='utf-8') as fh:
+        events = json.load(fh)
+    models = (opts.get('models') or KEY_MODELS).split(',')
+    rows = {_key_row_id(r): r for r in (json.loads(x) for x in open(
+        os.path.join(q.v1, 'reference_problems_v1.jsonl'), encoding='utf-8'))}
+    acc, queue, why = [], [], Counter()
+    for ev in events:
+        replies = []
+        for m in models:
+            rec = vv.read_record(os.path.join(folder, m.replace('/', '__'), ev['event_id'] + '.json'))
+            replies.append(vsosh_keys.parse_reply(rec['text']) if rec else {})
+        tests = [rows[k] for k in ev['rows']]
+        for i, (r, ans, reason) in enumerate(vsosh_keys.decide(tests, replies[0], replies[1]), 1):
+            k = _key_row_id(r)
+            if k not in ev['need']:
+                continue
+            if ans:
+                acc.append({'row': k, 'labels': list(ans), 'models': models,
+                            'answer': vsosh_keys.answer_text(
+                                ans, vsosh_keys.options(r.get('statement_md') or ''))})
+            else:
+                queue.append({'row': k, 'why': reason, 'pages': ev['pages'],
+                              'replies': {m: rep.get(f'q{i}') for m, rep in zip(models, replies)}})
+            why[reason or 'принят'] += 1
+    for name, data in (('accepted.jsonl', acc), ('queue.jsonl', queue)):
+        with open(os.path.join(folder, name), 'w', encoding='utf-8') as fh:
+            for x in data:
+                fh.write(json.dumps(x, ensure_ascii=False) + '\n')
+    log(f'ключи: принято {len(acc)}, в очередь {len(queue)}; {dict(why)}')
+    return acc, queue
+
+
 def run(cmd, opts):
     q = Q2(cmd.digitized)
     action = opts.get('action')
@@ -197,4 +370,10 @@ def run(cmd, opts):
         return calib_run(q, opts, log)
     if action == 'calib-report':
         return calib_report(q, log)
+    if action == 'keys-prepare':
+        return keys_prepare(q, log)
+    if action == 'keys':
+        return keys_run(q, opts, log)
+    if action == 'keys-decide':
+        return keys_decide(q, opts, log)
     raise ValueError(action)

@@ -131,3 +131,62 @@ class LedgerTests(SimpleTestCase):
             led.add(model='gpt-6.1-terra', phase='y', usd=0.4)
             self.assertAlmostEqual(led.spent('openai', 'x'), 8.5)
             self.assertAlmostEqual(led.spent('openai'), 8.9)
+
+
+class KeyGridTests(SimpleTestCase):
+    """Фаза 3: ключ из сетки принимается только при согласии двух моделей
+    и только если ответ — среди вариантов своего вопроса."""
+
+    from problems.olympiad_audit import vsosh_keys as K
+
+    ROWS = [{'number': 'тест-1', 'statement_md': 'Рост цен — это:\n\n1) инфляция\n2) дефляция\n3) стагфляция'},
+            {'number': 'тест-2', 'statement_md': 'Выберите все верные:\n\n- а) спрос\n- б) предложение\n- в) налог'},
+            {'number': 'тест-3', 'statement_md': '**Рост урожая уменьшает спрос на пшеницу.**'}]
+
+    def test_norm_answer_forms(self):
+        K = self.K
+        self.assertEqual(K.norm_answer('**3)**'), ('3',))
+        self.assertEqual(K.norm_answer('1, 3'), ('1', '3'))
+        self.assertEqual(K.norm_answer('13'), ('1', '3'))
+        self.assertEqual(K.norm_answer(['В', 'a']), ('а', 'в'))
+        self.assertEqual(K.norm_answer('Неверно'), ('нет',))
+        self.assertEqual(K.norm_answer(['1) верно']), ('1',))   # метка с текстом варианта
+
+    def test_options_labels_plain_and_binary(self):
+        K = self.K
+        self.assertEqual([x[0] for x in K.options(self.ROWS[0]['statement_md'])], ['1', '2', '3'])
+        self.assertEqual([x[0] for x in K.options(self.ROWS[1]['statement_md'])], ['а', 'б', 'в'])
+        self.assertEqual([x[0] for x in K.options(self.ROWS[2]['statement_md'])], ['да', 'нет'])
+        self.assertEqual([x[0] for x in K.options('Что?\n\n- хлеб\n- соль')], ['1', '2'])
+
+    def test_decide_accepts_only_agreement_inside_options(self):
+        K = self.K
+        a = {'q1': (('3',), 0.95), 'q2': (('а', 'в'), 0.9), 'q3': (('нет',), 0.95)}
+        b = {'q1': (('3',), 0.9), 'q2': (('а',), 0.9), 'q3': (('нет',), 0.95)}
+        got = [(ans, why) for _r, ans, why in K.decide(self.ROWS, a, b)]
+        # Третий вопрос — без напечатанных вариантов: согласие моделей есть,
+        # но «да/нет» подставлены по умолчанию — человеку.
+        self.assertEqual(got, [(('3',), ''), (None, 'модели_разошлись'),
+                               (None, 'варианты_не_напечатаны')])
+        rows = [{'number': 'тест-4', 'statement_md': 'Утверждение.\n\n- Да\n- Нет'}]
+        self.assertEqual(K.decide(rows, {'q1': (('нет',), 0.9)}, {'q1': (('нет',), 0.9)})[0][1],
+                         ('нет',))
+
+    def test_answer_outside_options_rejected(self):
+        K = self.K
+        a = b = {'q1': (('5',), 0.99)}
+        self.assertEqual(K.decide(self.ROWS[:1], a, b)[0][2], 'ответ_не_среди_вариантов')
+
+    def test_low_confidence_and_missing(self):
+        K = self.K
+        self.assertEqual(K.decide(self.ROWS[:1], {'q1': (('1',), 0.5)}, {'q1': (('1',), 0.99)})[0][2],
+                         'низкая_уверенность')
+        self.assertEqual(K.decide(self.ROWS[:1], {}, {'q1': (('1',), 0.99)})[0][2], 'нет_ответа_модели')
+
+    def test_parse_reply_and_answer_text(self):
+        K = self.K
+        got = K.parse_reply('```json\n{"answers": [{"id": "q1", "answer": ["3"], "confidence": 0.9},'
+                            ' {"id": "q2", "answer": null, "confidence": 0.2}]}\n```')
+        self.assertEqual(got, {'q1': (('3',), 0.9), 'q2': (None, 0.2)})
+        self.assertEqual(K.answer_text(('1', '3'), K.options(self.ROWS[0]['statement_md'])), '1), 3)')
+        self.assertEqual(K.answer_text(('нет',), K.options(self.ROWS[2]['statement_md'])), 'Нет')
