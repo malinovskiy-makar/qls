@@ -347,37 +347,52 @@ def collect(q, handlers, log):
     bl, env = BatchLog(q), vv.load_env()
     status = Counter()
     for row in bl.open_batches():
-        if row['provider'] == 'openai':
-            client = _openai_client(env)
-            b = client.batches.retrieve(row['batch_id'])
-            if b.status not in ('completed', 'expired', 'failed', 'cancelled'):
-                status[f'{row["model"]}:{b.status}'] += 1
-                continue
-            results = _openai_results(client, b) if b.status != 'failed' else iter(())
-            if b.status == 'failed':
-                log(f'  пакет {row["batch_id"]} failed: {str(b.errors)[:300]}')
-        else:
-            client = vsosh_digitize.claude_client()
-            b = client.messages.batches.retrieve(row['batch_id'])
-            if b.processing_status != 'ended':
-                status[f'{row["model"]}:{b.processing_status}'] += 1
-                continue
-            results = _anthropic_results(client, row['batch_id'])
-        usd, ok, bad = 0.0, 0, 0
-        for cid, good, text, tin, tout in results:
-            if not good:
-                bad += 1
-                continue
-            cost = vv.call_usd(row['model'], tin, tout, batch=True)
-            usd += cost
-            ok += 1
-            handlers[row['phase']](row['model'], cid, text, cost)
-        q.ledger.add(model=row['model'], phase=row['phase'], batch=row['batch_id'],
-                     usd=round(usd, 4), ok=ok, failed=bad)
-        bl.add(kind='collected', batch_id=row['batch_id'], ok=ok, failed=bad, usd=round(usd, 4))
-        status[f'{row["model"]}:забран'] += 1
-        log(f'  забран {row["phase"]}/{row["model"]} {row["batch_id"]}: ok {ok}, сбоев {bad}, ${usd:.3f}')
+        try:
+            collect_one(q, bl, env, row, handlers, log, status)
+        except Exception as exc:  # noqa: BLE001 — разовый 403/обрыв (29.10) не роняет насос
+            # Пакет не помечен забранным: следующий круг заберёт его целиком
+            # (записи страниц перезапишутся теми же, деньги учтутся один раз).
+            status[f'{row["model"]}:сбой_сбора'] += 1
+            log(f'  сбой сбора {row["batch_id"]}: {str(exc)[:200]}')
     return dict(status)
+
+
+def collect_one(q, bl, env, row, handlers, log, status):
+    """Один пакет: не готов — в `status`; готов — результаты в обработчик,
+    расход — в журнал денег, пакет — «забран»."""
+    from problems.olympiad_audit import vsosh_digitize
+    if row['provider'] == 'openai':
+        client = _openai_client(env)
+        b = client.batches.retrieve(row['batch_id'])
+        if b.status not in ('completed', 'expired', 'failed', 'cancelled'):
+            status[f'{row["model"]}:{b.status}'] += 1
+            return
+        results = _openai_results(client, b) if b.status != 'failed' else iter(())
+        if b.status == 'failed':
+            log(f'  пакет {row["batch_id"]} failed: {str(b.errors)[:300]}')
+    else:
+        client = vsosh_digitize.claude_client()
+        b = client.messages.batches.retrieve(row['batch_id'])
+        if b.processing_status != 'ended':
+            status[f'{row["model"]}:{b.processing_status}'] += 1
+            return
+        results = _anthropic_results(client, row['batch_id'])
+    usd, ok, bad, done = 0.0, 0, 0, []
+    for cid, good, text, tin, tout in results:   # сначала всё прочитать, потом писать
+        if not good:
+            bad += 1
+            continue
+        cost = vv.call_usd(row['model'], tin, tout, batch=True)
+        usd += cost
+        ok += 1
+        done.append((cid, text, cost))
+    for cid, text, cost in done:
+        handlers[row['phase']](row['model'], cid, text, cost)
+    q.ledger.add(model=row['model'], phase=row['phase'], batch=row['batch_id'],
+                 usd=round(usd, 4), ok=ok, failed=bad)
+    bl.add(kind='collected', batch_id=row['batch_id'], ok=ok, failed=bad, usd=round(usd, 4))
+    status[f'{row["model"]}:забран'] += 1
+    log(f'  забран {row["phase"]}/{row["model"]} {row["batch_id"]}: ok {ok}, сбоев {bad}, ${usd:.3f}')
 
 
 # ── Фаза 2: регионы ────────────────────────────────────────────────────
