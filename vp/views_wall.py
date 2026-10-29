@@ -172,6 +172,40 @@ def _survey_grade(user, variant):
     return variant.grade_band if variant.grade_band in codes else ''
 
 
+def survey_known(user):
+    """Что анкета стены уже знает из профиля (онбординг, раунд 2): класс 9–11 и
+    «откуда узнали». Известное стена не переспрашивает — человек отвечает о себе
+    один раз, начал ли он с онбординга или со стены."""
+    profile = getattr(user, 'profile', None)
+    grades = dict(VPWall.GRADE_CHOICES)
+    sources = dict(VPWall.SOURCE_CHOICES)
+    return {
+        'grade': profile.grade if profile is not None and profile.grade in grades else '',
+        'source': (profile.source_channel if profile is not None
+                   and profile.source_channel in sources else ''),
+    }
+
+
+SURVEY_TITLES = {3: 'Три вопроса – и начинаем', 2: 'Два вопроса – и начинаем',
+                 1: 'Последний вопрос – и начинаем'}
+
+
+def _survey_context(user, variant, note):
+    known = survey_known(user)
+    ask_grade, ask_source = not known['grade'], not known['source']
+    return {
+        'grades': [(code, code) for code, _ in VPWall.GRADE_CHOICES],
+        'statuses': VPWall.TOUR2_CHOICES,
+        'sources': VPWall.SOURCE_CHOICES,
+        'grade': (note or {}).get('grade') or _survey_grade(user, variant),
+        'status': (note or {}).get('tour2_status', ''),
+        'source': (note or {}).get('source', ''),
+        'ask_grade': ask_grade,
+        'ask_source': ask_source,
+        'title': SURVEY_TITLES[1 + ask_grade + ask_source],
+    }
+
+
 def wall_window(request, variant, attempt):
     """Окно стены для интро: словарь для `vp/_wall.html` или None — окна нет.
 
@@ -234,14 +268,7 @@ def wall_window(request, variant, attempt):
         'channel_url': 'https://t.me/' + channel,
         'with_timer': with_timer,
         'minutes_word': landing.duration_words(variant),
-        'survey': {
-            'grades': [(code, code) for code, _ in VPWall.GRADE_CHOICES],
-            'statuses': VPWall.TOUR2_CHOICES,
-            'sources': VPWall.SOURCE_CHOICES,
-            'grade': (note or {}).get('grade') or _survey_grade(user, variant),
-            'status': (note or {}).get('tour2_status', ''),
-            'source': (note or {}).get('source', ''),
-        } if screen == 'survey' else None,
+        'survey': _survey_context(user, variant, note) if screen == 'survey' else None,
         'urls': {
             'tg_screen': _wall_url(variant.slug),
             'email_screen': _wall_url(variant.slug, 'email'),
@@ -414,10 +441,12 @@ def wall_survey(request, slug):
     attempt = _current_attempt(request, variant)
     if attempt is None:
         if not VPWall.objects.filter(user=user, survey_at__isnull=False).exists():
+            # Известное из профиля сервер берёт из профиля, а не из формы.
+            known = survey_known(user)
             answers = {
-                'grade': request.POST.get('grade', ''),
+                'grade': known['grade'] or request.POST.get('grade', ''),
                 'tour2_status': request.POST.get('tour2_status', ''),
-                'source': request.POST.get('source', ''),
+                'source': known['source'] or request.POST.get('source', ''),
             }
             allowed = {'grade': VPWall.GRADE_CHOICES, 'tour2_status': VPWall.TOUR2_CHOICES,
                        'source': VPWall.SOURCE_CHOICES}
@@ -427,9 +456,16 @@ def wall_survey(request, slug):
             VPWall.objects.filter(user=user, survey_at__isnull=True).update(
                 survey_at=timezone.now(), **answers)
             profile = getattr(user, 'profile', None)
-            if profile is not None and not profile.grade:
-                profile.grade = answers['grade']
-                profile.save(update_fields=['grade'])
+            if profile is not None and (not profile.grade or not profile.source_channel):
+                # Обратно в профиль — только пустое: онбординг потом покажет это выбранным.
+                fields = []
+                if not profile.grade:
+                    profile.grade = answers['grade']
+                    fields.append('grade')
+                if not profile.source_channel:
+                    profile.source_channel = answers['source']
+                    fields.append('source_channel')
+                profile.save(update_fields=fields)
             tracking.defer(request, 'vp_wall_survey_done', variant=variant.slug,
                            grade=answers['grade'], tour2_status=answers['tour2_status'],
                            source=answers['source'])

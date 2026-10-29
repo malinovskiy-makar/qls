@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from problems.models_platform import UserProfile
+
 
 class VPVariant(models.Model):
     """Один вариант тура: 1 тур — 44 задания и 30 минут, 2 тур — 17 или 18 заданий
@@ -251,16 +253,9 @@ class VPWall(models.Model):
         ('future', 'Нет, готовлюсь на будущее'),
         ('no_tour1', 'Не писал 1 тур'),
     )
-    SOURCE_CHOICES = (
-        ('telegram', 'Telegram-канал'),
-        ('tiktok', 'TikTok'),
-        ('instagram', 'Instagram*'),
-        ('vk', 'ВКонтакте'),
-        ('friend', 'Друг или одноклассник'),
-        ('teacher', 'Учитель'),
-        ('search', 'Поиск'),
-        ('other', 'Другое'),
-    )
+    # «Откуда узнали» — ОДИН список на сайт (раунд 2): коды и подписи живут в
+    # `UserProfile.SourceChannel`, стена берёт их оттуда, а не держит копию.
+    SOURCE_CHOICES = tuple(UserProfile.SourceChannel.choices)
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vp_wall',
