@@ -97,7 +97,7 @@ def _test_of(problem, parts):
     key = (problem.answer or '').strip()
     if kind == problem_types.NUMERIC:
         return {'kind': 'short', 'options': [], 'key': key, 'why': ''}
-    options = [{'label': p.label, 'text': p.statement,
+    options = [{'pk': p.pk, 'label': p.label, 'text': p.statement,
                 'correct': (p.answer or '').strip().lower() == 'верно'} for p in parts]
     game = testplay.game_of(problem, parts)
     name = {problem_types.MULTI: 'multi', problem_types.BOOLEAN: 'boolean'}.get(kind, 'single')
@@ -175,7 +175,7 @@ def card_of(problem, refs, *, visible, ref_cards, rejected, suspect):
         pdf_official = _host_official(pdf_url, slug)
     is_test = bool(test)
     card_parts = [] if is_test else [
-        {'label': p.label, 'text': p.statement or '',
+        {'pk': p.pk, 'label': p.label, 'text': p.statement or '',
          'points': p.points, 'answer': p.answer or ''} for p in parts]
     return {
         'level': 'bank',

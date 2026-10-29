@@ -16,8 +16,11 @@ SCRIPT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 's
 CHUNK = 20000
 
 
-def check_texts(texts):
-    """[текст] → [{errors, currency, text_in_math, unpaired}] того же порядка."""
+def check_texts(texts, outside=False, full=False):
+    """[текст] → [{errors, currency, text_in_math, unpaired}] того же порядка.
+
+    `outside=True` — ещё и `outside`: текст вне формул, как его увидит ученик;
+    `full=True` — `math`: все формулы целиком с разделителями, ошибки — с полной формулой."""
     out = []
     for start in range(0, len(texts), CHUNK):
         chunk = list(texts[start:start + CHUNK])
@@ -27,7 +30,8 @@ def check_texts(texts):
             src, dst = os.path.join(tmp, 'in.json'), os.path.join(tmp, 'out.json')
             with open(src, 'w', encoding='utf-8') as handle:
                 json.dump(chunk, handle, ensure_ascii=False)
-            subprocess.run(['node', SCRIPT, src, dst], check=True, capture_output=True, timeout=1800)
+            cmd = ['node', SCRIPT, src, dst] + (['--outside'] if outside else []) + (['--full'] if full else [])
+            subprocess.run(cmd, check=True, capture_output=True, timeout=1800)
             with open(dst, encoding='utf-8') as handle:
                 out.extend(json.load(handle))
     return out

@@ -46,10 +46,10 @@ class Command(BaseCommand):
             self.run_check(opts)
         elif opts['step'] == 'render':
             from problems.olympiad_contour import render
-            render.run(opts, self.stdout)
+            render.main(opts, self.stdout)
         else:
             from problems.olympiad_contour import queue
-            queue.run(opts, self.stdout)
+            queue.main(opts, self.stdout)
         self.stdout.write('готово за %.0f с' % (time.time() - started))
 
     # ── check ──────────────────────────────────────────────────────────

@@ -109,19 +109,23 @@ function bareWords(tex) {
 }
 
 function check(text) {
-  const res = { errors: [], currency: [], text_in_math: [], unpaired: 0 };
+  const res = { errors: [], currency: [], text_in_math: [], unpaired: 0, outside: '', math: [] };
   const masked = maskOutsideMath(String(text || ''));
+  const outside = [];
   for (const seg of splitAtDelimiters(masked, DELIMS)) {
     if (seg.type === 'text') {
       const bare = seg.data.split('\\$').join('');
       res.unpaired += (bare.match(/\$/g) || []).length;
+      outside.push(seg.data.split(SENTINEL).join('$'));
       continue;
     }
+    outside.push(' ');
+    if (WANT_FULL) res.math.push(seg.rawData);
     const tex = seg.data;
     try {
       katex.renderToString(tex, { throwOnError: true, displayMode: seg.display, strict: 'ignore' });
     } catch (e) {
-      res.errors.push({ tex: tex.slice(0, 200), problem: String(e.message || e).slice(0, 200) });
+      res.errors.push({ tex: WANT_FULL ? seg.rawData : tex.slice(0, 200), problem: String(e.message || e).slice(0, 200) });
       continue;
     }
     if (!seg.display && bareWords(tex).length >= 2) {
@@ -131,9 +135,16 @@ function check(text) {
       else res.text_in_math.push(seg.rawData.slice(0, 120));
     }
   }
+  // текст вне формул — то, что ученик увидит как есть (для сырых \frac, **, |---|)
+  if (WANT_OUTSIDE) res.outside = outside.join('');
+  else delete res.outside;
+  if (!WANT_FULL) delete res.math;
   return res;
 }
 
-const [inp, out] = process.argv.slice(2);
+const [inp, out, ...flags] = process.argv.slice(2);
+const WANT_OUTSIDE = flags.includes('--outside');
+// --full: все формулы поля целиком (rawData с разделителями) — для автоисправлений
+const WANT_FULL = flags.includes('--full');
 const items = JSON.parse(fs.readFileSync(inp, 'utf8'));
 fs.writeFileSync(out, JSON.stringify(items.map(check)), 'utf8');
