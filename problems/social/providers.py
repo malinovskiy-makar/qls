@@ -29,9 +29,13 @@ missing» (раунд 1, ручная проверка владельца). По
 """
 import base64
 import hashlib
+import http.client
 import json
 import logging
 import re
+import socket
+import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,8 +49,10 @@ logger = logging.getLogger(__name__)
 #: Ключи-заглушки из ручных проверок: с ними сервис отвечает чужой ошибкой.
 PLACEHOLDER_KEYS = frozenset({'demo', 'test', 'changeme', 'change-me', 'xxx', 'todo', 'none'})
 
-#: Ожидание ответа сервиса (промпт: 10 с).
-HTTP_TIMEOUT = 10
+#: Всё время одного входа на запросы к сервису, с повтором (раунд 4). Меньше
+#: `--timeout 60` gunicorn и `proxy_read_timeout 60s` nginx: иначе воркер убили
+#: бы раньше, чем человек увидел нашу страницу «долго не отвечает».
+TOTAL_BUDGET = 50
 
 
 class SocialError(Exception):
@@ -55,11 +61,28 @@ class SocialError(Exception):
     `step` — где сломалось, для страницы ошибки и журнала (раунд 3): `exchange` —
     обмен кода или запрос данных не удался (сеть, HTTP-ошибка); `data` — сервис
     ответил, но без токена или без номера аккаунта.
+
+    `reason` — точная причина для журнала (раунд 4): `timeout` (не соединились
+    за отведённое время), `timeout_response` (запрос ушёл, ответа нет),
+    `network` / `network_dns` / `network_tls` (сеть до ответа),
+    `network_response` (связь оборвалась после отправки), `http_400 invalid_grant`
+    (HTTP-код и поле `error` из тела, если оно короткое и из `[a-z0-9_]`),
+    `bad_response`, `no_token`, `no_user_id`. ⚠️ Ни кода, ни токена, ни
+    `device_id`, ни `error_description` (в нём бывает эхо) здесь нет.
     """
 
-    def __init__(self, message, step='exchange'):
-        super().__init__(message)
+    def __init__(self, reason, step='exchange'):
+        super().__init__(reason)
         self.step = step
+        self.reason = reason
+
+    @property
+    def timed_out(self):
+        return self.reason.startswith('timeout')
+
+
+class _NoResponse(SocialError):
+    """Сбой ДО отправки запроса: сервис ничего не получил, повторять безопасно."""
 
 
 def code_challenge(verifier):
@@ -68,24 +91,76 @@ def code_challenge(verifier):
     return base64.urlsafe_b64encode(digest).rstrip(b'=').decode('ascii')
 
 
-def _request(url, *, data=None, headers=None):
-    """JSON от сервиса. Любой сбой сети или разбора — `SocialError`."""
+def _http_reason(error):
+    """`http_400 invalid_grant`: код ответа и поле `error` из JSON-тела сервиса."""
+    reason = 'http_%s' % error.code
+    try:
+        body = json.loads(error.read(4096).decode('utf-8'))
+    except Exception:  # noqa: BLE001 — тело по желанию, причина и без него понятна
+        return reason
+    code = body.get('error') if isinstance(body, dict) else None
+    if isinstance(code, str) and re.fullmatch(r'[a-z0-9_]{1,40}', code):
+        reason += ' ' + code
+    return reason
+
+
+def _send(request, timeout):
+    """Один запрос. Каждый сбой — `SocialError` с точной причиной.
+
+    `urllib` заворачивает в `URLError` только сбои соединения и отправки, а
+    таймаут ожидания ответа отдаёт голым `TimeoutError` — по этой границе и
+    решаем, можно ли повторить.
+    """
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 — адрес из констант модуля, только https
+            payload = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as error:
+        raise SocialError(_http_reason(error)) from None
+    except urllib.error.URLError as error:
+        cause = error.reason
+        if isinstance(cause, TimeoutError):
+            reason = 'timeout'
+        elif isinstance(cause, socket.gaierror):
+            reason = 'network_dns'
+        elif isinstance(cause, ssl.SSLError):
+            reason = 'network_tls'
+        else:
+            reason = 'network'
+        raise _NoResponse(reason) from None
+    except TimeoutError:
+        raise SocialError('timeout_response') from None
+    except OSError:
+        raise SocialError('network_response') from None
+    except (ValueError, http.client.HTTPException):
+        raise SocialError('bad_response') from None
+    if not isinstance(payload, dict):
+        raise SocialError('bad_response')
+    return payload
+
+
+def _request(url, *, data=None, headers=None, deadline=None):
+    """JSON от сервиса. Любой сбой сети или разбора — `SocialError`.
+
+    ⚠️ ПОВТОР — ОДИН И ТОЛЬКО ЕСЛИ ЗАПРОС НЕ УШЁЛ (`_NoResponse`). Код
+    авторизации одноразовый: после любого ответа, и даже после таймаута
+    ожидания ответа, сервис мог его уже погасить, и повтор дал бы только
+    `invalid_grant` вместо честной причины.
+    """
     body = urllib.parse.urlencode(data).encode('utf-8') if data is not None else None
     request = urllib.request.Request(url, data=body, headers=dict(headers or {}))
     if body is not None:
         request.add_header('Content-Type', 'application/x-www-form-urlencoded')
-    try:
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:  # nosec B310 — адрес из констант модуля, только https
-            payload = json.loads(response.read().decode('utf-8'))
-    except urllib.error.HTTPError as error:
-        # Тело ответа об ошибке в журнал не пишем: в нём бывает эхо кода.
-        raise SocialError('HTTP %s от %s' % (error.code, urllib.parse.urlsplit(url).netloc)) from None
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
-        raise SocialError('%s: %s' % (urllib.parse.urlsplit(url).netloc,
-                                      type(error).__name__)) from None
-    if not isinstance(payload, dict):
-        raise SocialError('ответ не объект')
-    return payload
+    deadline = deadline or time.monotonic() + TOTAL_BUDGET
+    for attempt in (1, 2):
+        left = deadline - time.monotonic()
+        if left < 1:
+            raise SocialError('timeout')
+        try:
+            return _send(request, min(settings.SOCIAL_HTTP_TIMEOUT, left))
+        except _NoResponse as error:
+            if attempt == 2:
+                raise SocialError(error.reason) from None
+            logger.info('Сервис входа: повтор после %s', error.reason)
 
 
 def _birth_date(raw, fmt):
@@ -165,7 +240,8 @@ class VKProvider(Provider):
     USER_INFO_URL = 'https://id.vk.ru/oauth2/user_info'
 
     def fetch_profile(self, params, verifier, redirect_uri, state):
-        token = _request(self.TOKEN_URL, data={
+        deadline = time.monotonic() + TOTAL_BUDGET
+        token = _request(self.TOKEN_URL, deadline=deadline, data={
             'grant_type': 'authorization_code',
             'code': params.get('code', ''),
             'code_verifier': verifier,
@@ -176,11 +252,11 @@ class VKProvider(Provider):
             'state': state,
         }).get('access_token')
         if not token:
-            raise SocialError('VK ID: нет access_token', step='data')
-        info = _request(self.USER_INFO_URL, data={
+            raise SocialError('no_token', step='data')
+        info = _request(self.USER_INFO_URL, deadline=deadline, data={
             'client_id': self.client_id, 'access_token': token}).get('user')
         if not isinstance(info, dict) or not info.get('user_id'):
-            raise SocialError('VK ID: нет user_id', step='data')
+            raise SocialError('no_user_id', step='data')
         email = (info.get('email') or '').strip()
         return {
             'uid': str(info['user_id']),
@@ -199,6 +275,7 @@ class YandexProvider(Provider):
     AVATAR_URL = 'https://avatars.yandex.net/get-yapic/%s/islands-200'
 
     def fetch_profile(self, params, verifier, redirect_uri, state):
+        deadline = time.monotonic() + TOTAL_BUDGET
         data = {
             'grant_type': 'authorization_code',
             'code': params.get('code', ''),
@@ -207,12 +284,13 @@ class YandexProvider(Provider):
         }
         if self.client_secret:
             data['client_secret'] = self.client_secret
-        token = _request(self.TOKEN_URL, data=data).get('access_token')
+        token = _request(self.TOKEN_URL, data=data, deadline=deadline).get('access_token')
         if not token:
-            raise SocialError('Яндекс ID: нет access_token', step='data')
-        info = _request(self.USER_INFO_URL, headers={'Authorization': 'OAuth ' + token})
+            raise SocialError('no_token', step='data')
+        info = _request(self.USER_INFO_URL, headers={'Authorization': 'OAuth ' + token},
+                        deadline=deadline)
         if not info.get('id'):
-            raise SocialError('Яндекс ID: нет id', step='data')
+            raise SocialError('no_user_id', step='data')
         email = (info.get('default_email') or '').strip()
         avatar_id = info.get('default_avatar_id')
         avatar = (self.AVATAR_URL % urllib.parse.quote(str(avatar_id), safe='')

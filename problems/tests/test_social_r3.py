@@ -3,7 +3,7 @@
 
 - понятные ошибки на возврате (`error=` сервиса, сбой обмена, нет данных) —
   наша страница с одной фразой и «Попробовать снова» / «Войти по почте», а в
-  журнал — только сервис, шаг и код ошибки;
+  журнал — только сервис, шаг и причина (код ошибки сервиса);
 - адрес возврата за nginx — `https://`, и при `SOCIAL_REDIRECT_BASE` — от него;
 - VK ID на своём компьютере — только `http://localhost` (порт 80);
 - `manage.py social_check` — сеть подменена целиком.
@@ -51,12 +51,12 @@ class ReturnErrorTests(SocialBase):
         response, log = self.returned(error='access_denied',
                                       error_description='User denied access')
         self.assert_page(response, 'Вход через Яндекс ID отменён')
-        self.assertIn('шаг authorize, код access_denied', log)
+        self.assertIn('шаг authorize, причина access_denied', log)
 
     def test_invalid_request(self):
         response, log = self.returned('vk', error='invalid_request')
         self.assert_page(response, 'VK ID не принял запрос сайта', provider='vk')
-        self.assertIn('код invalid_request', log)
+        self.assertIn('причина invalid_request', log)
 
     def test_access_denied_without_state_is_still_our_page(self):
         response, _log = self.returned(error='access_denied', state='')
@@ -65,7 +65,7 @@ class ReturnErrorTests(SocialBase):
     def test_unknown_error_code_is_not_copied_into_the_log(self):
         response, log = self.returned(error='<script>evil</script>')
         self.assert_page(response, 'Яндекс ID отказал во входе')
-        self.assertIn('код other', log)
+        self.assertIn('причина other', log)
         self.assertNotIn('evil', log)
 
     def test_exchange_failure(self):
@@ -81,7 +81,7 @@ class ReturnErrorTests(SocialBase):
             self.assertNotIn(secret, log)
 
     def test_service_gave_no_account_data(self):
-        def no_token(url, *, data=None, headers=None):
+        def no_token(url, *, data=None, headers=None, deadline=None):
             return {'error': 'nope'}
         _location, query = self.start('vk', '/vp/x/')
         with mock.patch.object(providers, '_request', no_token), \

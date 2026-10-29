@@ -53,7 +53,7 @@ class FakeNetwork:
         self.fail = fail
         self.calls = []
 
-    def __call__(self, url, *, data=None, headers=None):
+    def __call__(self, url, *, data=None, headers=None, deadline=None):
         self.calls.append((url, dict(data or {}), dict(headers or {})))
         if self.fail:
             raise providers.SocialError('нет связи')

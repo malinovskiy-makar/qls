@@ -23,6 +23,7 @@
 ⚠️ Логин нового аккаунта — `econ_` + 6 случайных знаков, НЕ из имени: логин
 виден в таблицах результатов, а имя ребёнка там светиться не должно.
 """
+import hashlib
 import logging
 import re
 import secrets
@@ -32,6 +33,7 @@ from urllib.parse import urlencode, urlsplit
 from django import forms
 from django.conf import settings
 from django.contrib.auth import login
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
@@ -91,6 +93,10 @@ STEP_TEXTS = {
     'exchange': '{title} не ответил. Попробуйте ещё раз или войдите почтой',
     'data': '{title} не передал данные аккаунта. Попробуйте ещё раз или войдите почтой',
 }
+#: Таймаут — своя фраза (раунд 4): сервис жив, но медленный, и повтор обычно помогает.
+TIMEOUT_TEXT = '{title} долго не отвечает. Попробуйте ещё раз'
+#: Второй запрос с тем же `state`, пока первый ещё ждёт сервис (раунд 4).
+BUSY_TEXT = 'Вход через {title} уже выполняется. Если страница не открылась, нажмите «Попробовать снова»'
 
 
 def _error_code(raw):
@@ -118,9 +124,9 @@ def _error_page(request, text, *, status=400, link=None, retry_url=None):
     }, status=status)
 
 
-def _failed(request, provider, text, *, step, code, target=''):
+def _failed(request, provider, text, *, step, reason, target=''):
     """Страница ошибки возврата + строка журнала без секретов."""
-    logger.warning('Вход через %s не удался: шаг %s, код %s', provider.name, step, code)
+    logger.warning('Вход через %s не удался: шаг %s, причина %s', provider.name, step, reason)
     return _error_page(request, text.format(title=provider.title),
                        retry_url=_retry_url(provider, target))
 
@@ -226,6 +232,27 @@ def _set_avatar(user, url):
         logger.warning('Аватар от сервиса не поставлен (user=%s)', user.pk)
 
 
+def _used_state_key(state):
+    """Ключ метки «этот `state` уже обработан». Сам `state` в кэш не кладём."""
+    return 'social:state:' + hashlib.sha256(state.encode('utf-8')).hexdigest()[:40]
+
+
+def _repeated(request, provider, target):
+    """Повторный возврат с уже обработанным `state`: второго обмена нет.
+
+    Первый уже вошёл — ведём туда же, куда повёл бы он; первый ждёт «Почти
+    готово» — туда; первый ещё ждёт сервис — «уже выполняется».
+    """
+    logger.warning('Вход через %s: повторный возврат с тем же state, второго обмена нет',
+                   provider.name)
+    if request.user.is_authenticated:
+        return redirect(target or _role_home(request.user))
+    if request.session.get(PENDING_KEY):
+        return redirect('social_finish')
+    return _error_page(request, BUSY_TEXT.format(title=provider.title), status=409,
+                       retry_url=_retry_url(provider, target))
+
+
 # ── 1. Переход на сервис ───────────────────────────────────────────────────
 
 @require_GET
@@ -271,26 +298,36 @@ def callback(request, provider):
         code = _error_code(request.GET['error'])
         return _failed(request, provider,
                        SERVICE_ERROR_TEXTS.get(code, SERVICE_ERROR_DEFAULT),
-                       step='authorize', code=code, target=target)
+                       step='authorize', reason=code, target=target)
     state = request.GET.get('state', '')
+    used_key = _used_state_key(state)
     if (flow.get('provider') != provider.name or not state
             or not secrets.compare_digest(str(flow.get('state', '')), state)
             or time.time() - flow.get('at', 0) > FLOW_TTL):
+        if state and cache.get(used_key):
+            return _repeated(request, provider, target)
         ratelimit.register_failure(SCOPE, request, None)
         logger.warning('Вход через %s не удался: шаг state', provider.name)
         return _error_page(request, _fail_text(provider),
                            retry_url=_retry_url(provider, target))
     if not request.GET.get('code'):
         return _failed(request, provider, STEP_TEXTS['data'], step='authorize',
-                       code='no_code', target=target)
+                       reason='no_code', target=target)
+    # Тот же возврат пришёл второй раз, пока первый ждёт сервис: сессия первого
+    # ещё не сохранена, и `state` в ней цел. Второй обмен погасил бы код —
+    # поэтому метка «state использован» в общем кэше, атомарно (`add`).
+    if not cache.add(used_key, 1, FLOW_TTL):
+        return _repeated(request, provider, target)
 
     try:
         data = provider.fetch_profile(request.GET, flow['verifier'],
                                       _redirect_uri(request, provider), state)
     except providers.SocialError as error:
         ratelimit.register_failure(SCOPE, request, None)
-        return _failed(request, provider, STEP_TEXTS.get(error.step, STEP_TEXTS['exchange']),
-                       step=error.step, code='social_error', target=target)
+        text = (TIMEOUT_TEXT if error.timed_out
+                else STEP_TEXTS.get(error.step, STEP_TEXTS['exchange']))
+        return _failed(request, provider, text, step=error.step, reason=error.reason,
+                       target=target)
 
     link = (SocialAccount.objects.select_related('user')
             .filter(provider=provider.name, uid=data['uid']).first())

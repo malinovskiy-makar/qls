@@ -964,6 +964,9 @@ SOCIAL_REDIRECT_BASE = ('' if _TESTING
                         else os.environ.get('SOCIAL_REDIRECT_BASE', '').strip().rstrip('/'))
 # Дата рождения от сервиса пишется в профиль, только когда она внесена в
 # документы (ред. 3, решение 29.10.2026). До этого не попадает даже в сессию.
+# Сколько секунд ждать сервис входа на один запрос (раунд 4: VK ID иногда отвечает
+# дольше 10 с). Повтор и общий предел — problems/social/providers.py.
+SOCIAL_HTTP_TIMEOUT = int(os.environ.get('SOCIAL_HTTP_TIMEOUT', '20') or 20)
 SOCIAL_STORE_BIRTHDATE = (not _TESTING) and (
     os.environ.get('SOCIAL_STORE_BIRTHDATE', '0').strip().lower()
     in ('1', 'true', 'yes', 'on'))
