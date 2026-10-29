@@ -259,7 +259,8 @@ def ile_2008_rows(html_path, figures_dir, fetch=True):
                 if fetch and not os.path.isfile(path):
                     url = 'https://iloveeconomics.ru' + src if src.startswith('/') else src
                     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=60) as resp, open(path, 'wb') as out:  # noqa: S310
+                    # Адрес — https://iloveeconomics.ru + src картинки печатной страницы.
+                    with urllib.request.urlopen(req, timeout=60) as resp, open(path, 'wb') as out:  # nosec B310
                         out.write(resp.read())
                 # Путь — от папки v2, как у вырезок `assemble` (`figures_v2/…`).
                 figs.append((kind, {'path': os.path.relpath(path, os.path.dirname(os.path.dirname(

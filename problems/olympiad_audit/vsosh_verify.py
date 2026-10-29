@@ -221,7 +221,8 @@ def anthropic_params(model, job, effort='low', max_tokens=12000):
 def _post(url, headers, body, timeout=300):
     req = urllib.request.Request(url, data=json.dumps(body).encode(),
                                  headers=dict(headers, **{'content-type': 'application/json'}))
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    # Адрес — только константы https API поставщиков из `call` (не ввод пользователя).
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
         return json.loads(r.read().decode())
 
 
