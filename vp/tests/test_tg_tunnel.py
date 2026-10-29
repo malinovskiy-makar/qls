@@ -89,3 +89,24 @@ class ComposeResolvesTelegramToHostTests(SimpleTestCase):
             for entry in service.get('extra_hosts', []):
                 if entry.startswith('api.telegram.org:'):
                     self.assertEqual(entry, 'api.telegram.org:host-gateway', name)
+
+
+class TunnelUnitTests(SimpleTestCase):
+    """Служба `tg-tunnel` на посреднике и боевой `.env` говорят об одном и том же порте."""
+
+    RELAY = Path(__file__).resolve().parents[2] / 'deploy' / 'tg_relay'
+
+    def unit(self):
+        text = (self.RELAY / 'tg-tunnel.service').read_text('utf-8')
+        return '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#'))
+
+    def test_unit_reconnects_and_fails_loudly_on_a_busy_port(self):
+        unit = self.unit()
+        for needle in ('Restart=always', 'ExitOnForwardFailure=yes', 'ServerAliveInterval=30',
+                       'ServerAliveCountMax=3', '-R 172.17.0.1:18443:api.telegram.org:443',
+                       'tgtunnel@'):
+            self.assertIn(needle, unit)
+
+    def test_port_in_env_example_matches_the_tunnel(self):
+        env = (self.RELAY.parents[1] / 'deploy' / 'env.example').read_text('utf-8')
+        self.assertIn('https://api.telegram.org:18443', env)

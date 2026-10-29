@@ -412,9 +412,11 @@ class RelayFilesTests(SimpleTestCase):
 
     def test_readme_walks_through_the_agreed_steps(self):
         readme = (self.RELAY / 'README.md').read_text('utf-8')
-        for needle in ('https://api.telegram.org/', 'ufw allow 22/tcp', 'ufw allow 80/tcp',
-                       'ufw allow 443/tcp', 'PasswordAuthentication no', 'dig +short',
-                       'certbot', 'certbot renew --dry-run', 'TELEGRAM_API_BASE=https://tg.weconomics.ai',
-                       'Spaceship', 'токен бота'):
+        # С 29.10.2026 схема – обратный SSH-туннель (nginx.conf оставлен как справка).
+        for needle in ('https://api.telegram.org/', 'НЕ ИСПОЛЬЗУЕТСЯ', 'permitlisten="172.17.0.1:18443"',
+                       'Match User tgtunnel', 'AllowTcpForwarding remote', 'GatewayPorts clientspecified',
+                       'ufw allow from 172.16.0.0/12 to 172.17.0.1 port 18443', 'tg-tunnel',
+                       '--resolve api.telegram.org:18443:172.17.0.1', 'host-gateway',
+                       'TELEGRAM_API_BASE=https://api.telegram.org:18443', 'LEGAL_TG_RELAY', 'токен'):
             self.assertIn(needle, readme)
         self.assertNotIn('access_log on', readme)

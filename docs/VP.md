@@ -390,7 +390,7 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` | пусто | бот из BotFather (имя без «@») |
 | `TELEGRAM_WEBHOOK_SECRET` | пусто | 1–256 из `A-Za-z0-9_-`; пусто — вебхук закрыт |
 | `TELEGRAM_CHANNEL` | `@` + `LEGAL['telegram']` | канал проверки (бот разработки — можно свой) |
-| `TELEGRAM_API_BASE` | `https://api.telegram.org` | только `https://`; на бою – посредник `https://tg.weconomics.ai` (только НАШ сервер, через него идёт токен) |
+| `TELEGRAM_API_BASE` | `https://api.telegram.org` | только `https://`, порт допустим; на бою – `https://api.telegram.org:18443` (обратный туннель до посредника, см. ниже) |
 
 Под тестами все `TELEGRAM_*` пустые. `vp.W001` — предупреждение при `VP_WALL_ENABLED`,
 `DEBUG=False` и ненастроенном пути (джоб `deploy-check` получает подставные значения).
@@ -402,13 +402,16 @@ manage.py analytics_export --since 2026-09-24 --out ev.csv   # сырые соб
 `tg_setup --ping | --check | --set-webhook <url> | --delete-webhook | --info` ·
 `tg_poll [--timeout 50] [--force]` (длинный опрос: боевая служба `tgbot` и бот разработки на маке).
 
-### Бот: посредник и длинный опрос (решение 28.10.2026, ADR 0168, «Дополнение 28.10»)
+### Бот: туннель до посредника и длинный опрос (решения 28–29.10.2026, ADR 0168, «Дополнение 28.10»)
 
 С российских серверов Telegram закрыт в обе стороны (с боевого сервера `curl https://api.telegram.org/` –
 timeout), поэтому:
 
-- бот ходит в Telegram **через свой сервер-посредник за рубежом** (nginx, пускает только IP нашего
-  сервера): `TELEGRAM_API_BASE=https://tg.weconomics.ai`. Устройство и инструкция –
+- бот ходит в Telegram **через свой сервер-посредник за рубежом – обратным SSH-туннелем, который открывает
+  посредник** (путь боевой → посредник режется, обратный открыт; 29.10). На боевом хосте `172.17.0.1:18443`
+  – сквозной TLS до `api.telegram.org`, посредник токена не видит. В контейнерах `web` и `tgbot` имя
+  `api.telegram.org` указывает на шлюз хоста (`extra_hosts: api.telegram.org:host-gateway`), настройка –
+  `TELEGRAM_API_BASE=https://api.telegram.org:18443`. Устройство и инструкция –
   [deploy/tg_relay/README.md](../deploy/tg_relay/README.md);
 - сообщения бот получает **длинным опросом** `getUpdates`, а не вебхуком: служба `tgbot` в боевом
   `docker compose` (`manage.py tg_poll`, [SERVER.md](SERVER.md#tgbot--бот-стены-вп-длинный-опрос-telegram)).
@@ -422,8 +425,8 @@ timeout), поэтому:
   SIGTERM (остановка контейнера) – чистый выход с кодом 0;
 - ⚠️ `telegram.call(…, http_timeout=…)`: `timeout` в параметрах – это параметр самого Telegram (длинный
   опрос `getUpdates`); до S2b оба назывались `timeout`, и `tg_poll` падал на первом запросе;
-- ⚠️ через посредника идут **токен бота и Telegram ID учеников**. Для Политики и уведомления РКН: это
-  трансграничная передача (Telegram и хостинг посредника). Журнал запросов на посреднике выключен.
+- ⚠️ через посредника идут **токен бота и Telegram ID учеников** (шифрованным сквозным TLS). Для Политики и
+  уведомления РКН: это трансграничная передача (Telegram и хостинг посредника).
 
 ### Бот разработки
 
@@ -437,14 +440,17 @@ timeout), поэтому:
 Боты уже созданы: боевой `@weconomics_bot` (администратор @weconomics_ru), для проверок
 `@weconomics_dev_bot`.
 
-1. **Посредник** – по [deploy/tg_relay/README.md](../deploy/tg_relay/README.md) (Андрей): сервер за
-   рубежом, nginx, сертификат; с боевого сервера `curl https://tg.weconomics.ai/` отвечает числом, не `403`.
-2. **Переменные в `/srv/weconomics/.env`** боевого сервера: `TELEGRAM_API_BASE=https://tg.weconomics.ai`,
+1. **Туннель до посредника** – по [deploy/tg_relay/README.md](../deploy/tg_relay/README.md) (Андрей;
+   на боевом пользователь `tgtunnel` и порт `18443`, на посреднике служба `tg-tunnel`). Проверка с хоста:
+   `curl -sS -m 10 -o /dev/null -w "%{http_code}
+" --resolve api.telegram.org:18443:172.17.0.1 https://api.telegram.org:18443/`
+   – `302`.
+2. **Переменные в `/srv/weconomics/.env`** боевого сервера: `TELEGRAM_API_BASE=https://api.telegram.org:18443`,
    `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME=weconomics_bot`, `TELEGRAM_WEBHOOK_SECRET` (нужен и без
    вебхука: без него путь Telegram считается ненастроенным), `TELEGRAM_CHANNEL` при необходимости.
    Секрет: `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`.
    Там же, для правовых документов (обязательны, иначе `legal.E001` / `legal.E003` не дадут поднять `web`):
-   - `LEGAL_TG_RELAY` = хостер и страна посредника (задаёт Андрей);
+   - `LEGAL_TG_RELAY` = `VDSina (SERVERS TECH FZCO, ОАЭ), Нидерланды` (хостер и страна посредника);
    - `LEGAL_DOCS_DATE` = дата выкатки (новая редакция документов; все один раз увидят экран согласия);
    - `VP_WALL_TG_ENABLED=1` – только когда Андрей подтвердил, что уведомление РКН о трансграничной передаче
      отправлено (Notion, задача `408b11c9-2bc1-81c6-a659-c0f572cfaa25`). Если РКН запретит передачу –
@@ -452,7 +458,10 @@ timeout), поэтому:
 3. **Пересоздать `web`, затем перезапустить `nginx`** (ловушка из [SERVER.md](SERVER.md): иначе nginx
    держит старый адрес контейнера):
    `docker compose up -d --force-recreate web && docker compose restart nginx`.
-4. `docker compose exec web python manage.py tg_setup --ping` – «Telegram отвечает за N мс».
+   (`extra_hosts` применяется только при пересоздании контейнера, обычный `restart` не поможет.)
+4. Проверка из контейнера: `docker compose exec web getent hosts api.telegram.org` – `172.17.0.1`
+   (настоящий адрес Telegram – контейнер не пересоздан); затем
+   `docker compose exec web python manage.py tg_setup --ping` – «Telegram отвечает за N мс».
    Не отвечает – вернуться к шагу 1.
 5. `docker compose exec web python manage.py tg_setup --check` – «Бот – администратор канала: да».
 6. **Вебхук снять и включить опрос:**
@@ -469,9 +478,9 @@ timeout), поэтому:
 
 Путь почты остаётся: окно ведёт на почту мелкой ссылкой. `VP_WALL_TG_ENABLED=0` (и перезапуск `web`)
 делает почту единственным путём; службу `tgbot` тогда можно остановить: `docker compose stop tgbot`.
-Сначала проверить посредника: `curl` с боевого сервера (шаг 1) и `docker compose logs --tail 50 tgbot`
-(«пауза 60 с» подряд – посредник или Telegram недоступен). Посредник `TELEGRAM_API_BASE` – только наш
-собственный сервер: через него проходит токен бота.
+Сначала проверить туннель: `curl` с боевого хоста (шаг 1), `ss -ltn | grep 18443` и
+`docker compose logs --tail 50 tgbot` («пауза 60 с» подряд – туннель или Telegram недоступен; на посреднике
+`systemctl status tg-tunnel`). Посредник – только наш собственный сервер: через него проходит токен бота.
 
 ## Тесты и как их гонять
 
