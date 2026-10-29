@@ -1037,6 +1037,12 @@ class OlympiadVariantItem(models.Model):
     quality_reasons = models.JSONField('Почему под вопросом', default=list,
                                        blank=True)
     has_solution = models.BooleanField('Есть решение', default=False)
+    # ⚠️ ЭТАЛОН ОТВЕТА — НЕ РЕШЕНИЕ. Непустой `answer` задания или ключ теста.
+    # Режим «На время» включается именно им (решение владельца 30.10): машина
+    # проверяет ответ по эталону, а разбор нужен только для показа после
+    # сдачи. По умолчанию «нет» — забытая разметка не включит таймер там,
+    # где проверить нечем.
+    has_answer = models.BooleanField('Есть эталон ответа', default=False)
     # Файл-источник и страницы: {"source_file": [...], "source_pages": [...],
     # "solution_pages": [...], "criteria_pages": [...]} — пути как в пакете.
     pages = models.JSONField('Страницы в PDF', default=dict, blank=True)

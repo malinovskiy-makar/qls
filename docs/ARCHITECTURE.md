@@ -139,6 +139,11 @@ manage.py test --settings=config.settings_test_pg
   `OlympiadVariant.ref_event_id` ↔ `OlympiadRef.event_id`. Внешнего ключа нет
   намеренно — привязки делает отдельный конвейер по экспортам чужих площадок.
   [ADR 0063](adr/0063-olympiads-own-models.md).
+  ⚠️ С 30.10.2026 исключение из «ни одна не ссылается»: позиция комплекта
+  `OlympiadVariantItem` ссылается на `Problem` (`PROTECT`) — задания пакета
+  олимпиад живут в банке, раздел держит только состав тура, `ref_key` и
+  «под вопросом». Модели тренировки (`TrainingDraft`, `TrainingItemResult`)
+  ссылались на `Problem` и раньше. [ADR 0169](adr/0169-olympiad-package-kits-point-to-bank-problems.md).
 
 ⚠️ Третьего исключения быть не должно: появится — правило пора переписывать.
 

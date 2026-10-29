@@ -144,6 +144,24 @@ class ItemTests(TestCase):
         self.assertEqual(item.quality_reasons, [])
         self.assertFalse(item.absent_in_last_import)
 
+    def test_answer_is_not_assumed(self):
+        """Эталона нет, пока его не отметили: забытая разметка не включит
+        «На время» там, где проверить нечем (миграция 0009)."""
+        item = self.item('mosh-2022-qualifying-9-v1:9:1')
+        item.refresh_from_db()
+        self.assertFalse(item.has_answer)
+
+    def test_solution_is_not_an_answer(self):
+        """Разбор есть, эталона нет — это разные признаки (решение 30.10)."""
+        item = self.item('mosh-2022-qualifying-9-v1:10:1', has_solution=True)
+        item.refresh_from_db()
+        self.assertTrue(item.has_solution)
+        self.assertFalse(item.has_answer)
+        item.has_answer = True
+        item.save(update_fields=['has_answer'])
+        self.assertEqual(
+            OlympiadVariantItem.objects.filter(has_answer=True).count(), 1)
+
 
 @override_settings(OLYMPIADS_PUBLIC=True)
 class KitWithoutYearPageTests(TestCase):
