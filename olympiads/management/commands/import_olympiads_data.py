@@ -316,8 +316,13 @@ class Command(BaseCommand):
 
     def _load_variants(self, rows):
         for row in rows:
+            # ⚠️ kit_key=None: после импорта пакета (import_olympiads_kits) под
+            # тот же год, этап и класс подходит несколько комплектов, и без
+            # этой строки update_or_create падал бы на «найдено несколько».
+            # Справочник работает только с прежними комплектами без ключа.
             OlympiadVariant.objects.update_or_create(
                 olympiad=Olympiad.objects.get(slug=row['slug']),
+                kit_key=None,
                 year=row['year'], grade=row.get('grade'),
                 stage=OlympiadStage.objects.filter(
                     olympiad__slug=row['slug'],
