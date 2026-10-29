@@ -384,3 +384,46 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
   «OK» ничего не доказывало – повторено через Python-замену.)
 - Итог: `vp` + `problems.tests.test_signup_source` + `problems.tests.test_production_settings` целиком –
   671 тест, OK (skipped=1).
+
+## Фаза 2. Полный прогон и разбор падений
+
+`./venv313/bin/python manage.py test` (SQLite в памяти, без `--parallel`, на коммите `d1e4e16a`):
+
+| Что | Значение |
+|---|---|
+| тестов | **7 659** (на 29.10 было 7 658 + 1 новый `test_check_deploy_warns_when_wall_token_is_missing`) |
+| время | 853 с (≈ 14,2 мин) |
+| failures / errors / skipped | **2 / 32 / 47** (всего 34 проблемы) |
+| код выхода | 1 |
+
+Каждый упавший тест – на `origin/main` (`c5e71939`) во временном worktree (`/tmp/qls_main`, окружение то же
+`venv313`; worktree удалён). Все семь затронутых модулей на main: 83 теста, failures=1, errors=32.
+
+| Тест / группа | Падает на main? | Причина одной строкой |
+|---|---|---|
+| `catalog.tests.test_lexical_bm25` (8 errors) | да | в `venv313` нет `bm25s` и `pymorphy3` |
+| `problems.tests.test_find_olympiad_text_duplicates` (11 errors) | да | в `venv313` нет `rapidfuzz` |
+| `problems.tests.test_text_dedup.FuzzyRatioTests` (3 errors) | да | нет `rapidfuzz` |
+| `catalog.tests.test_corpus_disk_cache` (6 errors) | да | нет `bm25s` (импорт лексической ноги) |
+| `problems.tests.test_load_probe.FakeDelayTests.test_real_provider_does_not_sleep` (1 error) | да | в `venv313` нет `openai` |
+| `calc2.tests.test_calc2_math.test_calc2_control_numbers` (1 fail) | да (проверено со ссылкой на `node_modules`: те же `✗`) | «Регулятор сцены · правка значения»: поле 40,375 px при потолке 40; `calc2` ветки = `calc2` main (`git diff` пуст). Карточка уже есть: 3ceb11c9 |
+| `problems.tests.test_tree_walk.НаЖивомДеревеTests.test_обход_не_выходит_за_пределы_проекта` (1 fail) | на main не запускался в той же папке; на `/tmp` зелёный и у main, и у кода ветки | тест считает чужими все пути, где есть сегмент `worktrees`/`.claude`, а этот worktree сам лежит в `.claude/worktrees/` – краснеет от места папки, не от кода. Код ветки, запущенный из `/tmp/qls_branch_check`: 13/13 OK |
+
+Новых падений от ветки (зелёных на main, красных на ветке по причине в коде ветки) – **нет**. Починок в п. 3
+не потребовалось, повторный полный прогон не нужен. Все три устаревших теста фазы 1 в полном прогоне зелёные.
+
+Карточки «Надо»: окружение мака (нет четырёх пакетов) – новая; `test_tree_walk` в worktree внутри
+`.claude/worktrees` – новая; calc2 40,375 px – уже была (3ceb11c9, добавлен комментарий); WebvisorTests –
+уже была (407b11c9-…-bc18, закрывается этой сессией); `pip-audit` – уже была (408b11c9), здесь не трогали.
+
+## Фаза 3. Остальные проверки CI у себя (без `pip-audit`)
+
+| Проверка | Итог |
+|---|---|
+| `ruff check .` | All checks passed |
+| `bandit -r problems catalog teacher student game calc2 config olympiads vp -ll` (как в джобе) | No issues identified (Medium 0, High 0; Low 738 ниже порога) |
+| `makemigrations --check --dry-run` | No changes detected |
+| `manage.py check` | 0 ошибок, 0 silenced |
+| `check --deploy --fail-level WARNING` с окружением джоба `deploy-check` | код 0, «no issues (1 silenced)» |
+| `scripts/check_em_dash.py` | код 0, «—» вне комментариев: 0 |
+| `pip-audit` | НЕ запускался – отдельная задача (408b11c9, Pillow 12.3.0, twisted, msgpack, autobahn) |
