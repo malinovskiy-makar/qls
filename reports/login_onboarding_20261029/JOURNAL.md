@@ -922,3 +922,123 @@ skipped=1** (браузерный): `vp.tests.test_wall_screens.SurveyTests.test
   главная задача `408b11c9-…ab62e` — итог раунда 2 в «Заметки», «На проверке».
 - Не записано как решение (лимит «больше 5 карточек — после показа владельцу»):
   «при `ONBOARDING_ENABLED=0` роль остаётся на регистрации» — вынесено в отчёт.
+
+---
+
+# РАУНД 3 (29.10.2026): правки владельца после живой проверки
+
+Промпт «Вход и онбординг, раунд 3». Notion прочитан: «Задачи» («В работе», «Надо») и
+10 последних «Решений» — три решения 29.10 этого раунда уже записаны (школа не зависит
+от города; логотипы целей без плашек; реестр школ — своя таблица + еженедельная
+синхронизация), повторно не пишу.
+
+## Р3 · Фаза −1. Сверка
+
+- `git status` — чисто; последний коммит `a84340fc` (р2 ф.8) — совпадает с журналом.
+- Тесты раунда 2: `test_social_login` + `test_onboarding` + `test_onboarding_gate` +
+  `test_school_search` — **126 OK** (103 с). ⚠️ В окне владельца задан
+  `MAIL_ENABLED=1` без почтового канала → `manage.py test` падает на системной
+  проверке `mail.E001` до первого теста. Тесты гоняю с `env -u MAIL_ENABLED -u
+  SOCIAL_* -u YANDEX_* -u VK_ID_* -u ONBOARDING_ENABLED` (тесты сами включают что нужно).
+- **Ключи сервисов** (значения не печатались, только проверка вида):
+
+  | Переменная | Состояние |
+  |---|---|
+  | `YANDEX_CLIENT_ID` | задан, похож на настоящий (32 знака 0–9a–f) |
+  | `YANDEX_CLIENT_SECRET` | задан |
+  | `VK_ID_CLIENT_ID` | задан, похож на настоящий (только цифры) |
+  | `VK_ID_CLIENT_SECRET` | задан |
+  | `SOCIAL_LOGIN_ENABLED` | задан, `1` |
+  | `SOCIAL_REDIRECT_BASE` | не задан |
+
+- Школ в `problems.School` (база worktree) — **5** (тестовые московские из раунда 2);
+  городов в `problems/data/cities_ru.json` — **1 116**.
+- Папки `C:\Users\shipu\weconomics-data\schools\` нет — файла реестра заранее нет.
+
+## Р3 · Фаза 1. Вход через VK ID и Яндекс ID: живая проверка
+
+**Ключи есть — живая проверка сделана.**
+
+### Что выяснилось запросами (без печати ключей)
+
+- **Яндекс** без входа в Яндекс уводит `oauth.yandex.ru/authorize` → `passport.yandex.ru`
+  (`retpath`) и о приложении ничего не говорит. Зато обмен заведомо неверного кода
+  (`POST oauth.yandex.ru/token`) различает: наш `client_id` → `invalid_grant` («Code has
+  expired»), выдуманный → `invalid_client` («Client not found»). Это и есть проверка
+  «приложение существует» в `social_check`.
+- **VK ID** проверяет приложение И адрес возврата ещё до входа: с
+  `http://localhost/auth/vk/callback/` в странице есть «Weconomics», с чужим адресом в
+  странице встроено `"error":{"message":"redirect_uri is missing or invalid","code":
+  "invalid_request"}`. Обмен (`/oauth2/auth`) с поддельным кодом отвечает одинаково
+  («invalid device id») для любого `client_id` — для диагностики бесполезен.
+- `id.vk.ru` с машины владельца изредка рвёт TLS (1 запрос из ~5) — в `social_check`
+  один повтор при сбое связи.
+
+### `https` за прокси
+
+`config/settings_production.py:59` — `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO',
+'https')`; nginx (`deploy/nginx/available/django.conf`, `location /`) шлёт
+`X-Forwarded-Proto $scheme` и `Host $host` → `build_absolute_uri()` даёт `https://…`.
+**Но** сайт отвечает на двух именах (`server_name weconomics.site … weconomics.ai …`,
+без переадресации одного на другое), а в кабинетах сервисов один адрес возврата: с
+weconomics.site сервис отказал бы. Поэтому добавлена `SOCIAL_REDIRECT_BASE`: адрес
+возврата строится от неё; вход, начатый не на её хосте, сначала переводится на то же
+начало на нём (иначе `state` лежал бы в сессии другого имени). Для `.env` сервера —
+`SOCIAL_REDIRECT_BASE=https://weconomics.ai` (`docs/SOCIAL_KEYS.md`, раздел 4).
+
+### Что сделано
+
+- `manage.py social_check [--base]` (`problems/management/commands/social_check.py`):
+  флаг, ключ (только «задан, длина N»), адрес возврата, GET адреса авторизации с
+  параметрами настоящей кнопки (код, конечный хост, признаки ошибки, встроенная ошибка
+  VK), для Яндекса — обмен неверного кода, итог одной строкой.
+- Понятные ошибки возврата (`problems/social/views.py`, `templates/social/error.html`):
+  `error=` сервиса разбирается ДО проверки `state` (аккаунтов не трогает): `access_denied`
+  → «Вход через … отменён», `invalid_request`/`invalid_scope` → «… не принял запрос
+  сайта», `invalid_client`/`unauthorized_client` → «… не узнал сайт», прочее — «… отказал
+  во входе»; сбой обмена → «… не ответил», нет токена/номера → «… не передал данные
+  аккаунта» (`SocialError.step`). Кнопки «Попробовать снова» (тот же `next`) и «Войти по
+  почте» («Войти по логину» без почты). Журнал: `Вход через <сервис> не удался: шаг X,
+  код Y`, код ошибки — только `[a-z0-9_]{1,40}`, иначе `other`.
+- VK ID не на `localhost`/`localhost:80` при `DEBUG` и без `SOCIAL_REDIRECT_BASE` → наша
+  страница «Для проверки VK ID откройте http://localhost/login/» (сессия не трогается).
+
+**Тесты:** новый `problems.tests.test_social_r3` — 20 (ошибки: `access_denied`,
+`invalid_request`, без `state`, чужой код в журнал не попадает, сбой обмена — в журнале
+нет кода/`state`/токена, нет данных, «Войти по логину»; адрес возврата с боевым
+`SECURE_PROXY_SSL_HEADER` и `X-Forwarded-Proto: https` → `https://weconomics.ai/auth/`;
+`SOCIAL_REDIRECT_BASE` и перевод с .site; обмен шлёт тот же адрес; VK на 127.0.0.1 /
+localhost / без DEBUG; `social_check` ×7 с подменой сети). Вместе с `test_social_login` —
+**59 OK**.
+
+### Живая проверка (Playwright, Python; поставлен в `venv313`: `playwright 1.64.1`)
+
+| Сервис | Сервер | Конечный хост | Ошибки на странице | Снимок |
+|---|---|---|---|---|
+| Яндекс | `127.0.0.1:8010` | `passport.yandex.ru` (вход в Яндекс) | нет («Неизвестное приложение» нет) | `shots_r3/yandex_authorize.png` |
+| VK ID | `localhost:80` (порт был свободен) | `id.vk.ru` | нет; страница «Вход в «Weconomics.ai»» с логотипом | `shots_r3/vk_authorize.png` |
+
+`/auth/vk/start/` на `127.0.0.1:8010` → 400 и «Для проверки VK ID откройте
+http://localhost/login/» (проверено curl). Дальше «Разрешить» нажимает владелец.
+
+### `social_check` (вывод без ключей)
+
+```
+--base http://127.0.0.1:8010
+  Яндекс: адрес возврата http://127.0.0.1:8010/auth/yandex/callback/; авторизация 200 → passport.yandex.ru;
+          обмен неверного кода 400 invalid_grant
+  VK ID:  адрес возврата http://127.0.0.1:8010/auth/vk/callback/; 200 → id.vk.ru;
+          ошибка в странице: redirect_uri is missing or invalid (invalid_request)
+  Яндекс: готов (адрес возврата Яндекс сверяет после входа — он должен стоять в кабинете буква в букву)
+  VK: VK ID на своём компьютере принимает только http://localhost (порт 80); адрес возврата не прописан в кабинете сервиса
+
+--base http://localhost
+  Яндекс: … 400 invalid_grant → Яндекс: готов (…)
+  VK ID: 200 → id.vk.ru; приложение узнано: в странице есть «Weconomics» → VK: готов
+
+без --base (боевой https://weconomics.ai)
+  Яндекс: готов (…) · VK: готов
+```
+
+(Первый прогон `--base http://localhost` дал «VK: нет связи (URLError)» — тот самый
+обрыв TLS; после добавления повтора — «готов».)

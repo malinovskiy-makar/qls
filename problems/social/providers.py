@@ -50,7 +50,16 @@ HTTP_TIMEOUT = 10
 
 
 class SocialError(Exception):
-    """Сервис не ответил или ответил не то. Текст — для журнала, не для человека."""
+    """Сервис не ответил или ответил не то. Текст — для журнала, не для человека.
+
+    `step` — где сломалось, для страницы ошибки и журнала (раунд 3): `exchange` —
+    обмен кода или запрос данных не удался (сеть, HTTP-ошибка); `data` — сервис
+    ответил, но без токена или без номера аккаунта.
+    """
+
+    def __init__(self, message, step='exchange'):
+        super().__init__(message)
+        self.step = step
 
 
 def code_challenge(verifier):
@@ -167,11 +176,11 @@ class VKProvider(Provider):
             'state': state,
         }).get('access_token')
         if not token:
-            raise SocialError('VK ID: нет access_token')
+            raise SocialError('VK ID: нет access_token', step='data')
         info = _request(self.USER_INFO_URL, data={
             'client_id': self.client_id, 'access_token': token}).get('user')
         if not isinstance(info, dict) or not info.get('user_id'):
-            raise SocialError('VK ID: нет user_id')
+            raise SocialError('VK ID: нет user_id', step='data')
         email = (info.get('email') or '').strip()
         return {
             'uid': str(info['user_id']),
@@ -200,10 +209,10 @@ class YandexProvider(Provider):
             data['client_secret'] = self.client_secret
         token = _request(self.TOKEN_URL, data=data).get('access_token')
         if not token:
-            raise SocialError('Яндекс ID: нет access_token')
+            raise SocialError('Яндекс ID: нет access_token', step='data')
         info = _request(self.USER_INFO_URL, headers={'Authorization': 'OAuth ' + token})
         if not info.get('id'):
-            raise SocialError('Яндекс ID: нет id')
+            raise SocialError('Яндекс ID: нет id', step='data')
         email = (info.get('default_email') or '').strip()
         avatar_id = info.get('default_avatar_id')
         avatar = (self.AVATAR_URL % urllib.parse.quote(str(avatar_id), safe='')

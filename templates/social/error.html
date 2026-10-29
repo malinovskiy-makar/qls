@@ -1,12 +1,18 @@
 {% extends 'registration/register.html' %}
 {% comment %}
-Отказ входа через сервис: ошибка сервиса, устаревший `state`, «уже привязан к
-другому аккаунту», «пока не настроен». Наследует страницу регистрации целиком и
-меняет только середину — как экраны почты (см. комментарий в начале там).
+Отказ входа через сервис: человек отменил вход, сервис отказал, обмен кода не
+удался, устаревший `state`, «уже привязан к другому аккаунту», «пока не настроен»,
+VK ID не на `localhost` (раунд 3). Одна человеческая фраза и кнопки «Попробовать
+снова» (если есть куда) и «Войти по почте». Наследует страницу регистрации целиком
+и меняет только середину — как экраны почты (см. комментарий в начале там).
 {% endcomment %}
 {% block title %}Вход · Weconomics{% endblock %}
 {% block main_class %} au-main--single{% endblock %}
 {% block card %}<div class="au-card au-card--single ob-anim-up">
   <h1 class="au-card-h">{{ text }}</h1>
-  <a class="k-btn k-btn--main au-submit" href="{{ link_url }}">{{ link_label }}</a>
+  {% if retry_url %}<div class="au-row">
+    <a class="k-btn k-btn--main au-submit" href="{{ retry_url }}">Попробовать снова</a>
+    <a class="k-btn au-alt" href="{{ link_url }}">{{ link_label }}</a>
+  </div>{% else %}
+  <a class="k-btn k-btn--main au-submit" href="{{ link_url }}">{{ link_label }}</a>{% endif %}
 </div>{% endblock %}

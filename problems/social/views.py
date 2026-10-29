@@ -24,9 +24,10 @@
 виден в таблицах результатов, а имя ребёнка там светиться не должно.
 """
 import logging
+import re
 import secrets
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django import forms
 from django.conf import settings
@@ -70,11 +71,58 @@ def _fail_text(provider):
             % provider.title)
 
 
-def _error_page(request, text, *, status=400, link=None):
-    link = link or (reverse('login'), 'Войти')
+# ── Понятные ошибки возврата (раунд 3) ──────────────────────────────────────
+# Сервис вернул `error=` или обмен не удался — человек видит одну фразу и две
+# кнопки, а в журнал уходит код ошибки сервиса и шаг. ⚠️ В ЖУРНАЛ НЕ ПИШЕМ НИ
+# КОД АВТОРИЗАЦИИ, НИ ТОКЕН, НИ ПОЧТУ: только сервис, шаг и код ошибки из
+# короткого набора знаков (чужая строка в журнал не попадает).
+
+#: `error=` сервиса → фраза. Остальные коды — общая фраза «отказал во входе».
+SERVICE_ERROR_TEXTS = {
+    'access_denied': 'Вход через {title} отменён',
+    'invalid_request': '{title} не принял запрос сайта. Попробуйте позже или войдите почтой',
+    'invalid_scope': '{title} не принял запрос сайта. Попробуйте позже или войдите почтой',
+    'invalid_client': '{title} не узнал сайт. Попробуйте позже или войдите почтой',
+    'unauthorized_client': '{title} не узнал сайт. Попробуйте позже или войдите почтой',
+}
+SERVICE_ERROR_DEFAULT = '{title} отказал во входе. Попробуйте ещё раз или войдите почтой'
+#: Шаг сбоя `SocialError.step` → фраза.
+STEP_TEXTS = {
+    'exchange': '{title} не ответил. Попробуйте ещё раз или войдите почтой',
+    'data': '{title} не передал данные аккаунта. Попробуйте ещё раз или войдите почтой',
+}
+
+
+def _error_code(raw):
+    """Код ошибки сервиса для журнала: только `[a-z0-9_]`, до 40 знаков."""
+    raw = (raw or '').strip().lower()
+    return raw if re.fullmatch(r'[a-z0-9_]{1,40}', raw) else 'other'
+
+
+def _login_link():
+    """Запасной путь — вход паролем; без почты на сайте это вход логином."""
+    return (reverse('login'),
+            'Войти по почте' if email_codes.mail_enabled() else 'Войти по логину')
+
+
+def _retry_url(provider, target=''):
+    url = reverse('social_start', args=[provider.name])
+    return url + ('?' + urlencode({'next': target}) if target else '')
+
+
+def _error_page(request, text, *, status=400, link=None, retry_url=None):
+    link = link or _login_link()
     return render(request, 'social/error.html', {
-        'text': text, 'link_url': link[0], 'link_label': link[1], 'seo_noindex': True,
+        'text': text, 'link_url': link[0], 'link_label': link[1],
+        'retry_url': retry_url, 'seo_noindex': True,
     }, status=status)
+
+
+def _failed(request, provider, text, *, step, code, target=''):
+    """Страница ошибки возврата + строка журнала без секретов."""
+    logger.warning('Вход через %s не удался: шаг %s, код %s', provider.name, step, code)
+    return _error_page(request, text.format(title=provider.title),
+                       retry_url=_retry_url(provider, target))
 
 
 class NotConfigured(Exception):
@@ -104,7 +152,36 @@ def _not_configured_page(request, provider):
 
 
 def _redirect_uri(request, provider):
-    return request.build_absolute_uri(reverse('social_callback', args=[provider.name]))
+    """Адрес возврата. При `SOCIAL_REDIRECT_BASE` — от него, а не от запроса:
+    сайт отвечает на двух именах, а в кабинете сервиса прописан один адрес."""
+    path = reverse('social_callback', args=[provider.name])
+    base = settings.SOCIAL_REDIRECT_BASE
+    return base + path if base else request.build_absolute_uri(path)
+
+
+def _off_canonical_host(request):
+    """Начало входа не на хосте `SOCIAL_REDIRECT_BASE` → адрес того же начала там.
+
+    ⚠️ Без этого человек начал бы на weconomics.site, а вернулся бы на
+    weconomics.ai: `state` лежит в сессии другого имени, и вход сорвался бы.
+    """
+    base = settings.SOCIAL_REDIRECT_BASE
+    if not base:
+        return None
+    parts = urlsplit(base)
+    if (request.scheme, request.get_host()) == (parts.scheme, parts.netloc):
+        return None
+    return base + request.get_full_path()
+
+
+def _vk_needs_localhost(request, provider):
+    """VK ID на своём компьютере пускает обратно только на http://localhost (порт 80).
+
+    Иначе владелец снова увидел бы чужую ошибку VK. Только при `DEBUG`: на бою
+    адрес задаёт `SOCIAL_REDIRECT_BASE`.
+    """
+    return (provider.name == 'vk' and settings.DEBUG and not settings.SOCIAL_REDIRECT_BASE
+            and request.get_host() not in ('localhost', 'localhost:80'))
 
 
 def _role_home(user):
@@ -157,6 +234,12 @@ def start(request, provider):
         provider = _provider_or_404(provider)
     except NotConfigured as missing:
         return _not_configured_page(request, missing.provider)
+    canonical = _off_canonical_host(request)
+    if canonical:
+        return redirect(canonical)
+    if _vk_needs_localhost(request, provider):
+        return _error_page(request, 'Для проверки VK ID откройте http://localhost/login/',
+                           link=('http://localhost/login/', 'Открыть localhost'))
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)          # 86 знаков: PKCE просит 43–128
     request.session[FLOW_KEY] = {
@@ -181,25 +264,34 @@ def callback(request, provider):
 
     # Поток одноразовый: забираем его из сессии сразу, удачен возврат или нет.
     flow = request.session.pop(FLOW_KEY, None) or {}
+    target = (flow.get('next') or '') if flow.get('provider') == provider.name else ''
+    if request.GET.get('error'):
+        # Человек нажал «Отмена» у сервиса или сервис отказал. Аккаунтов здесь не
+        # трогаем вовсе, поэтому `state` для страницы ошибки не нужен.
+        code = _error_code(request.GET['error'])
+        return _failed(request, provider,
+                       SERVICE_ERROR_TEXTS.get(code, SERVICE_ERROR_DEFAULT),
+                       step='authorize', code=code, target=target)
     state = request.GET.get('state', '')
     if (flow.get('provider') != provider.name or not state
             or not secrets.compare_digest(str(flow.get('state', '')), state)
             or time.time() - flow.get('at', 0) > FLOW_TTL):
         ratelimit.register_failure(SCOPE, request, None)
-        return _error_page(request, _fail_text(provider))
-    if request.GET.get('error') or not request.GET.get('code'):
-        # Человек нажал «Отмена» у сервиса или сервис отказал.
-        return _error_page(request, _fail_text(provider))
+        logger.warning('Вход через %s не удался: шаг state', provider.name)
+        return _error_page(request, _fail_text(provider),
+                           retry_url=_retry_url(provider, target))
+    if not request.GET.get('code'):
+        return _failed(request, provider, STEP_TEXTS['data'], step='authorize',
+                       code='no_code', target=target)
 
     try:
         data = provider.fetch_profile(request.GET, flow['verifier'],
                                       _redirect_uri(request, provider), state)
     except providers.SocialError as error:
-        logger.warning('Вход через %s не удался: %s', provider.title, error)
         ratelimit.register_failure(SCOPE, request, None)
-        return _error_page(request, _fail_text(provider))
+        return _failed(request, provider, STEP_TEXTS.get(error.step, STEP_TEXTS['exchange']),
+                       step=error.step, code='social_error', target=target)
 
-    target = flow.get('next') or ''
     link = (SocialAccount.objects.select_related('user')
             .filter(provider=provider.name, uid=data['uid']).first())
 

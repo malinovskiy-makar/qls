@@ -956,6 +956,12 @@ VK_ID_CLIENT_ID = '' if _TESTING else os.environ.get('VK_ID_CLIENT_ID', '').stri
 VK_ID_CLIENT_SECRET = '' if _TESTING else os.environ.get('VK_ID_CLIENT_SECRET', '').strip()
 YANDEX_CLIENT_ID = '' if _TESTING else os.environ.get('YANDEX_CLIENT_ID', '').strip()
 YANDEX_CLIENT_SECRET = '' if _TESTING else os.environ.get('YANDEX_CLIENT_SECRET', '').strip()
+# Откуда строится адрес возврата с сервиса (раунд 3). Пусто — от запроса.
+# ⚠️ На бою ЗАДАТЬ `https://weconomics.ai`: сайт отвечает на двух именах
+# (.site и .ai), а в кабинетах сервисов прописан один адрес возврата —
+# с .site сервис отказал бы «redirect_uri не совпадает». docs/SOCIAL_KEYS.md.
+SOCIAL_REDIRECT_BASE = ('' if _TESTING
+                        else os.environ.get('SOCIAL_REDIRECT_BASE', '').strip().rstrip('/'))
 # Дата рождения от сервиса пишется в профиль, только когда она внесена в
 # документы (ред. 3, решение 29.10.2026). До этого не попадает даже в сессию.
 SOCIAL_STORE_BIRTHDATE = (not _TESTING) and (
