@@ -1,40 +1,58 @@
-{% extends 'onboarding/base.html' %}{% load ru %}
+{% extends 'onboarding/base.html' %}{% load static ru %}
 {% comment %}
-«План готов» (решение 29.10.2026 «Собрали первый план»): чипы ответов, три
-карточки, «Начать». Открывается и после онбординга по /welcome/plan/.
-Дату тура не придумываем: строка «До тура N дней» — только из vp/config.py.
+«План готов» — раунд 2, макет `docs/design/onboarding_r2/shots/Plan.png`. Только то,
+что сайт умеет сегодня (решение 29.10.2026): «Три задачи для старта», олимпиадная
+карточка по целям (тренажёр ВП / «Задачи ВсОШ» / «Карта тем»), «Вызов дня» и «Умный
+поиск». Единственное обещание — плашка «Скоро · Подбор задач по вашим ошибкам»;
+других не добавлять. Дату тура не придумываем: «N дней до тура» — из vp/config.py.
+Карточки поднимаются по очереди, шаг 80 мс (`ob-pd*`). Состав — `plan_cards()`.
 {% endcomment %}
+{% block top_right %}<a class="k-btn k-btn--quiet" href="/profile/">В профиль</a>{% endblock %}
+{% block body_attrs %}{% endblock %}
 {% block main %}
-<h1 class="ob-h">{{ title }}</h1>
-<div class="ob-chips">{% for chip in chips %}<span class="k-chip">{{ chip }}</span>{% endfor %}<a class="ob-edit" href="{% url 'onboarding_step' 'grade' %}">Изменить</a></div>
+<div class="pl">
+  <div class="pl-head ob-anim-up">
+    <div class="pl-head-t">
+      <h1 class="ob-h" tabindex="-1">{{ heading }}</h1>
+      <div class="pl-chips">{% for chip in chips %}<span class="k-chip pl-chip">{{ chip }}</span>{% endfor %}<a class="pl-edit" href="{% url 'onboarding_step' 'grade' %}?change=1">Изменить</a></div>
+    </div>
+    <a class="k-btn k-btn--main pl-start" href="{{ start_url }}">Начать<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  </div>
 
-<div class="ob-cards">
-  <section class="ob-card">
-    <h2 class="ob-card-h">Три задачи</h2>
-    <ul class="ob-tasks">{% for task in tasks %}
-      <li><a class="ob-task" href="{{ task.url }}">
-        <span class="ob-task-t">{{ task.title }}</span>
-        <span class="ob-task-m">{% if task.topic %}<span class="ob-topic" style="--gc: var(--map-g-{{ task.section }})"><span class="ob-dot"></span>{{ task.topic }}</span>{% endif %}{% if task.stars %}<span class="ob-stars" role="img" aria-label="сложность">{% for _ in task.stars %}★{% endfor %}</span>{% endif %}</span>
-      </a></li>{% endfor %}
-    </ul>
-  </section>
+  <div class="pl-grid">
+    <section class="pl-card pl-card--tasks pl-pd1" aria-labelledby="pl-tasks-h">
+      <div class="pl-card-top"><span class="pl-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h6M8 11h6"/></svg></span><h2 class="pl-card-h" id="pl-tasks-h">Три задачи для старта</h2></div>
+      <ul class="pl-tasks">{% for task in tasks %}
+        <li><a class="pl-task" href="{{ task.url }}">
+          <span class="pl-task-body">
+            <span class="pl-task-t">{{ task.title }}</span>
+            <span class="pl-task-m">{% if task.topic %}<span class="pl-dot" style="background: var(--map-g-{{ task.section }})"></span>{{ task.topic }}{% endif %}{% if task.stars %}<span class="pl-stars" role="img" aria-label="Сложность {{ task.level }} из 5">{% for on in task.stars %}<i{% if not on %} class="off"{% endif %}>★</i>{% endfor %}</span>{% endif %}</span>
+          </span>
+          <svg class="pl-go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </a></li>{% endfor %}
+      </ul>
+    </section>
 
-  {% if vp %}
-  <section class="ob-card">
-    <h2 class="ob-card-h"><a href="{{ vp.url }}">Тренажёр {{ vp.tour }} тура «Высшей пробы»</a></h2>
-    {% if vp.days %}<div class="ob-card-sub">До тура {{ vp.days }} {{ vp.days|plural_ru:"день,дня,дней" }}</div>{% endif %}
-  </section>
-  {% else %}
-  <section class="ob-card">
-    <h2 class="ob-card-h"><a href="{% url 'olympiads:list' %}">Олимпиада</a></h2>
-  </section>
-  {% endif %}
+    <section class="pl-card pl-pd2" aria-labelledby="pl-ol-h">
+      <div class="pl-card-top">{% if olympiad.kind == 'vp' %}<span class="pl-plate" aria-hidden="true"><img src="{% static 'onboarding/logos/vp_logo.png' %}" alt=""></span>{% elif olympiad.kind == 'vsosh' %}<span class="pl-plate" aria-hidden="true"><img src="{% static 'onboarding/logos/vsosh_econ_top.png' %}" alt=""></span>{% else %}<span class="pl-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.2 7.2l7.6.6M16.6 10l-5 6M7.3 8.3l2 7.4"/></svg></span>{% endif %}<h2 class="pl-card-h" id="pl-ol-h">{{ olympiad.title }}</h2></div>
+      {% if olympiad.days %}<div class="pl-days"><b>{{ olympiad.days }}</b><span>{{ olympiad.days|plural_ru:"день,дня,дней" }} до тура</span></div>{% endif %}
+      <a class="k-btn k-btn--plain k-btn--wide pl-btn" href="{{ olympiad.url }}">{{ olympiad.button }}</a>
+    </section>
 
-  <section class="ob-card">
-    <h2 class="ob-card-h">Вызов дня</h2>
-    <a class="k-btn k-btn--plain ob-card-btn" href="{{ daily_url }}">Сыграть</a>
-  </section>
+    <section class="pl-card pl-pd3" aria-labelledby="pl-daily-h">
+      <div class="pl-card-top"><span class="pl-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></span><h2 class="pl-card-h" id="pl-daily-h">Вызов дня</h2></div>
+      <span class="pl-sub">Wecon Rush</span>
+      <a class="k-btn k-btn--plain k-btn--wide pl-btn" href="{{ daily_url }}">Сыграть</a>
+    </section>
+
+    <section class="pl-card pl-card--search pl-pd4" aria-labelledby="pl-search-h">
+      <div class="pl-card-top"><span class="pl-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span><h2 class="pl-card-h" id="pl-search-h">Умный поиск</h2></div>
+      <a class="pl-query" href="{{ search_url }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>{{ search_query }}</a>
+      <a class="k-btn k-btn--plain pl-btn pl-btn--auto" href="{{ search_url }}">Попробовать</a>
+    </section>
+  </div>
+
+  <div class="pl-soon pl-pd5"><span class="k-chip pl-soon-chip">Скоро</span>Подбор задач по вашим ошибкам</div>
+  <div class="pl-cta"><a class="k-btn k-btn--main pl-start" href="{{ start_url }}">Начать<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
 </div>
-
-<a class="k-btn k-btn--main ob-start" href="{{ start_url }}">Начать</a>
 {% endblock %}

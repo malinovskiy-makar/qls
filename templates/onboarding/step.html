@@ -1,65 +1,180 @@
-{% extends 'onboarding/base.html' %}
+{% extends 'onboarding/base.html' %}{% load static %}
 {% comment %}
-Шаг онбординга. Тексты — дословно из решения 29.10.2026; своих не добавлять.
-Подписи групп без видимого текста — только для экранного диктора (`ob-sr`).
-⚠️ Абзацев `<p>` на шагах нет, кроме сноски про Instagram: сторож в
-problems/tests/test_onboarding.py считает их.
+Шаг онбординга — раунд 2, по макету `docs/design/onboarding_r2/shots/*.png`.
+Тексты — дословно из макета и промпта раунда 2; своих не добавлять.
+⚠️ Абзацев `<p>` нет вовсе (подсказки уровня и вторая строка цели — подписи плиток,
+а сноска про Instagram — общий партиал): сторож в problems/tests/test_onboarding.py.
+⚠️ Где выбор один, плитка — кнопка отправки формы (`name=value`): без скрипта она
+сохраняет ответ сама, со скриптом — сначала галочка, потом переход (`data-ob-auto`).
 {% endcomment %}
 {% block main %}
-<h1 class="ob-h">{{ title }}</h1>
-<form id="ob-form" method="post" class="ob-form" novalidate data-ob-form>
-  {% csrf_token %}
-  {% if step == 'role' %}
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-sr">{{ title }}</legend>
-    {% include 'onboarding/_choices.html' with name='role' items=choices.role look='tiles' cols='ob-cols-2 ob-tiles--big' icon=True errors=form.role.errors %}
-  </fieldset>
+<div class="ob-body">
+<div class="ob-q ob-step-in">
+{% if step == 'role' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-auto novalidate>
+    {% csrf_token %}
+    <div class="ob-role" role="group" aria-label="Роль">{% for tile in tiles %}
+      <button type="submit" name="role" value="{{ tile.code }}" class="k-tile ob-t ob-anim-up ob-d{{ forloop.counter }}{% if tile.on %} k-tile--on{% endif %}" aria-pressed="{{ tile.on|yesno:'true,false' }}">
+        {% include 'onboarding/_mark.html' %}
+        <span class="ob-role-ico" aria-hidden="true">{% if tile.code == 'student' %}<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/><path d="M22 9v6"/></svg>{% else %}<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .6 3.2 2.4 3.5 5.4"/></svg>{% endif %}</span>
+        <span class="k-tile__name">{{ tile.label }}</span>
+        <span class="ob-role-chips">{% for chip in tile.chips %}<span class="k-chip">{{ chip }}</span>{% endfor %}</span>
+      </button>{% endfor %}
+    </div>
+    {% for error in form.role.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </form>
 
-  {% elif step == 'grade' %}
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-sr">Класс</legend>
-    {% include 'onboarding/_choices.html' with name='grade' items=choices.grade look='seg' errors=form.grade.errors %}
-  </fieldset>
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-sr">Уровень</legend>
-    {% include 'onboarding/_choices.html' with name='level' items=choices.level look='tiles' cols='ob-cols-2' errors=form.level.errors %}
-  </fieldset>
+{% elif step == 'grade' and stage == 'grade' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-auto novalidate>
+    {% csrf_token %}
+    <div class="ob-grades" role="group" aria-label="Класс">{% for grade in grades %}
+      <button type="submit" name="grade" value="{{ grade.code }}" class="k-tile ob-t ob-grade ob-anim-up ob-d{{ forloop.counter }}{% if grade.on %} k-tile--on{% endif %}" aria-pressed="{{ grade.on|yesno:'true,false' }}" aria-label="{% if grade.code == 'le7' %}7 класс и младше{% else %}{{ grade.number }} класс{% endif %}">
+        <span class="ob-grade-n" aria-hidden="true">{{ grade.number }}</span><span class="ob-grade-c" aria-hidden="true">класс</span>
+      </button>{% endfor %}
+    </div>
+    <button type="submit" name="grade" value="none" class="ob-notpupil ob-t ob-anim-up ob-d6{% if not_pupil_on %} is-on{% endif %}" aria-pressed="{{ not_pupil_on|yesno:'true,false' }}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/></svg>Уже не школьник
+    </button>
+    {% for error in form.grade.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </form>
 
-  {% elif step == 'olympiad' %}
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-sr">{{ title }}</legend>
-    {% include 'onboarding/_choices.html' with name='main_olympiad' items=choices.main_olympiad look='tiles' cols='ob-cols-3' errors=form.main_olympiad.errors %}
-  </fieldset>
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-cap">Откуда вы узнали о Weconomics?</legend>
-    {% include 'onboarding/_choices.html' with name='source_channel' items=choices.source_channel look='pills' errors=form.source_channel.errors %}
-  </fieldset>
-  {% include '_instagram_note.html' with note_class='ob-fine' %}
+{% elif step == 'grade' %}
+  <a class="ob-picked" href="?change=1" data-ob-link>{{ picked }}<span>Изменить</span></a>
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-auto novalidate>
+    {% csrf_token %}
+    <div class="ob-levels" role="group" aria-label="Уровень">{% for level in levels %}
+      <button type="submit" name="level" value="{{ level.code }}" class="k-tile ob-t ob-level ob-anim-up ob-d{{ forloop.counter }}{% if level.on %} k-tile--on{% endif %}" aria-pressed="{{ level.on|yesno:'true,false' }}">
+        {% include 'onboarding/_mark.html' %}
+        <span class="ob-sig" aria-hidden="true">{% for on in level.bars %}<i{% if on %} class="on"{% endif %}></i>{% endfor %}</span>
+        <span class="k-tile__name">{{ level.label }}</span>
+        <span class="k-tile__note">{{ level.hint }}</span>
+      </button>{% endfor %}
+    </div>
+    {% for error in form.level.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </form>
 
-  {% elif step == 'place' %}
-  <div class="ob-q">
-    <label class="ob-cap" for="ob-city">Город</label>
-    <input class="ob-input ym-disable-keys" type="text" id="ob-city" name="city" maxlength="120"
-           autocomplete="address-level2" required value="{{ form.city.value|default:'' }}">
-    {% for error in form.city.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
-  </div>
-  <div class="ob-q">
-    <label class="ob-cap" for="ob-school">Школа</label>
-    <input class="ob-input ym-disable-keys" type="text" id="ob-school" name="school" maxlength="200"
-           autocomplete="organization" required value="{{ form.school.value|default:'' }}">
-    {% for error in form.school.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
-  </div>
+{% elif step == 'goals' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-multi novalidate>
+    {% csrf_token %}
+    <div class="ob-goals" role="group" aria-label="Цели">{% for tile in tiles %}
+      <label class="k-tile ob-t ob-goal ob-anim-up ob-d{{ forloop.counter }}{% if tile.wide %} is-wide{% endif %}{% if tile.on %} k-tile--on{% endif %}">
+        <input type="checkbox" name="goals" value="{{ tile.code }}"{% if tile.on %} checked{% endif %}{% if tile.code == 'undecided' %} data-ob-exclusive{% endif %}>
+        {% include 'onboarding/_mark.html' with sq=True %}
+        <span class="ob-plate{% if tile.draw %} ob-plate--draw{% endif %}" aria-hidden="true">{% if tile.logo %}<img src="{% static tile.logo %}" alt="">{% if tile.badges %}<span class="ob-plate-badges">{% for badge in tile.badges %}<span><img src="{% static badge %}" alt=""></span>{% endfor %}</span>{% endif %}{% elif tile.draw == 'market' %}<svg width="44" height="36" viewBox="0 0 44 36" fill="none"><path d="M5 3v29h35" stroke="var(--text3)" stroke-width="1.6" stroke-linecap="round"/><path d="M9 7c8 3 17 11 27 22" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/><path d="M9 28C18 24 26 15 36 8" stroke="var(--amber)" stroke-width="2.6" stroke-linecap="round"/><circle cx="22.4" cy="17.6" r="3.2" fill="var(--surface)" stroke="var(--text)" stroke-width="1.8"/></svg>{% else %}<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="16" stroke="var(--text3)" stroke-width="1.6" stroke-dasharray="3 4"/><text x="20" y="27" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="20" font-weight="700" fill="var(--accent-ink)">?</text></svg>{% endif %}</span>
+        <span class="ob-goal-t"><span class="k-tile__name">{{ tile.label }}</span>{% if tile.note %}<span class="k-tile__note">{{ tile.note }}</span>{% endif %}</span>
+      </label>{% endfor %}
+    </div>
+    {% for error in form.goals.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    {% include 'onboarding/_next.html' %}
+  </form>
 
-  {% elif step == 'teach' %}
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-sr">{{ title }}</legend>
-    {% include 'onboarding/_choices.html' with name='teach_places' items=choices.teach_places look='tiles' cols='ob-cols-3' multi=True errors=form.teach_places.errors %}
-  </fieldset>
-  <fieldset class="ob-q" data-ob-need>
-    <legend class="ob-cap">Классы</legend>
-    {% include 'onboarding/_choices.html' with name='teach_grades' items=choices.teach_grades look='pills' multi=True errors=form.teach_grades.errors %}
-  </fieldset>
-  {% endif %}
-</form>
+{% elif step == 'school' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form ob-school" data-ob-multi data-ob-fields novalidate>
+    {% csrf_token %}
+    {% url 'onboarding_cities' as cities_url %}{% url 'onboarding_schools' as schools_url %}
+    <div class="ob-field ob-anim-up ob-d1">
+      <label class="ob-label" for="ob-city">Город</label>
+      <div class="ob-ac" data-ac="{{ cities_url }}">
+        <input class="k-input ob-input ym-disable-keys" type="text" id="ob-city" name="city" maxlength="120"
+               autocomplete="off" required value="{{ form.city.value|default:'' }}">
+        <span class="ob-ac-done" hidden aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
+      </div>
+      {% for error in form.city.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="ob-field ob-anim-up ob-d2" data-ob-school>
+      <label class="ob-label" for="ob-school">Школа</label>
+      <div class="ob-ac" data-ac="{{ schools_url }}" data-ac-city="ob-city" data-ac-numbers>
+        <input class="k-input ob-input ym-disable-keys" type="text" id="ob-school" name="school" maxlength="200"
+               autocomplete="off" required value="{{ form.school.value|default:'' }}">
+      </div>
+      {% for error in form.school.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    </div>
+    {% include 'onboarding/_next.html' %}
+  </form>
+
+{% elif step == 'source' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-auto data-ob-source novalidate>
+    {% csrf_token %}
+    <div class="ob-pills" role="group" aria-label="Откуда узнали">{% for pill in pills %}
+      <button type="submit" name="source_channel" value="{{ pill.code }}" class="ob-pill ob-t ob-anim-up ob-d{% if forloop.counter < 7 %}{{ forloop.counter }}{% else %}6{% endif %}{% if pill.on %} is-on{% endif %}" aria-pressed="{{ pill.on|yesno:'true,false' }}"{% if pill.code == 'other' %} data-ob-other-toggle aria-controls="ob-other"{% endif %}>{{ pill.label }}</button>{% endfor %}
+    </div>
+    <div class="ob-other{% if not other_on %} is-folded{% endif %}" id="ob-other" data-ob-other>
+      <input class="k-input ob-input ym-disable-keys" type="text" name="source_other" maxlength="120"
+             placeholder="Где именно?" aria-label="Где именно?" value="{{ other_value|default:'' }}">
+      <button type="submit" name="source_channel" value="other" class="k-btn k-btn--main ob-next">Готово<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    {% for error in form.source_channel.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+  </form>
+
+{% elif step == 'email' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" action="{{ email_action }}" class="ob-form ob-email" data-ob-leave novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+    <input type="hidden" name="src" value="onb">
+    <input type="hidden" name="next" value="{{ email_next }}">
+    {% if email_keep_mail %}<input type="hidden" name="mail_consent" value="on">{% endif %}
+    <div class="ob-field ob-anim-up ob-d1">
+      <label class="ob-label" for="ob-email">Почта</label>
+      <input class="k-input ob-input ym-disable-keys" type="email" id="ob-email" name="email"
+             inputmode="email" autocomplete="email" required>
+    </div>
+    <div class="ob-row ob-anim-up ob-d2">
+      <button type="submit" class="k-btn k-btn--main ob-next">Получить код<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button type="submit" form="ob-later" class="k-btn k-btn--quiet ob-later">Позже</button>
+    </div>
+  </form>
+  <form method="post" id="ob-later" class="ob-sr-form" data-ob-plain>{% csrf_token %}<input type="hidden" name="later" value="1"></form>
+
+{% elif step == 'teach' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form" data-ob-multi novalidate>
+    {% csrf_token %}
+    <div class="ob-places" role="group" aria-label="Где учите">{% for place in places %}
+      <label class="k-tile ob-t ob-place ob-anim-up ob-d{{ forloop.counter }}{% if place.on %} k-tile--on{% endif %}">
+        <input type="checkbox" name="teach_places" value="{{ place.code }}"{% if place.on %} checked{% endif %}>
+        {% include 'onboarding/_mark.html' with sq=True %}
+        <span class="k-tile__name">{{ place.label }}</span>
+      </label>{% endfor %}
+    </div>
+    {% for error in form.teach_places.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    <div class="ob-pills ob-pills--num" role="group" aria-label="Классы учеников">{% for grade in grades %}
+      <label class="ob-pill ob-pill--num ob-t ob-anim-up ob-d4{% if grade.on %} is-on{% endif %}">
+        <input type="checkbox" name="teach_grades" value="{{ grade.code }}"{% if grade.on %} checked{% endif %} aria-label="{{ grade.label }} класс">{{ grade.label }}
+      </label>{% endfor %}
+    </div>
+    {% for error in form.teach_grades.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    {% include 'onboarding/_next.html' %}
+  </form>
+
+{% elif step == 'group' %}
+  <h1 class="ob-h" tabindex="-1">{{ title }}</h1>
+  <form method="post" class="ob-form ob-group" data-ob-leave novalidate>
+    {% csrf_token %}
+    <div class="ob-field ob-anim-up ob-d1">
+      <label class="ob-label" for="ob-gname">Название</label>
+      <input class="k-input ob-input" type="text" id="ob-gname" name="name" maxlength="100" required
+             value="{{ form.name.value|default:'' }}">
+      {% for error in form.name.errors %}<div class="ob-err" role="alert">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="ob-code-card ob-anim-up ob-d2">
+      <div><div class="ob-code-k">Код приглашения</div><div class="ob-code" data-copy-src>{{ invite_code }}</div></div>
+      <button type="button" class="k-btn k-btn--plain k-btn--sm" data-copy>Скопировать</button>
+    </div>
+    <div class="ob-row ob-anim-up ob-d3">
+      <button type="submit" class="k-btn k-btn--main ob-next">Создать группу<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <a class="k-btn k-btn--quiet ob-later" href="{{ done_url }}">Позже</a>
+    </div>
+  </form>
+{% endif %}
+</div>
+{% include 'onboarding/_me.html' %}
+</div>
+{% if step == 'source' %}{% include '_instagram_note.html' with note_class='ob-fine' %}{% endif %}
 {% endblock %}
-{% block bar %}{% include 'onboarding/_bar.html' %}{% endblock %}

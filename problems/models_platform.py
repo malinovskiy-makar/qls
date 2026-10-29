@@ -121,16 +121,27 @@ class UserProfile(models.Model):
         SEARCH = 'search', 'Поиск'
         OTHER = 'other', 'Другое'
 
-    # Главная олимпиада — ответ онбординга (решение 29.10.2026). Коды `vsosh`
-    # нет в OLYMPIAD_HISTORY (там ВсОШ по этапам), остальные совпадают по смыслу.
-    MAIN_OLYMPIADS = (
+    # Цели — ответ онбординга «К чему готовитесь?» (раунд 2, решение 29.10.2026):
+    # можно несколько, «Пока не решил» — только одна. Список кодов, как
+    # `olympiad_history`. Заменили одно поле «Главная олимпиада» (миграция 0085
+    # перевела старые ответы: hse/mosh/listed → listed, ieo → international).
+    GOALS = (
         ('vsosh', 'ВсОШ'),
-        ('hse', 'Высшая проба'),
-        ('mosh', 'МОШ'),
-        ('listed', 'Другие перечневые'),
-        ('ieo', 'IEO'),
+        ('listed', 'Перечневые олимпиады'),
+        ('international', 'Международные олимпиады'),
+        ('knowledge', 'Разобраться в экономике'),
         ('undecided', 'Пока не решил'),
     )
+    #: Вторая строка плитки цели (макет `Goals.png`).
+    GOAL_NOTES = {
+        'listed': 'Высшая проба, МОШ, РАНХиГС и другие',
+        'international': 'IEO и другие',
+    }
+    #: Короткие подписи — в карточке «Ваш профиль» и в чипах плана.
+    GOAL_SHORT = {
+        'vsosh': 'ВсОШ', 'listed': 'Перечневые', 'international': 'Международные',
+        'knowledge': 'Разобраться в экономике', 'undecided': 'Пока не решил',
+    }
     # Ветка преподавателя в онбординге: где и кого учит. Списки кодов, как
     # `olympiad_history`.
     TEACH_PLACES = (
@@ -234,8 +245,11 @@ class UserProfile(models.Model):
     # Пустой `onboarded_at` — шлюз (problems/middleware_onboarding.py) ведёт
     # человека на /welcome/, пока анкета не пройдена.
     onboarded_at = models.DateTimeField('Онбординг пройден', null=True, blank=True)
-    main_olympiad = models.CharField('Главная олимпиада', max_length=16, blank=True,
-                                     default='', choices=MAIN_OLYMPIADS)
+    goals = models.JSONField('К чему готовится', default=list, blank=True)
+    # «Откуда узнали → Другое»: своими словами, по желанию. P0: в модель ИИ не
+    # уходит, как все поля профиля — сторож `problems/tests/profile_markers.py`.
+    source_other = models.CharField('Откуда узнали: другое', max_length=120,
+                                    blank=True, default='')
     teach_places = models.JSONField('Где учит', default=list, blank=True)
     teach_grades = models.JSONField('Классы учеников', default=list, blank=True)
     # Заполняется только из VK ID / Яндекс ID и только при SOCIAL_STORE_BIRTHDATE=1 —

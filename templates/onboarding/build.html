@@ -1,0 +1,24 @@
+{% extends 'onboarding/base.html' %}
+{% comment %}
+Экран-переход «собираем план» (макет раунда 2 `Build.png`, живой образец —
+`docs/design/onboarding_r2/Build.dc.html`): плитка с «искрой», строки по одной
+(≈450 мс) — индикатор, затем галочка с «пружинкой»; строки уезжают вверх, снизу
+поднимаются заготовки карточек, и страница уходит дальше (`data-ob-build`).
+Без скрипта и при «уменьшить движение» — сразу дальше: `<noscript>` и скрипт.
+Со стены ВП (`next`) строк две и дальше — сразу туда, без плана.
+{% endcomment %}
+{% block extra_head %}
+  <noscript><meta http-equiv="refresh" content="0; url={{ target }}"></noscript>{% endblock %}
+{% block top_right %}{% endblock %}
+{% block body_attrs %}{% endblock %}
+{% block main %}
+<div class="ob-build" data-ob-build data-ob-target="{{ target }}">
+  <span class="ob-build-mark" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></svg></span>
+  <h1 class="ob-sr" tabindex="-1">{{ title }}</h1>
+  <ol class="ob-build-lines" aria-live="polite">{% for line in lines %}
+    <li style="--i: {{ forloop.counter0 }}"><span class="ob-bi" aria-hidden="true"><span class="ob-bi-spin"></span><span class="ob-bi-ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span></span>{{ line }}</li>{% endfor %}
+  </ol>
+  <div class="ob-build-ghost" aria-hidden="true"><span></span><span></span><span></span></div>
+  <a class="k-btn k-btn--quiet ob-build-skip" href="{{ target }}">Дальше</a>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% comment %}
+Карточка «Ваш профиль» (макет раунда 2): аватар-инициалы, имя или логин и строки
+ответов. Строка текущего шага — акцентом (`is-now`), только что заполненная мигает
+(`is-new`, кадры `ob-flash`). Пустое значение — чёрточка рисунком CSS, не символом.
+`ym-hide-content`: Вебвизор не пишет имя и школу (ADR 0133).
+{% endcomment %}<aside class="ob-me ym-hide-content" aria-label="Ваш профиль">
+  <div class="ob-me-top"><span class="ob-ava" aria-hidden="true">{{ me_initials }}</span><span class="ob-me-name">{{ me_name }}</span></div>
+  <ul>{% for row in me_rows %}
+    <li class="{% if row.now %}is-now{% endif %}{% if row.new %} is-new{% endif %}"><span class="ob-me-k">{{ row.label }}</span>{% if row.value %}<span class="ob-me-v">{{ row.value }}</span>{% else %}<span class="ob-me-v is-empty"><span class="ob-sr">не заполнено</span></span>{% endif %}</li>{% endfor %}
+  </ul>
+</aside>
