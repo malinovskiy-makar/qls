@@ -28,6 +28,23 @@ STAGES = ('final', 'regional', 'municipal', 'school', 'invitational')
 QUEUE_SOURCE = 'q2_vsosh_v2'
 
 
+def fix_math_percent(text):
+    r"""`%` без обратной косой внутри формулы → `\%`: в TeX `%` — начало
+    комментария, KaTeX теряет хвост формулы (29.10: `\text{Норма банковского %}`).
+    Правится форма, не смысл (ADR 0005). → (текст, число правок)."""
+    if not text or '%' not in text:
+        return text, 0
+    n = 0
+
+    def one(m):
+        nonlocal n
+        s = m.group(0)
+        fixed = re.sub(r'(?<!\\)%', lambda _m: chr(92) + '%', s)
+        n += fixed.count(chr(92) + '%') - s.count(chr(92) + '%')
+        return fixed
+    return vsosh_digitize._MATH.sub(one, text), n
+
+
 def row_key(r):
     return f"{r['event_id']}|{r['number']}|{r.get('task_variant', '')}"
 
@@ -131,10 +148,11 @@ def assemble_v2(v1_root, v2_root, log):
             r[field], k1 = vsosh_digitize.fix_currency_dollars(r.get(field) or '')
             r[field], k2 = vsosh_digitize.fix_math_star(r[field])
             r[field], k3 = vsosh_digitize.fix_unbalanced_delims(r[field])
-            fixed += k1 + k2 + k3
+            r[field], k4 = fix_math_percent(r[field])
+            fixed += k1 + k2 + k3 + k4
         for part in r.get('parts') or []:
             for fn in (vsosh_digitize.fix_currency_dollars, vsosh_digitize.fix_math_star,
-                       vsosh_digitize.fix_unbalanced_delims):
+                       vsosh_digitize.fix_unbalanced_delims, fix_math_percent):
                 part['text'], k = fn(part.get('text') or '')
                 fixed += k
         if fixed:

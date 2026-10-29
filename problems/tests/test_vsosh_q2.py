@@ -410,6 +410,19 @@ class GridKeyTests(SimpleTestCase):
         self.assertFalse(V.open_answer({'statement_md': 'Выберите верное.'}))
 
 
+class MathPercentTests(SimpleTestCase):
+    def test_percent_escaped_only_inside_math(self):
+        from problems.olympiad_audit import vsosh_v2 as V
+        bsl = chr(92)
+        text = 'Ставка 5 % годовых: $r = \\frac{a}{\\text{норма %}}$ и $10\\%$.'
+        out, n = V.fix_math_percent(text)
+        self.assertEqual(n, 1)
+        self.assertIn('\\text{норма ' + bsl + '%}', out)
+        self.assertTrue(out.startswith('Ставка 5 % годовых'))   # вне формулы — как было
+        self.assertIn('$10\\%$', out)                            # уже экранированный — не трогаем
+        self.assertEqual(V.fix_math_percent(out), (out, 0))     # идемпотентно
+
+
 class Ile2008Tests(SimpleTestCase):
     HTML = ('<html><body><h2>1-й тур: задачи</h2>'
             '<div class="task"><h3>1. Простая задача</h3><div class="condition"><div class="tex2jax">'
