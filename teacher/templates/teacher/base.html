@@ -198,8 +198,8 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
 {% include '_cookie_bar.html' with metrika_private=True %}
-{% include '_site_version.html' %}
-{% include '_legal_footer.html' %}
+{% comment %}Подвал с документами и метка версии — только где он нужен (решение владельца 29.10.2026, Notion «Решения»): главная, профиль, /legal/, вход, регистрация, «Почти готово». Список — в `templates/_site_footer.html`. По умолчанию пусто.{% endcomment %}
+{% block site_footer %}{% endblock %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 {% include '_problem_report.html' %}

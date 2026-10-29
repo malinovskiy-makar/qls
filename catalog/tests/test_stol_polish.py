@@ -126,7 +126,8 @@ class EntryAndSiteTextsTests(TestCase):
 
     def test_site_version_is_beta_1_1(self):
         self.assertEqual(settings.SITE_VERSION, 'Beta 1.1')
-        html = self.client.get('/catalog/').content.decode()
+        # Метка версии — в подвале, а подвал с 29.10.2026 есть на главной, не в каталоге.
+        html = self.client.get('/').content.decode()
         self.assertIn('<div class="site-version">Beta 1.1</div>', html)
 
 

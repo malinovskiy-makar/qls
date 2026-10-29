@@ -197,9 +197,10 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
             check(not box['errors'], 'низ панелей %s: ошибки %s' % (size, box['errors']))
             check(box['rail'] == box['inner'] and box['help'] == box['inner'],
                   'низ панелей %s: лента %s, помощь %s, окно %s' % (size, box['rail'], box['help'], box['inner']))
-            check(box['version'] == 'none', 'низ панелей %s: «Beta 1.0» видна (%s)' % (size, box['version']))
-        check(opened['version'] == 'none', 'задача без перезагрузки: «Beta 1.0» видна')
-        check(box_back_version(data) != 'none', 'вернулись ко входу: «Beta 1.0» пропала')
+            check(box['version'] in ('none', 'нет'), 'низ панелей %s: «Beta 1.0» видна (%s)' % (size, box['version']))
+        check(opened['version'] in ('none', 'нет'), 'задача без перезагрузки: «Beta 1.0» видна')
+        # С 29.10.2026 подвала (и метки версии) в каталоге нет вовсе — решение владельца.
+        check(box_back_version(data) == 'нет', 'вернулись ко входу: в каталоге снова метка версии')
 
         # README §4: ответ ИИ показывается целиком (5 000 знаков, ни одного шага не срезано).
         box = data['long reply']

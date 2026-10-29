@@ -427,7 +427,9 @@ class VersionBadgeTests(TestCase):
                 username='nav_ver_tu', password=PASSWORD, role='teacher'),
         }
 
-    def test_version_at_the_bottom_of_every_template(self):
+    def test_version_only_where_the_footer_is(self):
+        """Метка версии — часть подвала (решение владельца 29.10.2026): она есть
+        там же, где подвал (профиль из этого списка), и нет в остальных корнях."""
         for url, template, role in TEMPLATE_PAGES:
             self.client.force_login(self.users[role])
             response = self.client.get(url)
@@ -436,7 +438,9 @@ class VersionBadgeTests(TestCase):
             html = response.content.decode('utf-8')
             self.assertFalse('beta 0.0' in html, url)
             self.assertFalse('nav-version' in html, url)
-            self.assertEqual(html.count('<div class="site-version">%s</div>' % settings.SITE_VERSION), 1, url)
+            expected = 1 if url == '/profile/' else 0
+            self.assertEqual(html.count('<div class="site-version">%s</div>' % settings.SITE_VERSION),
+                             expected, url)
 
     def test_login_and_register_have_it_below(self):
         self.client.logout()
@@ -445,10 +449,13 @@ class VersionBadgeTests(TestCase):
             self.assertTrue('<div class="site-version">%s</div>' % settings.SITE_VERSION in html, url)
             self.assertFalse('auth-version' in html, url)
 
-    def test_partial_is_included_in_every_base_template(self):
+    def test_every_base_template_has_the_footer_block(self):
+        """Метка версии приходит с `_site_footer.html` в блоке `site_footer`."""
+        with open('templates/_site_footer.html', encoding='utf-8') as fh:
+            self.assertIn("{% include '_site_version.html' %}", fh.read())
         for path in self.BASES:
             with open(path, encoding='utf-8') as fh:
-                self.assertTrue("{% include '_site_version.html' %}" in fh.read(), path)
+                self.assertIn('{% block site_footer %}', fh.read(), path)
 
     def test_version_stands_at_the_bottom_of_a_short_page(self):
         """На бою 17.09 «Beta 1.0» висела посреди окна у короткой страницы кабинета:
@@ -474,7 +481,7 @@ class VersionBadgeTests(TestCase):
         # угла (`_corner_stack.html`, position: fixed — вне потока) и инертные
         # `<template>` плашек (18.09.2026).
         self.client.force_login(self.users['teacher'])
-        html = self.client.get('/teacher/game-sets/').content.decode('utf-8')
+        html = self.client.get('/profile/').content.decode('utf-8')
         tail = html.split('<div class="site-version">', 1)[1].split('</div>', 1)[1]
         tail = re.sub(r'<script\b.*?</script>|<style\b.*?</style>|<template\b.*?</template>',
                       '', tail, flags=re.S)
@@ -484,7 +491,7 @@ class VersionBadgeTests(TestCase):
     def test_version_comes_from_settings(self):
         self.client.force_login(self.users['student'])
         with self.settings(SITE_VERSION='Beta 9.9'):
-            html = self.client.get('/catalog/').content.decode('utf-8')
+            html = self.client.get('/profile/').content.decode('utf-8')
         self.assertTrue('Beta 9.9' in html, 'значение не из настроек')
         self.assertFalse('Beta 1.0' in html, 'значение зашито в шаблон')
 

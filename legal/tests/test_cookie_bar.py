@@ -266,7 +266,8 @@ class CookieBarMarkupTests(TestCase):
         self.assertNotIn('—', visible)   # длинное тире: правило сайта
 
     def test_footer_has_the_settings_link(self):
-        html = self.client.get('/catalog/').content.decode('utf-8')
+        # Подвал с 29.10.2026 — на главной и в профиле (не в каталоге): выбор там и меняют.
+        html = self.client.get('/').content.decode('utf-8')
         self.assertIn('data-cookie-settings>Настройки cookie</button>', html)
 
     def test_the_script_is_served_and_wired_to_both_buttons_and_the_footer(self):

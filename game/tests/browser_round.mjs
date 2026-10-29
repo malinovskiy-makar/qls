@@ -105,7 +105,8 @@ try {
         playing: document.body.classList.contains('rush-playing'),
         navHidden: !nav || getComputedStyle(nav).display === 'none',
         // Метка «Beta 1.0» уходит вместе с шапкой: иначе легла бы на нижний ряд раунда (P8).
-        versionHidden: getComputedStyle(document.querySelector('.site-version')).display === 'none',
+        // С 29.10.2026 метки в игре нет вовсе (подвал только на главной) — тоже «скрыта».
+        versionHidden: (v => !v || getComputedStyle(v).display === 'none')(document.querySelector('.site-version')),
         timer: document.getElementById('hud-timer').textContent.trim(),
         options: opts.length, cols,
         keyInFirstCol: !!(key && o && key.left - o.getBoundingClientRect().left < 20),

@@ -16,8 +16,9 @@
 </head>
 {% comment %}
 Регистрация и экраны почты/сервисов — раунд 2 (29.10.2026), по макету
-`docs/design/onboarding_r2/shots/Register.png`: шапка сайта, фон-узор (`_tokens.html`),
-слева заголовок и три шага, справа карточка 420 px; подвал с документами в потоке.
+`docs/design/onboarding_r2/shots/Register.png`: фон-узор (`_tokens.html`), слева заголовок
+и три шага, справа карточка; подвал с документами в потоке. Раунд 4: вместо шапки сайта
+тонкая полоса с логотипом (`_auth_top.html`), карточка 500 px — страница влезает в окно.
 Регистрация = почта + пароль (решение владельца 29.10.2026): ни роли, ни повтора
 пароля, ни подзаголовка, ни подсказки под полем. Без почты (`MAIL_ENABLED=0`) —
 логин и пароль.
@@ -30,7 +31,8 @@
 {% endcomment %}
 <body class="au">
 {% include '_metrika_noscript.html' %}
-{% include '_nav.html' %}
+{% comment %}Шапки сайта на входе и регистрации нет (раунд 4): только полоса с логотипом.{% endcomment %}
+{% block site_nav %}{% include 'registration/_auth_top.html' %}{% endblock %}
 <main class="au-main{% block main_class %}{% endblock %}">{% block card %}
   <section class="au-pitch" aria-label="Как устроен вход">
     <h1 class="au-pitch-h ob-anim-up">Настройте сайт <em>под себя за минуту</em></h1>
@@ -129,8 +131,7 @@
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
 <script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' %}
-{% include '_site_version.html' %}
-{% include '_legal_footer.html' %}
+{% block site_footer %}{% include '_site_footer.html' %}{% endblock %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 </body>

@@ -149,14 +149,17 @@ try {
       const page = await context.newPage();
       await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
       seen[path] = await page.evaluate(() => {
-        const r = document.querySelector('.site-version').getBoundingClientRect();
+        const v = document.querySelector('.site-version');
+        // В кабинете метки нет с 29.10.2026 (подвал — только главная, профиль, /legal/, вход).
+        if (!v) return { none: true, ih: innerHeight, sh: document.documentElement.scrollHeight };
+        const r = v.getBoundingClientRect();
         return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left),
                  ih: innerHeight, sh: document.documentElement.scrollHeight };
       });
     }
     // Короткая страница: прокрутки нет, метка у нижнего края окна (на входе — над полем body в 24 px), слева.
     const ok = (p, gap) => p.sh === p.ih && Math.abs(p.ih - gap - p.bottom) <= 1 && p.left <= 24;
-    check('version_at_the_bottom_of_short_pages', ok(seen['/teacher/game-sets/'], 0) && ok(seen['/login/'], 24), seen);
+    check('version_at_the_bottom_of_short_pages', !!seen['/teacher/game-sets/'].none && ok(seen['/login/'], 24), seen);
   });
 } catch (e) {
   out.error = String((e && e.stack) || e);

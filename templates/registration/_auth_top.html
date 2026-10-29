@@ -1,0 +1,6 @@
+{% comment %}
+Тонкая полоса над входом и регистрацией (раунд 4, 29.10.2026): шапки сайта здесь нет,
+только логотип — тот же партиал `_wordmark.html`, что у онбординга, — и он же ссылка на
+главную. Больше ничего. Подключается в `{% block site_nav %}` входа и регистрации.
+{% endcomment %}
+<header class="au-top"><a class="ob-logo" href="/" aria-label="Weconomics: на главную">{% include '_wordmark.html' with logo_class='au-top-mark' %}</a></header>

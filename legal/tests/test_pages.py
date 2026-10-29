@@ -149,20 +149,22 @@ class PublicPagesTests(TestCase):
 
 
 class RootTemplateFooterTests(SimpleTestCase):
-    """Инвариант: каждый шаблон-документ несёт ссылку на /legal/.
+    """Инвариант: каждый шаблон-документ решает про подвал явно (раунд 4, 29.10.2026).
 
-    Список корневых шаблонов собирается обходом (как у
-    `problems.tests.test_signup_source.EveryRootTemplateTests`), а не пишется
-    руками: новый корневой шаблон без футера краснит этот тест.
+    Решение владельца: подвал с документами только на главной, в профиле, на /legal/
+    и на входе/регистрации. Каждый корневой шаблон либо держит блок
+    `{% block site_footer %}` (пустой по умолчанию, страница включает
+    `_site_footer.html`), либо сам является такой страницей. Список корней
+    собирается обходом: новый корневой шаблон без решения краснит этот тест.
+    Ссылки на /legal/ с главной и профиля дают доступность документов на сайте.
     """
 
-    #: Исключений нет: с части Б (09.10.2026) строка документов стоит и в игре, и на
-    #: калькуляторе, в нижней строке рядом с меткой версии. Раньше там была только
-    #: ссылка «Документы» в шапке (иконка без подписи).
-    NAV_LINK_ONLY = set()
-    #: 12 корневых шаблонов из отчёта инвентаризации (раздел 3.1), по умолчанию
-    #: подключающих счётчик, плюс экран согласия, добавленный этой работой.
-    INVENTORY_ROOTS = 12
+    #: Корни, которые сами — страницы с подвалом (документы, вход, регистрация).
+    OWN_FOOTER = {'legal/templates/legal/accept.html',
+                  'templates/registration/login.html',
+                  'templates/registration/register.html'}
+    #: 12 корневых шаблонов из отчёта инвентаризации + экран согласия + онбординг.
+    INVENTORY_ROOTS = 14
 
     def _roots(self):
         base = Path(settings.BASE_DIR)
@@ -176,33 +178,37 @@ class RootTemplateFooterTests(SimpleTestCase):
                 roots.append(rel.as_posix())
         return sorted(roots)
 
-    def test_every_root_template_links_to_legal(self):
+    def test_every_root_template_decides_about_the_footer(self):
         base = Path(settings.BASE_DIR)
         roots = self._roots()
-        with_footer, with_nav_link, missing = [], [], []
+        missing = []
         for rel in roots:
             text = (base / rel).read_text(encoding='utf-8')
-            if "{% include '_legal_footer.html' %}" in text:
-                with_footer.append(rel)
-            elif rel in self.NAV_LINK_ONLY and "nav_docs_link=True" in text:
-                with_nav_link.append(rel)
-            else:
-                missing.append(rel)
-        self.assertEqual(missing, [], 'корневой шаблон без ссылки на /legal/')
-        # Инвариант: корней из отчёта - 12 (+ экран согласия); у каждого есть ссылка.
-        new_roots = {'legal/templates/legal/accept.html',
-                     'templates/onboarding/base.html'}        # онбординг, 29.10.2026
-        self.assertEqual(len(with_footer) + len(with_nav_link), self.INVENTORY_ROOTS + len(new_roots))
-        self.assertEqual(set(with_nav_link), self.NAV_LINK_ONLY)
-        self.assertTrue(new_roots <= set(with_footer))
+            if '{% block site_footer %}' in text:
+                continue
+            if rel in self.OWN_FOOTER and "{% include '_legal_footer.html' %}" in text:
+                continue
+            missing.append(rel)
+        self.assertEqual(missing, [], 'корневой шаблон без решения про подвал')
+        self.assertEqual(len(roots), self.INVENTORY_ROOTS)
+
+    def test_footer_pages_include_it_in_the_block(self):
+        base = Path(settings.BASE_DIR)
+        for rel in ('catalog/templates/catalog/home.html', 'legal/templates/legal/index.html',
+                    'legal/templates/legal/document.html',
+                    'problems/templates/platform/profile.html',
+                    'templates/registration/login.html', 'templates/registration/register.html'):
+            text = (base / rel).read_text(encoding='utf-8')
+            self.assertIn("{% block site_footer %}{% include '_site_footer.html' %}{% endblock %}",
+                          text, rel)
 
 
 class FooterRenderTests(TestCase):
     LINE = ('© 2026 Weconomics', 'Документы', 'Политика', 'Соглашение', 'Рекомендации',
             'Настройки cookie', '12+')
 
-    def test_footer_is_on_public_pages(self):
-        for url in ('/', '/catalog/', '/login/', '/register/', '/legal/privacy/', '/game/', '/calc2/'):
+    def test_footer_is_on_home_legal_login_register(self):
+        for url in ('/', '/login/', '/register/', '/legal/', '/legal/privacy/'):
             response = self.client.get(url, follow=True)
             html = response.content.decode('utf-8')
             block = html.split('<p class="legal-foot">', 1)
@@ -213,25 +219,20 @@ class FooterRenderTests(TestCase):
             for href in ('/legal/', '/legal/privacy/', '/legal/terms/', '/legal/recommendations/'):
                 self.assertIn('href="%s"' % href, block[1].split('</p>', 1)[0], url)
 
-    def test_game_and_calculator_have_the_footer_line_with_visible_text(self):
-        """Часть Б: строка документов стоит и в игре, и на калькуляторе (с подписью, не значком)."""
-        for url in ('/game/', '/calc2/'):
+    def test_game_calculator_and_catalog_have_no_footer(self):
+        """Решение 29.10.2026: в игре, на калькуляторе и в каталоге подвала нет."""
+        for url in ('/game/', '/calc2/', '/catalog/'):
             html = self.client.get(url).content.decode('utf-8')
-            block = html.split('<p class="legal-foot">', 1)
-            self.assertEqual(len(block), 2, url)
-            self.assertIn('>Документы</a>', block[1].split('</p>', 1)[0], url)
-            # Метка версии и строка документов рядом: в одном месте страницы.
-            self.assertLess(html.index('class="site-version"'), html.index('<p class="legal-foot">'))
+            self.assertNotIn('<p class="legal-foot">', html, url)
+            self.assertNotIn('class="site-version"', html, url)
 
-    def test_calculator_model_picker_shows_the_footer_line(self):
-        """Экран выбора моделей (окно поверх приложения) не закрывает строку документов."""
+    def test_calculator_takes_the_whole_window_under_the_header(self):
+        """Полосы в 30 px под строку документов больше нет: приложение — до низа окна."""
         html = self.client.get('/calc2/').content.decode('utf-8')
         self.assertIn('id="scene-picker"', html)
-        footer = html.split('<div class="calc-foot">', 1)[1].split('</p>', 1)[0]
-        self.assertIn('Beta 1.1', footer)
-        self.assertIn('<a href="/legal/">Документы</a>', footer)
-        # Окно выбора кончается над полосой (и над окном cookie, пока оно открыто).
-        self.assertIn('#scene-picker { bottom: calc(30px + var(--ck-h, 0px)); }', html)
+        self.assertNotIn('calc-foot', html)
+        self.assertIn('.app { height: calc(100vh - 48px - var(--ck-h, 0px)); }', html)
+        self.assertIn('#scene-picker { bottom: var(--ck-h, 0px); }', html)
 
     def test_calculator_has_the_docs_link_in_the_header(self):
         from problems.tests.factories import make_user

@@ -138,8 +138,9 @@ try {
     await page.waitForSelector('#stol-center .stm');
     const opened = await page.evaluate(() => ({
       boot: window.__stolBoot, path: location.pathname,
-      /* «Beta 1.0» прячется вместе со сменой вида, без перезагрузки. */
-      version: getComputedStyle(document.querySelector('.site-version')).display,
+      /* «Beta 1.0» прячется вместе со сменой вида, без перезагрузки; с 29.10.2026 метки в
+         каталоге нет вовсе (подвал — только на главной). */
+      version: (v => v ? getComputedStyle(v).display : 'нет')(document.querySelector('.site-version')),
       view: document.getElementById('stol-app').dataset.view,
       statement: !!document.querySelector('#stol-center .stm .math-content'),
       helpOpen: document.getElementById('stol').dataset.help,
@@ -154,7 +155,7 @@ try {
     await page.goBack();
     await page.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
     const back = await page.evaluate(() => ({ boot: window.__stolBoot, path: location.pathname + location.search,
-                                             version: getComputedStyle(document.querySelector('.site-version')).display,
+                                             version: (v => v ? getComputedStyle(v).display : 'нет')(document.querySelector('.site-version')),
                                              rows: document.querySelectorAll('#ct-rows .rail-row').length }));
     out['no reload'] = { boot, ids, opened, next, back, errors };
     await ctx.close();

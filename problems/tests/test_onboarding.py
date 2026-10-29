@@ -341,19 +341,25 @@ class TextGuardTests(OnboardingBase):
 
 
 class FooterTests(OnboardingBase):
-    """Подвал с документами виден: обычный блок в потоке, не в фиксированной полосе."""
+    """Раунд 4 (решение владельца 29.10.2026): на шагах онбординга подвала с документами
+    НЕТ — согласие человек уже дал на регистрации или «Почти готово», и там подвал
+    есть (`test_footer_r4.FooterPagesTests`). По 152-ФЗ Политика должна быть
+    опубликована и доступна на сайте, а не стоять на каждой странице."""
 
-    def test_footer_is_a_plain_block_after_main(self):
+    def test_no_footer_on_the_steps(self):
         UserProfile.objects.filter(pk=self.profile.pk).update(role='student', grade='10',
                                                               level='basic')
         for url in ('/welcome/role/', '/welcome/goals/'):
             html = self.client.get(url).content.decode('utf-8')
-            tail = html.split('</main>', 1)[1]
-            self.assertIn('<p class="legal-foot">', tail, url)
-            before = tail.split('<p class="legal-foot">', 1)[0]
-            # Между концом середины и подвалом нет обёртки-полосы.
-            self.assertEqual(before.count('<div'), before.count('</div>'), url)
-            self.assertNotIn('ob-bar"', before, url)
+            self.assertNotIn('<p class="legal-foot">', html, url)
+            self.assertNotIn('<div class="site-version">', html, url)
+            self.assertIn('id="cookie-bar"', html, url)
+
+    def test_login_and_register_keep_the_footer(self):
+        self.client.logout()
+        for url in ('/login/', '/register/'):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertEqual(html.count('<p class="legal-foot">'), 1, url)
 
     def test_no_fixed_bar_in_the_styles(self):
         css = (Path(settings.BASE_DIR) / 'static' / 'onboarding' / 'onboarding.css').read_text(

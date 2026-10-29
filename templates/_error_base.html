@@ -118,7 +118,8 @@
       <a class="err-btn" href="/catalog/">В каталог задач</a>
     </div>
   </div>
-{% include '_legal_footer.html' %}
+{% comment %}Подвал с документами и метка версии — только где он нужен (решение владельца 29.10.2026, Notion «Решения»): главная, профиль, /legal/, вход, регистрация, «Почти готово». Список — в `templates/_site_footer.html`. По умолчанию пусто.{% endcomment %}
+{% block site_footer %}{% endblock %}
 {% include '_cookie_bar.html' %}
 </body>
 </html>

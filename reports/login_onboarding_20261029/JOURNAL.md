@@ -1447,3 +1447,83 @@ http://localhost/login/» (проверено curl). Дальше «Разреш
    **74 OK**.
 8. **Живая проверка** — ключей в окружении сессии нет; вход нажимает владелец (команда — в
    отчёте). Таблица причин — `docs/SOCIAL_KEYS.md`, раздел 5.
+
+## Р4 · Фаза 2. Без шапки сайта на входе; онбординг с узором и без подвала; подвал — только где нужен
+
+### Решение владельца (29.10.2026) и обоснование
+
+Подвал сайта (метка версии + © · Документы · Политика · Соглашение · Рекомендации ·
+Настройки cookie · 12+) — **только** на главной, в профиле (все вкладки), на `/legal/…` и на
+входе, регистрации и всём, что их наследует («Почти готово», код из письма, «Осталась почта»,
+ошибки сервисов). Обоснование (152-ФЗ): Политика должна быть опубликована и доступна на
+сайте, а не стоять на каждой странице; ссылки с главной и профиля это обеспечивают; согласие
+человек даёт на регистрации или «Почти готово» — там подвал и остаётся. Окно согласия на
+cookie — не подвал: оно на всех страницах, как было. Знак 12+ (436-ФЗ) — отдельный партиал
+`_age_mark.html`, вопрос «нужен ли на каждой странице» — карточка Аничу (фаза 6).
+
+### Как сделано
+
+- `templates/_site_footer.html` — новый партиал: `_site_version.html` + `_legal_footer.html`;
+  в комментарии — явный список страниц с подвалом и ссылка на решение.
+- Каждый корневой шаблон, где подвал был, держит **пустой** `{% block site_footer %}{% endblock %}`
+  (с комментарием про решение). Страницы с подвалом: `{% block site_footer %}{% include
+  '_site_footer.html' %}{% endblock %}` — `catalog/home.html`, `legal/index.html`,
+  `legal/document.html`, `platform/profile.html`, `registration/login.html`, `register.html`.
+  `legal/accept.html` (экран согласия, `/legal/…`) не тронут — подвал у него свой.
+- `_legal_footer.html`: «12+» вынесен в `{% include '_age_mark.html' %}`. Вернуть знак на все
+  страницы без подвала = поставить `_age_mark.html` в пустые блоки корней.
+- **Шапка:** во входе и регистрации `{% include '_nav.html' %}` → `{% block site_nav %}{% include
+  'registration/_auth_top.html' %}{% endblock %}` — полоса 56 px с логотипом (`_wordmark.html`,
+  как у онбординга), он же ссылка на главную. Всё, что наследует `register.html`, получает её
+  же. Онбординг шапки сайта и раньше не имел (своя `ob-top`).
+- **Узор онбординга:** в `onboarding/base.html` по умолчанию снят `data-bg-pattern="off"` —
+  узор на всех шагах (сборка и план и раньше его включали). Карточки и плитки на своём фоне.
+  Контраст — снимками в фазе 5.
+- **Калькулятор:** полоса `calc-foot` в 30 px убрана, `.app` снова `calc(100vh - 48px -
+  var(--ck-h, 0px))`, окно выбора моделей — до низа окна (над окном cookie). Страница задачи
+  («Стол»): подвал там и так прятался правилом `stol.css`; правило не тронуто (сторожит тест),
+  раскладку в высоту окна подвал не задавал.
+- Мёртвые правила `body.ob > .legal-foot` убраны из `onboarding.css`.
+
+### Тронутые строки (для слияния; номера — в файле ДО правки)
+
+| Файл | Строки | Что |
+|---|---|---|
+| `catalog/templates/catalog/base.html` | 201–202 | версия + подвал → пустой блок |
+| `problems/templates/platform/base.html` | 102–103 | то же |
+| `student/templates/student/base.html` | 212–213 | то же |
+| `teacher/templates/teacher/base.html` | 201–202 | то же |
+| `calendar_stub/templates/calendar_stub/calendar.html` | 925–926 | то же |
+| `game/templates/game/game.html` | 7336–7337 | то же |
+| `game/templates/game/result.html` | 228 | подвал → пустой блок |
+| `teacher/templates/teacher/assignment_print.html` | 309 | то же |
+| `templates/_error_base.html` | 121 | то же |
+| `templates/onboarding/base.html` | 25–26, 32, 46 | комментарий, узор, подвал → пустой блок |
+| `calc2/templates/calc2/calc2.html` | 75–89, 2548–2551 | стили полосы, полоса → пустой блок |
+| `templates/registration/login.html` | 20, 26, 91–92 | комментарий, шапка → блок, подвал → блок |
+| `templates/registration/register.html` | 19–20, 33, 132–133 | то же |
+| `templates/_legal_footer.html` | 78 | «12+» → `_age_mark.html` |
+| `catalog/home.html`, `legal/index.html`, `legal/document.html`, `platform/profile.html` | в конце файла | +3 строки: блок с подвалом |
+
+### Сторожа
+
+- Новый `problems/tests/test_footer_r4.py` (8): подвал и метка версии есть на `/`,
+  `/profile/`, `/profile/?tab=data`, `/legal/`, `/legal/privacy/`, `/login/`, `/register/`;
+  нет на `/catalog/` (гость и ученик), странице задачи, `/calc2/`, `/textbook/`,
+  `/olympiads/`, `/vp/`, `/game/`, `/student/`, `/teacher/groups/`, `/welcome/role/`; окно cookie
+  (`id="cookie-bar"` + `cookie_bar.js`) на всех этих страницах; ни один корень не включает подвал
+  мимо блока; `_age_mark.html` отдельно; нет `<nav class="site-nav">` на входе, регистрации,
+  сбросе пароля, «Почти готово», ошибке сервиса и шагах онбординга.
+- Переписаны под решение: `test_onboarding.FooterTests` (на шагах подвала нет; на входе и
+  регистрации есть), `legal/tests/test_pages.py` (`RootTemplateFooterTests` — каждый корень
+  решает про подвал блоком; `FooterRenderTests` — подвал на главной/legal/входе, нет в игре,
+  калькуляторе, каталоге; калькулятор во всю высоту), `config/tests/test_nav.py`
+  (`VersionBadgeTests`: метка там же, где подвал), `test_cookie_bar` (кнопка «Настройки cookie»
+  — на главной), `test_print_sheet` (на листке подвала нет), `test_stol_polish` (версия — на
+  главной), браузерные раннеры `stol_runner.mjs`, `browser_round.mjs`,
+  `browser_teacher_sets.mjs` (метки может не быть вовсе).
+- Прогон (без `--parallel`): `legal`, `config`, сторожа каталога, онбординга, входа, сервисов,
+  Wecon Rush — **638 тестов, 637 OK, skipped=4, 1 падение**: `test_design_canon.CanonBrowserChecks`
+  — раннер `calc2/tests/canon_checks.mjs` не находит пакет Node `playwright` (`node_modules`
+  нет ни в worktree, ни в основной папке). Это окружение, а не правка; Python-Playwright в
+  `venv313` есть, им идут проверки фаз 3 и 5.

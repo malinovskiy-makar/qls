@@ -17,13 +17,14 @@
 </head>
 {% comment %}
 Вход — раунд 2 (29.10.2026), по макету `docs/design/onboarding_r2/shots/Main.png`:
-шапка сайта, фон-узор, слева заголовок и три пункта, справа карточка. Логика входа
+полоса с логотипом (раунд 4, вместо шапки сайта), фон-узор, слева заголовок и три пункта, справа карточка. Логика входа
 (`RoleBasedLoginView`, `EmailOrUsernameBackend`) не менялась: поле принимает и
 почту, и логин, поэтому старые аккаунты с логином входят как раньше.
 {% endcomment %}
 <body class="au">
 {% include '_metrika_noscript.html' %}
-{% include '_nav.html' %}
+{% comment %}Шапки сайта на входе и регистрации нет (раунд 4): только полоса с логотипом.{% endcomment %}
+{% block site_nav %}{% include 'registration/_auth_top.html' %}{% endblock %}
 <main class="au-main">
   <section class="au-pitch" aria-label="Что есть на сайте">
     <h1 class="au-pitch-h ob-anim-up">Олимпиадная экономика <em>в одном месте</em></h1>
@@ -88,8 +89,7 @@
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
 <script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' %}
-{% include '_site_version.html' %}
-{% include '_legal_footer.html' %}
+{% block site_footer %}{% include '_site_footer.html' %}{% endblock %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 </body>

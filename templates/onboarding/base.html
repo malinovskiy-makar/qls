@@ -22,14 +22,16 @@
   центру круглая «Назад» + полоса прогресса + «N из M», справа «Выйти». На первом шаге
   «Назад» скрыта, но место держит — полоса не прыгает;
 - тело: слева вопрос и элементы выбора, справа карточка «Ваш профиль» (< 960 px — нет);
-- нижней полосы с кнопками НЕТ: «Дальше» стоит под выбором, подвал с документами —
-  обычный блок в потоке страницы (сторож — `test_onboarding.FooterTests`).
+- нижней полосы с кнопками НЕТ: «Дальше» стоит под выбором; подвала с документами
+  НЕТ (раунд 4, решение владельца 29.10.2026: согласие дано на регистрации или «Почти
+  готово», там ссылки и стоят; сторож — `test_onboarding.FooterTests`);
+- фон — фирменный узор с W на всех шагах (раунд 4), как на сборке и плане.
 Экран = заголовок + элементы управления: пояснительных абзацев нет намеренно.
 Счётчик — с `metrika_private`, как в кабинетах: здесь вводят город и школу.
 Переходы без перезагрузки — `static/onboarding/onboarding.js`; без скрипта всё —
 обычные страницы и формы.
 {% endcomment %}
-<body class="ob"{% block body_attrs %} data-bg-pattern="off"{% endblock %}>
+<body class="ob"{% block body_attrs %}{% endblock %}>
 {% include '_metrika_noscript.html' %}
 <header class="ob-top">
   <a class="ob-logo" href="/" aria-label="Weconomics: на главную">{% include '_wordmark.html' with logo_class='ob-logo-mark' %}</a>
@@ -43,6 +45,7 @@
 <main class="ob-main" id="ob-main" data-ob-step="{{ step }}" data-ob-stage="{{ stage }}">{% block main %}{% endblock %}</main>
 <script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' with metrika_private=True %}
-{% include '_legal_footer.html' %}
+{% comment %}Подвал с документами и метка версии — только где он нужен (решение владельца 29.10.2026, Notion «Решения»): главная, профиль, /legal/, вход, регистрация, «Почти готово». Список — в `templates/_site_footer.html`. По умолчанию пусто.{% endcomment %}
+{% block site_footer %}{% endblock %}
 </body>
 </html>

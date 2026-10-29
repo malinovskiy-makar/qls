@@ -75,6 +75,6 @@ body > .legal-foot a, body > .legal-foot .legal-foot-link { padding: 9px 0; marg
   <a href="{{ legal_terms_url|default:'/legal/terms/' }}">Соглашение</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <a href="{{ legal_reco_url|default:'/legal/recommendations/' }}">Рекомендации</a><span class="legal-foot-sep" aria-hidden="true">·</span>
   <button type="button" class="legal-foot-link" data-cookie-settings>Настройки cookie</button><span class="legal-foot-sep" aria-hidden="true">·</span>
-  <span class="legal-foot-age" title="Для аудитории 12+">12+</span>
+  {% include '_age_mark.html' %}
   <span class="legal-foot-meta">© 2026 Weconomics · 12+{% if site_version %} · {{ site_version }}{% endif %}</span>
 </p>

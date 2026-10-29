@@ -79,10 +79,10 @@ class PrintSheetTests(TestCase):
         self.assertNotIn('nav-link', body)
         self.assertNotIn('header-nav', body)
         self.assertNotIn('site-header', body)
-        # Юридический подвал (`_legal_footer.html`, «© 2026 Weconomics») стоит
-        # в каждом корневом шаблоне и на бумаге не печатается — его не считаем.
-        self.assertIn('<p class="legal-foot">', body)
-        sheet = re.sub(r'<p class="legal-foot">.*?</p>', '', body, flags=re.S)
+        # Юридического подвала (`_legal_footer.html`) на листке нет: с 29.10.2026
+        # он только на главной, в профиле, /legal/ и входе (`_site_footer.html`).
+        self.assertNotIn('<p class="legal-foot">', body)
+        sheet = body
         # Название сайта встречается ровно один раз — в подвале листка.
         self.assertEqual(sheet.count('Weconomics'), 1)
         self.assertIn('<span><b>Weconomics</b>', body)
