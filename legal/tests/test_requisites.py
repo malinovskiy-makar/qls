@@ -22,7 +22,7 @@ class RequisitesTests(SimpleTestCase):
         self.assertEqual(legal['operator_inn'], '662333547172')
         self.assertEqual(legal['operator_status'], 'плательщик налога на профессиональный доход')
         self.assertEqual(legal['telegram'], 'weconomics_ru')
-        self.assertEqual(legal['docs_version'], '1')
+        self.assertEqual(legal['docs_version'], '1')  # фаза 4 поднимет до '2'
 
     def test_no_private_data_in_the_public_repository(self):
         """Репозиторий публичный: ни домашнего адреса, ни телефона, ни почты в коде."""
@@ -41,12 +41,28 @@ class RequisitesTests(SimpleTestCase):
             for pattern in forbidden:
                 self.assertIsNone(pattern.search(text), '%s: %s' % (path, pattern.pattern))
 
-    def test_every_document_carries_the_current_edition_number(self):
-        """Номер в тексте («Редакция N от») и в настройках не должны расходиться."""
-        marker = 'Редакция %s от [ДАТА]' % settings.LEGAL['docs_version']
-        for doc in documents.all_documents():
+    def test_every_document_carries_the_right_edition_marker(self):
+        """Номер в тексте («Редакция N от») и в настройках не должны расходиться.
+
+        Согласие, Политика и Соглашение идут за `docs_version` и берут дату из
+        `LEGAL_DOCS_DATE` (метка `[ДАТА]`). Согласие на рассылку живёт своей
+        редакцией 1 и тоже берёт дату из настройки. Три неизменённых документа
+        несут свою настоящую дату: после смены `LEGAL_DOCS_DATE` они не должны
+        ложно показать «Редакция 1 от <новая дата>».
+        """
+        current = '2'   # фаза 4 свяжет это с settings.LEGAL['docs_version']
+        expected = {
+            'privacy.md': 'Редакция %s от [ДАТА]' % current,
+            'consent.md': 'Редакция %s от [ДАТА]' % current,
+            'terms.md': 'Редакция %s от [ДАТА]' % current,
+            'consent_mail.md': 'Редакция 1 от [ДАТА]',
+            'consent_ai.md': 'Редакция 1 от 20.10.2026',
+            'cookies.md': 'Редакция 1 от 20.10.2026',
+            'recommendations.md': 'Редакция 1 от 20.10.2026',
+        }
+        for doc in documents._every_document():
             text = doc.path.read_text(encoding='utf-8')
-            self.assertEqual(text.count(marker), 1, doc.filename)
+            self.assertEqual(text.count(expected[doc.filename]), 1, doc.filename)
             self.assertIn(settings.LEGAL['operator_inn'], text, doc.filename)
 
     def test_six_documents(self):

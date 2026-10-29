@@ -38,7 +38,7 @@ class PublicPagesTests(TestCase):
     @override_settings(LEGAL=FILLED)
     def test_values_are_substituted_from_settings(self):
         html = self.client.get('/legal/privacy/').content.decode('utf-8')
-        self.assertIn('Редакция 1 от 15 октября 2026 г.', html)
+        self.assertIn('Редакция 2 от 15 октября 2026 г.', html)
         self.assertIn('<a href="mailto:%s">%s</a>' % (MAIL, MAIL), html)
         self.assertNotIn('class="lg-missing"', html)
 
@@ -48,9 +48,39 @@ class PublicPagesTests(TestCase):
         self.assertNotIn('<script>alert(1)</script>', html)
 
     def test_the_text_files_stay_untouched_by_substitution(self):
-        for doc in documents.all_documents():
+        changed = {'privacy.md', 'consent.md', 'terms.md', 'consent_mail.md'}
+        for doc in documents._every_document():
             text = doc.path.read_text(encoding='utf-8')
-            self.assertIn('[ДАТА]', text, doc.filename)
+            if doc.filename in changed:
+                self.assertIn('[ДАТА]', text, doc.filename)
+            else:
+                self.assertNotIn('[ДАТА]', text, doc.filename)
+
+    @override_settings(LEGAL={**FILLED, 'docs_date': '29 октября 2026 г.'}, MAIL_ENABLED=True)
+    def test_changed_documents_take_the_date_from_the_setting(self):
+        for slug in ('consent', 'privacy', 'terms', 'consent-mail'):
+            html = self.client.get('/legal/%s/' % slug).content.decode('utf-8')
+            self.assertIn('от 29 октября 2026 г.', html, slug)
+
+    @override_settings(LEGAL={**FILLED, 'docs_date': '29 октября 2026 г.'})
+    def test_unchanged_documents_keep_their_own_date(self):
+        """Дата выкатки не должна переписать дату документов, которые не менялись."""
+        for slug in ('cookies', 'consent-ai', 'recommendations'):
+            html = self.client.get('/legal/%s/' % slug).content.decode('utf-8')
+            self.assertIn('Редакция 1 от 20.10.2026', html, slug)
+            self.assertNotIn('29 октября 2026 г.', html, slug)
+
+    def test_privacy_and_consent_name_the_recipients(self):
+        for slug in ('privacy', 'consent'):
+            html = self.client.get('/legal/%s/' % slug).content.decode('utf-8')
+            for name in ('Яндекс.Облако', 'Юнисендер Смарт', 'Telegram Messenger Inc.'):
+                self.assertIn(name, html, '%s: %s' % (slug, name))
+
+    def test_privacy_says_there_is_no_third_party_login(self):
+        html = self.client.get('/legal/privacy/').content.decode('utf-8')
+        self.assertIn('3.4. Войти в Сервис можно только по логину', html)
+        self.assertIn('Вход через Telegram, Google, Apple', html)
+        self.assertIn('не предусмотрен', html)
 
     def test_tables_render_as_tables(self):
         privacy = self.client.get('/legal/privacy/').content.decode('utf-8')
