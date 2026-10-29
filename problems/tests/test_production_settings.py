@@ -247,7 +247,7 @@ class DeployCheckTests(unittest.TestCase):
     SSL-редирект, и остальные тесты после этого проверяли бы не тот сайт.
     """
 
-    def _check_deploy(self, wall_env):
+    def _check_deploy(self, wall_env, legal_relay='Example Hosting B.V., Нидерланды'):
         import subprocess
         import sys
         from pathlib import Path
@@ -272,7 +272,7 @@ class DeployCheckTests(unittest.TestCase):
         # в репозитории писем нет.
         env['LEGAL_CONTACT_EMAIL'] = '@'.join(('ci', 'example.org'))
         env['LEGAL_DOCS_DATE'] = '15 октября 2026 г.'
-        env['LEGAL_TG_RELAY'] = 'Example Hosting B.V., Нидерланды'
+        env['LEGAL_TG_RELAY'] = legal_relay
         # ⚠️ Вывод команды по-русски: без явной кодировки Windows отдаёт его
         # в cp1251, и текст превращается в «РѕР±С‹С‡РЅС‹Р№».
         env['PYTHONIOENCODING'] = 'utf-8'
@@ -292,6 +292,13 @@ class DeployCheckTests(unittest.TestCase):
             'check --deploy вернул %s:\n%s\n%s'
             % (result.returncode, result.stdout, result.stderr))
         self.assertIn('System check identified no issues', output)
+
+    def test_check_deploy_fails_without_tg_relay_host(self):
+        """Без хостера посредника Telegram (`LEGAL_TG_RELAY`) боевой сайт не выкатывается:
+        иначе Политика показала бы людям «[не заполнено]» (`legal.E003`)."""
+        result = self._check_deploy(WALL_ENV, legal_relay='')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('legal.E003', (result.stdout or '') + (result.stderr or ''))
 
     def test_check_deploy_warns_when_wall_token_is_missing(self):
         """Без токена бота боевые настройки обязаны предупредить (`vp.W001`):
