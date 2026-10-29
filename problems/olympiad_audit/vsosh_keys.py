@@ -79,6 +79,18 @@ def options_printed(statement):
     return len(_OPT.findall(st)) >= 2 or len(_PLAIN.findall(st)) >= 2
 
 
+def key_matches_options(answer, statement):
+    """Ключ из таблицы ответов против напечатанных вариантов: каждая часть
+    ответа — метка варианта или его текст («Да» при «1) верно»). Варианты не
+    напечатаны — проверять не по чему (True)."""
+    if not options_printed(statement):
+        return True
+    opts = options(statement)
+    labels = {lab for lab, _t in opts} | {norm_label(t) for _l, t in opts}
+    ans = norm_answer(answer)
+    return bool(ans) and all(a in labels for a in ans)
+
+
 def answer_in_options(ans, opts):
     """Инвариант: каждая метка ответа есть среди меток вариантов вопроса."""
     labels = {lab for lab, _t in opts}

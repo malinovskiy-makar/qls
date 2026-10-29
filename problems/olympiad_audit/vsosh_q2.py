@@ -966,6 +966,8 @@ def build_v2(q, cmd, opts, log):
     rows += ile
     log(f'ЗЭ 2008/09 со страницы ILE: {len(ile)} заданий')
     st4 = V.apply_recheck(rows, os.path.join(q.work, 'recheck', 'decisions.jsonl'))
+    vetted = V.vet_table_keys(rows, v1_rows)
+    log(f'ключ из таблицы ответов (новые): оставлено {vetted[0]}, снято не среди вариантов {vetted[1]}')
     st3 = V.apply_keys(rows, os.path.join(q.work, 'keys', 'accepted.jsonl'), v1_rows)
     human_path = os.path.join(q.work, 'human_pages.json')
     human = json.load(open(human_path, encoding='utf-8')) if os.path.isfile(human_path) else []
@@ -986,14 +988,20 @@ def build_v2(q, cmd, opts, log):
            'by_stage': dict(Counter(r['stage'] for r in rows)),
            'v1_by_stage': dict(Counter(r['stage'] for r in v1_rows)),
            'flags_v1': V.flag_share(v1_rows), 'flags_v2': V.flag_share(rows),
+           'flags_v1_no_solution_excluded': V.flag_share(v1_rows, V.LOW_CHECKS),
+           'flags_v2_no_solution_excluded': V.flag_share(rows, V.LOW_CHECKS),
+           'table_keys_vetted': {'kept': vetted[0], 'dropped': vetted[1]},
+           'open_answer_tests': sum(1 for r in rows if r.get('open_answer')),
            'flag_counts_v2': dict(Counter(f for r in rows for f in set(r['check_flags']) - V.INFO)),
            'keys_unique': all(v == 1 for v in keys.values()),
            'katex_errors': kx.get('errors'), 'katex_red': kx.get('red'), 'katex_fields': kx.get('fields'),
            'test_keys_outside_options': V.test_keys_in_options(rows),
            'figures_bad': V.figures_ok(rows, v2_root), 'recheck_applied': dict(st4), 'keys_applied': dict(st3),
            'changed': V.changed_keys(v1_rows, rows, os.path.join(v2_root, 'changed_keys_v1_v2.csv')),
-           'queue_items': len(queue), 'queue_by_check': dict(Counter(x['check'] for x in queue)),
-           'queue_tasks': len({x['ref_key'] for x in queue})}
+           'queue_items': sum(1 for x in queue if x['check'] not in V.LOW_CHECKS),
+           'queue_tasks': len({x['ref_key'] for x in queue if x['check'] not in V.LOW_CHECKS}),
+           'queue_low_items': sum(1 for x in queue if x['check'] in V.LOW_CHECKS),
+           'queue_by_check': dict(Counter(x['check'] for x in queue))}
     if not opts.get('no_bank'):
         res['bank_plan'] = {f'{s}|{v}': n for (s, v), n in V.bank_plan(rows, v2_root).items()}
     with open(os.path.join(v2_root, 'check_v2.json'), 'w', encoding='utf-8') as fh:

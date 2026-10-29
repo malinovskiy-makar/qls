@@ -342,6 +342,56 @@ class ApplyV2Tests(SimpleTestCase):
             self.assertEqual(x['proposed'], {'answer_by_model': {'m1': ['1'], 'm2': ['2']}})
 
 
+class GridKeyTests(SimpleTestCase):
+    """Ключ-сетка кодом: столбец — вопрос, отметка — в строке варианта."""
+
+    def test_yes_no_grid_over_two_rows(self):
+        from problems.olympiad_audit import vsosh_digitize as D
+        text = ('Ответы на тест\n\n| 1 | 2 | 3 | 4 | 5 |\n|---|---|---|---|---|\n'
+                '|  | ДА | ДА |  |  |\n| НЕТ |  |  | НЕТ | НЕТ |')
+        self.assertEqual(D.key_table_pairs(text),
+                         [('1', 'НЕТ'), ('2', 'ДА'), ('3', 'ДА'), ('4', 'НЕТ'), ('5', 'НЕТ')])
+
+    def test_positional_marks_and_multi(self):
+        from problems.olympiad_audit import vsosh_digitize as D
+        text = ('| вариант | 1 | 2 | 3 |\n|---|---|---|---|\n'
+                '| а) | X |  | X |\n| б) |  | X | X |')
+        self.assertEqual(D.key_table_pairs(text), [('1', 'а)'), ('2', 'б)'), ('3', 'а), б)')])
+
+    def test_data_table_is_not_a_grid(self):
+        from problems.olympiad_audit import vsosh_digitize as D
+        text = '| Q | 1 | 2 | 3 |\n|---|---|---|---|\n| P | 100 | 90 | 80 |\n| TC | 20 | 35 | 45 |'
+        self.assertEqual(D.key_table_pairs(text), [])
+
+    def test_single_answer_row_keeps_old_rule(self):
+        from problems.olympiad_audit import vsosh_digitize as D
+        text = '| 1 | 2 | 3 |\n|---|---|---|\n| Б | А | В |'
+        self.assertEqual(D.key_table_pairs(text), [('1', 'Б'), ('2', 'А'), ('3', 'В')])
+
+    def test_vet_table_keys_and_text_match(self):
+        from problems.olympiad_audit import vsosh_keys as K
+        from problems.olympiad_audit import vsosh_v2 as V
+        self.assertTrue(K.key_matches_options('ДА', 'Утверждение.\n\n1) верно\n2) неверно'))
+        self.assertTrue(K.key_matches_options('2)', 'Вопрос\n\n1) a\n2) b'))
+        self.assertFalse(K.key_matches_options('5)', 'Вопрос\n\n1) a\n2) b'))
+        rows = [{'event_id': 'e', 'number': 'тест-1', 'task_variant': '', 'answer': '5)',
+                 'answer_from_key_table': True, 'statement_md': 'Вопрос\n\n1) a\n2) b'},
+                {'event_id': 'e', 'number': 'тест-2', 'task_variant': '', 'answer': '2)',
+                 'answer_from_key_table': True, 'statement_md': 'Вопрос\n\n1) a\n2) b'}]
+        v1 = [dict(rows[0], answer=''), {'event_id': 'e', 'number': 'тест-2', 'task_variant': '',
+                                         'answer': '9)'}]
+        self.assertEqual(V.vet_table_keys(rows, v1), (0, 1))
+        self.assertEqual((rows[0]['answer'], rows[0]['key_table_rejected']), ('', '5)'))
+        self.assertEqual(rows[1]['answer'], '2)')   # был в v1 — не трогаем
+
+    def test_open_answer_test(self):
+        from problems.olympiad_audit import vsosh_v2 as V
+        self.assertTrue(V.open_answer({'statement_md': 'Часть 4. Задания с открытым ответом. Найдите Q.'}))
+        self.assertTrue(V.open_answer({'statement_md': 'Найдите цену.', 'answer': '150'}))
+        self.assertFalse(V.open_answer({'statement_md': 'Выберите верное.', 'answer': '3)'}))
+        self.assertFalse(V.open_answer({'statement_md': 'Выберите верное.'}))
+
+
 class Ile2008Tests(SimpleTestCase):
     HTML = ('<html><body><h2>1-й тур: задачи</h2>'
             '<div class="task"><h3>1. Простая задача</h3><div class="condition"><div class="tex2jax">'

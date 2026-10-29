@@ -363,12 +363,58 @@ def key_table_pairs(text):
     for cells in rows:
         if len(cells) == 2 and re.fullmatch(r'\d{1,2}', cells[0]) and answer_like(cells[1]):
             out.append((cells[0], re.sub(r'[*_`]', '', cells[1]).strip()))
-    for head, vals in zip(rows, rows[1:]):
+    for n, (head, vals) in enumerate(zip(rows, rows[1:])):
         idx = [i for i, c in enumerate(head) if re.fullmatch(r'\d{1,2}', c)]
         if len(idx) >= 3 and len(vals) == len(head):
+            grid = grid_answers(head, idx, rows[n + 1:])
+            if grid is not None:
+                out.extend(grid)
+                continue
             out.extend((head[i], re.sub(r'[*_`]', '', vals[i]).strip())
                        for i in idx if answer_like(vals[i]))
     return out
+
+
+_MARK = re.compile(r'^(?:[xхv+✓✔*]|\\checkmark|\$\\checkmark\$)$', re.I)
+
+
+def grid_answers(head, idx, below):
+    """Ключ-сетка (сессия Q2): строка номеров вопросов подряд, под ней
+    НЕСКОЛЬКО строк той же ширины, отметка — в строке своего варианта
+    («| | ДА | ДА |» / «| НЕТ | | |»; «**3)**» в строке 3; «X» при подписи
+    варианта в первой ячейке строки). Ответ столбца — все непустые клетки
+    (несколько — «выберите все верные»). Сетка — только если номера идут
+    подряд и строк под шапкой ≥ 2; иначе None (прежнее правило: одна строка
+    ответов под строкой номеров). В клетке не ответ — это таблица данных:
+    [] (и прежнее правило к ней не применяется). → [(номер, ответ)] / [] / None."""
+    nums = [int(head[i]) for i in idx]
+    if nums != list(range(nums[0], nums[0] + len(nums))):
+        return None
+    def is_header(row):   # следующая шапка — номера вопросов подряд
+        ns = [int(c) for c in row if re.fullmatch(r'\d{1,2}', c)]
+        return len(ns) >= 3 and ns == list(range(ns[0], ns[0] + len(ns)))
+    body = []
+    for row in below:
+        if len(row) != len(head) or row is not below[0] and is_header(row):
+            break
+        body.append(row)
+    if len(body) < 2:
+        return None
+    out = []
+    for i in idx:
+        vals = []
+        for row in body:
+            cell = re.sub(r'[*_`]', '', row[i]).strip()
+            if not cell:
+                continue
+            if _MARK.match(cell) and i != 0:
+                cell = re.sub(r'[*_`]', '', row[0]).strip()   # подпись варианта — первая ячейка
+            if not answer_like(cell):
+                return []   # таблица данных, а не ключ: и прежнее правило не применять
+            vals.append(cell)
+        if vals:
+            out.append((head[i], ', '.join(dict.fromkeys(vals))))
+    return out or None
 
 
 def fill_test_keys(rows, keys):

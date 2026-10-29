@@ -362,6 +362,9 @@ def check_rows(rows, v1_root, v2_root, human_pages=()):
                 pages.add(f'{index[pdf]}/p{page}')
         if pages & human:
             flags.append('страница_на_человека')
+        if 'тест_без_вариантов' in flags and open_answer(r):
+            flags.remove('тест_без_вариантов')
+            r['open_answer'] = True
         if r.get('q2_recheck') in ('keep', 'fix'):
             closed = [f for f in flags if f in vsosh_recheck_closable()]
             r['check_flags_closed'] = closed
@@ -404,6 +407,40 @@ def figures_ok(rows, v2_root):
     return bad
 
 
+def vet_table_keys(rows, v1_rows):
+    """Ключ из таблицы ответов, которого не было в v1 (новые страницы и
+    ключи-сетки, сессия Q2): не входит в напечатанные варианты своего
+    вопроса — снимается (поле `key_table_rejected`). → (оставлено, снято)."""
+    old = {row_key(r): (r.get('answer') or '').strip() for r in v1_rows}
+    kept = dropped = 0
+    for r in rows:
+        if not r.get('answer_from_key_table') or old.get(row_key(r)):
+            continue
+        if vsosh_keys.key_matches_options(r.get('answer'), r.get('statement_md') or ''):
+            kept += 1
+            continue
+        r['key_table_rejected'] = r['answer']
+        r['answer'] = ''
+        r.pop('answer_from_key_table', None)
+        dropped += 1
+    return kept, dropped
+
+
+#: Открытый ответ в тесте: вариантов у такого вопроса нет по замыслу
+#: (Opus на ЗЭ/РЭ, 29.10: «вопрос из части с открытым ответом, флаг ложный»).
+_OPEN = re.compile(r'(?i)открыт\w*\s+ответ|ответ\s+запиш|запишите\s+(?:ответ|число)|впишите|'
+                   r'кратк\w*\s+ответ|ответ\s*[:—-]?\s*_{3,}')
+
+
+def open_answer(r):
+    """Вопрос теста с открытым ответом: так сказано в условии, или ответ —
+    число/слово, а не метка варианта."""
+    if _OPEN.search(r.get('statement_md') or ''):
+        return True
+    ans = (r.get('answer') or '').strip()
+    return bool(ans) and not vsosh_keys.norm_answer(ans) or bool(re.search(r'\d{2,}|[.,]\d', ans))
+
+
 def test_keys_in_options(rows):
     """Инвариант: у теста с ключом из сетки ответ — среди вариантов. → нарушения."""
     out = []
@@ -419,11 +456,12 @@ def test_keys_in_options(rows):
 INFO = vsosh_quality.INFO_FLAGS
 
 
-def flag_share(rows):
+def flag_share(rows, exclude=()):
+    """Доля заданий с флагами по этапам; `exclude` — флаги, которые не в счёт."""
     by = defaultdict(lambda: [0, 0])
     for r in rows:
         by[r['stage']][0] += 1
-        by[r['stage']][1] += bool(set(r.get('check_flags') or []) - INFO)
+        by[r['stage']][1] += bool(set(r.get('check_flags') or []) - INFO - set(exclude))
     return {s: {'tasks': by[s][0], 'flagged': by[s][1],
                 'share': round(by[s][1] / by[s][0], 3) if by[s][0] else None} for s in STAGES}
 
@@ -452,8 +490,15 @@ def page_images(r, index, v1_root):
     return out[:6]
 
 
+#: Проверки низкого приоритета — отдельным файлом рядом с очередью: «нет
+#: решения» — пробел источника (в файле ответов МЭ часто только ключ и
+#: ответы), а не брак расшифровки; в общей очереди он завалил бы людей.
+LOW_CHECKS = {'нет_решения'}
+
+
 def build_queue(rows, v1_root, key_queue, human_pages, path):
-    """Очередь людям (общий формат Q1–Q3): строка на (задание, проверка)."""
+    """Очередь людям (общий формат Q1–Q3): строка на (задание, проверка).
+    `LOW_CHECKS` — в `<path>_low.jsonl` того же формата."""
     index = {x['pdf']: x['page_dir'] for x in digitize.read_jsonl(
         os.path.join(v1_root, 'render_index.jsonl'))}
     kq = {x['row']: x for x in key_queue}
@@ -487,7 +532,9 @@ def build_queue(rows, v1_root, key_queue, human_pages, path):
                         'page_images': page_images(r, index, v1_root), 'current': current,
                         'proposed': proposed, 'confidence': conf})
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    digitize.write_jsonl(path, out)
+    digitize.write_jsonl(path, [x for x in out if x['check'] not in LOW_CHECKS])
+    digitize.write_jsonl(path[:-len('.jsonl')] + '_low.jsonl',
+                         [x for x in out if x['check'] in LOW_CHECKS])
     return out
 
 
