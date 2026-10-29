@@ -1,0 +1,137 @@
+/* Токены Weconomics (светлая тема) — из «weconomics.ai дизайн система (ориентир)», tokens.json.
+   bundle.css системы (k-*) читает эти переменные. Ниже — оболочка экранов входа и онбординга. */
+@font-face { font-family: 'Montserrat'; font-weight: 400; font-style: normal; src: url("ds/weconomics/fonts/montserrat-400.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 500; font-style: normal; src: url("ds/weconomics/fonts/montserrat-500.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 600; font-style: normal; src: url("ds/weconomics/fonts/montserrat-600.woff2") format("woff2"); }
+@font-face { font-family: 'Montserrat'; font-weight: 700; font-style: normal; src: url("ds/weconomics/fonts/montserrat-700.woff2") format("woff2"); }
+
+:root {
+  --accent: #00797a; --accent-ink: #006c6d; --accent-deep: #016769;
+  --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32); --on-accent: #ffffff;
+  --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+  --surface-tool: #81b5b4; --surface-info: #f2e8bd;
+  --border: rgba(45,45,45,.14); --border-soft: rgba(45,45,45,.08);
+  --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+  --brand-amber: #d6a525; --brand-amber-ink: #1d1a16; --brand-amber-hover: #e3b03a; --brand-cream: #fffce6;
+  --btn-bg: #2e2b27; --btn-bg-hover: #3d3933; --on-btn: #ffffff;
+  --nav-bg: #3c3531; --nav-accent: #81b5b4;
+  --chip-bg: rgba(45,45,45,.07); --chip-text: #5c5346;
+  --amber: #96500c; --amber-ink: #723c09; --amber-tint: rgba(150,80,12,.11); --amber-border: rgba(150,80,12,.34);
+  --green: #186e3c; --green-ink: #186e3c; --green-tint: rgba(24,110,60,.09); --green-border: rgba(24,110,60,.30); --on-green: #ffffff;
+  --error: #b93526; --error-ink: #b93526; --error-tint: rgba(185,53,38,.09); --error-border: rgba(185,53,38,.28); --on-error: #ffffff;
+  --pending: #43566f; --pending-tint: rgba(67,86,111,.09); --pending-border: rgba(67,86,111,.28);
+  --focus: #7d7466; --focus-ring: rgba(125,116,102,.22); --num-line: rgba(45,45,45,.34);
+  --r-sm: 4px; --r: 6px; --r-card: 10px; --r-panel: 12px; --r-pill: 999px;
+  --line: 1px; --stripe-thin: 2px; --stripe: 3px; --stripe-strong: 4px;
+  --t: .12s; --t-slow: .2s; --shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+  --font-ui: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── Страница ─────────────────────────────────────────────── */
+.w-page { position: relative; width: 1280px; height: 800px; overflow: hidden; background: var(--bg);
+  font-family: var(--font-ui); color: var(--text); display: flex; flex-direction: column; }
+.w-page > * { position: relative; }
+
+/* Шапка сайта — графит в обеих темах */
+.w-nav { height: 60px; flex-shrink: 0; background: var(--nav-bg); display: flex; align-items: center; gap: 28px; padding: 0 32px; color: var(--brand-cream); }
+.w-nav__logo { display: inline-flex; align-items: center; color: var(--brand-cream); text-decoration: none; }
+.w-nav__logo svg { height: 46px; width: auto; display: block; }
+.w-nav__link { font-size: 14px; font-weight: 500; color: rgba(255,255,255,.66); text-decoration: none; line-height: 60px; border-bottom: 2px solid transparent; }
+.w-nav__link--active { color: var(--nav-accent); border-bottom-color: var(--nav-accent); }
+.w-nav__sp { flex: 1; }
+
+/* Шапка онбординга: логотип, прогресс, выход */
+.w-obar { height: 72px; flex-shrink: 0; display: flex; align-items: center; gap: 32px; padding: 0 40px; border-bottom: var(--line) solid var(--border-soft); background: var(--surface); }
+.w-obar__logo { display: inline-flex; color: var(--text); text-decoration: none; }
+.w-obar__logo svg { height: 50px; width: auto; display: block; }
+.w-prog { flex: 1; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 7px; }
+.w-prog__cap { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; color: var(--text2); }
+.w-prog__cap b { color: var(--text); font-weight: 600; }
+.w-prog__bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.w-prog__bar--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.w-prog__seg { height: 6px; border-radius: var(--r-pill); background: var(--chip-bg); }
+.w-prog__seg.is-done { background: var(--accent); }
+.w-prog__seg.is-now { background: var(--accent); opacity: .45; }
+
+/* Тело онбординга: вопросы слева, «что настроим» справа */
+.w-obody { flex: 1; min-height: 0; display: flex; gap: 48px; padding: 40px 72px 0; }
+.w-oq { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 26px; }
+.w-eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
+.w-h1 { margin: 0; font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; }
+.w-lead { margin: 0; font-size: 16px; line-height: 1.6; color: var(--text2); max-width: 620px; }
+.w-q { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.w-q legend { padding: 0; margin-bottom: 12px; font-size: 15px; font-weight: 600; color: var(--text); }
+.w-q legend span { font-weight: 500; color: var(--text3); font-size: 13px; margin-left: 6px; }
+
+/* Нижняя полоса шага */
+.w-ofoot { flex-shrink: 0; height: 84px; display: flex; align-items: center; gap: 16px; padding: 0 72px; border-top: var(--line) solid var(--border-soft); background: var(--surface); }
+.w-ofoot__note { font-size: 13px; color: var(--text3); }
+.w-ofoot .k-btn--main { height: 48px; padding: 0 28px; font-size: 15px; font-weight: 600; gap: 10px; }
+
+/* Боковая карточка «Что мы настроим» */
+.w-aside { width: 340px; flex-shrink: 0; align-self: flex-start; background: var(--surface); border: var(--line) solid var(--border);
+  border-radius: var(--r-panel); padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.w-aside__h { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+.w-sum { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.w-sum li { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-top: var(--line) solid var(--border-soft); font-size: 14px; }
+.w-sum li:first-child { border-top: 0; padding-top: 0; }
+.w-sum__k { width: 92px; flex-shrink: 0; font-size: 13px; font-weight: 500; color: var(--text3); }
+.w-sum__v { color: var(--text); font-weight: 500; }
+.w-sum__v.is-empty { color: var(--text3); font-weight: 400; }
+.w-sum__v.is-now { color: var(--accent-ink); font-weight: 600; }
+.w-aside__foot { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2); padding-top: 12px; border-top: var(--line) solid var(--border-soft); }
+
+/* Крупные плитки выбора (поверх .k-tile системы) */
+.w-tiles { display: grid; gap: 12px; }
+.w-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.w-tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.w-tile { align-items: flex-start; flex-direction: column; gap: 6px; padding: 16px 18px; min-height: 64px; position: relative; }
+.w-tile .k-tile__name { font-size: 15.5px; }
+.w-tile .k-tile__meta { line-height: 1.45; }
+.w-tile[aria-pressed="true"]::after { content: ''; position: absolute; top: 14px; right: 14px; width: 20px; height: 20px; border-radius: var(--r-pill);
+  background: var(--accent); }
+.w-tile[aria-pressed="true"] .w-tick { display: block; }
+.w-tick { display: none; position: absolute; top: 14px; right: 14px; width: 20px; height: 20px; z-index: 1; color: var(--on-accent); }
+.w-stars { font-size: 13px; letter-spacing: 1px; color: var(--amber); font-weight: 600; }
+.w-stars .off { color: var(--border); }
+
+/* Сегменты класса — крупнее системных */
+.w-grades { display: flex; gap: 4px; padding: 4px; }
+.w-grades .k-seg__item { flex: 1 1 0; height: 44px; min-width: 56px; font-size: 16px; }
+
+/* Пилюли «откуда узнали» */
+.w-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.w-pill { height: 38px; padding: 0 16px; border-radius: var(--r-pill); border: var(--line) solid var(--border); background: var(--surface);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.w-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.w-fine { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text3); }
+.w-fine a { color: var(--accent-ink); }
+
+/* Карточка формы входа */
+.w-auth { flex: 1; display: flex; align-items: center; justify-content: center; gap: 88px; padding: 0 72px 24px; }
+.w-pitch { width: 470px; display: flex; flex-direction: column; gap: 22px; }
+.w-pitch__h { margin: 0; font-size: 40px; font-weight: 600; line-height: 1.15; letter-spacing: -.015em; }
+.w-pitch__h em { font-style: normal; color: var(--accent-ink); }
+.w-pitch__p { margin: 0; font-size: 17px; line-height: 1.6; color: var(--text2); }
+.w-facts { display: flex; gap: 28px; padding-top: 8px; }
+.w-card { width: 440px; background: var(--surface); border: var(--line) solid var(--border); border-radius: var(--r-panel);
+  padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; }
+.w-card__h { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.25; }
+.w-card .k-seg { align-self: stretch; display: flex; }
+.w-card .k-seg .k-seg__item { flex: 1 1 0; height: 36px; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.w-ids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.w-id { height: 48px; font-size: 14.5px; font-weight: 600; gap: 10px; justify-content: center; text-decoration: none; }
+.w-id__mark { width: 24px; height: 24px; border-radius: var(--r-sm); border: 1.5px dashed var(--text3); color: var(--text2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.w-field { display: flex; flex-direction: column; }
+.w-field .k-input { height: 44px; font-size: 15px; }
+.w-lrow { display: flex; justify-content: space-between; align-items: baseline; }
+.w-lrow a { font-size: 13px; color: var(--accent-ink); }
+.w-submit { height: 48px; font-size: 15px; font-weight: 600; text-decoration: none; }
+.w-switch { margin: 0; font-size: 14px; color: var(--text2); text-align: center; }
+.w-switch a { color: var(--accent-ink); font-weight: 600; }
+.w-check { align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--text2); }
+.w-check input { margin-top: 2px !important; }
+.w-check a { color: var(--accent-ink); }
+.w-req { color: var(--text); }
