@@ -1322,3 +1322,29 @@ http://localhost/login/» (проверено curl). Дальше «Разреш
 показываемому названию. Тест `test_school_chosen_by_people_is_not_shown_twice`.
 После правки оба сервера перезапущены, обход и `tools/onb_autocomplete_check.py`
 прогнаны заново: 88/88 и 16/16.
+
+## Р3 · Фаза 6. Зубастость, прогоны, Notion — ОСТАНОВЛЕНО НА ЗУБАСТОСТИ
+
+Скрипт зубастости (`teeth.py` в черновиках сессии: дефект → тест → `git checkout` файла → тест снова) **остановлен системой из-за нехватки памяти** после 18 из 39 дефектов. Рабочая копия после остановки чистая (`git status` пуст) — ни один дефект в коде не остался. Перезапуск — только по слову владельца. Серверы 8010/8011 остановлены, чтобы освободить память.
+
+| Дефект | Тест | С дефектом | После отката |
+|---|---|---|---|
+| вернуть тире в заголовок входа | `test_auth_texts_r3.LoginTextTests.test_login_heading_has_no_dash` | красный | OK |
+| «Забыли пароль?» снова над полем | — | дефект не вставился (многострочный образец не совпал: переводы строк CRLF) | — |
+| старый заголовок регистрации | `test_auth_texts_r3.RegisterTextTests` | красный | OK |
+| ссылка сброса вплотную к полю | `test_auth_texts_r3.ForgotStyleTests` | красный | OK |
+| redirect_uri с http:// при X-Forwarded-Proto: https | `test_social_r3.RedirectUriTests.test_behind_nginx_with_production_settings_it_is_https` | красный | OK |
+| вход с .site не переводится на SOCIAL_REDIRECT_BASE | `test_social_r3.RedirectUriTests.test_base_is_used_and_the_other_name_is_sent_there_first` | красный | OK |
+| error=access_denied даёт 500 | `test_social_r3.ReturnErrorTests.test_access_denied` | красный | OK |
+| чужой код ошибки сервиса уходит в журнал | `test_social_r3.ReturnErrorTests.test_unknown_error_code_is_not_copied_into_the_log` | красный | OK |
+| сбой обмена — без «Попробовать снова» | — | дефект не вставился (многострочный образец не совпал: переводы строк CRLF) | — |
+| VK на 127.0.0.1 уходит к сервису | `test_social_r3.VkLocalhostTests.test_vk_on_127_is_our_hint_page` | красный | OK |
+| social_check не узнаёт чужой адрес возврата | `test_social_r3.SocialCheckCommandTests.test_vk_wrong_redirect_uri_and_deleted_app` | красный | OK |
+| social_check не видит invalid_client Яндекса | `test_social_r3.SocialCheckCommandTests.test_unknown_yandex_app` | красный | OK |
+| social_check печатает ключ | — | дефект не вставился (многострочный образец не совпал: переводы строк CRLF) | — |
+| чипы вернулись на «Кто вы?» | `test_onboarding_r3.RoleTilesTests.test_role_tile_is_icon_name_and_mark_only` | красный | OK |
+| плитка роли снова 220 px | `test_onboarding_r3.RoleTilesTests.test_role_tile_is_about_168px_high` | красный | OK |
+| белая плашка вернулась на шаг целей | `test_onboarding_r3.GoalLogosTests.test_no_white_plate_and_no_supply_demand_picture` | красный | OK |
+| в тёмной теме подложка белая, а не кремовая | `test_onboarding_r3.GoalLogosTests.test_dark_theme_pad_only_under_olympiad_logos` | красный | OK |
+
+Из 18: **15 красных, все зелёные после отката**; 3 не вставились. Не дошли до очереди 21 дефект (поиск школ без города, город при выборе школы, реестр, синхронизация, `sync_schools`) — список в `teeth.py`.
