@@ -484,3 +484,12 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - `manage.py check` – 0; `scripts/check_em_dash.py` – 0; `ruff check` по изменённым `.py` – чисто.
 - Notion: 405b11c9… – «Заметки» + статус «На проверке»; 407b11c9… – комментарий.
 - Ветка не запушена: `git push origin feat/vp-wall-20261029`.
+
+### Развязка согласия на помощника от `docs_version` (решение владельца, 29.10.2026)
+- `LEGAL['ai_version'] = '1'` рядом с `docs_version`; `legal/consent.py::version_for(kind)`: для `Kind.AI` – `ai_version`, для остальных – `docs_version`. `has_current` и `grant` ходят через неё; профиль (`problems/views_platform.py::_ai_consent_record`) тоже.
+- Действующие записи ред. '1' остаются в силе: после выкатки повторного запроса согласия на помощника нет.
+- Тесты (`test_ai_consent.py`): запись ред. '1' действует при `docs_version='2'` и не закрывается; при `ai_version='2'` запрос появляется снова; новая запись получает `ai_version` (а PD – `docs_version`).
+- `manage.py test legal`: 176 OK. `ruff` чисто.
+- Зубастость: `version_for` для AI возвращает `docs_version` → красные 4 теста; возвращено.
+- Документация: одна фраза про раздельные редакции в `CLAUDE.md` (блок «Правовой контур»).
+- Коммит `098490e1`, ветка не запушена.
