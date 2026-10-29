@@ -533,6 +533,10 @@ def arb_submit(q, opts, log):
         todo = json.load(fh)
     pending = BatchLog(q).pending_ids('arb', vv.ARBITER_MODEL)
     items = []
+    # Деньги Sonnet кончатся раньше очереди: сначала расхождения в числах,
+    # потом номера/рисунки, разметка (варианты, таблицы) — в конце.
+    rank = {'числа': 0, 'нет_ответа': 0, 'номера': 1, 'рисунки': 1, 'таблицы': 2, 'варианты': 2}
+    todo.sort(key=lambda t: (min(rank.get(w, 2) for w in t['why']), t['key']))
     for t in todo:
         cid = f'{custom_id(t["key"])}-r{t["round"]}'
         if cid in pending or arb_reply(q, t['key'], t['round']):
