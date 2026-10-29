@@ -435,3 +435,61 @@ Telegram недоступен (`curl https://api.telegram.org/` – timeout, А�
 - Карточка WebvisorTests (407b11c9-…-bc18): «Готово», комментарий с коммитом `d1e4e16a`.
 - Новые «Надо / Техническое»: окружение мака без rapidfuzz, bm25s, pymorphy3, openai (32 ошибки); `test_tree_walk` в worktree внутри `.claude/worktrees`. Комментарий в 3ceb11c9 (calc2 40,375 px).
 - Ветка НЕ запушена после этой сессии (коммиты `d1e4e16a`, `b7484c2c` и этот): `git push origin feat/vp-wall-20261029`. В main ничего не сливалось, main не трогался.
+
+## Документы ред. 2
+
+### Фаза −1. Сверка (29.10.2026)
+- Ветка `feat/vp-wall-20261029`, дерево чистое, `HEAD` = `origin/...` = `ca37030d`.
+- В `legal/texts/` семь файлов, везде «Редакция 1 от [ДАТА]»; `docs_version == '1'`; `[ПОСРЕДНИК]` нигде нет.
+- `vp/bot.py`: `ready` / `ready_surveyed` / `moved` содержат `{login}` (старые тексты, не PREMAIN).
+- `_wall.html`: две «Нажимая кнопку, вы соглашаетесь с» (строки 85 и 172) и одна сноска Instagram (61).
+- Базовый прогон `manage.py test legal vp`: 769 тестов, OK (skipped=1), 93 с.
+
+### Фаза 1. Тексты документов
+- `consent.md`, `privacy.md`, `terms.md`, `consent_mail.md` – дословно из приложений A–D.
+- `consent_ai.md`, `cookies.md`, `recommendations.md`: «Редакция 1 от 20.10.2026».
+- Согласие на рассылку без пометки «ЧЕРНОВИК» (`legal/documents.py`, `docs/MAIL.md`).
+- Согласие на рассылку остаётся «Редакция 1» (так в приложении D), хотя `docs_version` станет 2: оно живёт своей редакцией и от `docs_version` не зависит.
+- Тесты: `test_requisites` (маркер редакции по документам), `test_pages` (дата у изменённых из настройки, у трёх неизменённых – 20.10.2026, получатели, пункт 3.4). Пока ожидание «Редакция 2» зашито литералом; фаза 4 свяжет его с `docs_version`.
+- `manage.py test legal`: 164 теста, OK.
+- Зубастость: `[ДАТА]` обратно в `cookies.md` → красные 3 теста (`..._stay_untouched_by_substitution`, `..._keep_their_own_date`, `..._right_edition_marker`); возвращено.
+
+### Фаза 2. Метка `[ПОСРЕДНИК]` и `legal.E003`
+- `settings.LEGAL['tg_relay']` ← `LEGAL_TG_RELAY`; `legal/documents.py`: третья метка (приватный символ до разбора, экранированный HTML после; пусто, длиннее 200 или с переводом строки → «[не заполнено]»).
+- `legal/checks.py`: `legal.E003` при `DEBUG=False` и пустом `LEGAL_TG_RELAY` (E001/E002 не менялись).
+- Подставное «Example Hosting B.V., Нидерланды»: джоб `deploy-check` в `ci.yml`, `problems/tests/test_production_settings.py`. Переменная (пустая) добавлена в `deploy/env.example` и `deploy/env.dev.example` (площадка dev живёт на боевых настройках, E003 иначе не даст ей подняться). Строки в `docs/VP.md` (порядок выкатки) и `docs/SERVER.md`.
+- Тесты: `legal` 170 OK (было 164), `test_production_settings` + `test_signup_source` 62 OK (в них `check --deploy` с окружением джоба – 0 замечаний).
+- Зубастость: условие E003 заменено на `if False` → `test_empty_relay_is_error_e003_when_not_debug` красный; возвращено.
+- Ловушка: метки в `documents.py` – это `…` (невидимые символы); правка файла скриптом по строке «DATE_MARK = 'DATE'» не находит.
+
+### Фаза 3. Стена и бот
+- `_wall.html`: три сноски дословно из приложения E (Instagram; экран почты; экран Telegram «из ваших данных мы передаём ему только ID в Telegram»). Ссылки на Политику те же. Строка «Галочка – по желанию…» на экране `known` (без слов о Политике) не менялась.
+- `vp/bot.py`: `ready`, `ready_surveyed`, `moved` из приложения F; `_ready_text` и `tail` больше ничего не подставляют (`.format(login=…)` убран). Остальные тексты бота не менялись.
+- Старые строки поправлены в `test_wall_screens.py` и `test_wall_tg.py` (три места).
+- Новые тесты: `OnlyTelegramIdLeavesTheSiteTests` (5: подписка есть, подписки нет, «Проверить», вторая редакция «ready_surveyed», перепривязка с другого аккаунта; логин `zzlogin_marker`, почта, имя и фамилия сайта не встречаются в параметрах ни одного вызова `vp.telegram.call`, вызовов > 0) и `FootnoteTests` (5).
+- `vp.tests.test_wall_screens` + `test_wall_tg`: 70 тестов OK. `scripts/check_em_dash.py` – 0.
+- Зубастость: к тексту `ready` дописан логин → 4 теста инварианта красные; на экран Telegram возвращено «Нажимая кнопку, вы соглашаетесь» → `test_no_screen_says_you_agree_to_the_policy` красный. Оба дефекта убраны.
+
+### Фаза 4. Номер редакции 2
+- `LEGAL['docs_version'] = '2'` (комментарий «ред. 2 от 29.10.2026: почта, рассылка, стена ВП и Telegram»).
+- Прежние тесты `legal`, которые «поднимали» версию до 2/3 и ждали записи '1', сдвинуты (3/4, текущая версия берётся из настроек); `test_requisites` связан с `docs_version`.
+- Новые тесты `legal/tests/test_edition2.py` (4): принявший ред. 1 → экран согласия, после «Принимаю» запись '2', старая закрыта (`superseded_at`), второй раз экран не появляется; запись рассылки ред. 1 остаётся действующей (`wants_mail` True, не закрыта); одно согласие на рассылку не вызывает экран.
+- `manage.py test legal`: 174 OK (было 164 в начале сессии).
+- Зубастость: `wants_mail` временно требует текущую редакцию (`has_current`) → красные 3 теста (2 новых + `test_raising_docs_version_does_not_unsubscribe`); возвращено.
+- ⚠️ Побочный эффект, решение владельца: согласие на помощника ИИ (`Kind.AI`) тоже сверяется с `docs_version` (`has_current`), а текст `consent_ai.md` не менялся. После выкатки все, кто его давал, при первом обращении к помощнику увидят запрос согласия заново. Либо оставить, либо развязать (как `wants_mail`).
+
+### Фаза 5. Проверки
+- `manage.py test legal vp problems.tests.test_production_settings problems.tests.test_signup_source problems.tests.test_register_email problems.tests.test_account_email problems.tests.test_password_reset_code`: 901 тест OK (skipped=1), 107 с (в начале для `legal vp` было 769).
+- Добавлен `DeployCheckTests.test_check_deploy_fails_without_tg_relay_host` (дочерний процесс `check --deploy` без `LEGAL_TG_RELAY` → `legal.E003`); с окружением джоба `check --deploy` чист.
+- `manage.py check` – 0; `scripts/check_em_dash.py` – 0; `ruff check` по изменённым `.py` – чисто.
+- Notion: 405b11c9… – «Заметки» + статус «На проверке»; 407b11c9… – комментарий.
+- Ветка не запушена: `git push origin feat/vp-wall-20261029`.
+
+### Развязка согласия на помощника от `docs_version` (решение владельца, 29.10.2026)
+- `LEGAL['ai_version'] = '1'` рядом с `docs_version`; `legal/consent.py::version_for(kind)`: для `Kind.AI` – `ai_version`, для остальных – `docs_version`. `has_current` и `grant` ходят через неё; профиль (`problems/views_platform.py::_ai_consent_record`) тоже.
+- Действующие записи ред. '1' остаются в силе: после выкатки повторного запроса согласия на помощника нет.
+- Тесты (`test_ai_consent.py`): запись ред. '1' действует при `docs_version='2'` и не закрывается; при `ai_version='2'` запрос появляется снова; новая запись получает `ai_version` (а PD – `docs_version`).
+- `manage.py test legal`: 176 OK. `ruff` чисто.
+- Зубастость: `version_for` для AI возвращает `docs_version` → красные 4 теста; возвращено.
+- Документация: одна фраза про раздельные редакции в `CLAUDE.md` (блок «Правовой контур»).
+- Коммит `098490e1`, ветка не запушена.

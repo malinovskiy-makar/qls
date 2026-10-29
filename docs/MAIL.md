@@ -27,7 +27,7 @@
 | Подтверждённая почта | `User.email_verified_at`; уникальность без учёта регистра — ограничение `user_verified_email_ci_unique` |
 | Вход почтой | `problems/auth_backends.py::EmailOrUsernameBackend` (первый в `AUTHENTICATION_BACKENDS`) |
 | Регистрация, сброс, «Почта» | `problems/views_auth.py` (тексты ошибок и привязка почты — `problems/email_codes.py`) |
-| Согласие на рассылку | `ConsentRecord.Kind.MAIL`, `legal/consent.py::wants_mail`, `legal:mail_grant` / `legal:mail_revoke`, документ `legal/texts/consent_mail.md` (ЧЕРНОВИК) |
+| Согласие на рассылку | `ConsentRecord.Kind.MAIL`, `legal/consent.py::wants_mail`, `legal:mail_grant` / `legal:mail_revoke`, документ `legal/texts/consent_mail.md` (финальный, редакция 1) |
 | Проверка канала | `manage.py send_test_email <адрес>`; проверка Django `mail.E001` (`problems/checks.py`) |
 | Сроки хранения | коды старше суток удаляет `purge_expired`; `erase_user` удаляет коды по связи и по адресу |
 

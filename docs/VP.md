@@ -443,6 +443,12 @@ timeout), поэтому:
    `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME=weconomics_bot`, `TELEGRAM_WEBHOOK_SECRET` (нужен и без
    вебхука: без него путь Telegram считается ненастроенным), `TELEGRAM_CHANNEL` при необходимости.
    Секрет: `python3 -c "import secrets;print(secrets.token_urlsafe(32))"`.
+   Там же, для правовых документов (обязательны, иначе `legal.E001` / `legal.E003` не дадут поднять `web`):
+   - `LEGAL_TG_RELAY` = хостер и страна посредника (задаёт Андрей);
+   - `LEGAL_DOCS_DATE` = дата выкатки (новая редакция документов; все один раз увидят экран согласия);
+   - `VP_WALL_TG_ENABLED=1` – только когда Андрей подтвердил, что уведомление РКН о трансграничной передаче
+     отправлено (Notion, задача `408b11c9-2bc1-81c6-a659-c0f572cfaa25`). Если РКН запретит передачу –
+     `VP_WALL_TG_ENABLED=0`, стена остаётся на почте.
 3. **Пересоздать `web`, затем перезапустить `nginx`** (ловушка из [SERVER.md](SERVER.md): иначе nginx
    держит старый адрес контейнера):
    `docker compose up -d --force-recreate web && docker compose restart nginx`.

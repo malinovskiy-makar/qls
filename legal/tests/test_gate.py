@@ -60,7 +60,7 @@ class GateTests(TestCase):
         self.assertEqual(accept.status_code, 302)
         self.assertEqual(accept['Location'], '/profile/stats/')
         record = ConsentRecord.objects.get(user=self.user)
-        self.assertEqual((record.kind, record.source, record.version), ('pd', 'gate', '1'))
+        self.assertEqual((record.kind, record.source, record.version), ('pd', 'gate', settings.LEGAL['docs_version']))
         self.assertEqual(self.client.get('/profile/stats/').status_code, 200)
 
     def test_accept_without_the_checkbox_does_not_record_anything(self):
@@ -79,7 +79,7 @@ class GateTests(TestCase):
         consent.grant(self.user, PD, ConsentRecord.Source.REGISTER)
         self._login()
         self.assertEqual(self.client.get('/profile/').status_code, 200)
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '2'}):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
             response = self.client.get('/profile/')
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response['Location'].startswith('/legal/accept/'))
@@ -171,8 +171,8 @@ class GateTests(TestCase):
         consent.grant(self.user, PD, ConsentRecord.Source.REGISTER)
         self._login()
         self.assertEqual(self.client.get('/profile/').status_code, 200)
-        self.assertEqual(self.client.session[consent.SESSION_KEY], '1')
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
+        self.assertEqual(self.client.session[consent.SESSION_KEY], settings.LEGAL['docs_version'])
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '4'}):
             self.assertEqual(self.client.get('/profile/').status_code, 302)
 
 

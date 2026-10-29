@@ -34,15 +34,15 @@ logger = logging.getLogger(__name__)
 TEXTS = {
     'hello': 'Привет! Это бот тренажёра «Высшей пробы» от Weconomics.',
     'expired': 'Ссылка устарела. Вернитесь на сайт и нажмите «Подключить Telegram» ещё раз.',
-    'ready': ('Готово: подписка есть, аккаунт «{login}» привязан к сайту. Вернитесь во '
+    'ready': ('Готово: подписка есть, Telegram привязан к вашему аккаунту на сайте. Вернитесь во '
               'вкладку браузера с вариантом – она обновится сама, останется ответить '
               'на три вопроса.'),
-    'ready_surveyed': ('Готово: подписка есть, аккаунт «{login}» привязан к сайту. Вернитесь '
-                       'во вкладку браузера с вариантом – можно начинать вариант.'),
+    'ready_surveyed': ('Готово: подписка есть, Telegram привязан к вашему аккаунту на сайте. '
+                       'Вернитесь во вкладку браузера с вариантом – можно начинать вариант.'),
     'no_sub': 'Подписки на {channel} пока нет. Подпишитесь и нажмите «Проверить».',
     'failed': 'Не получилось проверить подписку. Попробуйте через минуту.',
-    'moved': ('Этот Telegram был привязан к другому аккаунту Weconomics – теперь он '
-              'привязан к «{login}».'),
+    'moved': ('Этот Telegram раньше был привязан к другому аккаунту Weconomics – теперь он '
+              'привязан к аккаунту, с которого вы нажали «Подключить Telegram».'),
     'plain': ('Чтобы открыть вариант, нажмите «Подключить Telegram» на странице варианта: '
               '{site}/vp/'),
     'button_subscribe': 'Подписаться',
@@ -82,7 +82,7 @@ def _check_keyboard(with_subscribe):
 def _ready_text(user):
     surveyed = VPWall.objects.filter(user=user, survey_at__isnull=False).exists()
     key = 'ready_surveyed' if surveyed else 'ready'
-    return TEXTS[key].format(login=user.get_username())
+    return TEXTS[key]
 
 
 def _send(chat_id, text, keyboard=None):
@@ -149,7 +149,7 @@ def _start(chat_id, sender, code):
         return
     user = row.user
     link, moved = _link(user, sender)
-    tail = ('\n\n' + TEXTS['moved'].format(login=user.get_username())) if moved else ''
+    tail = ('\n\n' + TEXTS['moved']) if moved else ''
     subscribed = check_link(link)
     if subscribed:
         _send(chat_id, TEXTS['hello'] + '\n\n' + _ready_text(user) + tail)

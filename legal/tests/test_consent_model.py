@@ -19,7 +19,7 @@ class ConsentRecordTests(TestCase):
     def test_grant_writes_who_what_version_when_and_where_from(self):
         record = consent.grant(self.user, PD, ConsentRecord.Source.REGISTER)
         self.assertEqual((record.user, record.kind, record.version, record.source),
-                         (self.user, 'pd', '1', 'register'))
+                         (self.user, 'pd', settings.LEGAL['docs_version'], 'register'))
         self.assertIsNotNone(record.given_at)
         self.assertIsNone(record.revoked_at)
 
@@ -58,12 +58,12 @@ class ConsentRecordTests(TestCase):
 
     def test_a_new_edition_supersedes_the_old_one_without_deleting_it(self):
         consent.grant(self.user, PD, ConsentRecord.Source.REGISTER)
-        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '2'}):
+        with override_settings(LEGAL={**settings.LEGAL, 'docs_version': '3'}):
             self.assertFalse(consent.has_current(self.user, PD))
             consent.grant(self.user, PD, ConsentRecord.Source.GATE)
             self.assertTrue(consent.has_current(self.user, PD))
         rows = ConsentRecord.objects.filter(user=self.user, kind=PD).order_by('pk')
-        self.assertEqual([r.version for r in rows], ['1', '2'])
+        self.assertEqual([r.version for r in rows], [settings.LEGAL['docs_version'], '3'])
         self.assertIsNotNone(rows[0].superseded_at)
         self.assertEqual(rows.filter(revoked_at__isnull=True, superseded_at__isnull=True).count(), 1)
 

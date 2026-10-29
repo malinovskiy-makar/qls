@@ -12,7 +12,8 @@ def legal_requisites_filled(app_configs, **kwargs):
 
     Документы показывают заглушку «[не заполнено]», пока значения пусты;
     на боевом сайте это недопустимо. Значения берутся из окружения
-    (`LEGAL_CONTACT_EMAIL`, `LEGAL_DOCS_DATE`).
+    (`LEGAL_CONTACT_EMAIL`, `LEGAL_DOCS_DATE`). Хостер посредника Telegram
+    (`LEGAL_TG_RELAY`) проверяется отдельной ошибкой `legal.E003`.
     """
     if settings.DEBUG or not getattr(settings, 'LEGAL_ENFORCEMENT_ENABLED', True):
         return []
@@ -37,4 +38,10 @@ def legal_requisites_filled(app_configs, **kwargs):
             'LEGAL_CONTACT_EMAIL не похож на адрес почты.',
             hint='Нужен один адрес электронной почты без пробелов и скобок.',
             id='legal.E002'))
+    if not (legal.get('tg_relay') or '').strip():
+        errors.append(Error(
+            'Не заполнено: хостер и страна сервера-посредника Telegram.',
+            hint='Задайте LEGAL_TG_RELAY – хостер и страна сервера-посредника '
+                 'Telegram. Без него Политика и Согласие показывают «[не заполнено]».',
+            id='legal.E003'))
     return errors
