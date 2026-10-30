@@ -161,3 +161,37 @@ def tail_is_parts(tail, parts):
     rest = BALLS.sub('', rest)
     glued = ''.join(BALLS.sub('', p['statement']) for p in parts)
     return squeeze(rest) == squeeze(glued)
+
+
+# ── Д3: «(4 балла)» в начале текста пункта ───────────────────────────────
+
+REASON_POINTS_DIFFER = 'пометка баллов в тексте пункта расходится с баллами пункта'
+REASON_POINTS_MARKUP = 'пометка баллов пункта внутри разметки'
+
+_LEAD_POINTS = re.compile(
+    r'\s*(?P<pre>[*_]*)\(\s*(?P<n>\d+(?:[.,]\d+)?)\s*балл\w*\s*\)(?P<post>[*_]*)\s*',
+    re.IGNORECASE)
+
+
+def points_plan(part):
+    """(новый текст или None, баллы для пустого поля или None, причина или None).
+
+    Пометка «(N балл…)» в начале текста при `points = N` убирается — баллы
+    экран показывает отдельно. `points` пусто — ставится N. N ≠ `points` —
+    причина, текст не трогаем. Пометка, разрывающая разметку («**(4 балла)
+    Найдите**»), — тоже причина: убрать её значит сломать жирный шрифт.
+    """
+    match = _LEAD_POINTS.match(part['statement'] or '')
+    if not match:
+        return None, None, None
+    rest = part['statement'][match.end():]
+    if match.group('pre') != match.group('post'):
+        return None, None, REASON_POINTS_MARKUP
+    if not _MEANINGFUL.search(rest):
+        return None, None, REASON_POINTS_DIFFER
+    number = float(match.group('n').replace(',', '.'))
+    if part['points'] is None:
+        return rest, match.group('n').replace(',', '.'), None
+    if float(part['points']) != number:
+        return None, None, REASON_POINTS_DIFFER
+    return rest, None, None

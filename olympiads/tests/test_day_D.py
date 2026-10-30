@@ -263,3 +263,43 @@ class SplitStatementTests(DayMixin, TestCase):
         self.assertEqual(problem.statement, LEAD_59997)
         out = self.run_cmd('--apply')
         self.assertIn('Условий укорочено: 0', out)
+
+
+class StripPointsTests(DayMixin, TestCase):
+    """Д3: «(4 балла)» в начале текста пункта."""
+
+    command = 'strip_part_points'
+
+    def test_59997_parts_start_with_words(self):
+        problem = self.add(LEAD_59997, [(label, text, 4) for label, text in PARTS_59997])
+        self.run_cmd('--apply')
+        texts = [p[1] for p in self.parts(problem)]
+        self.assertTrue(texts[0].startswith('Представим'))
+        self.assertTrue(texts[1].startswith('Правительство'))
+        self.assertEqual({p[2] for p in self.parts(problem)}, {Decimal('4.00')})
+
+    def test_empty_points_are_filled_from_mark(self):
+        problem = self.add('Условие', [('а', '(3 балла) Найдите цену.', None)])
+        out = self.run_cmd('--apply')
+        self.assertEqual(self.parts(problem), [('а', 'Найдите цену.', Decimal('3.00'))])
+        self.assertIn('баллы заполнены из пометки: 1', out)
+
+    def test_other_points_are_flagged_not_changed(self):
+        problem = self.add('Условие', [('а', '(3 балла) Найдите цену.', 4)])
+        self.run_cmd('--apply')
+        self.assertEqual(self.parts(problem), [('а', '(3 балла) Найдите цену.', Decimal('4.00'))])
+        self.assertEqual(problem.olympiad_items.get().quality, 'flagged')
+
+    def test_mark_inside_bold_is_flagged_not_changed(self):
+        text = '**(4 балла) Найдите цену.**'
+        problem = self.add('Условие', [('а', text, 4)])
+        self.run_cmd('--apply')
+        self.assertEqual(self.parts(problem)[0][1], text)
+
+    def test_legacy_untouched_and_second_run_changes_nothing(self):
+        before = self.legacy_state()
+        self.add(LEAD_59997, [(label, text, 4) for label, text in PARTS_59997])
+        self.run_cmd('--apply')
+        self.assertEqual(self.legacy_state(), before)
+        out = self.run_cmd('--apply')
+        self.assertIn('Пометок убрано: 0', out)
