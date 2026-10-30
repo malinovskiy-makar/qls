@@ -68,7 +68,7 @@
 
 (таблицы по этапам)
 
-### Э1 (10:20–11:00)
+### Э1
 
 | дефект | проверка | провалов | вернул, зелёный |
 |---|---|---|---|
@@ -78,7 +78,7 @@
 | N+1 на сезонах (снят `prefetch_related('grades','files')`) | `GridTests.test_page_is_built_in_few_queries_without_n_plus_one` | 1 | да, OK |
 | звёздочка гостя пишет в базу (снята проверка входа) | `FollowTests.test_guest_goes_to_login_and_base_is_untouched` | 1 | да, OK |
 
-## Этап Э1 — сделан (10:05 → 11:00)
+## Этап Э1 — сделан (09:47 → 09:56)
 
 База: `b5b81478`, тесты olympiads 236 OK.
 Сделано: `olympiads/navigator.py`, модель `OlympiadFollow` + миграция `0012_olympiad_follow`, `POST /olympiads/<slug>/follow/`, фикстуры ночи, тесты.
