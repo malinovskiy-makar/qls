@@ -1,0 +1,14 @@
+{% comment %}
+Кнопка обратной связи на входе и регистрации (решение владельца 30.10.2026): плавающий круг в
+правом нижнем углу, над кружком Telegram, как у остальных кнопок угла. Шапку сайта на этих
+экранах не возвращаем (раунд 4), поэтому прежняя кнопка из шапки превратилась в круг. Открывает
+то же окно обратной связи (`_feedback.html`, делегат на `.fb-btn`). Правила — `_fb_btn_style.html`
+плюс `.fb-btn--fab` в `_auth_style.html`. Размер значка стоит и атрибутами (тест
+`test_fb_button_style`), CSS увеличивает его до размера значка Telegram.
+{% endcomment %}
+<button type="button" class="fb-btn fb-btn--onpage fb-btn--fab" aria-label="Проблема или предложение">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+  </svg>
+</button>

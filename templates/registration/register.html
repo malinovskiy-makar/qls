@@ -33,6 +33,7 @@
 {% include '_metrika_noscript.html' %}
 {% comment %}Шапки сайта на входе и регистрации нет (раунд 4): только полоса с логотипом.{% endcomment %}
 {% block site_nav %}{% include 'registration/_auth_top.html' %}{% endblock %}
+{% include 'registration/_auth_fb.html' %}
 <main class="au-main{% block main_class %}{% endblock %}">{% block card %}
   <section class="au-pitch" aria-label="Как устроен вход">
     <h1 class="au-pitch-h ob-anim-up">Настройте сайт <em>под себя за минуту</em></h1>

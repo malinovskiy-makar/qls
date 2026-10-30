@@ -58,3 +58,26 @@ class FeedbackButtonStyleOrderTests(TestCase):
                      '.fb-btn--onpage {', '.fb-btn .fb-btn-text {'):
             # assertFalse, а не assertNotIn: тот напечатал бы в отчёт весь файл.
             self.assertFalse(head in src, 'в _feedback.html осталось правило %s' % head)
+
+
+class AuthScreensFloatingButtonTests(TestCase):
+    """Вход и регистрация: кнопка обратной связи — плавающий круг, а не кнопка в шапке
+    (решение владельца 30.10.2026; шапки сайта на этих экранах нет)."""
+
+    def test_floating_button_is_on_login_and_register(self):
+        for url in ('/login/', '/register/'):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertIn('class="fb-btn fb-btn--onpage fb-btn--fab"', html, url)
+            self.assertIn('aria-label="Проблема или предложение"', html, url)
+            # Правило круга разобрано ДО кнопки и держит её в углу окна, над кружком Telegram.
+            rule = html.find('.fb-btn--fab {')
+            self.assertNotEqual(rule, -1, url)
+            self.assertLess(rule, html.find('class="fb-btn fb-btn--onpage fb-btn--fab"'), url)
+            self.assertIn('position: fixed; right: 16px; bottom: 79px', html, url)
+            # Пока открыто окно cookie, круг Telegram поднят на его высоту, и этот круг тоже.
+            self.assertIn('.ck-bar:not([hidden])) .fb-btn--fab { bottom: calc(79px + var(--ck-h', html, url)
+            # На телефоне круг уходит в полосу с логотипом, чтобы не лечь на кнопку формы.
+            self.assertIn('position: absolute; top: 8px; right: 16px; bottom: auto', html, url)
+            # Шапку сайта на входе не возвращаем: только полоса с логотипом.
+            self.assertNotIn('class="nav-', html, url)
+

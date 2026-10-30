@@ -226,4 +226,25 @@ a:focus-visible, button:focus-visible {
 .consent a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
 .consent a:hover { color: var(--text); }
 {% include '_fb_btn_style.html' %}
+/* Плавающая кнопка обратной связи (`_auth_fb.html`): круг 53 px, как кружок Telegram `.tg-fab`
+   (`_feedback.html`), и стоит над ним: 16 + 53 + 10. Идёт ПОСЛЕ правил кнопки в шапке — они равны
+   по весу, и размер, отступы и скругление кнопки надо переопределить. */
+.fb-btn--fab {
+  position: fixed; right: 16px; bottom: 79px; z-index: 150;
+  width: 53px; height: 53px; padding: 0; justify-content: center;
+  border-radius: var(--r-pill);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-pop);
+}
+.fb-btn--fab svg { width: 25px; height: 25px; }
+/* Пока открыто окно cookie, круг Telegram поднят на его высоту (`_cookie_bar.html`): этот — вместе с ним. */
+html:has(.ck-bar:not([hidden])) .fb-btn--fab { bottom: calc(79px + var(--ck-h, 64px)); }
+/* Телефон: внизу круг лёг бы на «Войти» / «Создать аккаунт» (страница тут короткая или листается),
+   поэтому круг уходит в правый верх, в полосу с логотипом, и листается вместе со страницей. */
+@media (max-width: 760px) {
+  .fb-btn--fab, html:has(.ck-bar:not([hidden])) .fb-btn--fab {
+    position: absolute; top: 8px; right: 16px; bottom: auto; width: 40px; height: 40px;
+  }
+  .fb-btn--fab svg { width: 20px; height: 20px; }
+}
 </style>
