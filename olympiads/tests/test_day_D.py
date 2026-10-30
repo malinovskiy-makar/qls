@@ -1,0 +1,167 @@
+"""Механические починки задач пакета олимпиад (день 30.10, этапы Д1–Д5).
+
+Задачи S4 собираются в тестовой базе с явными номерами не меньше
+`bank_fix.S4_FIRST` — команды правят только их; прежняя задача банка —
+номером ниже. Тексты задачи 59997 — как лежат в базе площадки.
+"""
+import tempfile
+from decimal import Decimal
+from io import StringIO
+
+from django.core.management import call_command
+from django.test import TestCase
+
+from olympiads import bank_fix as bf
+from olympiads.models import OlympiadStage, OlympiadVariant, OlympiadVariantItem
+from problems.models import Hint, Problem, ProblemPart
+
+from .test_models import make_olympiad
+
+# Задача 59997 «Торговля с ограничениями» (ВсОШ 2025/26, 11 кл., 2 тур, № 6).
+LEAD_59997 = (
+    'В мире существуют две страны — Альфа и Бета. Они производят и потребляют '
+    'два товара: $X$ и $Y$. Технологии стран различаются, кривые '
+    'производственных возможностей задаются следующими уравнениями: для страны '
+    'Альфа $X_A^2 + 2000Y_A = 1\\,200\\,000$, для страны Бета '
+    '$X_B^2 + 400Y_B = 480\\,000$.\n\nПредпочтения потребителей в обеих странах '
+    'одинаковые. Они потребляют товары строго комплектами в пропорции 1:1, то '
+    'есть функция полезности имеет вид $U = \\min(X, Y)$.\n\nСчитайте, что во '
+    'всех обменах цена товара $Y$ равна 1, а цена товара $X$ обозначается как '
+    '$p$. При решении этой задачи численные значения цен и объемов можно '
+    'округлять до первого знака после запятой.')
+PARTS_59997 = [
+    ('а', '(4 балла) Представим, что страны открывают границы и торгуют без '
+          'ограничений, при этом цена устанавливается на уровне равновесия '
+          'совершенной конкуренции. Найдите мировую цену $p^\\star$, объемы '
+          'производства, потребления и экспорта (импорта) товара $X$ для каждой '
+          'страны.'),
+    ('б', '(4 балла) Правительство страны, ставшей импортером товара $X$, решает '
+          'начать «торговую войну» с целью увеличить собственное производство '
+          'этого товара. Для этого оно вводит потолок цены $\\overline{p}$ на '
+          'импорт на уровне $0{,}9p^\\star$. Выиграют ли потребители в этой '
+          'стране по сравнению со свободной торговлей?'),
+    ('в', '(4 балла) Правительство решает опустить потолок цены еще ниже, до '
+          'уровня $\\hat{p} = 2p^\\star/3$. Выиграют ли потребители '
+          'страны-импортера товара $X$ по сравнению со свободной торговлей и с '
+          'потолком $\\overline{p}$ теперь?'),
+]
+STATEMENT_59997 = LEAD_59997 + ''.join(
+    '\n\n{}) {}'.format(label, text) for label, text in PARTS_59997)
+
+
+class DayMixin:
+    """Комплект, прежняя задача банка и конструктор задач S4."""
+
+    command = ''
+
+    def setUp(self):
+        super().setUp()
+        olympiad = make_olympiad('dd')
+        stage = OlympiadStage.objects.create(olympiad=olympiad, code='final',
+                                             name='Заключительный')
+        self.variant = OlympiadVariant.objects.create(
+            olympiad=olympiad, stage=stage, kit_key='dd-1', season='2025/26')
+        self.next_id = bf.S4_FIRST + 100
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.legacy = self.add(STATEMENT_59997,
+                               [(label, text, 4) for label, text in PARTS_59997] * 2,
+                               pk=bf.S4_FIRST - 1, legacy=True)
+
+    def add(self, statement, parts=(), *, pk=None, legacy=False, human='',
+            **fields):
+        if pk is None:
+            pk = self.next_id
+            self.next_id += 1
+        problem = Problem.objects.create(
+            pk=pk, title='з', statement=statement, status='draft',
+            hidden_pending_review=True, human_review=human,
+            content_format='plain' if legacy else 'markdown', **fields)
+        for order, (label, text, points) in enumerate(parts):
+            ProblemPart.objects.create(problem=problem, label=label, statement=text,
+                                       points=points, order=order)
+        OlympiadVariantItem.objects.create(
+            variant=self.variant, problem=problem, order=pk,
+            ref_key='dd-1:{}'.format(pk))
+        return problem
+
+    def run_cmd(self, *args, command=''):
+        out = StringIO()
+        call_command(command or self.command, '--report-dir', self.tmp.name,
+                     '--no-snapshot', *args, stdout=out)
+        return out.getvalue()
+
+    def parts(self, problem):
+        return list(problem.parts.order_by('order', 'id')
+                    .values_list('label', 'statement', 'points'))
+
+    def legacy_state(self):
+        self.legacy.refresh_from_db()
+        return (self.legacy.statement, self.legacy.updated_at, self.parts(self.legacy))
+
+
+class DedupePartsTests(DayMixin, TestCase):
+    """Д1: «а б в а б в» → «а б в»."""
+
+    command = 'dedupe_problem_parts'
+
+    def test_59997_keeps_three_parts_four_points_each(self):
+        problem = self.add(STATEMENT_59997,
+                           [(label, text, 4) for label, text in PARTS_59997] * 2)
+        self.run_cmd('--apply')
+        parts = self.parts(problem)
+        self.assertEqual([p[0] for p in parts], ['а', 'б', 'в'])
+        self.assertEqual({p[2] for p in parts}, {Decimal('4.00')})
+
+    def test_same_label_with_other_text_is_flagged_not_removed(self):
+        problem = self.add('Условие', [('а', 'первый вопрос', 4),
+                                       ('а', 'другой вопрос', 4)])
+        self.run_cmd('--apply')
+        self.assertEqual(len(self.parts(problem)), 2)
+        item = problem.olympiad_items.get()
+        self.assertEqual(item.quality, 'flagged')
+        self.assertTrue(item.quality_reasons)
+
+    def test_same_text_with_other_points_is_not_a_copy(self):
+        problem = self.add('Условие', [('а', 'вопрос', 4), ('а', 'вопрос', 2)])
+        self.run_cmd('--apply')
+        self.assertEqual(len(self.parts(problem)), 2)
+
+    def test_link_to_removed_copy_moves_to_kept_part(self):
+        problem = self.add('Условие', [('а', 'вопрос', 4), ('а', 'вопрос', 4)])
+        kept, copy = problem.parts.order_by('order', 'id')
+        hint = Hint.objects.create(problem=problem, part=copy, text='подсказка')
+        self.run_cmd('--apply')
+        hint.refresh_from_db()
+        self.assertEqual(hint.part_id, kept.pk)
+
+    def test_parts_shrink_exactly_by_copies(self):
+        self.add(STATEMENT_59997, [(label, text, 4) for label, text in PARTS_59997] * 2)
+        before = ProblemPart.objects.count()
+        out = self.run_cmd('--apply')
+        self.assertEqual(ProblemPart.objects.count(), before - 3)
+        self.assertIn('копий удалено: 3', out)
+
+    def test_legacy_and_reviewed_problems_are_never_changed(self):
+        reviewed = self.add('Условие', [('а', 'вопрос', 4), ('а', 'вопрос', 4)],
+                            human='approved')
+        before = self.legacy_state()
+        self.run_cmd('--apply')
+        self.assertEqual(self.legacy_state(), before)
+        self.assertEqual(len(self.parts(reviewed)), 2)
+
+    def test_dry_run_and_second_run_change_nothing(self):
+        problem = self.add(STATEMENT_59997,
+                           [(label, text, 4) for label, text in PARTS_59997] * 2)
+        self.add('Условие', [('а', 'первый вопрос', 4), ('а', 'другой вопрос', 4)])
+        self.run_cmd()
+        self.assertEqual(len(self.parts(problem)), 6)
+        self.run_cmd('--apply')
+        flags = list(OlympiadVariantItem.objects.order_by('pk')
+                     .values_list('quality', 'quality_reasons', 'updated_at'))
+        out = self.run_cmd('--apply')
+        self.assertIn('копий удалено: 0', out)
+        self.assertIn('Позиций с новой пометкой: 0', out)
+        self.assertEqual(flags, list(OlympiadVariantItem.objects.order_by('pk')
+                                     .values_list('quality', 'quality_reasons',
+                                                  'updated_at')))
