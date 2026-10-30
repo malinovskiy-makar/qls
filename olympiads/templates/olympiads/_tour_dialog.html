@@ -1,0 +1,126 @@
+{% comment %}Своё окно раздела вместо браузерного (день 30.10, У3): «Сдать тур?»,
+«Завершить тур?», «Сдать задание без решения?».
+
+⚠️ `platform/exam.js` и `WorkForm` НЕ ТРОНУТЫ. Нажатие на `#finish-btn` и на
+«Сдать задание» перехватывается на фазе захвата документа — раньше, чем до
+кнопки дойдёт обработчик exam.js (тот звал `window.confirm`). Подтвердили —
+форма уходит сама; `form.dataset.submitted` ставится, чтобы exam.js при сдаче
+по времени не отправил её второй раз.
+
+Окно — `<dialog>` с `showModal()`: фокус заперт внутри, Esc и «Вернуться к
+решению» закрывают, остальная страница недоступна. Нативных alert / confirm /
+prompt в разделе нет вовсе (прибор и сквозной проход роняют проверку на
+событии `dialog`).{% endcomment %}
+<dialog class="om om-dlg" id="om-dlg" aria-labelledby="om-dlg-t" aria-describedby="om-dlg-b">
+  <form method="dialog" class="om-dlg__in">
+    <h2 class="om-dlg__t" id="om-dlg-t"></h2>
+    <div class="om-dlg__b" id="om-dlg-b"></div>
+    <div class="om-dlg__go">
+      <button type="submit" value="back" class="k-btn k-btn--plain" autofocus data-dlg-back>Вернуться к решению</button>
+      <button type="submit" value="ok" class="k-btn" data-dlg-ok></button>
+    </div>
+  </form>
+</dialog>
+<script>
+(function () {
+  var dlg = document.getElementById('om-dlg');
+  var form = document.getElementById('exam-form');
+  if (!dlg || !form || typeof dlg.showModal !== 'function') return;
+  var title = document.getElementById('om-dlg-t');
+  var body = document.getElementById('om-dlg-b');
+  var ok = dlg.querySelector('[data-dlg-ok]');
+  var timed = !!document.querySelector('.om-take--timed');
+  var answer = null;
+
+  function text(node) { return (node && node.value || '').trim(); }
+  // Есть ли решение у задания: текст, листы, краткий ответ или отмеченный вариант.
+  function hasWork(pane) {
+    if (!pane) return false;
+    if (text(pane.querySelector('textarea.answer-text'))) return true;
+    if (pane.querySelector('.om-sheets figure')) return true;
+    if (Array.prototype.some.call(pane.querySelectorAll('input.answer-short'), function (i) { return text(i); })) return true;
+    return !!pane.querySelector('.om-opts input:checked');
+  }
+  function tasks() {
+    return Array.prototype.map.call(document.querySelectorAll('#exam-form .om-taskpane'), function (pane) {
+      var tab = document.querySelector('.om-tn[data-task="' + pane.getAttribute('data-task') + '"]');
+      return {number: tab ? tab.getAttribute('data-number') : pane.getAttribute('data-task'),
+              locked: pane.hasAttribute('data-locked'), work: hasWork(pane)};
+    });
+  }
+  function timeLeft() {
+    var node = document.getElementById('timer');
+    return node && node.textContent && node.textContent.indexOf(':') > 0 ? node.textContent : '';
+  }
+  function el(tag, cls, content) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (content) node.textContent = content;
+    return node;
+  }
+  function open(opts, done) {
+    title.textContent = opts.title;
+    body.innerHTML = '';
+    opts.lines.forEach(function (line) { body.appendChild(line); });
+    ok.textContent = opts.ok;
+    ok.className = 'k-btn ' + (opts.amber ? 'om-amber' : 'k-btn--main');
+    answer = done;
+    dlg.returnValue = '';
+    dlg.showModal();
+  }
+  dlg.addEventListener('close', function () {
+    var done = answer;
+    answer = null;
+    if (done && dlg.returnValue === 'ok') done();
+  });
+
+  function finishTour() {
+    form.dataset.submitted = '1';
+    form.submit();
+  }
+
+  document.addEventListener('click', function (e) {
+    var finish = e.target.closest('#finish-btn');
+    if (finish) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      var list = tasks();
+      var lines = [];
+      if (timed) {
+        var ul = el('ul', 'om-dlg__list');
+        list.forEach(function (t) {
+          var li = el('li', t.work ? 'om-dlg__yes' : 'om-dlg__no');
+          li.appendChild(el('span', '', 'Задание ' + t.number));
+          li.appendChild(el('b', '', t.work ? 'есть решение' : 'нет решения'));
+          ul.appendChild(li);
+        });
+        lines.push(ul);
+        var left = timeLeft();
+        if (left) lines.push(el('p', 'om-dlg__time', 'До конца тура: ' + left + '.'));
+        lines.push(el('p', 'meta', 'После сдачи дописать будет нельзя.'));
+        open({title: 'Сдать тур?', lines: lines, ok: 'Сдать тур', amber: true}, finishTour);
+      } else {
+        var open_ = list.filter(function (t) { return !t.locked; });
+        lines.push(el('p', '', open_.length
+          ? 'Не сдано заданий: ' + open_.length + ' из ' + list.length + '. Они получат 0 баллов, если в них нет решения.'
+          : 'Все задания сданы.'));
+        lines.push(el('p', 'meta', 'После завершения дописать будет нельзя.'));
+        open({title: 'Завершить тур?', lines: lines, ok: 'Завершить тур', amber: true}, finishTour);
+      }
+      return;
+    }
+    var submit = e.target.closest('[data-item-submit]');
+    if (submit && !submit.dataset.confirmed) {
+      var pane = submit.closest('.om-taskpane');
+      if (hasWork(pane)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      open({title: 'Решения нет', lines: [el('p', '', 'Сдать задание без решения? Балл\u00a0—\u00a00.')],
+            ok: 'Сдать без решения', amber: false}, function () {
+        submit.dataset.confirmed = '1';
+        if (form.requestSubmit) form.requestSubmit(submit); else submit.click();
+      });
+    }
+  }, true);
+})();
+</script>

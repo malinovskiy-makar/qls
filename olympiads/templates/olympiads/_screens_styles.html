@@ -607,3 +607,23 @@ main.page-wrap:has(.om-with-chat) { max-width: 1240px; }
 }
 
 /* @@NEXT@@ */
+
+/* ── Своё окно раздела (день 30.10, У3): «Сдать тур?», «Завершить тур?» ── */
+.om-dlg { position: fixed; inset: 0; margin: auto; height: fit-content; border: 1px solid var(--border); border-radius: var(--r-panel); padding: 0; width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
+.om-dlg::backdrop { background: color-mix(in srgb, var(--text) 45%, transparent); }
+.om-dlg__in { display: flex; flex-direction: column; gap: 14px; padding: 22px 22px 18px; margin: 0; }
+.om-dlg__t { font-size: 20px; line-height: 1.25; margin: 0; font-weight: 700; }
+.om-dlg__b { display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.45; }
+.om-dlg__b p { margin: 0; }
+.om-dlg__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-soft); border-radius: var(--r); max-height: 40vh; overflow: auto; }
+.om-dlg__list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border-soft); }
+.om-dlg__list li:first-child { border-top: 0; }
+.om-dlg__yes b { color: var(--green-ink); font-weight: 600; }
+.om-dlg__no b { color: var(--error-ink); font-weight: 600; }
+.om-dlg__time { font-weight: 600; }
+.om-dlg__go { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.om-dlg__go .k-btn { min-height: 44px; font-family: inherit; }
+.om-dlg .om-amber { background: var(--brand-amber); color: var(--brand-amber-ink); border-color: var(--brand-amber); font-weight: 700; }
+.om-dlg .om-amber:hover { background: var(--brand-amber-hover); }
+.om-dlg .k-btn--main { background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg); }
+@media (max-width: 480px) { .om-dlg__go { flex-direction: column-reverse; } .om-dlg__go .k-btn { width: 100%; } }

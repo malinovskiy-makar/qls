@@ -39,7 +39,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
   <div class="om-take-wrap">
     <nav class="om-tasknav" id="qnav" aria-label="Задания тура">
       {% for row in rows %}
-      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }} из {{ row.result.max_score|score }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
+      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}" data-number="{{ row.number }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }} из {{ row.result.max_score|score }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
       {% endfor %}
     </nav>
     <span class="sr-only">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</span>
@@ -47,7 +47,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
     <form method="post" id="exam-form" action="{% url 'olympiads:training_finish' olympiad.slug variant.pk %}" enctype="multipart/form-data">
       {% csrf_token %}
       {% for row in rows %}
-      <section class="om-taskpane" id="item-{{ row.item.pk }}" data-task="{{ row.index }}"{% if row.index != current %} hidden{% endif %}>
+      <section class="om-taskpane" id="item-{{ row.item.pk }}" data-task="{{ row.index }}"{% if row.locked %} data-locked{% endif %}{% if row.index != current %} hidden{% endif %}>
         <div class="k-card om-task">
           <div class="om-task__hd"><h2 class="om-task__t">{{ row.number }}. {{ row.problem.title|default:"Задание" }}</h2><span class="meta">{{ row.points|score }} {% if row.points == 1 %}балл{% elif row.points < 5 %}балла{% else %}баллов{% endif %}</span></div>
           <div class="math-content om-task__s">{% include "catalog/_math_text.html" with text=row.problem.statement problem=row.problem %}</div>
@@ -127,4 +127,5 @@ window.EXAM = {
 <script src="{% static 'platform/work_form.js' %}"></script>
 <script src="{% static 'platform/exam.js' %}"></script>
 {% include 'olympiads/_take_js.html' %}
+{% include 'olympiads/_tour_dialog.html' %}
 {% endblock %}

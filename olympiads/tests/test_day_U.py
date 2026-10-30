@@ -166,3 +166,63 @@ class AnswerFieldTests(TestCase):
                                        how, 'решение')
         self.assertIn('ЭТАЛОННЫЙ ОТВЕТ', prompt)
         self.assertIn('а) 12', prompt)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, OLYMPIAD_AI_CHECK=False)
+class SubmitItemTests(TestCase):
+    """У6: «Сдать задание» сдаёт ровно одно задание; тур — только «Завершить тур»."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)
+        cls.variant = fx.kit(cls.olymp, cls.final, '2025/26', tour='2', tasks=8)
+
+    def url(self, name):
+        return reverse('olympiads:' + name, args=['vs', self.variant.pk])
+
+    def test_two_items_of_eight_leave_attempt_open(self):
+        from olympiads import training_engine as engine
+        from olympiads.models import TrainingAttempt
+        self.client.post(self.url('training_start'), {'timer': '0'})
+        items = engine.variant_items(self.variant)
+        for item in items[:2]:
+            self.client.post(self.url('training_item_submit'), {
+                'item_id': item.pk, 'solution_item_%d' % item.pk: 'решение'})
+        attempt = TrainingAttempt.objects.get()
+        self.assertIsNone(attempt.submitted_at)
+        self.assertEqual(attempt.results.count(), 2)
+
+    def test_late_autosave_of_submitted_item_is_not_409(self):
+        from olympiads import training_engine as engine
+        self.client.post(self.url('training_start'), {'timer': '0'})
+        item = engine.variant_items(self.variant)[0]
+        self.client.post(self.url('training_item_submit'), {
+            'item_id': item.pk, 'solution_item_%d' % item.pk: 'решение'})
+        response = self.client.post(self.url('training_autosave'),
+                                    data={'item_id': item.pk, 'solution': 'ещё'},
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get('saved'), False)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, OLYMPIAD_AI_CHECK=False)
+class OwnDialogTests(TestCase):
+    """У3: на странице тура — своё окно; общий exam.js не тронут."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)
+        cls.variant = fx.kit(cls.olymp, cls.final, '2025/26', tour='2')
+
+    def test_take_page_has_own_dialog_after_exam_js(self):
+        self.client.post(reverse('olympiads:training_start', args=['vs', self.variant.pk]),
+                         {'timer': '1'})
+        html = self.client.get(reverse('olympiads:training_take',
+                                       args=['vs', self.variant.pk])).content.decode()
+        self.assertIn('id="om-dlg"', html)
+        self.assertLess(html.index('platform/exam.js'), html.index('id="om-dlg"'))
+        self.assertIn('stopImmediatePropagation', html)
+        self.assertNotIn('window.confirm', html)
+        self.assertNotIn('alert(', html)
