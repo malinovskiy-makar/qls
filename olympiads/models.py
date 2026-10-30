@@ -891,6 +891,25 @@ class OlympiadVariant(models.Model):
     absent_in_last_import = models.BooleanField(
         'Нет в последнем пакете', default=False)
 
+    # --- Повтор другого комплекта (миграция 0011, ADR 0171) ---------------
+    # ⚠️ ПОМЕТКА, А НЕ СКРЫТИЕ. Один вариант лежит в пакете по 2–3 раза:
+    # каждый источник оцифрован своим комплектом. Навигатору нужен один вход
+    # на вариант, поэтому повтор ссылается на основной, но не удаляется и
+    # `visibility` не меняет — его PDF остаются дополнительными файлами.
+    # Ставит и снимает только `mark_olympiad_kit_duplicates`. Цепочек нет:
+    # ссылка всегда на корень, у которого своей ссылки нет.
+    class DuplicateKind(models.TextChoices):
+        NONE = '', 'Не повтор'
+        SOURCE = 'source', 'Тот же вариант из другого источника'
+        COMBINED = 'combined', 'Сводный файл нескольких туров'
+
+    duplicate_of = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='duplicates', verbose_name='Повтор комплекта')
+    duplicate_kind = models.CharField(
+        'Вид повтора', max_length=10, choices=DuplicateKind.choices,
+        default=DuplicateKind.NONE, blank=True)
+
     class Meta:
         verbose_name = 'Комплект заданий'
         verbose_name_plural = 'Комплекты заданий'
