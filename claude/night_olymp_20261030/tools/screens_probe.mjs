@@ -34,12 +34,16 @@ const PROBE = (phone) => {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || hidden(el)) continue;
     if (el.classList.contains('sr-only')) continue;
+    // Внутренности формулы KaTeX: `.katex-mathml` скрыт, как sr-only; вылезание самой
+    // формулы за край ловится по её родителю, а не по служебным узлам.
+    if (el.closest('.katex')) continue;
     const scrolls = cs.overflowX === 'auto' || cs.overflowX === 'scroll';
     const ellipsis = cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden';
     if (cs.display !== 'inline' && el.clientWidth > 0) {
       if (el.scrollWidth > el.clientWidth + 1 && !scrolls && !ellipsis)
         out.overflow.push({ el: name(el), sw: el.scrollWidth, cw: el.clientWidth, kind: 'ширина' });
-      if (scrolls && el.scrollWidth > el.clientWidth + 1 && !el.hasAttribute('data-scroll'))
+      // Прокрутка законна там, где задумана: data-scroll и выключная формула KaTeX.
+      if (scrolls && el.scrollWidth > el.clientWidth + 1 && !el.hasAttribute('data-scroll') && !el.classList.contains('katex-display'))
         out.overflow.push({ el: name(el), sw: el.scrollWidth, cw: el.clientWidth, kind: 'прокрутка' });
     }
     const r = el.getBoundingClientRect();

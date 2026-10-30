@@ -1,0 +1,53 @@
+{% comment %}Решение тура: вкладки заданий без перезагрузки и листы «с компьютера» (выбор и перетаскивание).
+Без JS вкладки — ссылки `?task=`, листы — обычная форма с кнопкой «Загрузить».{% endcomment %}
+<script>
+(function () {
+  var root = document.querySelector('.om-take');
+  if (!root) return;
+  document.querySelectorAll('[data-nojs]').forEach(function (b) { b.hidden = true; });
+  function show(n) {
+    root.querySelectorAll('.om-taskpane').forEach(function (p) { p.hidden = p.getAttribute('data-task') !== String(n); });
+    root.querySelectorAll('.om-tn').forEach(function (a) { a.classList.toggle('om-tn--on', a.getAttribute('data-task') === String(n)); });
+    if (history.replaceState) history.replaceState(null, '', '?task=' + n);
+    window.scrollTo({top: 0});
+  }
+  root.addEventListener('click', function (e) {
+    var tab = e.target.closest('.om-tn, [data-go]');
+    if (!tab) return;
+    e.preventDefault();
+    show(tab.getAttribute('data-task') || tab.getAttribute('data-go'));
+  });
+  var csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value;
+  function upload(itemId, files, box) {
+    var form = document.getElementById('up-' + itemId);
+    if (!form || !files.length) return;
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', csrf);
+    data.append('item_id', itemId);
+    Array.prototype.forEach.call(files, function (f) { data.append('file', f); });
+    // Перед перезагрузкой — сохранить набранный текст задания (exam.js шлёт по focusout).
+    var card = document.getElementById('item-' + itemId);
+    var area = card && card.querySelector('textarea.answer-text');
+    if (area) area.dispatchEvent(new Event('focusout', {bubbles: true}));
+    var err = box.querySelector('[data-up-err]');
+    if (err) err.textContent = 'загружаем…';
+    fetch(form.action, {method: 'POST', body: data, credentials: 'same-origin',
+      headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (err) err.textContent = res.error || '';
+        if ((res.sheets || []).length) window.location.reload();
+      })
+      .catch(function () { if (err) err.textContent = 'Не удалось загрузить — попробуйте ещё раз.'; });
+  }
+  root.querySelectorAll('[data-drop]').forEach(function (box) {
+    var itemId = box.getAttribute('data-item');
+    box.querySelectorAll('input[data-upload]').forEach(function (input) {
+      input.addEventListener('change', function () { upload(itemId, input.files, box); input.value = ''; });
+    });
+    box.addEventListener('dragover', function (e) { e.preventDefault(); box.classList.add('om-drop--on'); });
+    box.addEventListener('dragleave', function () { box.classList.remove('om-drop--on'); });
+    box.addEventListener('drop', function (e) { e.preventDefault(); box.classList.remove('om-drop--on'); upload(itemId, e.dataTransfer.files, box); });
+  });
+})();
+</script>

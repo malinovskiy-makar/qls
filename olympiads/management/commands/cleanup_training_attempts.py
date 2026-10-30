@@ -40,6 +40,13 @@ class Command(BaseCommand):
                 'Ничего не тронуто.'.format(days, count))
             return
 
+        # ⚠️ Листы решения (ночь 30.10, Э5) — файлы в хранилище: каскад
+        # удалит строки, но не файлы. Сначала файлы, потом попытки.
+        from olympiads.models import TrainingUpload
+        from olympiads.uploads import delete_files
+        files = delete_files(TrainingUpload.objects.filter(attempt__in=stale))
         stale.delete()
+        if files:
+            self.stdout.write('Удалено файлов листов: {}.'.format(files))
         self.stdout.write(self.style.SUCCESS(
             'Удалено гостевых попыток старше {} дней: {}.'.format(days, count)))

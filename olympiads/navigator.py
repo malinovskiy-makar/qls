@@ -1132,3 +1132,75 @@ def calendar_search(query, user=None):
                                    if olympiad.grade_min and olympiad.grade_max
                                    else '')})
     return out[:8]
+
+
+# ---------------------------------------------------------------------------
+# Тур: вход и решение (Э5)
+# ---------------------------------------------------------------------------
+
+def minutes_label(minutes):
+    """210 → «3 ч 30 мин», 180 → «3 ч», 45 → «45 мин»."""
+    if not minutes:
+        return ''
+    hours, rest = divmod(int(minutes), 60)
+    if not hours:
+        return '{} мин'.format(rest)
+    return '{} ч'.format(hours) + (' {} мин'.format(rest) if rest else '')
+
+
+def tour_info(variant):
+    """Шапка тура: что за тур, сколько заданий, максимум, время, PDF.
+
+    Те же функции, что в панели тура страницы олимпиады (`_tour_row`):
+    число на входе и число в панели не могут разойтись.
+    """
+    annotated = _annotated(OlympiadVariant.objects.filter(pk=variant.pk)).get()
+    grades = sorted(g.grade for g in annotated.grades.all())
+    start = season_start(annotated.season)
+    maximum = tour_max_score(annotated)
+    minutes = tour_minutes(annotated)
+    return {
+        'variant': annotated,
+        'label': TOUR_LABELS.get(annotated.tour, annotated.tour or 'Тур'),
+        'stage_short': stage_short(annotated.stage),
+        'stage_title': stage_title(annotated.stage),
+        'season': season_text(start) if start is not None else 'сезон не указан',
+        'grades': grades_text(grades) or 'все классы',
+        'tasks': annotated.n_items,
+        'tasks_label': tasks_label(annotated.n_items),
+        'max_score': maximum,
+        'max_label': _fmt(maximum),
+        'minutes': minutes,
+        'minutes_label': minutes_label(minutes),
+        'pdfs': tour_pdfs(annotated),
+        'with_criteria': annotated.n_criteria,
+    }
+
+
+def sibling_tours(variant):
+    """Другие туры той же клетки (этап, сезон, те же классы) — «1 тур»."""
+    grades = sorted(g.grade for g in variant.grades.all())
+    out = []
+    for other in (base_variants().filter(olympiad_id=variant.olympiad_id,
+                                         stage_id=variant.stage_id,
+                                         season=variant.season)
+                  .exclude(pk=variant.pk).prefetch_related('grades')):
+        if sorted(g.grade for g in other.grades.all()) == grades:
+            out.append(other)
+    out.sort(key=lambda v: (TOUR_ORDER.get(v.tour, 9), v.pk))
+    return out
+
+
+def last_result(variant, user=None, session_key=''):
+    """Последняя сданная попытка решающего по комплекту — или None."""
+    attempts = _attempts_for([variant.pk], user, session_key).get(variant.pk, [])
+    done = [a for a in attempts if a.submitted_at is not None]
+    return max(done, key=lambda a: a.submitted_at) if done else None
+
+
+def spent_label(attempt):
+    """Сколько решал: «3 ч 12 мин» — от начала до сдачи."""
+    if attempt is None or attempt.submitted_at is None:
+        return ''
+    minutes = int((attempt.submitted_at - attempt.started_at).total_seconds() // 60)
+    return minutes_label(max(minutes, 1))

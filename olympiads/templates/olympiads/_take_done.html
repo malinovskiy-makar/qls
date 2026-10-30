@@ -1,0 +1,18 @@
+{% load olymp_tags %}{% comment %}Сданное задание режима «Без времени» (доска TakeFree): что отправлено и итог.
+Проверка ИИ по критериям (Э7) — `_take_check.html`; пока её нет — разбор и критерии жюри для самопроверки.{% endcomment %}
+<div class="k-card k-card--flat om-sent">
+  <div class="om-sol__hd"><h3 class="om-h2 om-grow">Решение</h3><span class="meta">{% if row.sheets %}фото · {{ row.sheets|length }} {% if row.sheets|length == 1 %}лист{% elif row.sheets|length < 5 %}листа{% else %}листов{% endif %}{% elif row.solution_value %}текстом{% endif %} · отправлено</span></div>
+  {% if row.solution_value %}<div class="om-sent__text">{{ row.solution_value|linebreaksbr }}</div>{% endif %}
+  {% if row.sheets %}<div class="om-sheets">{% for sheet in row.sheets %}{% include 'olympiads/_sheet.html' %}{% endfor %}</div>{% endif %}
+  {% if row.is_test %}<div class="meta">Ответ: {{ row.parts.0.value|default:"—" }}</div>{% endif %}
+</div>
+<div class="k-card om-check">
+  {% if row.result.is_pending %}
+  <div class="om-check__hd"><span class="om-big">Самопроверка</span></div>
+  {% else %}
+  <div class="om-check__hd"><span class="om-big">{{ row.result.score|score }} из {{ row.result.max_score|score }}</span>{% if row.result.comment %}<span class="meta">{{ row.result.comment }}</span>{% endif %}</div>
+  {% endif %}
+  {% if row.reference %}<details class="om-det" open><summary class="om-row"><span class="om-grow om-det__t">Разбор задачи</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.reference problem=row.problem %}</div></details>{% endif %}
+  {% if row.criteria %}<details class="om-det"{% if not row.reference %} open{% endif %}><summary class="om-row"><span class="om-grow om-det__t">Критерии жюри</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.criteria problem=row.problem %}</div></details>{% endif %}
+  {% if not row.reference and not row.criteria %}<p class="meta om-ref">Разбора к этому заданию в базе нет.</p>{% endif %}
+</div>

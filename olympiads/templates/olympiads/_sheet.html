@@ -1,0 +1,6 @@
+{% comment %}Лист решения: миниатюра (картинка своей попытки через `training_sheet`) или значок PDF.{% endcomment %}
+<figure class="om-sheet om-sheet--real" data-sheet="{{ sheet.pk }}">
+  {% if sheet.mime == 'application/pdf' %}<span class="om-sheet__pdf">{% include 'olympiads/_ico.html' with name='file' %}PDF</span>{% else %}<img src="{% url 'olympiads:training_sheet' olympiad.slug variant.pk sheet.pk %}" alt="Лист {{ sheet.page }}" loading="lazy">{% endif %}
+  <figcaption>Лист {{ sheet.page }}</figcaption>
+  {% if not row.locked and not attempt.submitted_at %}<form method="post" action="{% url 'olympiads:training_sheet_delete' olympiad.slug variant.pk sheet.pk %}" class="om-sheet__del">{% csrf_token %}<input type="hidden" name="task" value="{{ row.index }}"><button type="submit" class="k-btn k-btn--quiet" aria-label="Убрать лист {{ sheet.page }}">{% include 'olympiads/_ico.html' with name='x' %}</button></form>{% endif %}
+</figure>

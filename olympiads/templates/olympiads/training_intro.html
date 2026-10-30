@@ -1,83 +1,72 @@
 {% extends 'olympiads/base_olymp.html' %}
+{% load olymp_tags %}
 {% comment %}
-Экран до старта. Отделён от списка комплектов намеренно: таймер запускает
-СЕРВЕР в момент нажатия, и нажатие должно быть осознанным.
+Вход в тур по доске Intro (ночь 30→31.10, Э5). Два режима: «На время» —
+время тура из этапа, проверка после сдачи всего тура; «Без времени» —
+проверка сразу после каждого задания. Числа — `navigator.tour_info`.
 {% endcomment %}
-{% block title %}Тренировка · {{ olympiad.name_short }} {{ variant.year }}{% endblock %}
+{% block title %}{{ info.label }} · {{ olympiad.name_short }} {{ info.season }}{% endblock %}
 {% block olymp_content %}
-<nav class="ol-crumbs" aria-label="Хлебные крошки">
-  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
-  <span aria-hidden="true">→</span>
-  <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a>
-  <span aria-hidden="true">→</span>
-  <span>Комплект {{ variant.year }}</span>
-</nav>
+<div class="om om-intro">
+  <nav class="ol-crumbs" aria-label="Хлебные крошки"><a href="{% url 'olympiads:list' %}">Олимпиады</a> → <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a> → {{ info.stage_short }} {{ info.season }} · {{ info.grades }}</nav>
+  <h1 class="ol-title">{{ info.label }}</h1>
+  <p class="ol-sub">{{ info.stage_title }} {{ olympiad.name_short }} {{ info.season }} · {{ info.grades }} · {{ info.tasks_label }}{% if info.max_label %} · максимум {{ info.max_label }} баллов{% endif %}</p>
 
-<h1 class="ol-title">Комплект {{ variant.year }} года</h1>
-<p class="ol-sub">
-  {% if variant.stage %}{{ variant.stage.name }} · {% endif %}{{ variant.grade_label }}
-</p>
-
-{% if blocked %}
-  <p class="ol-empty">{{ blocked }}</p>
-{% else %}
-  <ul class="ol-facts">
-    <li><b>{{ items_count }}</b> заданий</li>
-    {% if variant.duration_minutes %}<li><b>{{ variant.duration_minutes }}</b> минут на тур</li>
-    {% else %}<li class="ol-mute">длительность тура неизвестна</li>{% endif %}
-    {% if max_score %}<li>максимум <b>{{ max_score|floatformat:"-2" }}</b> баллов</li>{% endif %}
-  </ul>
-
-  {% if attempt %}
-  {# Перерешивать можно сколько угодно раз, поэтому спрашиваем, а не решаем за человека. #}
-  <div class="ol-note">
-    <p>Начатая попытка уже есть: {{ attempt.started_at|date:"j E, H:i" }}.</p>
-    <div class="ol-actions">
-      <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
-        {% csrf_token %}
-        <input type="hidden" name="resume" value="1">
-        <button type="submit" class="ol-btn">Продолжить</button>
-      </form>
-      <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
-        {% csrf_token %}
-        <input type="hidden" name="timer" value="{% if attempt.with_timer %}1{% else %}0{% endif %}">
-        <button type="submit" class="ol-btn ol-btn--second">Начать заново</button>
-      </form>
-    </div>
-  </div>
+  {% if blocked %}
+  <div class="k-card om-pad om-mt14"><div class="om-empty__t">{{ blocked }}</div></div>
   {% else %}
-  <div class="ol-actions">
+  {% if attempt %}
+  <div class="k-card om-pad om-intro-cont">
+    <span class="om-grow"><b>Тур начат {% if attempt.with_timer %}на время{% else %}без времени{% endif %}</b></span>
+    <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">{% csrf_token %}<input type="hidden" name="resume" value="1"><button type="submit" class="k-btn k-btn--main">Продолжить</button></form>
+  </div>
+  {% endif %}
+  <div class="om-modes">
     {% if timer_possible %}
-    <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
-      {% csrf_token %}
-      <input type="hidden" name="timer" value="1">
-      <button type="submit" class="ol-btn">Решать на время</button>
-    </form>
-    {% else %}
-    <span class="ol-btn ol-btn--off" aria-disabled="true">Время тура неизвестно</span>
+    <section class="k-card om-mode{% if mode == 'timed' %} om-mode--on{% endif %}">
+      <h2 class="om-mode__h">На время</h2>
+      <div class="om-big">{{ info.minutes_label }}</div>
+      <p class="meta">Как на олимпиаде · проверка после сдачи тура</p>
+      <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">{% csrf_token %}<input type="hidden" name="timer" value="1"><button type="submit" class="k-btn k-btn--main k-btn--hero">Начать</button></form>
+    </section>
     {% endif %}
-    <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
-      {% csrf_token %}
-      <input type="hidden" name="timer" value="0">
-      <button type="submit" class="ol-btn ol-btn--second">Решать без таймера</button>
-    </form>
+    <section class="k-card om-mode{% if mode == 'free' %} om-mode--on{% endif %}">
+      <h2 class="om-mode__h">Без времени</h2>
+      <div class="om-big">Без таймера</div>
+      <p class="meta">Проверка сразу после каждого задания, с разбором</p>
+      <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">{% csrf_token %}<input type="hidden" name="timer" value="0"><button type="submit" class="k-btn k-btn--plain k-btn--hero">Начать</button></form>
+    </section>
+  </div>
+  {% if ai_all %}<p class="meta om-mt10">Решения проверяет ИИ по критериям жюри</p>{% elif ai_some %}<p class="meta om-mt10">ИИ проверит по критериям жюри задания {{ ai_numbers }}; у остальных после сдачи — эталонное решение</p>{% endif %}
+
+  <div class="om-intro-grid">
+    <section class="k-card om-tasks">
+      <div class="om-tasks__hd"><h2 class="om-h2 om-grow">Задания</h2>{% with pdf=info.pdfs.0 %}{% if pdf %}<a class="om-link" href="{{ pdf.href }}"{% if pdf.external %} target="_blank" rel="noopener"{% endif %}>Условия в PDF</a>{% endif %}{% endwith %}</div>
+      <div class="om-tasks__cols meta"><span class="om-grow"></span><span>максимум</span></div>
+      {% for row in rows %}
+      <div class="om-row om-task-row"><span class="om-stepno" aria-hidden="true">{{ row.number }}</span><span class="om-grow om-task-row__t">{{ row.title }}</span><span class="meta om-task-row__p">{{ row.points|score }} {% if row.points == 1 %}балл{% elif row.points < 5 %}балла{% else %}баллов{% endif %}</span></div>
+      {% endfor %}
+    </section>
+    {% if siblings or mine_last %}
+    <aside class="om-intro-side">
+      {% for s in siblings %}
+      <section class="k-card om-pad">
+        <div class="meta">{{ s.label }}</div>
+        <div class="om-big om-big--sm">{{ s.attempt.score|score }} из {{ s.attempt.max_score|score }}</div>
+        <div class="meta">{% if s.attempt.with_timer %}на время{% else %}без времени{% endif %}{% if s.spent %} · {{ s.spent }}{% endif %}</div>
+        <a class="om-link om-mt10 om-block" href="{% url 'olympiads:training_result' olympiad.slug s.variant.pk %}">Результат {{ s.label }}а →</a>
+      </section>
+      {% endfor %}
+      {% if mine_last %}
+      <section class="k-card om-pad">
+        <div class="meta">Прошлая попытка · {{ info.label }}</div>
+        <div class="om-big om-big--sm">{{ mine_last.score|score }} из {{ mine_last.max_score|score }}</div>
+        <a class="om-link om-mt10 om-block" href="{% url 'olympiads:training_result' olympiad.slug variant.pk %}">Разбор →</a>
+      </section>
+      {% endif %}
+    </aside>
+    {% endif %}
   </div>
   {% endif %}
-
-  {% if is_guest %}
-  <div class="ol-guest" role="note">
-    <strong>Результат не сохранится.</strong>
-    Решать можно и без входа — ответы держатся на этом устройстве, пока вы не
-    закроете браузер, и через неделю удаляются.
-    <a href="/login/">Войдите</a>, чтобы попытки сохранялись.
-  </div>
-  {% endif %}
-{% endif %}
-
-{% if variant.has_original %}
-<p class="ol-note">
-  Задания в оригинале:
-  <a href="{{ variant.original_url }}" target="_blank" rel="noopener">открыть источник</a>.
-</p>
-{% endif %}
+</div>
 {% endblock %}

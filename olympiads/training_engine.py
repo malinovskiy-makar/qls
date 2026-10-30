@@ -53,14 +53,36 @@ class _Rollback(Exception):
 # Задачи комплекта и постоянное «задание» под них
 # ---------------------------------------------------------------------------
 
+def package_items(variant):
+    """Позиции комплекта из пакета олимпиад по порядку тура (ночь 30.10, Э5).
+
+    Позиция, которой нет в последнем пакете, в тур не идёт: на ней могут
+    висеть старые попытки, но решать её заново незачем.
+    """
+    return list(variant.items.filter(absent_in_last_import=False)
+                .select_related('problem').order_by('order', 'id'))
+
+
 def variant_problems(variant):
     """Задачи комплекта из банка, в порядке номеров тура. Пусто — не привязан.
 
-    Связь односторонняя и только на чтение: `OlympiadVariant.ref_event_id`
-    → `problems.OlympiadRef.event_id`. Раздел олимпиад в `problems` ничего
+    ⚠️ С 30.10.2026 СНАЧАЛА ПОЗИЦИИ ПАКЕТА (`OlympiadVariantItem`): у всех
+    624 основных комплектов пакета совпадений в `OlympiadRef` ноль, и без
+    этого тренировка не открывалась ни на одном из них. Комплект без позиций
+    (прежние 12) — по-старому: `OlympiadVariant.ref_event_id` →
+    `problems.OlympiadRef.event_id`. Раздел олимпиад в `problems` ничего
     не пишет ([ADR 0063]).
     """
     from problems.models import OlympiadRef
+
+    items = package_items(variant)
+    if items:
+        seen, problems = set(), []
+        for item in items:
+            if item.problem_id not in seen:
+                seen.add(item.problem_id)
+                problems.append(item.problem)
+        return problems
 
     event_id = (variant.ref_event_id or '').strip()
     if not event_id:
@@ -151,6 +173,10 @@ def training_assignment(variant):
         defaults={'kind': Assignment.Kind.EXAM},
     )
 
+    # Балл позиции пакета — балл задания в туре. Нет его — правило всей
+    # системы (`AssignmentItem.save`: задаче 10, тесту 3).
+    points = {i.problem_id: i.max_score for i in package_items(variant)
+              if i.max_score is not None}
     existing = {item.catalog_problem_id: item
                 for item in assignment.items.all()}
     for order, problem in enumerate(problems, start=1):
@@ -158,10 +184,18 @@ def training_assignment(variant):
         if item is None:
             AssignmentItem.objects.create(assignment=assignment,
                                           catalog_problem=problem,
-                                          order=order)
-        elif item.order != order:
-            item.order = order
-            item.save(update_fields=['order'])
+                                          order=order,
+                                          points=points.get(problem.pk))
+        else:
+            changed = []
+            if item.order != order:
+                item.order = order
+                changed.append('order')
+            if problem.pk in points and item.points != points[problem.pk]:
+                item.points = points[problem.pk]
+                changed.append('points')
+            if changed:
+                item.save(update_fields=changed)
     return assignment
 
 
@@ -204,12 +238,17 @@ def start_attempt(variant, user=None, session_key='', with_timer=True,
     # задач — мусор, который потом некуда деть.
     variant_items(variant)
 
+    from .navigator import tour_minutes
+
     expires_at = None
     if with_timer:
-        if not variant.duration_minutes:
+        # ⚠️ У комплектов пакета своего времени нет — время тура задаёт
+        # этап (ВсОШ, заключительный — 210 минут). Одна функция на экран и
+        # на таймер: иначе на входе одно число, а на часах другое.
+        minutes = tour_minutes(variant)
+        if not minutes:
             raise TrainingError('Время тура неизвестно.')
-        expires_at = now + timezone.timedelta(
-            minutes=variant.duration_minutes)
+        expires_at = now + timezone.timedelta(minutes=minutes)
 
     return TrainingAttempt.objects.create(
         variant=variant,
@@ -326,8 +365,50 @@ def drafts_map(attempt):
 # Проверка: одноразовое решение
 # ---------------------------------------------------------------------------
 
+def graded_problem_ids(attempt):
+    """Задачи попытки, у которых итог уже есть — в режиме «Без времени» это
+    сданные по одной задачи: править их больше нельзя."""
+    from .models import TrainingItemResult
+
+    return set(TrainingItemResult.objects.filter(attempt=attempt)
+               .values_list('problem_id', flat=True))
+
+
+def grade_item(attempt, item):
+    """«Сдать задание» без времени: проверить ОДНУ задачу и записать итог.
+
+    Повторная сдача той же задачи ничего не меняет — итог уже снят.
+    Возвращает `TrainingItemResult`.
+    """
+    from problems.assignment_rows import item_max_score
+
+    from .models import TrainingItemResult
+
+    problem = item.catalog_problem
+    done = TrainingItemResult.objects.filter(attempt=attempt,
+                                             problem=problem).first()
+    if done is not None:
+        return done
+    items = variant_items(attempt.variant)
+    order = next((n for n, i in enumerate(items, start=1) if i.pk == item.pk), 0)
+    drafts = drafts_map(attempt)
+    values = _draft_values(item, drafts, problem)
+    row = _grade_one(service_user(), training_assignment(attempt.variant), item,
+                     values, _joined_answer(item, values), order, problem,
+                     float(item_max_score(item)),
+                     has_work=_has_work(attempt, drafts, problem))
+    return TrainingItemResult.objects.create(
+        attempt=attempt, problem=problem, order=order, score=row['score'],
+        max_score=row['max_score'], is_pending=row['pending'],
+        comment=row['comment'])
+
+
 def grade_attempt(attempt):
     """Проверяет попытку ВЫЗОВОМ `grade_submission` и сохраняет итог.
+
+    ⚠️ УЖЕ СДАННЫЕ ЗАДАЧИ НЕ ПЕРЕПРОВЕРЯЮТСЯ (ночь 30.10): в режиме «Без
+    времени» итог задачи снят при «Сдать задание», а позже его может
+    уточнить ИИ-проверка (Э7) — пересчёт при сдаче тура стёр бы и то и другое.
 
     ⚠️ РЕШЕНИЕ ОДНОРАЗОВОЕ. `Submission`, `PartAnswer` и `TeacherFeedback`
     создаются внутри точки сохранения и откатываются: проверке нужен
@@ -347,17 +428,20 @@ def grade_attempt(attempt):
     student = service_user()
     assignment = training_assignment(attempt.variant)
 
+    done = graded_problem_ids(attempt)
     rows = []
     for order, item in enumerate(items, start=1):
         problem = item.catalog_problem
+        if problem.pk in done:
+            continue
         maximum = float(item_max_score(item))
         values = _draft_values(item, drafts, problem)
         answer_text = _joined_answer(item, values)
         rows.append(_grade_one(student, assignment, item, values, answer_text,
-                               order, problem, maximum))
+                               order, problem, maximum,
+                               has_work=_has_work(attempt, drafts, problem)))
 
     # Пишем итоги ПОСЛЕ отката — иначе они уехали бы вместе с ним.
-    TrainingItemResult.objects.filter(attempt=attempt).delete()
     TrainingItemResult.objects.bulk_create([
         TrainingItemResult(attempt=attempt, problem_id=row['problem_id'],
                            order=row['order'], score=row['score'],
@@ -365,12 +449,27 @@ def grade_attempt(attempt):
                            is_pending=row['pending'],
                            comment=row['comment'])
         for row in rows])
-
-    attempt.score = sum(row['score'] for row in rows if row['score'] is not None)
-    attempt.max_score = sum(row['max_score'] for row in rows)
-    attempt.pending_count = sum(1 for row in rows if row['pending'])
-    attempt.save(update_fields=['score', 'max_score', 'pending_count'])
+    recount(attempt)
     return rows
+
+
+def recount(attempt):
+    """Итог попытки — сумма итогов по задачам (после проверки и после ИИ)."""
+    from .models import TrainingItemResult
+
+    results = list(TrainingItemResult.objects.filter(attempt=attempt))
+    attempt.score = sum(float(r.score) for r in results if r.score is not None)
+    attempt.max_score = sum(float(r.max_score) for r in results)
+    attempt.pending_count = sum(1 for r in results if r.is_pending)
+    attempt.save(update_fields=['score', 'max_score', 'pending_count'])
+
+
+def _has_work(attempt, drafts, problem):
+    """Сдано ли развёрнутое решение: текст «Моё решение» или листы."""
+    whole = drafts.get((problem.pk, None))
+    if whole is not None and (whole.solution_draft or '').strip():
+        return True
+    return attempt.uploads.filter(problem=problem).exists()
 
 
 def _draft_values(item, drafts, problem):
@@ -392,7 +491,7 @@ def _joined_answer(item, values):
 
 
 def _grade_one(student, assignment, item, values, answer_text, order, problem,
-               maximum):
+               maximum, has_work=False):
     """Одна задача: создать решение, проверить, снять числа, откатить.
 
     Возвращает обычный словарь — он переживает откат, объекты базы нет.
@@ -405,6 +504,13 @@ def _grade_one(student, assignment, item, values, answer_text, order, problem,
     result = {'problem_id': problem.pk, 'order': order,
               'max_score': maximum, 'score': None, 'pending': True,
               'comment': ''}
+    if has_work and not any((v or '').strip() for v in values.values()):
+        # ⚠️ РАЗВЁРНУТОЕ РЕШЕНИЕ БЕЗ КРАТКОГО ОТВЕТА — НЕ НОЛЬ (ночь 30.10).
+        # Экран тура по макету даёт открытому заданию только «Решение» —
+        # фото или текст, полей ответа нет. Машина поставила бы ноль «ответа
+        # не было» человеку, который решение сдал. Такое задание ждёт
+        # проверки: ИИ по критериям (Э7) или самопроверки по разбору.
+        return result
     try:
         with transaction.atomic():
             submission = Submission.objects.create(

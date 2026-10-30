@@ -1380,3 +1380,50 @@ class TrainingItemResult(models.Model):
     def __str__(self):
         return '#{} задача {}: {}'.format(self.attempt_id, self.problem_id,
                                           self.score)
+
+
+def _upload_path(instance, filename):
+    """Имя листа даём сами: имя файла с телефона ученика хранилищу не нужно."""
+    import uuid
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'bin'
+    return 'olympiad_training/{}/{}.{}'.format(instance.attempt_id,
+                                                uuid.uuid4().hex, ext)
+
+
+class TrainingUpload(models.Model):
+    """Лист решения тура: фото или PDF, с компьютера или с телефона (ночь 30.10, Э5).
+
+    ⚠️ ЛИСТ ПРИНАДЛЕЖИТ ПОПЫТКЕ, а не человеку: у гостя человека нет, и
+    уборка гостевых попыток (`cleanup_training_attempts`) удаляет листы вместе
+    с файлами. Проверка файла — та же, что у вложений «Стола»
+    (`catalog.attachments.validate_upload`); EXIF снимается пересохранением.
+    """
+
+    class Source(models.TextChoices):
+        PHONE = 'phone', 'С телефона'
+        COMPUTER = 'computer', 'С компьютера'
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE, related_name='uploads',
+        verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_uploads', verbose_name='Задача')
+    file = models.FileField('Файл', upload_to=_upload_path, max_length=300)
+    page = models.PositiveSmallIntegerField('Лист', default=1)
+    source = models.CharField('Откуда', max_length=10, choices=Source.choices,
+                              default=Source.COMPUTER)
+    sha256 = models.CharField('SHA-256', max_length=64)
+    mime = models.CharField('Тип', max_length=40, blank=True)
+    created_at = models.DateTimeField('Загружен', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Лист решения тура'
+        verbose_name_plural = 'Листы решений тура'
+        ordering = ['attempt', 'problem', 'page', 'id']
+        indexes = [models.Index(fields=['attempt', 'problem'],
+                                name='olymp_upload_att_prob')]
+
+    def __str__(self):
+        return '#{} задача {} лист {}'.format(self.attempt_id, self.problem_id,
+                                             self.page)

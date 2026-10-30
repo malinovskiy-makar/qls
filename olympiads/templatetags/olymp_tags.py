@@ -28,3 +28,21 @@ def get_item(mapping, key):
         return mapping.get(key)
     except AttributeError:
         return None
+
+
+@register.filter
+def prev_number(rows, index):
+    """Номер задания перед строкой `index` (счёт с 1): «← Задание 5»."""
+    return _number(rows, int(index) - 2)
+
+
+@register.filter
+def next_number(rows, index):
+    """Номер задания после строки `index` (счёт с 1): «Задание 7 →»."""
+    return _number(rows, int(index))
+
+
+def _number(rows, position):
+    if 0 <= position < len(rows):
+        return rows[position]['number']
+    return ''

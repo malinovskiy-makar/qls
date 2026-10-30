@@ -1,96 +1,116 @@
 {% extends 'olympiads/base_olymp.html' %}
-{% load static %}
+{% load static olymp_tags %}
 {% comment %}
-Сам процесс решения.
+Решение тура по доскам TakeTimed / TakeTimedPhone (на время) и TakeFree /
+TakeFreePhone (без времени); ночь 30→31.10, Э5.
 
 ⚠️ РАЗМЕТКА ПОДЧИНЕНА `platform/exam.js`, А НЕ НАОБОРОТ. Скрипты контрольной
 переиспользованы БЕЗ КОПИРОВАНИЯ: они привязаны к адресам (через window.EXAM)
 и к именам узлов — `#exam-form`, `#item-<pk>`, `#timer`, `#qnav`,
 `#save-state`, `#answered-count`, `#finish-btn`, `input.answer-short`,
 `textarea.answer-text`. Менять эти имена нельзя, не поправив exam.js.
+
+⚠️ ДО СДАЧИ НЕТ НИ РАЗБОРА, НИ ОТВЕТА, НИ КРИТЕРИЕВ: `row.reference` и
+`row.criteria` заполнены только у сданного задания режима «Без времени».
 {% endcomment %}
-{% block title %}Решаю · {{ olympiad.name_short }} {{ variant.year }}{% endblock %}
+{% block title %}{{ info.label }} · {{ olympiad.name_short }} {{ info.season }}{% endblock %}
+{% block body_attrs %}{% if attempt.with_timer %} class="om-take-body"{% endif %}{% endblock %}
 {% block olymp_content %}
-<div class="ol-tbar">
+<div class="om om-take{% if attempt.with_timer %} om-take--timed{% else %} om-take--free{% endif %}">
   {% if attempt.with_timer %}
-  <div>
-    <div class="ol-tbar-cap">осталось</div>
-    <div class="ol-timer" id="timer" data-seconds="{{ seconds_left|default_if_none:'' }}">–:–</div>
-  </div>
+  {# ── Полоса тура вместо шапки сайта (TakeTimed) ── #}
+  <header class="tt-bar om-ttbar">
+    <a class="om-ttbar__logo" href="{% url 'olympiads:detail' olympiad.slug %}" aria-label="Страница олимпиады">{% include 'olympiads/_logo.html' %}</a>
+    <span class="om-ttbar__t om-ell">{{ olympiad.name_short }} · {{ info.stage_short|lower }} {{ info.season }} · {{ info.grades }} · {{ info.label }}</span>
+    <span class="om-ttbar__time"><span class="om-timer" id="timer" data-seconds="{{ seconds_left|default_if_none:'' }}">–:–</span> <span class="meta">осталось</span></span>
+    <span class="meta om-ttbar__save" id="save-state">сохранено</span>
+    <button type="button" class="k-btn om-amber" id="finish-btn">Сдать тур</button>
+  </header>
   {% else %}
-  {# Без таймера часы не показываются ВОВСЕ, а не показываются пустыми. #}
-  <div><div class="ol-tbar-cap">режим</div><div class="ol-tbar-cap">без таймера</div></div>
-  <span id="timer" data-seconds="" hidden></span>
-  {% endif %}
-  <div class="ol-qnav" id="qnav">
-    {% for row in rows %}
-    <a href="#item-{{ row.item.pk }}" data-item="{{ row.item.pk }}"
-       class="{% if row.answered %}is-answered{% endif %}">{{ row.number }}</a>
-    {% endfor %}
+  <nav class="ol-crumbs" aria-label="Хлебные крошки"><a href="{% url 'olympiads:list' %}">Олимпиады</a> → <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a> → <a href="{% url 'olympiads:training_intro' olympiad.slug variant.pk %}">{{ info.stage_short }} {{ info.season }} · {{ info.grades }}</a> → {{ info.label }}</nav>
+  <div class="om-free-hd">
+    <h1 class="ol-title">{{ info.label }}</h1><span class="k-chip-kind">без времени</span>
+    <span class="om-grow"></span>
+    {% if free_done %}<span class="om-free-sum"><b>{{ free_score|score }} из {{ free_max|score }}</b> за {{ free_done }} {% if free_done == 1 %}задание{% elif free_done < 5 %}задания{% else %}заданий{% endif %}</span>{% endif %}
+    <span id="timer" data-seconds="" hidden></span><span id="save-state" class="meta om-free-save">сохранено</span>
   </div>
-  <div class="ol-tcount">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</div>
-  <span class="ol-tsave" id="save-state">все ответы сохраняются сами</span>
-</div>
+  {% endif %}
 
-<h1 class="ol-title">{{ olympiad.name_short }} · {{ variant.year }}</h1>
-<p class="ol-sub">{% if variant.stage %}{{ variant.stage.name }} · {% endif %}{{ variant.grade_label }}</p>
+  <div class="om-take-wrap">
+    <nav class="om-tasknav" id="qnav" aria-label="Задания тура">
+      {% for row in rows %}
+      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }} из {{ row.result.max_score|score }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
+      {% endfor %}
+    </nav>
+    <span class="sr-only">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</span>
 
-<form method="post" id="exam-form"
-      action="{% url 'olympiads:training_finish' olympiad.slug variant.pk %}">
-  {% csrf_token %}
-  {% for row in rows %}
-  <section class="ol-task" id="item-{{ row.item.pk }}">
-    <div class="ol-task-head">
-      <span class="ol-task-num">{{ row.number }}</span>
-      <span class="ol-task-pts">{{ row.points|floatformat:"-2" }} б.</span>
-    </div>
-    <div class="ol-task-body">{{ row.problem.statement }}</div>
+    <form method="post" id="exam-form" action="{% url 'olympiads:training_finish' olympiad.slug variant.pk %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% for row in rows %}
+      <section class="om-taskpane" id="item-{{ row.item.pk }}" data-task="{{ row.index }}"{% if row.index != current %} hidden{% endif %}>
+        <div class="k-card om-task">
+          <div class="om-task__hd"><h2 class="om-task__t">{{ row.number }}. {{ row.problem.title|default:"Задание" }}</h2><span class="meta">{{ row.points|score }} {% if row.points == 1 %}балл{% elif row.points < 5 %}балла{% else %}баллов{% endif %}</span></div>
+          <div class="math-content om-task__s">{% include "catalog/_math_text.html" with text=row.problem.statement problem=row.problem %}</div>
+          {% for part in row.display_parts %}
+          <div class="om-part"><b>{{ part.label }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement problem=row.problem %}</span>{% if part.points %}<span class="om-pts">{{ part.points|score }} {% if part.points == 1 %}балл{% elif part.points < 5 %}балла{% else %}баллов{% endif %}</span>{% endif %}</div>
+          {% endfor %}
+        </div>
 
-    {% if row.kind == 'radio' or row.kind == 'checkbox' %}
-      <div class="ol-field">
-        <label>Выберите ответ</label>
-        {% for option in row.options %}
-        <label class="ol-opt">
-          <input type="{{ row.kind }}" name="{{ row.parts.0.name }}"
-                 value="{{ option.value }}"
-                 {% if option.value in row.chosen %}checked{% endif %}>
-          <span>{{ option.label }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    {% else %}
-      {% for part in row.parts %}
-      <div class="ol-field">
-        {% if part.part %}
-        <div class="ol-task-part">
-          <span class="ol-task-part-label">{{ part.label }}</span>
-          {{ part.statement }}
+        {% if row.locked %}
+          {% include 'olympiads/_take_done.html' %}
+        {% else %}
+        <div class="k-card om-sol">
+          {% if row.is_test %}
+          <div class="om-sol__hd"><h3 class="om-h2">Ответ</h3></div>
+          <div class="om-opts">{% for option in row.options %}<label class="ol-opt om-opt"><input type="{{ row.kind }}" name="{{ row.parts.0.name }}" value="{{ option.value }}" {% if option.value in row.chosen %}checked{% endif %}><span>{{ option.label }}</span></label>{% endfor %}</div>
+          <textarea class="answer-text" name="{{ row.solution_name }}" hidden>{{ row.solution_value }}</textarea>
+          {% else %}
+          {% if row.has_answer %}
+          <div class="om-answers">{% for part in row.parts %}<label class="om-answer"><span class="om-answer__l">Ответ{% if part.part %} {{ part.label }}{% endif %}</span><input class="answer-short k-input" type="text" name="{{ part.name }}" value="{{ part.value }}"{% if part.part %} data-part="{{ part.part.pk }}"{% endif %} autocomplete="off"></label>{% endfor %}</div>
+          {% endif %}
+          <input type="radio" class="om-mode-r sr-only" name="mode-{{ row.item.pk }}" id="m-photo-{{ row.item.pk }}" {% if row.sheets or not row.solution_value %}checked{% endif %}>
+          <input type="radio" class="om-mode-r sr-only" name="mode-{{ row.item.pk }}" id="m-text-{{ row.item.pk }}" {% if row.solution_value and not row.sheets %}checked{% endif %}>
+          <div class="om-sol__hd"><h3 class="om-h2 om-grow">Решение</h3><div class="om-seg om-sol__seg"><label for="m-photo-{{ row.item.pk }}">Фото</label><label for="m-text-{{ row.item.pk }}">Текст</label></div></div>
+          <div class="om-sol__photo">
+            <div class="om-ways">
+              {% include 'olympiads/_phone_way.html' %}
+              <div class="om-drop" data-drop data-item="{{ row.item.pk }}" data-task="{{ row.index }}">
+                <b class="om-drop__t om-desk-only">С компьютера</b>
+                <label class="k-btn k-btn--main om-cam om-phone-only">{% include 'olympiads/_ico.html' with name='camera' %}Сфотографировать<input type="file" class="sr-only" accept="image/*" capture="environment" data-upload form="up-{{ row.item.pk }}" name="file"></label>
+                <label class="k-btn k-btn--main om-desk-only">Выбрать файлы<input type="file" class="sr-only" accept="image/jpeg,image/png,image/webp,application/pdf" multiple data-upload form="up-{{ row.item.pk }}" name="file"></label>
+                <label class="k-btn k-btn--plain om-phone-only">Из галереи<input type="file" class="sr-only" accept="image/*" multiple data-upload form="up-{{ row.item.pk }}" name="file"></label>
+                <span class="meta om-desk-only">или перетащите сюда</span>
+                <button type="submit" class="k-btn k-btn--plain k-btn--sm" form="up-{{ row.item.pk }}" data-nojs>Загрузить</button>
+                <span class="meta om-up-err" data-up-err role="status"></span>
+              </div>
+            </div>
+            <div class="om-sheets" data-sheets="{{ row.item.pk }}">
+              {% for sheet in row.sheets %}{% include 'olympiads/_sheet.html' %}{% endfor %}
+            </div>
+          </div>
+          <div class="om-sol__text">
+            <label class="sr-only" for="{{ row.solution_name }}">Решение текстом</label>
+            <textarea class="answer-text k-area om-area" id="{{ row.solution_name }}" name="{{ row.solution_name }}" placeholder="Решение текстом">{{ row.solution_value }}</textarea>
+          </div>
+          {% endif %}
+          {% if not attempt.with_timer %}
+          <div class="om-sol__go"><button type="submit" class="k-btn k-btn--main" formaction="{% url 'olympiads:training_item_submit' olympiad.slug variant.pk %}" name="item_id" value="{{ row.item.pk }}" formenctype="application/x-www-form-urlencoded" data-item-submit>Сдать задание</button></div>
+          {% endif %}
         </div>
         {% endif %}
-        <label for="{{ part.name }}">Ответ{% if part.part %} на {{ part.label }}{% endif %}</label>
-        <input class="answer-short" type="text" id="{{ part.name }}"
-               name="{{ part.name }}" value="{{ part.value }}"
-               {% if part.part %}data-part="{{ part.part.pk }}"{% endif %}
-               autocomplete="off">
-      </div>
+
+        <div class="om-pager">
+          {% if row.index > 1 %}<a class="k-btn k-btn--plain" href="?task={{ row.index|add:'-1' }}" data-go="{{ row.index|add:'-1' }}">← Задание {{ rows|prev_number:row.index }}</a>{% else %}<span></span>{% endif %}
+          {% if row.index < rows|length %}<a class="k-btn k-btn--main" href="?task={{ row.index|add:'1' }}" data-go="{{ row.index|add:'1' }}">Задание {{ rows|next_number:row.index }} →</a>{% elif not attempt.with_timer %}<button type="button" class="k-btn k-btn--plain" id="finish-btn">Завершить тур</button>{% endif %}
+        </div>
+      </section>
       {% endfor %}
-    {% endif %}
-
-    <div class="ol-field">
-      <label for="{{ row.solution_name }}">Моё решение (необязательно)</label>
-      <textarea class="answer-text" id="{{ row.solution_name }}"
-                name="{{ row.solution_name }}">{{ row.solution_value }}</textarea>
-    </div>
-  </section>
-  {% empty %}
-  <p class="ol-empty">В этом комплекте нет задач.</p>
-  {% endfor %}
-
-  <div class="ol-finish">
-    <button type="button" class="ol-btn" id="finish-btn">Завершить</button>
-    <span class="ol-mute">После завершения покажем правильные ответы и разборы.</span>
+    </form>
+    {% for row in rows %}{% if not row.locked and not row.is_test %}
+    <form method="post" id="up-{{ row.item.pk }}" action="{% url 'olympiads:training_upload' olympiad.slug variant.pk %}" enctype="multipart/form-data" hidden>{% csrf_token %}<input type="hidden" name="item_id" value="{{ row.item.pk }}"><input type="hidden" name="task" value="{{ row.index }}"></form>
+    {% endif %}{% endfor %}
   </div>
-</form>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -98,11 +118,12 @@
 window.EXAM = {
   autosaveUrl: "{% url 'olympiads:training_autosave' olympiad.slug variant.pk %}",
   timeUrl: "{% url 'olympiads:training_time' olympiad.slug variant.pk %}",
-  itemIds: [{% for row in rows %}{{ row.item.pk }}{% if not forloop.last %},{% endif %}{% endfor %}],
+  itemIds: [{% for row in rows %}{% if not row.locked %}{{ row.item.pk }}{% if not forloop.last %},{% endif %}{% endif %}{% endfor %}],
   totalItems: {{ rows|length }}
 };
 </script>
 <script src="{% static 'platform/exam_timer.js' %}"></script>
 <script src="{% static 'platform/work_form.js' %}"></script>
 <script src="{% static 'platform/exam.js' %}"></script>
+{% include 'olympiads/_take_js.html' %}
 {% endblock %}

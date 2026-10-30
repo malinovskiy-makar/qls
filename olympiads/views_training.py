@@ -15,12 +15,17 @@
 import json
 import logging
 
+from django.conf import settings
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from problems.assignment_rows import item_max_score
+
+from . import navigator
 from . import training_engine as engine
 from .models import Olympiad
 from .views import _has_placeholder, soon_page
@@ -62,7 +67,12 @@ def _base_context(olympiad, variant, request):
 # ---------------------------------------------------------------------------
 
 def training_intro(request, slug, pk):
-    """Что за комплект, сколько задач, сколько времени, что будет с итогом."""
+    """Вход в тур по доске Intro: два режима, список заданий, прошлый тур.
+
+    ⚠️ Обещание «проверит ИИ» — только у заданий с критериями жюри и только
+    при включённом флаге `OLYMPIAD_AI_CHECK`. Без критериев после сдачи —
+    эталонное решение, и слов про ИИ на экране нет.
+    """
     stub = soon_page(request)
     if stub is not None:
         return stub
@@ -85,13 +95,37 @@ def training_intro(request, slug, pk):
         if attempt.submitted_at is not None:
             attempt = None
 
+    info = navigator.tour_info(variant)
+    package = {i.problem_id: i for i in engine.package_items(variant)}
+    rows = []
+    for item in items:
+        pos = package.get(item.catalog_problem_id)
+        rows.append({'item': item, 'number': (pos.number if pos else '') or '',
+                     'title': item.catalog_problem.title,
+                     'points': float(item_max_score(item)),
+                     'criteria': bool(pos and pos.has_criteria)})
+    ai_on = settings.OLYMPIAD_AI_CHECK
+    with_criteria = [r for r in rows if r['criteria']]
+    siblings = []
+    for other in navigator.sibling_tours(variant):
+        done = navigator.last_result(other, user, session_key)
+        if done is not None:
+            siblings.append({'variant': other, 'attempt': done,
+                             'label': navigator.TOUR_LABELS.get(other.tour, other.tour),
+                             'spent': navigator.spent_label(done)})
     context = _base_context(olympiad, variant, request)
     context.update({
-        'items_count': len(items),
-        'max_score': engine.variant_max_score(variant),
+        'info': info,
+        'rows': rows,
         'blocked': blocked,
         'attempt': attempt,
-        'timer_possible': bool(variant.duration_minutes),
+        'timer_possible': bool(info['minutes']),
+        'mode': request.GET.get('mode', ''),
+        'ai_all': ai_on and rows and len(with_criteria) == len(rows),
+        'ai_some': ai_on and with_criteria and len(with_criteria) < len(rows),
+        'ai_numbers': ', '.join(r['number'] for r in with_criteria if r['number']),
+        'siblings': siblings,
+        'mine_last': navigator.last_result(variant, user, session_key),
     })
     return render(request, 'olympiads/training_intro.html', context)
 
@@ -135,13 +169,21 @@ def training_start(request, slug, pk):
 # ---------------------------------------------------------------------------
 
 def training_take(request, slug, pk):
-    """Сам процесс: задачи, поля ответов, таймер, автосохранение."""
+    """Решение тура: доски TakeTimed (на время) и TakeFree (без времени).
+
+    Задания — вкладками (`?task=<n>`, без JS — ссылки), ответ на открытое
+    задание — фото листов или текст. ⚠️ ДО СДАЧИ НИ РЕШЕНИЯ, НИ ОТВЕТА, НИ
+    КРИТЕРИЕВ: в режиме «Без времени» разбор и критерии показываются только
+    у задания, которое уже сдано («Сдать задание»).
+    """
     stub = soon_page(request)
     if stub is not None:
         return stub
     from problems.assignment_rows import (answer_parts, answer_input_name,
-                                          display_parts, item_answer_form,
-                                          item_max_score)
+                                          display_parts, item_answer_form)
+
+    from . import uploads
+    from .criteria import split_solution
 
     olympiad, variant = _variant_or_404(slug, pk)
     user, session_key = _who(request)
@@ -156,6 +198,11 @@ def training_take(request, slug, pk):
 
     items = engine.variant_items(variant)
     drafts = engine.drafts_map(attempt)
+    package = {i.problem_id: i for i in engine.package_items(variant)}
+    results = {r.problem_id: r for r in attempt.results.all()}
+    sheets = {}
+    for sheet in uploads.sheets(attempt):
+        sheets.setdefault(sheet.problem_id, []).append(sheet)
 
     rows = []
     answered = 0
@@ -163,6 +210,7 @@ def training_take(request, slug, pk):
         problem = item.catalog_problem
         kind, options = item_answer_form(item)
         whole = drafts.get((problem.pk, None))
+        pos = package.get(problem.pk)
         parts = []
         for part in answer_parts(item):
             key = part.pk if part is not None else None
@@ -174,35 +222,226 @@ def training_take(request, slug, pk):
                 'name': answer_input_name(item, part),
                 'value': (draft.answer_draft if draft else '') or '',
             })
-        has_answer = any(p['value'].strip() for p in parts) or bool(
-            (whole.solution_draft if whole else '').strip())
+        own_sheets = sheets.get(problem.pk, [])
+        has_answer = (any(p['value'].strip() for p in parts) or bool(
+            (whole.solution_draft if whole else '').strip()) or bool(own_sheets))
         answered += int(has_answer)
+        # В режиме «Без времени» сданное задание закрыто для правки.
+        locked = (not attempt.with_timer) and problem.pk in results
+        solution, criteria = ('', '')
+        if locked:
+            solution, criteria = split_solution(problem.solution)
+        result = results.get(problem.pk) if locked else None
         rows.append({
-            'number': number,
+            'index': number,
+            'number': (pos.number if pos else '') or str(number),
             'item': item,
             'problem': problem,
             'kind': kind,
+            'is_test': kind in ('radio', 'checkbox'),
             'options': options,
             'chosen': [v.strip() for v in
                        ((parts[0]['value'] if parts else '') or '').split(',')],
             'parts': parts,
             'display_parts': display_parts(item),
-            'has_parts': len(parts) > 1 or (parts and parts[0]['part']
-                                            is not None),
             'solution_name': 'solution_item_%d' % item.pk,
             'solution_value': (whole.solution_draft if whole else '') or '',
             'points': float(item_max_score(item)),
             'answered': has_answer,
+            'sheets': own_sheets,
+            'sheets_left': uploads.MAX_SHEETS - len(own_sheets),
+            'locked': locked,
+            'result': result,
+            'reference': solution,
+            'criteria': criteria,
+            'has_criteria': bool(pos and pos.has_criteria),
+            # Поля краткого ответа — только у задания с эталоном ответа
+            # (машина его проверит); у остальных, как на макете, только
+            # «Решение»: фото или текст.
+            'has_answer': (pos.has_answer if pos else bool(
+                (problem.answer or '').strip()
+                or any((p['part'].answer or '').strip()
+                       for p in parts if p['part'] is not None))),
         })
 
+    try:
+        current = int(request.GET.get('task') or 1)
+    except ValueError:
+        current = 1
+    current = min(max(current, 1), len(rows) or 1)
+    # В сумму «17 из 24 за два задания» — только проверенные: «ждёт проверки» не ноль.
+    done_rows = [r for r in rows if r['result'] is not None
+                 and not r['result'].is_pending]
     context = _base_context(olympiad, variant, request)
     context.update({
         'attempt': attempt,
         'rows': rows,
+        'current': current,
         'answered_count': answered,
         'seconds_left': engine.seconds_remaining(attempt, now),
+        'info': navigator.tour_info(variant),
+        'free_score': sum(float(r['result'].score or 0) for r in done_rows),
+        'free_max': sum(float(r['result'].max_score) for r in done_rows),
+        'free_done': len(done_rows),
+        'max_sheets': uploads.MAX_SHEETS,
     })
     return render(request, 'olympiads/training_take.html', context)
+
+
+@require_POST
+def training_item_submit(request, slug, pk):
+    """«Сдать задание» в режиме «Без времени»: проверить одно задание.
+
+    Последние значения полей приходят вместе с нажатием (как у сдачи тура).
+    Сданное задание больше не правится; когда сданы все — тур сдан.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from problems.assignment_rows import answer_parts, part_key
+    from problems.models import AssignmentItem
+    from problems.part_grading import read_part_answers
+
+    _, variant = _variant_or_404(slug, pk)
+    user, session_key = _who(request)
+    attempt = engine.current_attempt(variant, user, session_key)
+    if attempt is None or attempt.with_timer:
+        return redirect('olympiads:training_intro', slug=slug, pk=pk)
+    assignment = engine.training_assignment(variant)
+    item = get_object_or_404(AssignmentItem, pk=request.POST.get('item_id'),
+                             assignment=assignment)
+    problem = item.catalog_problem
+    if problem.pk not in engine.graded_problem_ids(attempt):
+        solution = request.POST.get('solution_item_%d' % item.pk)
+        if solution:
+            engine.save_draft(attempt, problem, None, solution)
+        values = read_part_answers(request, item)
+        for part in answer_parts(item):
+            if values.get(part_key(part)):
+                engine.save_draft(attempt, problem, values[part_key(part)], None,
+                                  part=part)
+        engine.grade_item(attempt, item)
+    items = engine.variant_items(variant)
+    if len(engine.graded_problem_ids(attempt)) >= len(items):
+        engine.submit_attempt(attempt)
+        return redirect('olympiads:training_result', slug=slug, pk=pk)
+    index = next((n for n, i in enumerate(items, start=1) if i.pk == item.pk), 1)
+    return redirect('{}?task={}'.format(
+        reverse('olympiads:training_take', args=[slug, pk]), index))
+
+
+@require_POST
+def training_upload(request, slug, pk):
+    """Лист решения «с компьютера»: один или несколько файлов к заданию.
+
+    Отвечает JSON (`fetch` страницы) или перенаправлением обратно (без JS).
+    Загружать можно, пока попытка открыта и задание не сдано.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from problems.models import AssignmentItem
+
+    from . import uploads
+
+    _, variant = _variant_or_404(slug, pk)
+    user, session_key = _who(request)
+    attempt = engine.current_attempt(variant, user, session_key)
+    wants_json = request.headers.get('x-requested-with') == 'fetch'
+
+    def answer(error='', status=400, sheets=()):
+        if wants_json:
+            return JsonResponse({'error': error, 'sheets': [
+                {'id': s.pk, 'page': s.page,
+                 'url': reverse('olympiads:training_sheet', args=[slug, pk, s.pk]),
+                 'pdf': s.mime == 'application/pdf'} for s in sheets]},
+                status=status if error else 200)
+        if error:
+            messages.warning(request, error)
+        return redirect('{}?task={}'.format(
+            reverse('olympiads:training_take', args=[slug, pk]),
+            request.POST.get('task') or 1))
+
+    if attempt is None or not engine.can_accept(attempt, timezone.now()):
+        return answer('Попытка закрыта — листы больше не принимаются.', 409)
+    assignment = engine.training_assignment(variant)
+    item = AssignmentItem.objects.filter(pk=request.POST.get('item_id'),
+                                         assignment=assignment).first()
+    if item is None:
+        return answer('Задание не найдено.', 404)
+    if not attempt.with_timer and \
+            item.catalog_problem_id in engine.graded_problem_ids(attempt):
+        return answer('Задание уже сдано.', 409)
+    files = request.FILES.getlist('file')
+    if not files:
+        return answer(uploads.WRONG_TYPE)
+    saved = []
+    for uploaded in files:
+        try:
+            saved.append(uploads.save_sheet(attempt, item.catalog_problem,
+                                            uploaded, source='computer'))
+        except uploads.UploadError as error:
+            return answer(str(error), 400, saved)
+    return answer(sheets=saved)
+
+
+def _own_attempt_sheet(request, slug, pk, sheet_id):
+    """Лист СВОЕЙ попытки (пользователь или гостевая сессия) — иначе 404."""
+    from .models import TrainingUpload
+
+    _, variant = _variant_or_404(slug, pk)
+    user, session_key = _who(request)
+    sheet = get_object_or_404(TrainingUpload.objects.select_related('attempt'),
+                              pk=sheet_id, attempt__variant=variant)
+    owner = sheet.attempt
+    mine = (owner.user_id == user.pk) if user is not None else (
+        owner.user_id is None and owner.session_key == session_key)
+    if not mine:
+        raise Http404
+    return sheet
+
+
+def training_sheet(request, slug, pk, sheet_id):
+    """Файл листа — только хозяину попытки. Наружу (в общий media) не отдаётся.
+
+    ⚠️ Пятая файловая вьюха платформы (к четырём из ADR 0118): лист решения —
+    работа ученика, прямой ссылки на файл в хранилище страница не даёт.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    sheet = _own_attempt_sheet(request, slug, pk, sheet_id)
+    response = FileResponse(sheet.file.open('rb'), content_type=sheet.mime or
+                            'application/octet-stream')
+    response['Cache-Control'] = 'private, max-age=3600'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@require_POST
+def training_sheet_delete(request, slug, pk, sheet_id):
+    """Убрать лист, пока задание не сдано. Номера оставшихся листов сдвигаются."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    sheet = _own_attempt_sheet(request, slug, pk, sheet_id)
+    attempt = sheet.attempt
+    task = request.POST.get('task') or 1
+    if (attempt.submitted_at is None and
+            (attempt.with_timer or sheet.problem_id not in
+             engine.graded_problem_ids(attempt))):
+        problem_id = sheet.problem_id
+        sheet.file.delete(save=False)
+        sheet.delete()
+        for page, rest in enumerate(attempt.uploads.filter(problem_id=problem_id)
+                                    .order_by('page', 'id'), start=1):
+            if rest.page != page:
+                rest.page = page
+                rest.save(update_fields=['page'])
+    if request.headers.get('x-requested-with') == 'fetch':
+        return JsonResponse({'ok': True})
+    return redirect('{}?task={}'.format(
+        reverse('olympiads:training_take', args=[slug, pk]), task))
 
 
 def training_time(request, slug, pk):
@@ -264,6 +503,12 @@ def training_autosave(request, slug, pk):
             pk=raw_part, problem_id=item.catalog_problem_id).first()
         if part is None:
             return JsonResponse({'error': 'Неизвестный пункт'}, status=400)
+
+    if not attempt.with_timer and \
+            item.catalog_problem_id in engine.graded_problem_ids(attempt):
+        # Сданное задание закрыто: черновик после проверки не меняется.
+        return JsonResponse({'error': 'Задание уже сдано', 'locked': True,
+                             'seconds_remaining': None}, status=409)
 
     try:
         left = engine.save_draft(
