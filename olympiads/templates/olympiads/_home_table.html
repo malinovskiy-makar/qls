@@ -10,7 +10,7 @@
         <td>{% if row.level_chip %}<span class="k-chip-kind">{{ row.level_chip }}</span>{% else %}<span class="mute">—</span>{% endif %}</td>
         <td class="num">{% if row.olympiad.grade_min and row.olympiad.grade_max %}{{ row.olympiad.grade_min }}–{{ row.olympiad.grade_max }}{% else %}<span class="mute">—</span>{% endif %}</td>
         <td class="num">{% if row.has_tasks %}{{ row.seasons_label }} · {{ row.problems|nbsp_int }}{% else %}<span class="mute om-small">заданий пока нет</span>{% endif %}</td>
-        <td>{% if row.nearest %}<span class="om-block om-near">{{ row.nearest_what }}</span><span class="meta om-ell om-block">{{ row.nearest.display_date }}</span>{% else %}<span class="mute">—</span>{% endif %}</td>
+        <td>{% if row.nearest %}<span class="om-block om-near">{{ row.nearest_what }}</span><span class="meta om-ell om-block">{{ row.nearest_when }}</span>{% else %}<span class="mute">—</span>{% endif %}</td>
         <td>{% include 'olympiads/_star.html' %}</td>
       </tr>
     {% endfor %}
@@ -20,7 +20,7 @@
 <div class="k-card om-phone">
   {% for row in rows %}
   <div class="ph-ol">
-    <a class="om-phl" href="{% url 'olympiads:detail' row.olympiad.slug %}"><span class="ol-logo--empty om-hlogo om-hlogo--ph" aria-hidden="true">{{ row.logo_text }}</span><span class="om-min0"><b class="om-ell">{{ row.olympiad.name_short }}</b><span class="meta om-block">{% if row.level_chip %}{{ row.level_chip }}{% endif %}{% if row.level_chip and row.olympiad.grade_min %} · {% endif %}{% if row.olympiad.grade_min and row.olympiad.grade_max %}{{ row.olympiad.grade_min }}–{{ row.olympiad.grade_max }}{% endif %}</span>{% if row.has_tasks %}<span class="meta om-block">{{ row.seasons_label }} · {{ row.problems_label }}</span>{% else %}<span class="meta mute om-block">заданий пока нет</span>{% endif %}{% if row.nearest %}<span class="meta om-block om-ell">{{ row.nearest.display_date }}</span>{% endif %}</span></a>
+    <a class="om-phl" href="{% url 'olympiads:detail' row.olympiad.slug %}"><span class="ol-logo--empty om-hlogo om-hlogo--ph" aria-hidden="true">{{ row.logo_text }}</span><span class="om-min0"><b class="om-ell">{{ row.olympiad.name_short }}</b><span class="meta om-block">{% if row.level_chip %}{{ row.level_chip }}{% endif %}{% if row.level_chip and row.olympiad.grade_min %} · {% endif %}{% if row.olympiad.grade_min and row.olympiad.grade_max %}{{ row.olympiad.grade_min }}–{{ row.olympiad.grade_max }}{% endif %}</span>{% if row.has_tasks %}<span class="meta om-block">{{ row.seasons_label }} · {{ row.problems_label }}</span>{% else %}<span class="meta mute om-block">заданий пока нет</span>{% endif %}{% if row.nearest %}<span class="meta om-block om-ell">{{ row.nearest_when }}</span>{% endif %}</span></a>
     {% include 'olympiads/_star.html' %}
   </div>
   {% endfor %}

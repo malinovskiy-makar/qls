@@ -573,7 +573,12 @@ def home_rows(user=None, today=None):
             plural(count, 'задача', 'задачи', 'задач'))
         nearest = row['nearest']
         row['nearest_what'] = ''
+        row['nearest_when'] = ''
         if nearest is not None:
+            # Когда: подтверждённая дата, иначе месяц-ориентир, иначе ориентир (У8).
+            row['nearest_when'] = (nearest.display_date if nearest.is_confirmed
+                                   else months_phrase(nearest.approx_text, prepositional=True)
+                                   or nearest.approx_text)
             row['nearest_what'] = (stage_short(nearest.stage).lower()
                                    if nearest.stage else
                                    nearest.chip_label.lower())
@@ -596,10 +601,24 @@ def feed_order(events, today=None):
     dated = sorted((e for e in events if e.is_confirmed and e.date_start
                     and (e.date_end or e.date_start) >= today),
                    key=lambda e: (e.date_start, e.pk))
+    # Без даты — в порядке этапов (школьный → муниципальный → региональный →
+    # заключительный; день 30.10, У8), регистрация — перед этапами, результаты —
+    # после. Раньше сортировка шла по тексту ориентира, и региональный этап
+    # ВсОШ вставал первым.
     undated = sorted((e for e in events if not e.is_confirmed),
-                     key=lambda e: (_STATUS_ORDER.get(e.date_status, 3),
-                                    e.approx_text, e.pk))
+                     key=lambda e: (_undated_rank(e), _STATUS_ORDER.get(e.date_status, 3),
+                                    -e.olympiad.manual_rank if e.olympiad_id else 0, e.pk))
     return dated + undated
+
+
+def _undated_rank(event):
+    if event.kind == OlympiadEvent.Kind.REGISTRATION_OPEN:
+        return 0
+    if event.kind == OlympiadEvent.Kind.REGISTRATION_CLOSE:
+        return 1
+    if event.kind == OlympiadEvent.Kind.STAGE and event.stage is not None:
+        return 10 + event.stage.order
+    return 100
 
 
 def upcoming(today=None):
@@ -937,12 +956,13 @@ def event_title(event):
 
 
 def event_date_label(event):
-    """Короткая дата слева в ленте: «24 сентября» или «—» без даты."""
+    """Короткая дата слева в ленте: «24 сентября»; без даты — месяц-ориентир
+    («обычно в марте–апреле», день 30.10, У8) или «—», если месяца нет."""
     from .models import MONTHS_GENITIVE
     if event.is_confirmed and event.date_start:
         day = event.date_start
         return '{} {}'.format(day.day, MONTHS_GENITIVE[day.month - 1])
-    return '—'
+    return months_phrase(event.approx_text, prepositional=True) or '—'
 
 
 STATUS_SHORT = {OlympiadEvent.DateStatus.CONFIRMED: ('confirmed', 'объявлено'),
@@ -1027,6 +1047,41 @@ def months_in_text(text, year):
     return _month_date(year, first), _month_date(year, last, last=True)
 
 
+MONTH_NOMINATIVE = ('январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
+                    'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь')
+MONTH_PREPOSITIONAL = ('январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле',
+                       'августе', 'сентябре', 'октябре', 'ноябре', 'декабре')
+
+
+def months_phrase(text, prepositional=False):
+    """Месяц-ориентир словами из текста ориентира (день 30.10, У8).
+
+    «…обычно в марте–апреле…» → «обычно март–апрель» (подпись календаря) или
+    «обычно в марте–апреле» (лента главной); «19 ноября» → «около 19 ноября».
+    Месяца в тексте нет — пусто: числа не выдумываем.
+    """
+    import re
+    from .models import MONTHS_GENITIVE
+    low = (text or '').lower()
+    point = re.search(r'(\d{1,2})\s+(' + '|'.join(_MONTH_STEMS) + r')', low)
+    if point:
+        month = next(i for i, st in enumerate(_MONTH_STEMS, 1) if re.match(st, point.group(2)))
+        return 'около {} {}'.format(int(point.group(1)), MONTHS_GENITIVE[month - 1])
+    found = []
+    for match in re.finditer('|'.join(_MONTH_STEMS), low):
+        month = next(i for i, st in enumerate(_MONTH_STEMS, 1) if re.match(st, match.group(0)))
+        if month not in found:
+            found.append(month)
+    if not found:
+        return ''
+    season = [m for m in CAL_MONTHS if m in found] or found
+    first, last = season[0], season[-1]
+    names = MONTH_PREPOSITIONAL if prepositional else MONTH_NOMINATIVE
+    words = names[first - 1] if first == last else '{}–{}'.format(names[first - 1],
+                                                               names[last - 1])
+    return ('обычно в ' if prepositional else 'обычно ') + words
+
+
 def _pct(day, lo, hi):
     return round(100 * (day - lo).days / (hi - lo).days, 2)
 
@@ -1102,7 +1157,9 @@ def calendar_season(year=None, today=None, user=None, only_mine=False):
                 start, end = span
                 kind = ('est' if event.date_status ==
                         OlympiadEvent.DateStatus.APPROX_LAST_YEAR else 'rule')
-                sub = event.approx_text
+                # Подпись короткая и без повтора названия этапа (У8):
+                # «Заключительный · обычно март–апрель».
+                sub = months_phrase(event.approx_text) or event.approx_text
                 events_in = [event]
             if end < lo or start >= hi:
                 undated.append({'event': event, 'word': _event_word(event),
@@ -1114,12 +1171,15 @@ def calendar_season(year=None, today=None, user=None, only_mine=False):
             bars.append({'events': events_in, 'kind': kind,
                          # Подпись не шире места до правого края дорожки.
                          'label_room': round(100 - left, 2),
+                         # У8: у правого края места мало — подпись прижата
+                         # вправо и растёт влево, а не режется многоточием.
+                         'label_right': 100 - left < 35,
                          'past': (event.date_end or end) < today and kind == 'ok',
                          'left': left, 'width': width,
                          'point': start == end,
                          'word': 'Регистрация' if len(events_in) == 2
                          else _event_word(event),
-                         'sub': sub})
+                         'sub': sub, 'inline': kind != 'ok'})
         lanes.append({
             'olympiad': olympiad,
             'sub': ('{} {}'.format(len(olympiad.stages.all()),

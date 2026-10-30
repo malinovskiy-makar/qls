@@ -638,3 +638,11 @@ main.page-wrap:has(.om-with-chat) { max-width: 1240px; }
 
 /* У7: кнопка «только без JS» прячется атрибутом hidden — класс .k-btn его не перебивает. */
 [data-nojs][hidden] { display: none !important; }
+
+/* У8: подпись неподтверждённого события календаря — одной строкой «Заключительный · обычно март–апрель»;
+   события без месяца — под названием олимпиады в левой колонке, а не через линию «сегодня». */
+.om .om-bl .om-bl__one { display: inline; font-weight: 600; color: var(--text); }
+.om .om-cal__name .om-cal__undated { font-size: 11.5px; font-weight: 500; color: var(--text3); margin-top: 4px; line-height: 1.35; }
+.om .om-bl.om-bl--right { text-align: right; }
+/* У8: месяц-ориентир в колонке даты ленты переносится, а не вылезает. */
+.om .om-frow .om-date { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }

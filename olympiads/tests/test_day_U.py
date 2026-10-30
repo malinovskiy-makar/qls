@@ -388,3 +388,54 @@ class LayoutTests(TestCase):
         css = open('olympiads/templates/olympiads/_screens_styles.html', encoding='utf-8').read()
         self.assertIn('.om .om-dispute { position: sticky; top: 64px;', css)
         self.assertIn('.om .om-task__s ul', css)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True)
+class UndatedOrderTests(TestCase):
+    """У8: события без даты — в порядке этапов; месяц-ориентир словами; короткие
+    подписи календаря; «без даты» — в левой колонке, а не через линию «сегодня»."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from datetime import date
+        from olympiads.models import OlympiadEvent as E, OlympiadStage
+        cls.today = date(2026, 10, 30)
+        cls.olymp = fx.olympiad('vs')
+        stages = {code: OlympiadStage.objects.create(olympiad=cls.olymp, code=code, name=name,
+                                                     order=order)
+                  for code, name, order in (('school', 'Школьный этап', 1),
+                                            ('municipal', 'Муниципальный этап', 2),
+                                            ('regional', 'Региональный этап', 3),
+                                            ('final', 'Заключительный этап', 4))}
+        texts = {'regional': 'график регионального этапа издаёт Минпросвещения',
+                 'municipal': 'даты муниципального этапа устанавливает каждый субъект',
+                 'school': 'даты школьного этапа устанавливает каждый субъект своим приказом',
+                 'final': 'заключительный этап обычно в марте–апреле; график не издан'}
+        for code in ('regional', 'final', 'municipal', 'school'):
+            E.objects.create(olympiad=cls.olymp, stage=stages[code], academic_year='2026/27',
+                             kind=E.Kind.STAGE, approx_text=texts[code],
+                             date_status=E.DateStatus.AWAITING)
+
+    def test_feed_and_nearest_follow_stage_order(self):
+        from olympiads import navigator as nav
+        feed = nav.upcoming(self.today)
+        self.assertEqual([e.stage.code for e in feed], ['school', 'municipal', 'regional', 'final'])
+        row = next(r for r in nav.home_rows(today=self.today) if r['olympiad'] == self.olymp)
+        self.assertEqual(row['nearest_what'], 'школьный')
+
+    def test_month_hint_instead_of_dash(self):
+        from olympiads import navigator as nav
+        labels = {e.stage.code: nav.event_date_label(e) for e in nav.upcoming(self.today)}
+        self.assertEqual(labels['final'], 'обычно в марте–апреле')
+        self.assertEqual(labels['school'], '—')
+
+    def test_calendar_labels_are_short_and_undated_sits_in_left_column(self):
+        from olympiads import navigator as nav
+        season = nav.calendar_season('2026/27', today=self.today)
+        lane = season['lanes'][0]
+        self.assertEqual([(b['word'], b['sub']) for b in lane['bars']],
+                         [('Заключительный', 'обычно март–апрель')])
+        html = self.client.get(reverse('olympiads:calendar') + '?season=2026/27').content.decode()
+        self.assertIn('om-cal__undated', html)
+        self.assertNotIn('class="om-undated meta">без даты', html)
+        self.assertNotIn('заключительный этап обычно', html)

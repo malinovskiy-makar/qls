@@ -65,6 +65,22 @@ const PROBE = (phone) => {
     if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5)
       out.overlap.push({ a: name(labels[i]), b: name(labels[j]) });
   }
+  // День 30.10, У8: подпись полосы календаря не режется многоточием, а текст
+  // «без даты» не пересекает линию «сегодня».
+  for (const el of document.querySelectorAll('.om-bl, .om-bl span')) {
+    if (hidden(el)) continue;
+    if (el.scrollWidth > el.clientWidth + 1) out.overflow.push({ el: name(el), sw: el.scrollWidth, cw: el.clientWidth, kind: 'многоточие' });
+  }
+  const todays = [...document.querySelectorAll('.om-today')].filter(el => !hidden(el));
+  for (const u of document.querySelectorAll('.om-undated, .om-cal__undated')) {
+    if (hidden(u)) continue;
+    const a = u.getBoundingClientRect();
+    for (const t of todays) {
+      const b = t.getBoundingClientRect();
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+        out.overlap.push({ a: name(u), b: 'линия «сегодня»' });
+    }
+  }
   return out;
 };
 

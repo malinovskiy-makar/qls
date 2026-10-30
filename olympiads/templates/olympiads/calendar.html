@@ -47,13 +47,13 @@
         <div></div>
         <div class="om-cal__months">{% for m in season.months %}<span>{{ m }}</span>{% endfor %}</div>
         {% for lane in season.lanes %}
-        <div class="om-cal__name"><a href="{% url 'olympiads:detail' lane.olympiad.slug %}">{{ lane.olympiad.name_short }}</a>{% if lane.sub %}<span>{{ lane.sub }}</span>{% endif %}</div>
+        <div class="om-cal__name"><a href="{% url 'olympiads:detail' lane.olympiad.slug %}">{{ lane.olympiad.name_short }}</a>{% if lane.sub %}<span>{{ lane.sub }}</span>{% endif %}{% if lane.undated %}<span class="om-cal__undated">без даты: {% for u in lane.undated %}{{ u.word|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}</div>
         <div class="om-lane" data-lane>
           {% for bar in lane.bars %}
-          <span class="om-bar om-bar--{{ bar.kind }}{% if bar.past %} om-bar--past{% endif %}" style="left: {{ bar.left|stringformat:'s' }}%; {% if bar.point %}width: 12px;{% else %}width: {{ bar.width|stringformat:'s' }}%;{% endif %}" data-bar></span><span class="om-bl{% if bar.past %} om-bl--past{% endif %}" style="left: {{ bar.left|stringformat:'s' }}%; max-width: min(240px, calc({{ bar.label_room|stringformat:'s' }}% - 6px));">{{ bar.word }}<span>{{ bar.sub }}</span></span>
+          <span class="om-bar om-bar--{{ bar.kind }}{% if bar.past %} om-bar--past{% endif %}" style="left: {{ bar.left|stringformat:'s' }}%; {% if bar.point %}width: 12px;{% else %}width: {{ bar.width|stringformat:'s' }}%;{% endif %}" data-bar></span><span class="om-bl{% if bar.past %} om-bl--past{% endif %}{% if bar.label_right %} om-bl--right{% endif %}" style="{% if bar.label_right %}right: 0; max-width: 100%;{% else %}left: {{ bar.left|stringformat:'s' }}%; max-width: min(240px, calc({{ bar.label_room|stringformat:'s' }}% - 6px));{% endif %}">{% if bar.inline %}<span class="om-bl__one">{{ bar.word }} · {{ bar.sub }}</span>{% else %}{{ bar.word }}<span>{{ bar.sub }}</span>{% endif %}</span>
           {% endfor %}
           {% if season.today_pct is not None %}<i class="om-today" style="left: {{ season.today_pct|stringformat:'s' }}%;" data-today></i>{% endif %}
-          {% if lane.undated %}<span class="om-undated meta">без даты: {% for u in lane.undated %}{{ u.word|lower }}{% if not forloop.last %}, {% endif %}{% endfor %} — {{ lane.undated.0.status }}</span>{% elif not lane.bars %}<span class="om-undated meta">пока без дат</span>{% endif %}
+          {% if not lane.bars and not lane.undated %}<span class="om-undated meta">пока без дат</span>{% endif %}
         </div>
         {% endfor %}
         <div></div>
