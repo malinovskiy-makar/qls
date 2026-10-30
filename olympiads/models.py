@@ -1114,6 +1114,34 @@ class OlympiadVariantItem(models.Model):
         return self.ref_key
 
 
+class OlympiadFollow(models.Model):
+    """«Мои олимпиады»: человек отметил олимпиаду звёздочкой (ночь 30.10, Э1).
+
+    Только для вошедших: гостю звёздочка ведёт на вход, в базу он не пишет.
+    Пара «человек + олимпиада» уникальна — повторное нажатие ничего не плодит.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='olympiad_follows', verbose_name='Пользователь')
+    olympiad = models.ForeignKey(
+        Olympiad, on_delete=models.CASCADE, related_name='follows',
+        verbose_name='Олимпиада')
+    created_at = models.DateTimeField('Добавлена', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Моя олимпиада'
+        verbose_name_plural = 'Мои олимпиады'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'olympiad'],
+                                    name='olymp_follow_uniq'),
+        ]
+
+    def __str__(self):
+        return '{} → {}'.format(self.user, self.olympiad)
+
+
 class RegionalCoordinator(models.Model):
     """Региональный организатор ВсОШ.
 

@@ -30,5 +30,6 @@ urlpatterns = [
          views_training.training_finish, name='training_finish'),
     path('<slug:slug>/variant/<int:pk>/result/',
          views_training.training_result, name='training_result'),
+    path('<slug:slug>/follow/', views.follow, name='follow'),
     path('<slug:slug>/', views.olympiad_detail, name='detail'),
 ]

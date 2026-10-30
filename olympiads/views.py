@@ -4,12 +4,17 @@
 четыре функции только читают.
 """
 from django.conf import settings
+from django.contrib.auth.views import redirect_to_login
 from django.db.models import F
-from django.shortcuts import get_object_or_404, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
-from . import services, training_engine
-from .models import (TAG_LABELS, Olympiad, RegionalCoordinator,
-                     current_academic_year)
+from . import navigator, services, training_engine
+from .models import (TAG_LABELS, Olympiad, OlympiadFollow,
+                     RegionalCoordinator, current_academic_year)
 
 
 def soon_page(request):
@@ -129,6 +134,38 @@ def olympiad_detail(request, slug):
         # демонстрационным у совершенно настоящей олимпиады.
         'has_placeholder_variants': _has_placeholder(variants),
     })
+
+
+@require_POST
+def follow(request, slug):
+    """«В мои олимпиады» / «Убрать» — POST с CSRF, только для вошедших.
+
+    ⚠️ Гость в базу не пишет НИЧЕГО: его отправляем на вход с возвратом на
+    страницу олимпиады. Звёздочка гостя — ссылка на вход, а не форма; сюда
+    гость попадает, только если прислал POST руками.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    olympiad = get_object_or_404(navigator.visible_olympiads(), slug=slug)
+    back = request.POST.get('next') or reverse('olympiads:detail',
+                                               args=[olympiad.slug])
+    if not url_has_allowed_host_and_scheme(back, {request.get_host()},
+                                           request.is_secure()):
+        back = reverse('olympiads:detail', args=[olympiad.slug])
+    if not request.user.is_authenticated:
+        return redirect_to_login(back)
+    if request.POST.get('action') == 'remove':
+        OlympiadFollow.objects.filter(user=request.user,
+                                      olympiad=olympiad).delete()
+    else:
+        OlympiadFollow.objects.get_or_create(user=request.user,
+                                             olympiad=olympiad)
+    followed = OlympiadFollow.objects.filter(user=request.user,
+                                             olympiad=olympiad).exists()
+    if request.headers.get('x-requested-with') == 'fetch':
+        return JsonResponse({'followed': followed})
+    return redirect(back)
 
 
 def calendar(request):
