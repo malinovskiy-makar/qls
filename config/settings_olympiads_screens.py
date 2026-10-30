@@ -14,7 +14,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db_screens.sqlite3',  # noqa: F405
-        'OPTIONS': {'timeout': 20},
+        # ⚠️ IMMEDIATE: автосохранение (по уходу фокуса) и «Сдать задание»
+        # пишут одновременно; отложенная транзакция SQLite не может поднять
+        # блокировку и сразу падает «database is locked» (Э9, телефон). На бою
+        # PostgreSQL — это настройка только площадки ночи.
+        'OPTIONS': {'timeout': 20, 'transaction_mode': 'IMMEDIATE'},
     }
 }
 

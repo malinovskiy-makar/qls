@@ -7,6 +7,8 @@ claude/night_olymp_20261030/mockups/olymp.css, перенесён програм
 templates/_tokens.html. Ниже переноса — правила телефона и состояний,
 которых на досках нет (доски рисуются каждая своей шириной).
 {% endcomment %}
+/* Кнопки и поля — шрифтом страницы (на досках: `.pg button { font: inherit }`). */
+.om button, .om input, .om textarea, .om select { font-family: inherit; }
 .om .page-wrap { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
 .om .ol-crumbs { font-size: 13px; color: var(--text2); margin-bottom: 14px; }
 .om .ol-crumbs a { color: var(--accent-ink); text-decoration: none; }
