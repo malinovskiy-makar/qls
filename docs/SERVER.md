@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-09-07 (сессия D1: площадка dev.weconomics.ai)
+> **Обновлён:** 2026-10-30 (вход для VPN на tg-relay)
 > **Статус:** актуален
 
 # SERVER.md — боевой сервер weconomics.site
@@ -359,6 +359,7 @@ docker compose -f deploy/docker-compose.loadtest.yml down
 | `LEGAL_CONTACT_EMAIL`, `LEGAL_DOCS_DATE` | почта для обращений по данным и дата редакции документов («15 октября 2026 г.»); **обязательны**, пусто = `manage.py check` падает с `legal.E001` и контейнер `web` не стартует |
 | `LEGAL_TG_RELAY` | хостер и страна сервера-посредника Telegram («VDSina (SERVERS TECH FZCO, ОАЭ), Нидерланды»), метка `[ПОСРЕДНИК]` документов; **обязательна**, пусто = `legal.E003` |
 | `BACKUP_S3_*` | внешнее хранилище копий, пока пусто |
+| `WEB_RELAY_IP` | публичный IPv4 машины tg-relay — входа для VPN. Django не читает; читают `prod_realip.sh` и `prod_firewall.sh` (раздел «Вход для VPN»). Пусто — входа нет |
 
 ⚠️ **`DATABASE_URL` и `REDIS_URL` живут ТОЛЬКО в `.env`.** Раньше
 `docker-compose.yml` собирал их сам из `POSTGRES_*`; оттуда убрано. Секция
@@ -950,11 +951,70 @@ sudo systemctl start weconomics-certbot.service  # запустить прямо
 
 ---
 
+## Вход для VPN (на tg-relay)
+
+**Что и зачем.** Людям с VPN, у которых адрес выхода в чёрном списке РКН, российский фильтр
+режет путь до этого сервера. Зарубежная машина tg-relay (VDSina, Нидерланды — та же, что держит
+туннель бота) принимает 443/80 и пересылает TCP сюда на **8443/8080**, не расшифровывая. Первой
+строкой соединения она шлёт **PROXY protocol** с настоящим адресом клиента. Сертификат — только
+здесь. Решение и поправка от 30.10 — Notion, «Доступность сайта с VPN…»; DNS по стране (Gcore) —
+там же, здесь не дублируется. Установка и проверки по шагам — [deploy/web_relay/README.md](../deploy/web_relay/README.md).
+
+**Что на этом сервере:**
+
+- `django.conf`: у каждого из шести server-блоков рядом с `listen 443 ssl` / `listen 80` стоят
+  `listen 8443 ssl proxy_protocol` / `listen 8080 proxy_protocol`, у двух default-блоков — тоже с
+  `default_server`. На уровне http: `real_ip_header proxy_protocol` и `port_in_redirect off`.
+  Обычные 80/443 работают как раньше;
+- **адрес tg-relay** — `WEB_RELAY_IP` в `/srv/weconomics/.env`. В репозитории его нет.
+  `deploy/web_relay/prod_realip.sh` пишет из него строку `set_real_ip_from …;` в
+  `/srv/weconomics/nginx/conf.d/web_relay_realip.conf`. Файл подхватывает
+  `include conf.d/*.conf` образа nginx; без файла nginx не падает, просто никому не верит;
+- **файрвол** — `deploy/web_relay/prod_firewall.sh`: цепочка `WEB-RELAY` в `DOCKER-USER` пускает
+  к 8080/8443 только `WEB_RELAY_IP` (через ufw нельзя: Docker его обходит, см. «Главная ловушка»
+  ниже). После перезагрузки правила ставит юнит `weconomics-web-relay-firewall.service`.
+
+**Где Django берёт адрес клиента.** Ничего не поменялось: `client_ip()` в `problems/ratelimit.py`
+читает `X-Real-IP`, а nginx кладёт туда `$remote_addr`. После realip для пришедших через вход
+это адрес ученика, а не tg-relay, поэтому лимиты входа, регистрации и выгрузки банка считают
+людей по отдельности.
+
+**Проверить:**
+
+```bash
+iptables -n -v -L WEB-RELAY                                 # RETURN от tg-relay, DROP остальным
+cat /srv/weconomics/nginx/conf.d/web_relay_realip.conf      # set_real_ip_from <адрес tg-relay>;
+cd /srv/weconomics/app/deploy && docker compose logs --since 10m nginx | grep relay-check
+```
+
+Последняя команда — после запроса через вход (`curl.exe --resolve weconomics.ai:443:<адрес tg-relay>
+"https://weconomics.ai/?relay-check=1"` с компьютера). В начале строки должен стоять адрес того,
+кто спрашивал, а не адрес tg-relay. На tg-relay: `sudo bash setup.sh` повторно — его самопроверка
+напечатает «ГОТОВО».
+
+**Откатить.** На tg-relay — `sudo bash rollback.sh`. Здесь — оставить `WEB_RELAY_IP=` пустым,
+затем `prod_realip.sh` и `systemctl restart weconomics-web-relay-firewall.service`. Сайт по
+80/443 работает как раньше.
+
+**Если адрес tg-relay попал в чёрный список** (или машина нужна отдельная):
+
+1. новая машина за рубежом → скопировать туда `deploy/web_relay/` → `sudo bash setup.sh`.
+   Туннеля бота там нет — скрипт спросит «Продолжить?», ответить `y`;
+2. здесь: новый адрес в `WEB_RELAY_IP` → `prod_realip.sh` →
+   `systemctl restart weconomics-web-relay-firewall.service`;
+3. новый адрес в Gcore вместо старого;
+4. на старой машине — `rollback.sh`, если вход там больше не нужен.
+
+---
+
 ## Что закрыто
 
 - Вход по паролю по SSH — запрещён.
 - Вход под root по SSH — запрещён.
 - `ufw`: снаружи открыты **только 22, 80, 443**, остальное закрыто.
+- `8080` и `8443` опубликованы Docker для входа для VPN, но открыты **только
+  машине tg-relay** — цепочкой `WEB-RELAY` в `DOCKER-USER`, а не ufw
+  (раздел «Вход для VPN (на tg-relay)»).
 - `fail2ban`: 5 промахов за 10 минут → бан на час, дальше по нарастающей.
 - Автоматические обновления безопасности включены.
 - Порты базы и Redis наружу не опубликованы вовсе.
