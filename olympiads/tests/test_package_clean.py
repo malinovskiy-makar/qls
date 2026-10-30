@@ -433,6 +433,13 @@ class BallsAndBrokenWordsTests(CleanMixin, TestCase):
         self.run_cmd('--apply')
         self.assertEqual(self.reload(problem).statement, points)
 
+    def test_points_beat_a_small_extra_clause_in_the_other_edition(self):
+        points = TASK.format(q=60) + ' (4 балла)'
+        plain = TASK.format(q=60) + ' Известно, что ёмкость рынка равна 77 единицам.'
+        problem, _item = self.add(plain + '\n\n' + points)
+        self.run_cmd('--apply')
+        self.assertEqual(self.reload(problem).statement, points)
+
     def test_broken_words_in_kept_edition_are_flagged(self):
         good = TASK.format(q=60)
         broken = good.replace('Объясните', 'Объяс ните').replace('максимизирует', 'максими зирует')
