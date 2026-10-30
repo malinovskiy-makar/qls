@@ -12,6 +12,8 @@ from django.test import SimpleTestCase
 
 STYLES = (Path(settings.BASE_DIR) / 'olympiads' / 'templates' /
           'olympiads' / '_styles.html')
+# Стили экранов по макетам 30.10 — то же правило (ночь 30→31.10).
+SCREENS = STYLES.with_name('_screens_styles.html')
 
 # #abc, #abcd, #aabbcc, #aabbccdd — все четыре записи цвета.
 HEX_COLOR = re.compile(
@@ -27,6 +29,10 @@ class NoHexColorsTests(SimpleTestCase):
             found, [],
             'В {} найдены свои цвета: {}. Только токены из '
             '_tokens.html.'.format(STYLES.name, found))
+
+    def test_screens_partial_has_no_hex_colors(self):
+        found = HEX_COLOR.findall(SCREENS.read_text(encoding='utf-8'))
+        self.assertEqual(found, [], 'В {} свои цвета: {}'.format(SCREENS.name, found))
 
     def test_the_check_itself_catches_a_colour(self):
         """Сторож самого сторожа: регулярка обязана ловить все четыре записи."""

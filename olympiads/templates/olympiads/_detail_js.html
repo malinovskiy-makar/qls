@@ -1,0 +1,33 @@
+{% comment %}Страница олимпиады: раскрытие клетки и «Ещё N сезонов» без перезагрузки.
+Без JS всё работает ссылками (`?open=`, `?all=1`) — здесь только улучшение.{% endcomment %}
+<script>
+(function () {
+  var root = document.querySelector('.om-detail');
+  if (!root) return;
+  // Клетка → панель под своей строкой. Одна раскрытая на таблицу.
+  root.addEventListener('click', function (event) {
+    var link = event.target.closest('[data-open]');
+    if (!link) return;
+    var key = link.getAttribute('data-open');
+    var box = link.closest('.om-desk, .om-phone');
+    if (!box) return;
+    event.preventDefault();
+    var opened = link.getAttribute('aria-expanded') === 'true';
+    box.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = true; });
+    box.querySelectorAll('[data-open]').forEach(function (a) {
+      a.classList.remove('om-cell--on'); a.setAttribute('aria-expanded', 'false');
+    });
+    if (!opened) {
+      box.querySelectorAll('[data-panel="' + key + '"]').forEach(function (p) { p.hidden = false; });
+      link.classList.add('om-cell--on'); link.setAttribute('aria-expanded', 'true');
+    }
+  });
+  // «Ещё N сезонов»: показать спрятанные строки на месте.
+  var more = root.querySelector('[data-more-btn] a');
+  if (more) more.addEventListener('click', function (event) {
+    event.preventDefault();
+    root.querySelectorAll('[data-more]').forEach(function (el) { el.hidden = false; });
+    more.parentNode.remove();
+  });
+})();
+</script>

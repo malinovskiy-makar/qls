@@ -1,0 +1,22 @@
+{% load olymp_tags %}{% comment %}
+Панель туров клетки: раскрывается под строкой сезона, уголок — на клетку.
+Числа — из навигатора (`navigator._tour_row`). Кнопки ведут на вход тура (Э5).
+Контекст: cell, row, olympiad, phone (телефонная раскладка).
+{% endcomment %}
+<div class="om-panel" id="panel-{{ cell.key }}" style="--x: calc({% if phone %}84px + (100% - 84px) / 2{% else %}90px + (100% - 90px) * {{ cell.x_num }} / {{ cell.x_den }}{% endif %} - 6px);">
+  <div class="om-panel__hd"><b>{% if cell.grades_label %}{{ cell.grades_label }}{% elif cell.grades|length == 1 %}{{ cell.grades.0 }} класс{% else %}Все классы{% endif %} · {{ row.label }}</b>{% if cell.all_criteria and cell.all_solution %}<span class="meta">критерии и разборы у всех заданий</span>{% elif cell.all_solution %}<span class="meta">разборы у всех заданий</span>{% endif %}</div>
+  {% for tour in cell.tours %}
+  <div class="om-tour{% if phone %} om-tour--ph{% endif %}">
+    <span class="om-tour__t">{{ tour.label }}</span>
+    <span class="meta">{{ tour.tasks_label }}{% if tour.max_label %} · максимум {{ tour.max_label }} {% if tour.max_score == 1 %}балл{% else %}баллов{% endif %}{% endif %}</span>
+    <span class="om-tour__mine">{% if tour.state.status == 'done' %}{% include 'olympiads/_ico.html' with name='check' %} {{ tour.state.score|score }} из {{ tour.state.max|score }}{% elif tour.state.status == 'started' %}начато{% endif %}</span>
+    <span class="om-acts{% if phone %} ph-acts{% endif %}">
+      {% with pdf=tour.pdfs.0 %}{% if pdf %}<a class="k-btn k-btn--plain k-btn--sm" href="{{ pdf.href }}"{% if pdf.external %} target="_blank" rel="noopener"{% endif %}>PDF</a>{% endif %}{% endwith %}
+      {% if tour.tasks %}{# решать можно только то, что лежит в банке позициями #}
+      {% if tour.minutes %}<a class="k-btn k-btn--main k-btn--sm" href="{% url 'olympiads:training_intro' olympiad.slug tour.pk %}?mode=timed">На время</a>{% endif %}
+      <a class="k-btn k-btn--plain k-btn--sm" href="{% url 'olympiads:training_intro' olympiad.slug tour.pk %}?mode=free">Без времени</a>
+      {% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>

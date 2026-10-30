@@ -1,0 +1,14 @@
+{% load olymp_tags %}{% comment %}Строка сезона таблицы «сезон × класс» и (скрытая или раскрытая) панель каждой клетки.{% endcomment %}
+<tr>
+  <td class="om-ys">{{ row.label }}</td>
+  {% if row.empty %}
+  <td colspan="{{ grid.columns|length|default:1 }}"><span class="om-cell om-cell--none">—</span></td>
+  {% else %}
+  {% for cell in row.cells %}
+  <td{% if cell.colspan > 1 %} colspan="{{ cell.colspan }}"{% endif %}>{% if cell.empty %}<span class="om-cell om-cell--none">—</span>{% else %}<a class="om-cell{% if cell.state.status == 'done' %} om-cell--done{% elif cell.state.status == 'started' %} om-cell--part{% endif %}{% if view.cell.key == cell.key %} om-cell--on{% endif %}" href="?open={{ cell.key }}#panel-{{ cell.key }}" data-open="{{ cell.key }}" aria-expanded="{% if view.cell.key == cell.key %}true{% else %}false{% endif %}">{% if cell.state.status == 'done' %}{% include 'olympiads/_ico.html' with name='check' %}{{ cell.state.label }}{% elif cell.state.status == 'started' %}{{ cell.state.label }}{% elif grid.columns|length > 5 %}{% if cell.grades_label %}<span class="om-cell__k">{{ cell.grades.0 }}–{{ cell.grades|last }}</span>{% endif %}<span title="{{ cell.tasks_label }}">{{ cell.tasks }}</span>{% elif cell.grades_label %}<span class="om-cell__k">{{ cell.grades_label }}</span><span>{{ cell.tasks_label }}</span>{% else %}{{ cell.tasks_label }}{% endif %}</a>{% endif %}</td>
+  {% endfor %}
+  {% endif %}
+</tr>
+{% for cell in row.cells %}{% if not cell.empty %}
+<tr class="om-prow" data-panel="{{ cell.key }}"{% if view.cell.key != cell.key %} hidden{% endif %}><td colspan="{{ grid.columns|length|add:1 }}">{% include 'olympiads/_tour_panel.html' with phone=False %}</td></tr>
+{% endif %}{% endfor %}

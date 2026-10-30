@@ -161,11 +161,25 @@ def tour_minutes(variant):
 
 
 def tour_pdfs(variant):
-    """Залитые PDF комплекта: сначала условия, потом решения и критерии."""
-    files = [f for f in variant.files.all() if f.file]
-    files.sort(key=lambda f: (0 if f.kind.startswith('условия') else 1,
-                              f.order, f.pk))
-    return files
+    """PDF комплекта: сначала условия, потом решения и критерии.
+
+    ⚠️ Ссылка — на нашу копию, только если файл РЕАЛЬНО лежит в хранилище;
+    иначе на страницу источника. Строка с именем файла без самого файла (так
+    на площадке ночи: тома media нет) дала бы кнопку, ведущую в 404.
+    """
+    from django.core.files.storage import default_storage
+
+    out = []
+    for item in variant.files.all():
+        if item.file and default_storage.exists(item.file.name):
+            out.append({'href': item.file.url, 'external': False,
+                        'kind': item.kind, 'order': item.order, 'pk': item.pk})
+        elif item.url:
+            out.append({'href': item.url, 'external': True,
+                        'kind': item.kind, 'order': item.order, 'pk': item.pk})
+    out.sort(key=lambda f: (0 if f['kind'].startswith('условия') else 1,
+                            f['external'], f['order'], f['pk']))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +391,7 @@ def stage_grid(stage, variants, attempts):
         'stage': stage,
         'code': stage.code if stage is not None else '',
         'name': stage.name if stage is not None else 'Без этапа',
+        'short': stage_short(stage),
         'columns': columns,
         'rows': rows,
         'seasons': len(by_season),
@@ -430,6 +445,7 @@ def olympiad_page(olympiad, user=None, session_key='', today=None):
     seasons = {season_start(v.season) for v in variants} - {None}
     year = current_academic_year(today)
     events = [e for e in olympiad.events.all() if e.academic_year == year]
+    nearest = nearest_stage_event(events, today)
     return {
         'grids': grids,
         'facts': {
@@ -437,7 +453,8 @@ def olympiad_page(olympiad, user=None, session_key='', today=None):
             'seasons': len(seasons),
             'first_season': season_text(min(seasons)) if seasons else '',
             'stages': len(stages),
-            'nearest': nearest_stage_event(events, today),
+            'nearest': nearest,
+            'nearest_name': stage_short(nearest.stage) if nearest else '',
         },
         'variants_count': len(variants),
     }
@@ -559,3 +576,231 @@ def continue_attempt(user):
             .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
             .select_related('variant', 'variant__olympiad', 'variant__stage')
             .order_by('-started_at').first())
+
+
+# ---------------------------------------------------------------------------
+# Страница олимпиады: что раскрыто, что видно, сводка этапов (Э2)
+# ---------------------------------------------------------------------------
+
+def stage_title(stage):
+    """«Заключительный этап (два тура)» → «Заключительный этап».
+
+    Макет 30.10: «2 тура» живёт в строке этапа, а не в названии. Базу не
+    правим — приписку в скобках снимает показ.
+    """
+    if stage is None:
+        return 'Без этапа'
+    return stage.name.split(' (')[0].strip()
+
+
+def stage_short(stage):
+    """«Заключительный этап» → «Заключительный» — для плашек и вкладок."""
+    title = stage_title(stage)
+    for tail in (' этап', ' тур'):
+        if title.endswith(tail):
+            return title[:-len(tail)]
+    return title
+
+
+def _place_cells(grid):
+    """У клетки — центр по колонкам для уголка панели (`--x` в шаблоне)."""
+    total = max(len(grid['columns']), 1)
+    for row in grid['rows']:
+        start = 0
+        for cell in row['cells']:
+            cell['x_num'] = 2 * start + cell['colspan']
+            cell['x_den'] = 2 * total
+            start += cell['colspan']
+
+
+def page_view(page, stage_code='', open_key='', show_all=False, grade=None):
+    """Что показывает страница: этап, раскрытая клетка, видимые строки, класс.
+
+    Ключи приходят из адреса (`?stage=`, `?open=`, `?all=1`, `?grade=`) —
+    так раскрытие работает без JS. Чужой или устаревший ключ — просто
+    ничего не раскрыто, не ошибка.
+    """
+    grids = page['grids']
+    if not grids:
+        return {'grid': None}
+    by_code = {g['code']: g for g in grids}
+    found = find_cell(page, open_key) if open_key else None
+    if found is not None:
+        grid, cell = found
+    else:
+        grid = by_code.get(stage_code) or grids[-1]
+        cell = None
+    _place_cells(grid)
+
+    rows = grid['rows']
+    open_index = None
+    if cell is not None:
+        for index, row in enumerate(rows):
+            if cell in row['cells']:
+                open_index = index
+    show_all = show_all or (open_index is not None
+                            and open_index >= SEASONS_VISIBLE)
+    visible = rows if show_all else rows[:SEASONS_VISIBLE]
+    hidden = [] if show_all else rows[SEASONS_VISIBLE:]
+
+    columns = grid['columns']
+    if grade not in columns:
+        # Телефон: по умолчанию старший класс — как на макете (вкладка 11).
+        if cell is not None and cell['grades']:
+            grade = cell['grades'][-1]
+        else:
+            grade = columns[-1] if columns else None
+    hidden_dated = [r for r in hidden if r['start'] is not None]
+    return {
+        'grid': grid,
+        'cell': cell,
+        'rows': visible,
+        'hidden_rows': hidden,
+        'more_label': ('Ещё {} · с {}'.format(
+            seasons_label(len(hidden)), hidden_dated[-1]['label'])
+            if hidden_dated else
+            ('Ещё {}'.format(seasons_label(len(hidden))) if hidden else '')),
+        'grade': grade,
+    }
+
+
+def stages_summary(olympiad, page, today=None):
+    """Блок «Этапы»: номер, название, статус даты сезона, устройство, сезоны.
+
+    ⚠️ Строка устройства собирается ТОЛЬКО из полей этапа и комплектов:
+    сколько туров — по турам «1»/«2» основных комплектов, минуты и максимум —
+    из `OlympiadStage`. Нет данных — строки нет.
+    """
+    year = current_academic_year(today)
+    grids = {g['code']: g for g in page['grids']}
+    events = {}
+    for event in olympiad.events.all():
+        if (event.academic_year == year and event.stage_id
+                and event.kind == OlympiadEvent.Kind.STAGE):
+            events.setdefault(event.stage_id, event)
+    out = []
+    for number, stage in enumerate(olympiad.stages.all(), start=1):
+        grid = grids.get(stage.code)
+        tours = set()
+        if grid is not None:
+            # Устройство этапа — по ПОСЛЕДНЕМУ сезону: у регионального ВсОШ
+            # два тура были до 2019/20, а сейчас тур один.
+            latest = next((r for r in grid['rows'] if not r['empty']
+                           and r['start'] is not None), None)
+            if latest is not None:
+                tours = {t['tour'] for c in latest['cells'] for t in c['tours']
+                         if t['tour'] in ('1', '2')}
+        parts = []
+        many = len(tours) > 1
+        if many:
+            parts.append('{} {}'.format(len(tours), plural(len(tours), 'тур',
+                                                          'тура', 'туров')))
+        if stage.duration_minutes:
+            parts.append('{} мин{}'.format(stage.duration_minutes,
+                                           ' на тур' if many else ''))
+        if stage.max_score:
+            parts.append('максимум {} {}{}'.format(
+                stage.max_score, plural(stage.max_score, 'балл', 'балла',
+                                        'баллов'),
+                ' за тур' if many else ''))
+        if stage.has_test_part is True:
+            parts.append('есть тестовая часть')
+        elif stage.has_test_part is False:
+            parts.append('без тестовой части')
+        regional_format = (olympiad.kind == Olympiad.Kind.VSOSH
+                           and stage.code in ('sch', 'mun'))
+        out.append({
+            'number': number,
+            'stage': stage,
+            'title': stage_title(stage),
+            'event': events.get(stage.pk),
+            'meta': ' · '.join(parts),
+            'regional_format': regional_format,
+            'law_note': (olympiad.kind == Olympiad.Kind.VSOSH
+                         and stage.code == 'final'),
+            'grid': grid,
+            'last': number == len(olympiad.stages.all()),
+        })
+    return out
+
+
+def continue_cell(page):
+    """«Продолжить» на странице олимпиады: последняя начатая, но не решённая
+    клетка. Строки «1 тур — 34 из 48 · остался 2 тур» — из её туров."""
+    best = None
+    for grid in page['grids']:
+        for cell in grid['cells']:
+            if cell['state']['status'] != 'started':
+                continue
+            moments = [t['state']['attempt'].started_at for t in cell['tours']
+                       if t['state']['attempt'] is not None]
+            if moments and (best is None or max(moments) > best[0]):
+                best = (max(moments), grid, cell)
+    if best is None:
+        return None
+    _, grid, cell = best
+    done = [t for t in cell['tours'] if t['state']['status'] == 'done']
+    going = [t for t in cell['tours'] if t['state']['status'] == 'started']
+    left = [t for t in cell['tours'] if t['state']['status'] == 'none']
+    parts = ['{} — {} из {}'.format(t['label'], _fmt(t['state']['score']),
+                                     _fmt(t['state']['max'])) for t in done]
+    parts += ['идёт {}'.format(t['label']) for t in going]
+    if left:
+        parts.append('остался {}'.format(', '.join(t['label'] for t in left)))
+    target = (going or left or cell['tours'])[0]
+    row_label = next((r['label'] for r in grid['rows'] if cell in r['cells']),
+                     '')
+    return {
+        'title': '{} {} · {}'.format(stage_short(grid['stage']), row_label,
+                                     cell['grades_label'] or
+                                     grades_text(cell['grades']) or 'все классы'),
+        'sub': ' · '.join(parts),
+        'tour': target,
+        'resume': target['state']['status'] == 'started',
+    }
+
+
+def tours_done(page):
+    """Сколько туров решающий сдал на этой олимпиаде — «решено 5 туров»."""
+    return sum(1 for grid in page['grids'] for cell in grid['cells']
+               for tour in cell['tours'] if tour['state']['status'] == 'done')
+
+
+ROMAN = {1: 'I', 2: 'II', 3: 'III'}
+
+
+def admission_summary(olympiad, benefits, level=None):
+    """Плашка «Поступление» и блок «Что это даёт» — из льгот в базе.
+
+    ВсОШ — льгота по закону (`Kind.VSOSH`), у остальных — по правилам вузов
+    и уровню перечня. Нет льгот в базе — блока нет, слова в плашке нет.
+    """
+    real = [b for b in benefits if b.benefit_type != b.BenefitType.NONE]
+    none = [b for b in benefits if b.benefit_type == b.BenefitType.NONE]
+    if not real:
+        return None
+    bvi = any(b.benefit_type == b.BenefitType.BVI for b in real)
+    law = olympiad.kind == Olympiad.Kind.VSOSH
+    no_confirm = {b.confirm_label for b in real} == {'Не требуется'}
+    if law:
+        title = ('Без вступительных испытаний — в любом вузе России' if bvi
+                 else real[0].gives_label)
+        note = 'Право даёт закон об образовании' + (
+            ', подтверждать баллом ЕГЭ не нужно' if no_confirm else '')
+    else:
+        title = ('{} уровень перечня {}'.format(ROMAN[level.level],
+                                                 level.academic_year)
+                 if level is not None and level.level in ROMAN
+                 else real[0].gives_label)
+        note = 'Льготу назначает вуз' + (
+            '' if no_confirm else '; результат подтверждают баллом ЕГЭ')
+    return {
+        'short': 'БВИ' if bvi else '100 баллов',
+        'law': law,
+        'title': title,
+        'note': note,
+        'chip': 'диплом заключительного этапа' if law else '',
+        'examples': real[:4],
+        'none_names': ', '.join(b.program.university_short for b in none),
+        'year': real[0].admission_year,
+    }

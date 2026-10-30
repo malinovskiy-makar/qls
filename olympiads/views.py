@@ -78,61 +78,52 @@ def olympiad_detail(request, slug):
     stub = soon_page(request)
     if stub is not None:
         return stub
+    # ⚠️ Скрытая олимпиада и заглушка — 404: в раздел они не попадают
+    # (ночь 30.10, Э2). Числа страницы — только из навигатора.
     olympiad = get_object_or_404(
-        Olympiad.objects.prefetch_related('levels', 'events', 'stages'),
+        navigator.visible_olympiads().prefetch_related(
+            'levels', 'events', 'events__stage', 'events__source', 'stages'),
         slug=slug,
     )
-    stages = list(olympiad.stages.all())
+    user = request.user if request.user.is_authenticated else None
+    page = navigator.olympiad_page(
+        olympiad, user, request.session.session_key or '')
+    try:
+        grade = int(request.GET.get('grade') or 0)
+    except ValueError:
+        grade = None
+    view = navigator.page_view(page, request.GET.get('stage', ''),
+                               request.GET.get('open', ''),
+                               request.GET.get('all') == '1', grade)
     benefits = list(
-        olympiad.benefits.select_related('program')
+        olympiad.benefits.select_related('program', 'source')
         .order_by('-admission_year', 'program__order')
     )
-    variants = list(
-        olympiad.variants.select_related('stage')
-        .order_by('-year', 'stage__order', 'grade')
-    )
-    # Кнопки «Решать» живут только у комплектов, задачи которых есть в банке.
-    # Спрашиваем ОДНИМ запросом: заводить «задание» на каждый комплект ради
-    # проверки кнопки — значит создавать работы, которые никто не откроет.
-    linked = training_engine.linked_event_ids(variants)
-    for variant in variants:
-        variant.is_trainable = (variant.ref_event_id or '').strip() in linked
-    # Блок региональных организаторов есть только у ВсОШ: школьный и
-    # муниципальный этапы назначает субъект, и только у неё это так.
-    show_regions = olympiad.kind == Olympiad.Kind.VSOSH
-    regions = list(RegionalCoordinator.objects.all()) if show_regions else []
     score_rows, score_years = services.pass_score_rows(olympiad)
-    year = current_academic_year()
-    events = list(
-        olympiad.events.filter(academic_year=year)
-        .select_related('stage', 'source')
-        .order_by(F('stage__order').asc(nulls_first=True), 'date_start', 'kind')
-    )
+    show_regions = olympiad.kind == Olympiad.Kind.VSOSH
+    sources = {}
+    for holder in ([olympiad] + list(olympiad.stages.all())
+                   + list(olympiad.events.all()) + benefits):
+        if holder.source_id and holder.source:
+            sources[holder.source_id] = holder.source
     return render(request, 'olympiads/detail.html', {
         'olympiad': olympiad,
-        'stages': stages,
-        'events': events,
-        'academic_year': year,
-        'stats': services.problem_stats(olympiad),
-        'benefits': benefits,
+        'page': page,
+        'facts': page['facts'],
+        'view': view,
+        'stages_summary': navigator.stages_summary(olympiad, page),
+        'continue': navigator.continue_cell(page),
+        'tours_done': navigator.tours_done(page),
+        'admission': navigator.admission_summary(
+            olympiad, benefits, navigator.last_approved_level(olympiad)),
         'score_rows': score_rows,
         'score_years': score_years,
-        'variants': variants,
-        'variant_stages': stages,
-        'variant_grades': sorted({v.grade for v in variants if v.grade}),
-        # ⚠️ Год у комплекта бывает пустым (пакет 30.10): `None` с числом
-        # не сравнивается, и без фильтра падала бы вся страница олимпиады.
-        'variant_years': sorted({v.year for v in variants if v.year is not None},
-                                reverse=True),
-        'regions': regions,
-        'show_regions': show_regions,
-        # Год берётся из данных, а не зашивается в шаблон: правила приёма
-        # пересматриваются каждый год, и подпись обязана ехать за ними.
-        'benefit_year': benefits[0].admission_year if benefits else None,
-        'has_placeholder': _has_placeholder([olympiad]),
-        # Отдельно от общей плашки страницы: комплект может быть
-        # демонстрационным у совершенно настоящей олимпиады.
-        'has_placeholder_variants': _has_placeholder(variants),
+        'regions': list(RegionalCoordinator.objects.all()) if show_regions else [],
+        'sources': sorted(sources.values(), key=lambda s: (s.publisher, s.title)),
+        'level': navigator.last_approved_level(olympiad),
+        'academic_year': current_academic_year(),
+        'followed': bool(user) and OlympiadFollow.objects.filter(
+            user=user, olympiad=olympiad).exists(),
     })
 
 

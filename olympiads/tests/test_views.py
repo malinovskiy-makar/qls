@@ -37,18 +37,21 @@ class EmptyStateTests(TestCase):
         self.assertIn('Это олимпиады по экономике.', visible_text(response))
 
     def test_detail_works_with_nothing_filled(self):
-        """Ни событий, ни льгот, ни баллов, ни комплектов — все блоки пустые."""
+        """Ни событий, ни льгот, ни баллов, ни комплектов — страница работает.
+
+        ⚠️ ПРЕЖНИЙ ТЕСТ ЖДАЛ ТЕКСТОВ «…пока не собраны» в каждом блоке. Экран
+        по макету 30.10 (ночь 30→31.10, Э2) держит правило «нет данных — нет
+        блока»: пустых блоков с оговорками на нём нет. Остаётся одно честное
+        пустое состояние — «Заданий прошлых лет пока нет».
+        """
         make_olympiad('bare', is_published=True)
         response = self.client.get(
             reverse('olympiads:detail', args=['bare']))
         self.assertEqual(response.status_code, 200)
         text = visible_text(response)
-        self.assertIn('Описание готовится', text)
-        self.assertIn('Даты сезона пока не объявлены', text)
-        self.assertIn('Данных о льготах пока нет', text)
-        self.assertIn('Данные о проходных баллах пока не собраны', text)
-        self.assertIn('Задания прошлых лет пока не собраны', text)
-        self.assertIn('Задания пока не размечены', text)
+        self.assertIn('Заданий прошлых лет пока нет', text)
+        self.assertNotIn('Что это даёт Без', text)
+        self.assertNotIn('Проходной балл на заключительный этап', text)
 
     def test_calendar_works_with_zero_events(self):
         response = self.client.get(reverse('olympiads:calendar'))
@@ -139,34 +142,33 @@ class VariantButtonsTests(TestCase):
         self.olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
                                       is_published=True)
 
+    # ⚠️ ДВА ТЕСТА НИЖЕ ПЕРЕПИСАНЫ ПОД ЭКРАН ПО МАКЕТУ (ночь 30.10, Э2):
+    # список комплектов со словами «Задания ещё не привязаны» и «Время тура
+    # неизвестно» сменила сетка «сезон × класс» с панелью туров. Смысл тот
+    # же: решать зовут только то, что лежит в банке, и только при известном
+    # времени — «на время».
+
     def test_variant_without_linked_problems_offers_no_training(self):
-        """Комплект без задач в банке не зовёт решать — и говорит почему."""
-        OlympiadVariant.objects.create(
-            olympiad=self.olympiad, year=2026, grade=11,
-            duration_minutes=240)
+        """Тур без позиций в банке — в панели нет кнопок решать."""
+        from olympiads.tests import night_fixtures as fx
+        stage = fx.stage(self.olympiad)
+        variant = fx.kit(self.olympiad, stage, '2025/26', tasks=0)
         response = self.client.get(
             reverse('olympiads:detail', args=['vseros']))
-        text = visible_text(response)
-        self.assertIn('Задания ещё не привязаны', text)
-        self.assertNotIn('Решать на время', text)
+        intro = reverse('olympiads:training_intro', args=['vseros', variant.pk])
+        self.assertNotContains(response, intro)
+        self.assertIn('0 заданий', visible_text(response))
 
     def test_variant_without_duration_cannot_be_timed(self):
-        """Длительность тура неизвестна — «на время» неактивно."""
-        variant = OlympiadVariant.objects.create(
-            olympiad=self.olympiad, year=2026, grade=11,
-            duration_minutes=None, ref_event_id='ev')
-        Problem_ = __import__('problems.models', fromlist=['x'])
-        problem = Problem_.Problem.objects.create(
-            title='з', statement='у', answer='1')
-        Problem_.OlympiadRef.objects.create(
-            problem=problem, event_id='ev', source_site='solvehub',
-            olympiad_slug='vseros', number='1', record_id='r1')
+        """Длительность тура неизвестна — «На время» нет, «Без времени» есть."""
+        from olympiads.tests import night_fixtures as fx
+        stage = fx.stage(self.olympiad, minutes=None)
+        variant = fx.kit(self.olympiad, stage, '2025/26')
         response = self.client.get(
             reverse('olympiads:detail', args=['vseros']))
-        text = visible_text(response)
-        self.assertIn('Время тура неизвестно', text)
-        self.assertIn('Решать без таймера', text)
-        self.assertEqual(variant.duration_minutes, None)
+        intro = reverse('olympiads:training_intro', args=['vseros', variant.pk])
+        self.assertNotContains(response, intro + '?mode=timed')
+        self.assertContains(response, intro + '?mode=free')
 
 
 @override_settings(OLYMPIADS_PUBLIC=True)
@@ -188,14 +190,16 @@ class PlaceholderVariantTests(TestCase):
         self.olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
                                       is_published=True)
 
-    def test_placeholder_variant_says_so_on_screen(self):
+    def test_placeholder_variant_is_not_on_screen(self):
+        """⚠️ Было «комплект без чисел говорит "чисел нет"». С ночи 30.10 (Э2)
+        демонстрационный комплект в сетку не попадает вовсе
+        (`navigator.base_variants`): показывать нечего — выдумывать нельзя."""
         OlympiadVariant.objects.create(
-            olympiad=self.olympiad, year=2026, grade=11,
+            olympiad=self.olympiad, year=2026, grade=11, season='2025/26',
             problem_count=None, duration_minutes=None, max_score=None,
             is_placeholder=True)
-        text = visible_text(self.client.get(
-            reverse('olympiads:detail', args=['vseros'])))
-        self.assertIn('чисел нет', text)
+        response = self.client.get(reverse('olympiads:detail', args=['vseros']))
+        self.assertNotContains(response, 'class="om-grid')
 
     def test_template_comments_do_not_leak_to_the_page(self):
         """⚠️ `{# #}` в Django ОДНОСТРОЧНЫЙ — многострочный уезжает на экран.
