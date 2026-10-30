@@ -753,7 +753,6 @@ def training_result(request, slug, pk):
                 'max': sum(float(p['attempt'].max_score or 0) for p in parts),
                 'terms': ' + '.join(navigator._fmt(p['attempt'].score) for p in parts),
                 'count': len(parts)}
-    solutions = [f for f in info['pdfs'] if 'решени' in f['kind']]
     open_dispute = _dispute_context(request, attempt, checks)
     context.update({
         'info': info,
@@ -764,7 +763,7 @@ def training_result(request, slug, pk):
         'checks_done': len(checks) - len(waiting),
         'stats': stats,
         'both': both,
-        'solutions_pdf': solutions[0] if solutions else None,
+        'solutions_pdf': info['pdfs']['solutions'],
         'dispute': open_dispute,
         'chat_on': _chat_available(),
     })

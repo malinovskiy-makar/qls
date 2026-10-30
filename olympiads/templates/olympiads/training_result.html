@@ -72,7 +72,7 @@
   <div class="om-res-acts">
     <a class="k-btn k-btn--main" href="{% url 'olympiads:detail' olympiad.slug %}">К заданиям {{ olympiad.name_short }}</a>
     <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">{% csrf_token %}<input type="hidden" name="timer" value="0"><button type="submit" class="k-btn k-btn--plain">Решить ещё раз без времени</button></form>
-    {% if solutions_pdf %}<a class="k-btn k-btn--plain" href="{{ solutions_pdf.href }}"{% if solutions_pdf.external %} target="_blank" rel="noopener"{% endif %}>Разборы тура</a>{% endif %}
+    {% if solutions_pdf %}<a class="k-btn k-btn--plain" href="{{ solutions_pdf.href }}" target="_blank" rel="noopener">Разборы тура</a>{% endif %}
   </div>
   </div>
   {% if dispute %}{% with back=request.path dispute_number=dispute.number %}{% include 'olympiads/_dispute_panel.html' %}{% endwith %}{% endif %}

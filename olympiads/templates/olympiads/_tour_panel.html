@@ -11,7 +11,7 @@
     <span class="meta">{{ tour.tasks_label }}{% if tour.max_label %} · максимум {{ tour.max_label }} {% if tour.max_score == 1 %}балл{% else %}баллов{% endif %}{% endif %}</span>
     <span class="om-tour__mine">{% if tour.state.status == 'done' %}{% include 'olympiads/_ico.html' with name='check' %} {{ tour.state.score|score }} из {{ tour.state.max|score }}{% elif tour.state.status == 'started' %}начато{% endif %}</span>
     <span class="om-acts{% if phone %} ph-acts{% endif %}">
-      {% with pdf=tour.pdfs.0 %}{% if pdf %}<a class="k-btn k-btn--plain k-btn--sm" href="{{ pdf.href }}"{% if pdf.external %} target="_blank" rel="noopener"{% endif %}>PDF</a>{% endif %}{% endwith %}
+      {% with pdf=tour.pdfs.tasks %}{% if pdf %}<a class="k-btn k-btn--plain k-btn--sm" href="{{ pdf.href }}" target="_blank" rel="noopener">PDF</a>{% endif %}{% endwith %}
       {% if tour.tasks %}{# решать можно только то, что лежит в банке позициями #}
       {% if tour.minutes %}<a class="k-btn k-btn--main k-btn--sm" href="{% url 'olympiads:training_intro' olympiad.slug tour.pk %}?mode=timed">На время</a>{% endif %}
       <a class="k-btn k-btn--plain k-btn--sm" href="{% url 'olympiads:training_intro' olympiad.slug tour.pk %}?mode=free">Без времени</a>

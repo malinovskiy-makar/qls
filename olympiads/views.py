@@ -141,7 +141,10 @@ def olympiad_detail(request, slug):
         'score_rows': score_rows,
         'score_years': score_years,
         'regions': list(RegionalCoordinator.objects.all()) if show_regions else [],
-        'sources': sorted(sources.values(), key=lambda s: (s.publisher, s.title)),
+        # Источник-архив (`?accept=zip`) — названием без ссылки (день 30.10, У1).
+        'sources': [{'title': src.title or src.url, 'publisher': src.publisher,
+                     'url': '' if navigator.is_archive_url(src.url) else src.url}
+                    for src in sorted(sources.values(), key=lambda s: (s.publisher, s.title))],
         'level': navigator.last_approved_level(olympiad),
         'logo_text': navigator.logo_text(olympiad),
         'academic_year': current_academic_year(),

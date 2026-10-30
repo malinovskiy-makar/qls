@@ -213,7 +213,7 @@
       {% if sources %}
       <details class="om-det">
         <summary class="om-row"><span class="om-grow om-det__t">Источники</span>{% include 'olympiads/_ico.html' with name='down' %}</summary>
-        <ul class="om-det__list">{% for source in sources %}<li><a href="{{ source.url }}" target="_blank" rel="noopener">{{ source.title|default:source.url }}</a>{% if source.publisher %} <span class="meta">· {{ source.publisher }}</span>{% endif %}</li>{% endfor %}</ul>
+        <ul class="om-det__list">{% for source in sources %}<li>{% if source.url %}<a href="{{ source.url }}" target="_blank" rel="noopener">{{ source.title }}</a>{% else %}{{ source.title }} <span class="meta">(архив организатора, в браузере не открывается)</span>{% endif %}{% if source.publisher %} <span class="meta">· {{ source.publisher }}</span>{% endif %}</li>{% endfor %}</ul>
       </details>
       {% endif %}
     </div>

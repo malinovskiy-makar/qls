@@ -129,7 +129,7 @@ _OWN = Q(items__excluded=False)
 
 def _annotated(queryset):
     """Комплекты со счётчиками позиций ОДНИМ запросом (без N+1 на клетку)."""
-    return (queryset.select_related('stage')
+    return (queryset.select_related('stage', 'olympiad')
             .prefetch_related('grades', 'files')
             .annotate(
                 n_items=Count('items', filter=_OWN, distinct=True),
@@ -165,26 +165,60 @@ def tour_minutes(variant):
     return stage.duration_minutes if stage is not None else None
 
 
-def tour_pdfs(variant):
-    """PDF комплекта: сначала условия, потом решения и критерии.
+# Сайты организаторов: их копия файла — первая. Остальное (iloveeconomics.ru,
+# хранилища SolveHub) — запасные копии того же PDF.
+OFFICIAL_HOSTS = ('olimpiada.ru', 'hse.ru', 'rosolymp.ru', 'edsoo.ru')
+TASKS_KINDS = ('условия',)
+SOLUTIONS_KINDS = ('решения+критерии', 'решения')
 
-    ⚠️ Ссылка — на нашу копию, только если файл РЕАЛЬНО лежит в хранилище;
-    иначе на страницу источника. Строка с именем файла без самого файла (так
-    на площадке ночи: тома media нет) дала бы кнопку, ведущую в 404.
+
+def _official(url):
+    from urllib.parse import urlsplit
+    host = (urlsplit(url or '').hostname or '').lower()
+    return any(host == h or host.endswith('.' + h) for h in OFFICIAL_HOSTS)
+
+
+def is_archive_url(url):
+    """Ссылка отдаёт архив, а не страницу или PDF (облако `vso.edsoo.ru` с
+    `?accept=zip`, `.zip`): в браузере не открывается — на экран ссылкой не идёт."""
+    from urllib.parse import urlsplit
+    parts = urlsplit(url or '')
+    return ('accept=zip' in parts.query or parts.path.lower().endswith('.zip')
+            or (parts.hostname or '').lower() == 'vso.edsoo.ru')
+
+
+def tour_pdfs(variant):
+    """PDF тура: {'tasks': файл условий или None, 'solutions': файл разборов или None}.
+
+    ⚠️ ТОЛЬКО НАША КОПИЯ (день 30.10, У1). Ссылка ведёт на адрес раздела
+    `olympiads:variant_file`, который отдаёт файл из хранилища; внешний адрес
+    файла (`OlympiadVariantFile.url`) на экран не попадает никогда: чужое
+    облако отдавало архив (`vso.edsoo.ru …?accept=zip`), который не
+    открывается. Файла нет в хранилище или он не PDF — кнопки нет.
+
+    «Условия» — только вид «условия»: файл «условия+решения» показал бы разбор
+    до решения. «Разборы» — «решения+критерии», потом «решения». Внутри вида —
+    сначала копия с сайта организатора, потом остальные, потом порядок пакета.
     """
     from django.core.files.storage import default_storage
+    from django.urls import reverse
 
-    out = []
-    for item in variant.files.all():
-        if item.file and default_storage.exists(item.file.name):
-            out.append({'href': item.file.url, 'external': False,
-                        'kind': item.kind, 'order': item.order, 'pk': item.pk})
-        elif item.url:
-            out.append({'href': item.url, 'external': True,
-                        'kind': item.kind, 'order': item.order, 'pk': item.pk})
-    out.sort(key=lambda f: (0 if f['kind'].startswith('условия') else 1,
-                            f['external'], f['order'], f['pk']))
-    return out
+    def pick(kinds):
+        found = []
+        for f in variant.files.all():
+            if (f.kind in kinds and f.file and f.file.name.lower().endswith('.pdf')
+                    and default_storage.exists(f.file.name)):
+                found.append(f)
+        if not found:
+            return None
+        found.sort(key=lambda f: (not _official(f.url), kinds.index(f.kind),
+                                  f.order, f.pk))
+        best = found[0]
+        return {'href': reverse('olympiads:variant_file', args=[
+                    variant.olympiad.slug, variant.pk, best.pk]),
+                'kind': best.kind, 'pk': best.pk}
+
+    return {'tasks': pick(TASKS_KINDS), 'solutions': pick(SOLUTIONS_KINDS)}
 
 
 # ---------------------------------------------------------------------------

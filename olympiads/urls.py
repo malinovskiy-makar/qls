@@ -22,6 +22,8 @@ urlpatterns = [
     # ни на одном — решать комплект может любой посетитель.
     path('<slug:slug>/variant/<int:pk>/', views_training.training_intro,
          name='training_intro'),
+    path('<slug:slug>/variant/<int:pk>/file/<int:file_id>/', training_files.variant_file,
+         name='variant_file'),
     path('<slug:slug>/variant/<int:pk>/start/', views_training.training_start,
          name='training_start'),
     path('<slug:slug>/variant/<int:pk>/take/', views_training.training_take,
