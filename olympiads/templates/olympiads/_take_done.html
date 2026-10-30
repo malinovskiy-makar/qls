@@ -1,18 +1,32 @@
-{% load olymp_tags %}{% comment %}Сданное задание режима «Без времени» (доска TakeFree): что отправлено и итог.
-Проверка ИИ по критериям (Э7) — `_take_check.html`; пока её нет — разбор и критерии жюри для самопроверки.{% endcomment %}
+{% load olymp_tags %}{% comment %}Сданное задание режима «Без времени» (доски TakeFree, TakeFreePhone): что отправлено
+и итог. Есть проверка ИИ (Э7) — балл и разбор по критериям жюри по частям; нет — разбор и критерии
+жюри для самопроверки. «Оспорить оценку» — Э8.{% endcomment %}
 <div class="k-card k-card--flat om-sent">
   <div class="om-sol__hd"><h3 class="om-h2 om-grow">Решение</h3><span class="meta">{% if row.sheets %}фото · {{ row.sheets|length }} {% if row.sheets|length == 1 %}лист{% elif row.sheets|length < 5 %}листа{% else %}листов{% endif %}{% elif row.solution_value %}текстом{% endif %} · отправлено</span></div>
-  {% if row.solution_value %}<div class="om-sent__text">{{ row.solution_value|linebreaksbr }}</div>{% endif %}
+  {% if row.solution_value %}<div class="om-sent__text math-content">{{ row.solution_value|linebreaksbr }}</div>{% endif %}
   {% if row.sheets %}<div class="om-sheets">{% for sheet in row.sheets %}{% include 'olympiads/_sheet.html' %}{% endfor %}</div>{% endif %}
   {% if row.is_test %}<div class="meta">Ответ: {{ row.parts.0.value|default:"—" }}</div>{% endif %}
 </div>
-<div class="k-card om-check">
-  {% if row.result.is_pending %}
-  <div class="om-check__hd"><span class="om-big">Самопроверка</span></div>
-  {% else %}
+<div class="k-card om-check" id="check-{{ row.item.pk }}">
+  {% if row.check and row.check.status == 'done' %}
+  <div class="om-check__hd"><span class="om-big">{{ row.check.score|score }} из {{ row.check.max_score|score }}</span><span class="meta">{% if row.check.approximate %}Оценка ориентировочная: ИИ по тексту критериев жюри{% else %}Проверено ИИ по критериям жюри{% endif %}</span></div>
+  {% for group in row.check_parts %}
+  {% if group.part %}<div class="cr-part"><span class="om-grow">{{ group.part }})</span><span class="om-score{% if group.score == group.max %} om-score--full{% endif %}">{{ group.score|score }} из {{ group.max|score }}</span></div>{% endif %}
+  {% for c in group.rows %}
+  <div class="om-crit" data-crit="{{ c.code }}"><span><span class="math-content">{{ c.text }}</span>{% if c.why and c.verdict != 'ok' %}<span class="om-crit__why">{{ c.why }}</span>{% endif %}</span><span class="om-score{% if c.score == c.max %} om-score--full{% elif c.score == 0 %} om-score--zero{% endif %}">{{ c.score|score }} из {{ c.max|score }}</span></div>
+  {% endfor %}
+  {% endfor %}
+  {% if row.check.summary %}<p class="meta om-mt10">{{ row.check.summary }}</p>{% endif %}
+  {% elif row.check and row.check.status == 'error' %}
+  <div class="om-check__hd"><span class="om-big">Без балла</span><span class="meta">{{ row.check.summary }}</span></div>
+  {% elif row.check and row.check.status == 'unavailable' %}
+  <div class="om-check__hd"><span class="om-big">Самопроверка</span><span class="meta">ИИ сейчас недоступен: {{ row.check.summary|default:"проверка не выполнена" }}</span></div>
+  {% elif row.result and not row.result.is_pending %}
   <div class="om-check__hd"><span class="om-big">{{ row.result.score|score }} из {{ row.result.max_score|score }}</span>{% if row.result.comment %}<span class="meta">{{ row.result.comment }}</span>{% endif %}</div>
+  {% else %}
+  <div class="om-check__hd"><span class="om-big">Самопроверка</span>{% if ai_on and row.has_criteria and is_guest %}<span class="meta"><a class="om-link" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войдите, чтобы ИИ проверил решение</a></span>{% endif %}</div>
   {% endif %}
-  {% if row.reference %}<details class="om-det" open><summary class="om-row"><span class="om-grow om-det__t">Разбор задачи</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.reference problem=row.problem %}</div></details>{% endif %}
-  {% if row.criteria %}<details class="om-det"{% if not row.reference %} open{% endif %}><summary class="om-row"><span class="om-grow om-det__t">Критерии жюри</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.criteria problem=row.problem %}</div></details>{% endif %}
+  {% if row.reference %}<details class="om-det"{% if not row.check or row.check.status != 'done' %} open{% endif %}><summary class="om-row"><span class="om-grow om-det__t">Разбор задачи</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.reference problem=row.problem %}</div></details>{% endif %}
+  {% if row.criteria %}<details class="om-det"{% if not row.reference and row.check.status != 'done' %} open{% endif %}><summary class="om-row"><span class="om-grow om-det__t">Критерии жюри</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.criteria problem=row.problem %}</div></details>{% endif %}
   {% if not row.reference and not row.criteria %}<p class="meta om-ref">Разбора к этому заданию в базе нет.</p>{% endif %}
 </div>

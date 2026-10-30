@@ -24,3 +24,12 @@ OLYMPIADS_PUBLIC = True
 # ИИ-проверка решения тура по критериям жюри (Э7). На бою выключена до
 # правовой части; здесь включена, чтобы увидеть экраны целиком.
 OLYMPIAD_AI_CHECK = True
+
+# Поставщик модели на площадке ночи. Ключей в окружении ночи нет, поэтому для
+# снимков и сквозного прохода (Э9) сервер можно поднять с подставным:
+#   NIGHT_AI_PROVIDER=fake QLS_FAKE_REPLY="$(cat …)" ./venv313/bin/python manage.py runserver …
+# По умолчанию — как у сайта (без ключа проверка честно «недоступна»).
+import os  # noqa: E402
+
+if os.environ.get('NIGHT_AI_PROVIDER'):
+    AI_PROVIDER = os.environ['NIGHT_AI_PROVIDER']

@@ -174,3 +174,23 @@ vseros=/olympiads/vseros/ …` (сервер ночи на 8097) — 1280/390 ×
 - Проверка двух страниц: `node claude/night_olymp_20261030/tools/phone_flow.mjs
   '<путь задания>' --login-file=<логин:пароль>` (лист с телефона на компьютере
   ≤ 5 с, опрос стоп после сдачи, 410).
+
+## ИИ-проверка по критериям жюри (Э7, ADR 0176)
+
+- `olympiads/ai_check.py`: `parse_criteria` (критерии с баллами / правила /
+  пункт), `plan` (точный или ориентировочный режим; `None` — критериев нет),
+  `build_prompt` (только условие, критерии, правила, максимум, решение и
+  расшифровка листов — без эталона и без профиля), `validate`, `eligible`
+  (флаг, вошедший, согласие `ai`, не тест, есть критерии), `check_item`
+  («Без времени»), `enqueue` + `run_next` («На время»), `by_part` (экран).
+- Модель `TrainingCheck(attempt, problem, status: queued|running|done|error|
+  unavailable, score, max_score, criteria, summary, transcription, approximate,
+  provider, model, cost, human_review, created_at, finished_at)`.
+- Флаг `OLYMPIAD_AI_CHECK` (`config/settings.py`, по умолчанию выключен; в
+  `settings_olympiads_screens` включён). Выключен — 0 вызовов, после сдачи —
+  разбор и критерии жюри. Потолок денег — `AI_DAILY_COST_CAPS['olympiad_check']`.
+- Адрес очереди: `POST /olympiads/<slug>/variant/<pk>/check-next/` → `{total,
+  done, finished}`; одно задание за запрос.
+- Площадка ночи: ключей нет; сервер для снимков — `NIGHT_AI_PROVIDER=fake`
+  и `QLS_FAKE_REPLY` из `claude/night_olymp_20261030/tools/fake_reply_59997.json`
+  (подставной ответ подписан в `summary`).

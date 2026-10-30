@@ -200,6 +200,8 @@ def training_take(request, slug, pk):
     drafts = engine.drafts_map(attempt)
     package = {i.problem_id: i for i in engine.package_items(variant)}
     results = {r.problem_id: r for r in attempt.results.all()}
+    checks = {c.problem_id: c for c in attempt.checks.all()}
+    from . import ai_check
     sheets = {}
     for sheet in uploads.sheets(attempt):
         sheets.setdefault(sheet.problem_id, []).append(sheet)
@@ -232,6 +234,7 @@ def training_take(request, slug, pk):
         if locked:
             solution, criteria = split_solution(problem.solution)
         result = results.get(problem.pk) if locked else None
+        check = checks.get(problem.pk) if locked else None
         rows.append({
             'index': number,
             'number': (pos.number if pos else '') or str(number),
@@ -252,6 +255,8 @@ def training_take(request, slug, pk):
             'sheets_left': uploads.MAX_SHEETS - len(own_sheets),
             'locked': locked,
             'result': result,
+            'check': check,
+            'check_parts': ai_check.by_part(check) if check else [],
             'reference': solution,
             'criteria': criteria,
             'has_criteria': bool(pos and pos.has_criteria),
@@ -285,6 +290,7 @@ def training_take(request, slug, pk):
         'free_max': sum(float(r['result'].max_score) for r in done_rows),
         'free_done': len(done_rows),
         'max_sheets': uploads.MAX_SHEETS,
+        'ai_on': ai_check.enabled(),
     })
     return render(request, 'olympiads/training_take.html', context)
 
@@ -430,6 +436,10 @@ def training_item_submit(request, slug, pk):
                 engine.save_draft(attempt, problem, values[part_key(part)], None,
                                   part=part)
         engine.grade_item(attempt, item)
+        # ИИ-проверка по критериям — сразу, синхронно, с потолком времени
+        # ядра. Нет флага, критериев, входа или согласия — модель не зовём.
+        from . import ai_check
+        ai_check.check_item(attempt, item, request.user)
     items = engine.variant_items(variant)
     if len(engine.graded_problem_ids(attempt)) >= len(items):
         engine.submit_attempt(attempt)
@@ -662,6 +672,8 @@ def training_finish(request, slug, pk):
                                       None, part=part)
 
     engine.submit_attempt(attempt, now)
+    from . import ai_check
+    ai_check.enqueue(attempt)
     messages.success(request, 'Работа сдана.')
     return redirect('olympiads:training_result', slug=slug, pk=pk)
 
@@ -691,7 +703,41 @@ def training_result(request, slug, pk):
     if attempt is None:
         return redirect('olympiads:training_intro', slug=slug, pk=pk)
 
+    from . import ai_check
+    # Сдана по таймеру (автосдача) — очередь заводится здесь: идемпотентно.
+    ai_check.enqueue(attempt)
     context = _base_context(olympiad, variant, request)
     context.update({'attempt': attempt})
     context.update(engine.attempt_result(attempt))
     return render(request, 'olympiads/training_result.html', context)
+
+
+@require_POST
+def training_check_next(request, slug, pk):
+    """Очередь ИИ-проверки после тура на время: ОДНО задание за запрос.
+
+    Без Celery и Redis: страница результата спрашивает, пока очередь не
+    опустеет. Ответ — сколько проверено из скольких.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from . import ai_check
+    from .models import TrainingAttempt, TrainingCheck
+
+    _, variant = _variant_or_404(slug, pk)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=403)
+    attempt = (TrainingAttempt.objects
+               .filter(variant=variant, user=request.user,
+                       submitted_at__isnull=False)
+               .order_by('-submitted_at').first())
+    if attempt is None:
+        return JsonResponse({'error': 'no attempt'}, status=404)
+    ai_check.run_next(attempt, request.user)
+    checks = list(attempt.checks.all())
+    waiting = [c for c in checks if c.status in (TrainingCheck.Status.QUEUED,
+                                                 TrainingCheck.Status.RUNNING)]
+    return JsonResponse({'total': len(checks),
+                         'done': len(checks) - len(waiting),
+                         'finished': not waiting})

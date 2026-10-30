@@ -364,6 +364,10 @@ AI_DAILY_COST_CAPS = {
         os.environ.get('CATALOG_CHECK_DAILY_CAP_USD', '1.0').strip() or 1.0),
     'catalog_ocr': float(
         os.environ.get('CATALOG_OCR_DAILY_CAP_USD', '1.0').strip() or 1.0),
+    # Проверка решения тура олимпиады по критериям жюри (ночь 30.10, Э7) —
+    # тот же потолок, что у проверки решения в «Столе».
+    'olympiad_check': float(
+        os.environ.get('OLYMPIAD_CHECK_DAILY_CAP_USD', '1.0').strip() or 1.0),
     'homework_plan': float(
         os.environ.get('HOMEWORK_PLAN_DAILY_CAP_USD', '1.0').strip() or 1.0),
 }

@@ -1457,3 +1457,62 @@ class PhoneUploadToken(models.Model):
 
     def __str__(self):
         return '#{} задача {}'.format(self.attempt_id, self.problem_id)
+
+
+class TrainingCheck(models.Model):
+    """Проверка решения задания тура моделью по критериям жюри (ночь 30.10, Э7).
+
+    Одна на пару «попытка + задача». Итог переносится в `TrainingItemResult`
+    (балл и `is_pending=False`); сама запись хранит разбор по критериям — его
+    показывает экран и получает чат «Оспорить оценку» (Э8).
+
+    ⚠️ `error` — модель ответила не по схеме или не прошла нашу проверку
+    (код не из списка, балл больше максимума): балла нет, страница не падает.
+    `unavailable` — модель недоступна (нет ключа, лимит, бюджет).
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'В очереди'
+        RUNNING = 'running', 'Проверяется'
+        DONE = 'done', 'Проверено'
+        ERROR = 'error', 'Ошибка проверки'
+        UNAVAILABLE = 'unavailable', 'Модель недоступна'
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE, related_name='checks',
+        verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_checks', verbose_name='Задача')
+    status = models.CharField('Статус', max_length=12, choices=Status.choices,
+                              default=Status.QUEUED, db_index=True)
+    score = models.DecimalField('Балл', max_digits=6, decimal_places=2,
+                                null=True, blank=True)
+    max_score = models.DecimalField('Максимум', max_digits=6, decimal_places=2,
+                                    null=True, blank=True)
+    # [{code, text, max, score, verdict, why, part}] — по критерию.
+    criteria = models.JSONField('Разбор по критериям', default=list, blank=True)
+    summary = models.TextField('Общий комментарий', blank=True)
+    transcription = models.TextField('Расшифровка фото', blank=True)
+    approximate = models.BooleanField('Оценка ориентировочная', default=False)
+    provider = models.CharField('Поставщик', max_length=40, blank=True)
+    model = models.CharField('Модель', max_length=80, blank=True)
+    cost = models.DecimalField('Стоимость, $', max_digits=10, decimal_places=6,
+                               default=0)
+    # «Отправить на проверку человеку» из чата «Оспорить оценку» (Э8).
+    human_review = models.BooleanField('Попросили человека', default=False)
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+    finished_at = models.DateTimeField('Закончена', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Проверка задания тура'
+        verbose_name_plural = 'Проверки заданий тура'
+        ordering = ['attempt', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['attempt', 'problem'],
+                                    name='uniq_training_check'),
+        ]
+
+    def __str__(self):
+        return '#{} задача {}: {}'.format(self.attempt_id, self.problem_id,
+                                         self.status)
