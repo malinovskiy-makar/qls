@@ -5,7 +5,7 @@
 * **Ветка:** `feat/olympiads-screens-20261031`; код `olympiads/training_engine.py`,
   `olympiads/uploads.py`, `olympiads/views_training.py`, модель `TrainingUpload`
   (миграция `olympiads/0013_training_upload`), тесты `olympiads/tests/test_night_E5.py`.
-* **Продолжает:** [ADR 0066](0066-olympiad-training-throwaway-submission.md) (одноразовое
+* **Продолжает:** [ADR 0066](0066-training-mode-grades-through-exam-engine.md) (одноразовое
   решение), [ADR 0170](0170-olympiad-package-tasks-into-bank.md), [ADR 0173](0173-olympiads-navigator-single-place-for-numbers.md).
 
 ## Контекст
