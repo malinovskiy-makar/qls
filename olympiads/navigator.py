@@ -352,7 +352,7 @@ def stage_grid(stage, variants, attempts):
 
     ⚠️ Сезон без комплектов ВНУТРИ диапазона (ВсОШ 2019/20) — пустая строка
     «—», а не пропуск: пропуск выглядел бы как опечатка в годах. Комплект
-    без сезона идёт последней строкой «сезон не указан» — молча выбросить
+    без сезона идёт последней строкой «без сезона» — молча выбросить
     его значило бы спрятать настоящие задания.
     """
     columns = sorted({g.grade for v in variants for g in v.grades.all()})
@@ -376,7 +376,7 @@ def stage_grid(stage, variants, attempts):
                 'cells': _row_cells(found, columns, attempts) if found else [],
             })
     if undated:
-        rows.append({'start': None, 'label': 'сезон не указан', 'empty': False,
+        rows.append({'start': None, 'label': 'без сезона', 'empty': False,
                      'cells': _row_cells(undated, columns, attempts)})
 
     for row in rows:

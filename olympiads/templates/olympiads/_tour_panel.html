@@ -3,7 +3,7 @@
 Числа — из навигатора (`navigator._tour_row`). Кнопки ведут на вход тура (Э5).
 Контекст: cell, row, olympiad, phone (телефонная раскладка).
 {% endcomment %}
-<div class="om-panel" id="panel-{{ cell.key }}" style="--x: calc({% if phone %}84px + (100% - 84px) / 2{% else %}90px + (100% - 90px) * {{ cell.x_num }} / {{ cell.x_den }}{% endif %} - 6px);">
+<div class="om-panel" id="panel-{{ cell.key }}" style="--x: calc({% if phone %}84px + (100% - 84px) / 2{% else %}102px + (100% - 102px) * {{ cell.x_num }} / {{ cell.x_den }}{% endif %} - 6px);">
   <div class="om-panel__hd"><b>{% if cell.grades_label %}{{ cell.grades_label }}{% elif cell.grades|length == 1 %}{{ cell.grades.0 }} класс{% else %}Все классы{% endif %} · {{ row.label }}</b>{% if cell.all_criteria and cell.all_solution %}<span class="meta">критерии и разборы у всех заданий</span>{% elif cell.all_solution %}<span class="meta">разборы у всех заданий</span>{% endif %}</div>
   {% for tour in cell.tours %}
   <div class="om-tour{% if phone %} om-tour--ph{% endif %}">
