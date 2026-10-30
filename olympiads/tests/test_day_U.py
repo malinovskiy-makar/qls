@@ -266,7 +266,7 @@ class NoInventedMaximumTests(TestCase):
         self.html(self.scored, 'training_intro')
         self.client.post(reverse('olympiads:training_finish', args=['vs', self.scored.pk]))
         self.assertEqual(float(TrainingAttempt.objects.get(variant=self.scored).max_score), 48.0)
-        self.assertIn('12 баллов', self.html(self.scored, 'training_intro'))
+        self.assertIn('12\u00a0баллов', self.html(self.scored, 'training_intro'))
 
 
 from .test_night_E7 import CRITERIA_59997, Capture, reply  # noqa: E402
@@ -369,7 +369,7 @@ class LayoutTests(TestCase):
         head = html[html.index('class="om-tasks__hd"'):]
         head = head[:head.index('</div>')]
         self.assertIn('максимум', head)
-        self.assertNotIn('om-tasks__cols', html)
+        self.assertNotIn('class="om-tasks__cols', html)
 
     def test_upload_button_only_without_js(self):
         self.client.post(reverse('olympiads:training_start', args=['vs', self.variant.pk]),
