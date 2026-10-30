@@ -613,8 +613,14 @@ def training_autosave(request, slug, pk):
     if not attempt.with_timer and \
             item.catalog_problem_id in engine.graded_problem_ids(attempt):
         # Сданное задание закрыто: черновик после проверки не меняется.
-        return JsonResponse({'error': 'Задание уже сдано', 'locked': True,
-                             'seconds_remaining': None}, status=409)
+        # ⚠️ НЕ 409 (день 30.10, У6). `platform/exam.js` читает любой 409 как
+        # «время вышло» и сам отправляет форму на «Завершить тур»: запоздавшее
+        # автосохранение только что сданного задания (страница ещё жива, пока
+        # идёт проверка) сдавало весь тур. Отвечаем «принято, не записано» —
+        # клиент выкинет значение из очереди, а терять нечего: последние поля
+        # приехали вместе с «Сдать задание».
+        return JsonResponse({'ok': True, 'locked': True, 'saved': False,
+                             'seconds_remaining': None})
 
     try:
         left = engine.save_draft(

@@ -158,7 +158,13 @@ class TourTests(TestCase):
         locked = self.client.post(self.url('training_autosave'),
                                   data={'item_id': first.pk, 'solution': 'правка'},
                                   content_type='application/json')
-        self.assertEqual(locked.status_code, 409)
+        # День 30.10, У6: не 409 — exam.js читает 409 как «время вышло» и
+        # сдаёт весь тур. Принято, но не записано: черновик не меняется.
+        self.assertEqual(locked.status_code, 200)
+        self.assertIs(locked.json()['saved'], False)
+        from olympiads.models import TrainingDraft
+        self.assertFalse(TrainingDraft.objects.filter(
+            attempt=attempt, problem=first.catalog_problem, solution_draft='правка').exists())
         open_ = self.client.post(self.url('training_autosave'),
                                  data={'item_id': second.pk, 'solution': 'черновик'},
                                  content_type='application/json')
