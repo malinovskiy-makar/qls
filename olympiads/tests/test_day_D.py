@@ -494,6 +494,8 @@ class ForeignTourTests(TestCase):
             self.item('2', number, self.task(title), 12, files=('tasks2.pdf',))
             self.item('1', number, self.task(title), 2, files=('solutions.pdf',))
         self.item('1', 9, self.task('Своё 9'), 12)
+        # Общий файл решений лежит в обоих комплектах — как в настоящих данных.
+        self.item('2', 9, self.task('Своё 9'), None, files=('solutions.pdf',))
         self.run_cmd('--apply')
         v = nav._annotated(OlympiadVariant.objects.filter(pk=self.kits['1'].pk)).get()
         self.assertEqual((v.n_items, nav.tour_max_score(v)), (1, 12.0))
