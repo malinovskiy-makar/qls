@@ -352,6 +352,9 @@ class BenefitWhoGetsTests(TestCase):
         self.assertEqual(benefit.who_label, '')
 
 
+# Флаг выключен ЯВНО: тесты гейта не должны зависеть от того, с какими
+# настройками их запустили (на площадке ночи 30.10 раздел открыт).
+@override_settings(OLYMPIADS_PUBLIC=False)
 class OlympiadsAreClosedTests(TestCase):
     """⚠️ РАЗДЕЛ ЗАКРЫТ ЗАГЛУШКОЙ «СКОРО» — гейт, а не содержимое экранов.
 
