@@ -186,7 +186,7 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ('grade', 'school', 'city', 'level', 'goal', 'prep_mode',
+        fields = ('grade', 'city', 'school', 'level', 'goal', 'prep_mode',
                   'hours_week', 'source_channel', 'olympiad_history', 'telegram')
 
     #: Подписи полей на вкладке «Аккаунт» (ТЗ владельца 22.09.2026).
@@ -214,6 +214,10 @@ class ProfileForm(forms.ModelForm):
             del self.fields['email']
         self.fields['grade'].required = False
         self.fields['school'].required = False
+        # Город и школа — с подсказками анкеты (`static/onboarding/suggest.js`): без
+        # подсказок браузера поверх них.
+        for name in ('city', 'school'):
+            self.fields[name].widget.attrs['autocomplete'] = 'off'
         self.fields['goal'].widget.attrs.setdefault(
             'placeholder', 'Например: призёр регионального этапа')
         for name, label in self.LABELS.items():

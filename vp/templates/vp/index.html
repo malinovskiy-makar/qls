@@ -97,7 +97,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
       <span>Лучшие попытки</span>
     </h2>
-    <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.{% if boards|length > 1 %} Таблица своя у каждого класса.{% endif %}</p>
+    <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.</p>
 
     {% if boards|length > 1 %}
     {# Вкладки — ссылки `?board=`: без JS страница откроется с нужной таблицей, с JS переключит на месте. #}
@@ -168,38 +168,37 @@
     </div>
     {% else %}
 
-    {# Ячейка 1: моя лучшая попытка #}
+    {# Ячейка 1: лучшая попытка #}
     <div class="vp-land-card vp-land-cell">
-      <p class="vp-land-ct">Моя лучшая попытка{% if mine.best_band_label %} · {{ mine.best_band_label }}{% endif %}</p>
+      <p class="vp-land-ct">Лучшая попытка{% if mine.best_band_label %} · {{ mine.best_band_label }}{% endif %}</p>
       {% if mine.best %}
       <p class="vp-land-cv"><b>{{ mine.best.score|num }}</b> из {{ mine.best.max_score|num }} · {{ mine.best_place }}-е место</p>
       <p class="vp-land-cs">{{ mine.best.variant|with_band }} · {{ mine.best.submitted_at|date:"j E" }} · {{ mine.best_seconds|mmss }}</p>
       <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:result' mine.best.public_code %}">Разбор</a></div>
       {% else %}
       <p class="vp-land-cv">Пока нет</p>
-      <p class="vp-land-cs">Первая попытка с таймером по любому варианту попадёт в таблицу</p>
       <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:variants' %}">Выбрать вариант</a></div>
       {% endif %}
     </div>
 
-    {# Ячейка 2: что дальше — по приоритету (`landing.my_block`, ключ `step`) #}
+    {# Ячейка 2: заголовок по состоянию — по приоритету (`landing.my_block`, ключ `step`) #}
     <div class="vp-land-card vp-land-cell{% if mine.step == 'continue' %} is-live{% endif %}">
-      <p class="vp-land-ct">Что дальше{% if mine.step == 'continue' and mine.current.with_timer %} <span class="vp-land-live"><i aria-hidden="true"></i>время идёт</span>{% endif %}</p>
+      <p class="vp-land-ct">{% if mine.step == 'continue' %}Начатая попытка{% if mine.current.with_timer %} <span class="vp-land-live"><i aria-hidden="true"></i>время идёт</span>{% endif %}{% elif mine.step == 'next' %}Следующий вариант{% else %}Тренировка записи ответа{% endif %}</p>
       {% if mine.step == 'continue' %}
       <p class="vp-land-cv">Продолжить: {{ mine.current.variant|with_band }}</p>
       <p class="vp-land-cs">Отвечено {{ mine.current_answered }} из {{ mine.current_count }} · {% if mine.current.with_timer %}осталось {{ mine.current_left|mmss }}{% else %}без таймера{% endif %}</p>
       <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:take' mine.current.public_code %}">Продолжить</a></div>
       {% elif mine.step == 'drill_loss' %}
-      <p class="vp-land-cv">Потренировать запись ответа</p>
-      <p class="vp-land-cs">в прошлой попытке на записи потеряно {{ mine.lost|points_word }}</p>
+      <p class="vp-land-cv">На записи потеряно {{ mine.lost|points_word }}</p>
+      <p class="vp-land-cs">в прошлой попытке</p>
       <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:drill' %}">Начать</a></div>
       {% elif mine.step == 'next' %}
-      <p class="vp-land-cv">Следующий вариант: {{ mine.next_variant|with_band }}</p>
+      <p class="vp-land-cv">{{ mine.next_variant|with_band }}</p>
       <p class="vp-land-cs">ещё не открывали</p>
       <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
       {% else %}
-      <p class="vp-land-cv">Потренировать запись ответа</p>
-      <p class="vp-land-cs">12 готовых чисел, 2–3 минуты</p>
+      <p class="vp-land-cv">12 готовых чисел</p>
+      <p class="vp-land-cs">2–3 минуты</p>
       <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:drill' %}">Начать</a></div>
       {% endif %}
     </div>

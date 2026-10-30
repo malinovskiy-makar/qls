@@ -14,7 +14,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from vp import landing
-from vp.models import VPAttempt
+from vp.models import VPAttempt, VPVariant
 from vp.tests.helpers import load_demo
 
 User = get_user_model()
@@ -77,6 +77,73 @@ class LandingTests(TestCase):
         response = client.get(reverse('vp:index'))
         self.assertEqual(response.context['mine']['step'], 'drill_loss')
         html = response.content.decode()
-        self.assertIn('в прошлой попытке на записи потеряно 25 баллов', html)
-        self.assertIn('Моя лучшая попытка · 10 класс', html)
+        self.assertIn('На записи потеряно 25 баллов', html)
+        self.assertIn('в прошлой попытке', html)
+        self.assertIn('Тренировка записи ответа', html)
+        self.assertIn('Лучшая попытка · 10 класс', html)
+        self.assertNotIn('Моя лучшая попытка', html)
         self.assertIn(reverse('vp:drill'), html)
+
+
+# Заголовки карточек «моё» – существительные (решение владельца 30.10.2026). Старые обороты
+# («Моя …», «Что дальше», обещание про таблицу) на посадочной возвращаться не должны.
+# ⚠️ «Таблица своя у каждого класса» стоит и в блоке правил (`_rules.html`, он включён в страницу,
+# там после слова «класса» двоеточие – владелец просил его не трогать), поэтому ищем хвост
+# подзаголовка таблицы целиком: с пробелом перед фразой и точкой после неё.
+GONE_ON_LANDING = ('Что дальше', 'Моя лучшая попытка', 'попадёт в таблицу',
+                   ' Таблица своя у каждого класса.')
+
+
+class LandingCardTitlesTests(TestCase):
+    def setUp(self):
+        for band in ('9', '10', '11'):
+            load_demo(band)
+
+    def _page(self, client):
+        return client.get(reverse('vp:index')).content.decode()
+
+    def test_guest_page_has_no_old_phrases(self):
+        html = self._page(Client())
+        for gone in GONE_ON_LANDING:
+            self.assertNotIn(gone, html, gone)
+        self.assertIn('Первая попытка по варианту, с таймером. При равных баллах выше тот, '
+                      'кто сдал быстрее.</p>', html)
+
+    def test_student_without_attempts_sees_next_variant_and_best_titles(self):
+        client = Client()
+        client.force_login(User.objects.create_user('vp_titles', password='p12345'))
+        response = client.get(reverse('vp:index'))
+        html = response.content.decode()
+        self.assertEqual(response.context['mine']['step'], 'next')
+        for gone in GONE_ON_LANDING:
+            self.assertNotIn(gone, html, gone)
+        self.assertNotIn('Первая попытка с таймером по любому варианту', html)
+        self.assertIn('Лучшая попытка', html)
+        self.assertIn('Следующий вариант', html)
+
+    def test_student_with_nothing_to_open_gets_the_drill_card(self):
+        # Нетронутых вариантов своего класса нет → последнее `else`: тренировка записи.
+        VPVariant.objects.all().delete()
+        client = Client()
+        client.force_login(User.objects.create_user('vp_titles3', password='p12345'))
+        response = client.get(reverse('vp:index'))
+        html = response.content.decode()
+        self.assertEqual(response.context['mine']['step'], 'drill')
+        for gone in GONE_ON_LANDING:
+            self.assertNotIn(gone, html, gone)
+        self.assertIn('Лучшая попытка', html)
+        self.assertIn('Тренировка записи ответа', html)
+        self.assertIn('12 готовых чисел', html)
+        self.assertIn('2–3 минуты', html)
+        self.assertNotIn('Потренировать запись ответа', html)
+
+    def test_started_attempt_card_is_titled_by_state(self):
+        client = Client()
+        client.force_login(User.objects.create_user('vp_titles2', password='p12345'))
+        client.post(reverse('vp:start', args=[load_demo('10').slug]))
+        html = self._page(client)
+        self.assertEqual(client.get(reverse('vp:index')).context['mine']['step'], 'continue')
+        self.assertIn('Начатая попытка', html)
+        self.assertIn('время идёт', html)
+        for gone in GONE_ON_LANDING:
+            self.assertNotIn(gone, html, gone)

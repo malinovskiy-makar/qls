@@ -17,7 +17,6 @@
 @keyframes ob-tick  { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 @keyframes ob-flash { 0% { background: var(--accent-tint); } 100% { background: transparent; } }
 @keyframes ob-spin  { to { transform: rotate(360deg); } }
-@keyframes ob-drop  { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes ob-grow  { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 120px; } }
 
 /* ⚠️ `backwards`, а не `both` (раунд 3): с `both` конечный `transform` оставался на
@@ -382,34 +381,6 @@ body.ob .ob-input { height: 52px; font-size: 16px; padding: 0 14px; border-width
 .ob-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .ob-later { height: 48px; padding: 0 18px; }
 .ob-sr-form { display: none; }
-
-/* Подсказки города и школы. Поле с открытым списком — над соседними полями и над
-   липкой «Дальше» на телефоне (у неё z-index 4). */
-.ob-field.is-ac-open { position: relative; z-index: 30; }
-.ob-ac { position: relative; }
-.ob-ac.is-open .ob-input { background: var(--surface); border-color: var(--focus);
-                           box-shadow: 0 0 0 3px var(--focus-ring); }
-.ob-ac-done { position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-              color: var(--green-ink); display: inline-flex; pointer-events: none; }
-.ob-ac-done[hidden] { display: none; }
-.ob-dd { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; margin: 0;
-         padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border);
-         border-radius: var(--r-card); box-shadow: var(--shadow-pop); display: flex;
-         flex-direction: column; animation: ob-drop .16s ease-out both; max-height: 320px; overflow-y: auto;
-         overscroll-behavior: contain; }
-.ob-dd[hidden] { display: none; }
-.ob-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r);
-          font-size: 15px; color: var(--text); cursor: pointer; }
-.ob-opt.is-hi { background: var(--accent-tint); }
-.ob-opt mark { background: transparent; color: inherit; font-weight: 700; }
-.ob-opt-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ob-opt-name--full { font-size: 13px; line-height: 1.35; }
-.ob-opt-sub { font-size: 13px; color: var(--text3); }
-.ob-opt-num { min-width: 44px; height: 26px; padding: 0 8px; border-radius: var(--r-sm);
-              background: var(--chip-bg); font-size: 13px; font-weight: 600; color: var(--text2);
-              display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.ob-opt--own { color: var(--text2); border-top: 1px solid var(--border-soft);
-               border-radius: 0 0 var(--r) var(--r); margin-top: 4px; }
 
 /* «Первая группа»: код приглашения. */
 .ob-code-card { max-width: 560px; display: flex; align-items: center; justify-content: space-between;

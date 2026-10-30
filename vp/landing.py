@@ -499,7 +499,7 @@ def my_block(request, published):
     untouched = [v for v, dot in zip(ordered, dots) if dot == '']
     best_attempt, place = board.my_best(user)
 
-    # «Что дальше» по приоритету: начатая работа → в прошлой сданной попытке текущего тура
+    # Состояние второй карточки (`step`) по приоритету: начатая работа → в прошлой сданной попытке текущего тура
     # потеряно на записи → следующий нетронутый вариант своего класса → тренировка записи.
     from vp import review
     last = (VPAttempt.objects.filter(user=user, variant__tour=config.CURRENT_TOUR,

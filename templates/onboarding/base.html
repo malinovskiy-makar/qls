@@ -12,7 +12,8 @@
   <style>
 {% include '_kit.html' %}
   </style>
-  <link rel="stylesheet" href="{% static 'onboarding/onboarding.css' %}">{% block extra_head %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'onboarding/onboarding.css' %}">
+  <link rel="stylesheet" href="{% static 'onboarding/suggest.css' %}">{% block extra_head %}{% endblock %}
 </head>
 {% comment %}
 Каркас онбординга — раунд 2 (решения 29.10.2026), макет
@@ -43,6 +44,7 @@
   <div class="ob-out">{% block top_right %}<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="k-btn k-btn--quiet">Выйти</button></form>{% endblock %}</div>
 </header>
 <main class="ob-main" id="ob-main" data-ob-step="{{ step }}" data-ob-stage="{{ stage }}">{% block main %}{% endblock %}</main>
+<script src="{% static 'onboarding/suggest.js' %}" defer></script>
 <script src="{% static 'onboarding/onboarding.js' %}" defer></script>
 {% include '_cookie_bar.html' with metrika_private=True %}
 {% comment %}Подвал с документами и метка версии — только где он нужен (решение владельца 29.10.2026, Notion «Решения»): главная, профиль, /legal/, вход, регистрация, «Почти готово». Список — в `templates/_site_footer.html`. По умолчанию пусто.{% endcomment %}

@@ -679,19 +679,31 @@
       </div>
       {% else %}
 
+      {% comment %}
+      Город — перед школой, подсказки те же, что на шагах анкеты (`static/onboarding/suggest.js`
+      и `suggest.css`, адреса `onboarding_cities` / `onboarding_schools`). Школа не зависит от
+      города: список по всей стране, школы своего города — выше. Сохраняется текст, как в анкете.
+      {% endcomment %}
+      {% url 'onboarding_cities' as cities_url %}{% url 'onboarding_schools' as schools_url %}
       <div class="form-grid">
         <div class="pf-field">
           {% include 'platform/_pf_dd.html' with field=form.grade label='Класс' kind='single' %}
         </div>
-        <div class="pf-field">
-          <label class="pf-label" for="{{ form.school.id_for_label }}">Школа</label>
-          {{ form.school }}
+        <div class="pf-field" data-pf-city>
+          <label class="pf-label" for="{{ form.city.id_for_label }}">Город</label>
+          <div class="ob-ac" data-ac="{{ cities_url }}">
+            {{ form.city }}
+            <span class="ob-ac-done" hidden aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
+          </div>
         </div>
       </div>
 
-      <div class="pf-field">
-        <label class="pf-label" for="{{ form.city.id_for_label }}">Город</label>
-        {{ form.city }}
+      <div class="pf-field" data-pf-school>
+        <label class="pf-label" for="{{ form.school.id_for_label }}">Школа</label>
+        <div class="ob-ac" data-ac="{{ schools_url }}" data-ac-city="{{ form.city.id_for_label }}" data-ac-numbers>
+          {{ form.school }}
+          <span class="ob-ac-done" hidden aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
+        </div>
       </div>
 
       <div class="pf-field">
@@ -933,6 +945,8 @@
 Поведение вкладки «Аккаунт»: списки, меню аватарки, своя обрезка и просмотр
 фото. Инлайн-обработчиков в разметке нет — весь код в этом файле.
 {% endcomment %}
+<link rel="stylesheet" href="{% static 'onboarding/suggest.css' %}">
+<script src="{% static 'onboarding/suggest.js' %}" defer></script>
 <script src="{% static 'platform/profile.js' %}" defer></script>
 {% endif %}
 <script>
