@@ -158,3 +158,19 @@ vseros=/olympiads/vseros/ …` (сервер ночи на 8097) — 1280/390 ×
   `_take_done.html` только у него). Обещание «проверяет ИИ» на входе — только
   при `OLYMPIAD_AI_CHECK` и критериях у заданий.
 - Поля краткого ответа — только у задания с эталоном (`has_answer`).
+
+## Фото с телефона по QR (Э6, ADR 0175): доски UploadB, UploadBPhone
+
+- `olympiads/phone.py`: `issue` (пропуск на 30 минут, переиздаётся за 5 минут
+  до конца), `state` (`ok` / `gone`), `qr_svg` (`segno`; нет библиотеки — '').
+- Модель `PhoneUploadToken(attempt, problem, token, expires_at, created_at, used_at)`;
+  `used_at` — «телефон подключён».
+- Адреса: `/olympiads/u/<токен>/` — страница телефона (GET — листы, POST — файл);
+  `/olympiads/u/<токен>/sheet/<id>/` — миниатюра; `…/variant/<pk>/sheets/?item=` —
+  опрос компьютера (JSON: `closed`, `connected`, `token`, `qr`, `sheets`).
+  Истёкший пропуск / сданная попытка — 410, чужой лист — 404.
+- Файлы листов — только `olympiads/training_files.py` (сторож
+  `problems/tests/test_media_route.py`).
+- Проверка двух страниц: `node claude/night_olymp_20261030/tools/phone_flow.mjs
+  '<путь задания>' --login-file=<логин:пароль>` (лист с телефона на компьютере
+  ≤ 5 с, опрос стоп после сдачи, 410).
