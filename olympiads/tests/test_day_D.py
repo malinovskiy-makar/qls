@@ -165,3 +165,101 @@ class DedupePartsTests(DayMixin, TestCase):
         self.assertEqual(flags, list(OlympiadVariantItem.objects.order_by('pk')
                                      .values_list('quality', 'quality_reasons',
                                                   'updated_at')))
+
+
+class SplitStatementTests(DayMixin, TestCase):
+    """Д2: условие = общая часть до первого пункта, если хвост — ровно пункты."""
+
+    command = 'split_statement_parts'
+
+    def parts_59997(self):
+        return [(label, text, 4) for label, text in PARTS_59997]
+
+    def test_59997_statement_ends_before_first_part(self):
+        problem = self.add(STATEMENT_59997, self.parts_59997())
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, LEAD_59997)
+        self.assertTrue(problem.statement.endswith('до первого знака после запятой.'))
+
+    def test_cut_tail_is_exactly_the_parts(self):
+        from olympiads import parts_fix as pf
+        problem = self.add(STATEMENT_59997, self.parts_59997())
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        tail = STATEMENT_59997[len(problem.statement):]
+        rows = list(problem.parts.order_by('order', 'id').values(
+            'label', 'statement', 'points'))
+        self.assertTrue(pf.tail_is_parts(tail, rows))
+
+    def test_bold_labels_and_points_mark_only_in_statement(self):
+        statement = (LEAD_59997 + '\n\n**а)** (4 балла) первый вопрос задачи'
+                     '\n\n**б)** (4 балла) второй вопрос задачи')
+        problem = self.add(statement, [('а', 'первый вопрос задачи', 4),
+                                       ('б', 'второй вопрос задачи', 4)])
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, LEAD_59997)
+
+    def test_points_mark_with_other_points_is_not_dropped(self):
+        statement = LEAD_59997 + '\n\nа) (5 баллов) первый вопрос задачи'
+        problem = self.add(statement, [('а', 'первый вопрос задачи', 4)])
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, statement)
+
+    def test_extra_paragraph_in_tail_is_flagged_not_cut(self):
+        statement = STATEMENT_59997 + '\n\nОтвет: 12.'
+        problem = self.add(statement, self.parts_59997())
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, statement)
+        self.assertIn('пункты в условии не совпали с пунктами задачи',
+                      problem.olympiad_items.get().quality_reasons)
+
+    def test_parts_in_other_order_are_flagged_not_cut(self):
+        parts = self.parts_59997()
+        problem = self.add(STATEMENT_59997, [parts[1], parts[0], parts[2]])
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, STATEMENT_59997)
+        self.assertEqual(problem.olympiad_items.get().quality, 'flagged')
+
+    def test_trailing_semicolon_of_option_is_not_lost(self):
+        statement = 'Что такое ипотека?\n\nA. Залог недвижимости;\nB. Ценная бумага.'
+        problem = self.add(statement, [('a', 'Залог недвижимости', None),
+                                       ('b', 'Ценная бумага', None)])
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, statement)
+
+    def test_latin_capital_labels_match(self):
+        statement = 'Что такое ипотека?\n\nA. Залог недвижимости\nB. Ценная бумага'
+        problem = self.add(statement, [('a', 'Залог недвижимости', None),
+                                       ('b', 'Ценная бумага', None)])
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, 'Что такое ипотека?')
+
+    def test_legacy_untouched_and_second_run_changes_nothing(self):
+        before = self.legacy_state()
+        self.add(STATEMENT_59997, self.parts_59997())
+        self.add(STATEMENT_59997 + '\n\nОтвет: 12.', self.parts_59997())
+        self.run_cmd('--apply')
+        self.assertEqual(self.legacy_state(), before)
+        state = list(Problem.objects.order_by('pk').values_list('statement', 'updated_at'))
+        out = self.run_cmd('--apply')
+        self.assertIn('Условий укорочено: 0', out)
+        self.assertIn('Позиций с новой пометкой: 0', out)
+        self.assertEqual(state, list(Problem.objects.order_by('pk')
+                                     .values_list('statement', 'updated_at')))
+
+    def test_parts_twice_in_statement_are_cut_in_one_run(self):
+        statement = STATEMENT_59997 + ''.join(
+            '\n\n{}) {}'.format(label, text) for label, text in PARTS_59997)
+        problem = self.add(statement, self.parts_59997())
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, LEAD_59997)
+        out = self.run_cmd('--apply')
+        self.assertIn('Условий укорочено: 0', out)
