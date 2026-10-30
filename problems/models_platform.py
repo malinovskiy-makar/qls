@@ -245,13 +245,16 @@ class UserProfile(models.Model):
     # Пустой `onboarded_at` — шлюз (problems/middleware_onboarding.py) ведёт
     # человека на /welcome/, пока анкета не пройдена.
     onboarded_at = models.DateTimeField('Онбординг пройден', null=True, blank=True)
-    goals = models.JSONField('К чему готовится', default=list, blank=True)
+    # ⚠️ `db_default` у четырёх полей ниже (миграция 0088) — чтобы откат КОДА без отката базы был
+    # безопасен: старый код вставляет профиль, не зная этих колонок, а колонка NOT NULL без
+    # DEFAULT в базе роняла бы каждую новую регистрацию. Значения те же, что у `default`.
+    goals = models.JSONField('К чему готовится', default=list, db_default=[], blank=True)
     # «Откуда узнали → Другое»: своими словами, по желанию. P0: в модель ИИ не
     # уходит, как все поля профиля — сторож `problems/tests/profile_markers.py`.
     source_other = models.CharField('Откуда узнали: другое', max_length=120,
-                                    blank=True, default='')
-    teach_places = models.JSONField('Где учит', default=list, blank=True)
-    teach_grades = models.JSONField('Классы учеников', default=list, blank=True)
+                                    blank=True, default='', db_default='')
+    teach_places = models.JSONField('Где учит', default=list, db_default=[], blank=True)
+    teach_grades = models.JSONField('Классы учеников', default=list, db_default=[], blank=True)
     # Заполняется только из VK ID / Яндекс ID и только при SOCIAL_STORE_BIRTHDATE=1 —
     # после ред. 3 документов. Решение 29.10. P0: в модель ИИ не уходит, как все
     # поля профиля — сторож `problems/tests/profile_markers.py`.
