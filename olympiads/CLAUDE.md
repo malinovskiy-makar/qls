@@ -92,3 +92,24 @@
 Проверка глазами: `node claude/night_olymp_20261030/tools/screens_probe.mjs E2
 vseros=/olympiads/vseros/ …` (сервер ночи на 8097) — 1280/390 × светлая/тёмная,
 вылезания, края, кнопки < 44 px, ошибки консоли; снимки в `shots/E2/`.
+
+## Главная раздела (Э3): доски Home, HomePhone
+
+- `list.html` + партиалы `_home_table.html` (таблица компьютера и список
+  телефона), `_star.html` (звёздочка: вошедший — POST-форма, гость — ссылка
+  на вход), `_feed_row.html` (строка ленты). Ширина 1200 — блок `main_class`
+  `page-wrap om-wide`.
+- Фильтры — GET: `kind=vsosh|perechen|international|other`,
+  `grade=le7|8|9|10|11`, `tasks=1`, `mine=1` (только вошедший; у гостя
+  игнорируется). Логика — `navigator.filter_rows` / `grade_matches`:
+  «≤7» — `grade_min ≤ 7`; класс N — `grade_min ≤ N ≤ grade_max`; олимпиада
+  без классов под фильтр класса не попадает.
+- Порядок — раздел, `-manual_rank`. Раздел «Финансовая грамотность и Основы
+  бизнеса» — `navigator.FIN_SECTION` (не `display_group`, см. Э1).
+- Лента «Ближайшее» — `navigator.upcoming()` → `feed_rows`: 4 сразу, остальное
+  в `<details>` «Ещё N событий сезона» (без JS). У события без даты слева «—»,
+  ориентир — строкой под названием.
+- «Продолжить» — `navigator.home_continue(user)`: последняя незаконченная
+  попытка вошедшего (не истёкшая), сводка — та же `continue_cell`, что на
+  странице олимпиады. «Мои олимпиады» — чипы по `OlympiadFollow`; нет — блока нет.
+- Квадрат логотипа — `navigator.logo_text`: короткое название, если ≤ 5 знаков.
