@@ -45,6 +45,7 @@ await page.route('**/autosave/', async route => {
 });
 
 for (const number of ['6', '7']) {
+  if (!page.url().includes('/take/')) break;   // тур уже завершён — дефект У6
   await page.locator('.om-tn', { hasText: 'Задание ' + number }).click();
   const pane = page.locator('.om-taskpane:not([hidden])');
   await pane.locator('.om-sol__seg label', { hasText: 'Текст' }).click();
@@ -55,9 +56,9 @@ for (const number of ['6', '7']) {
 }
 const url = page.url();
 check('после двух «Сдать задание» открыта страница заданий, а не результат', url.includes('/take/'), url.replace(BASE, ''));
-const tabs = await page.locator('.om-tn').allInnerTexts();
+const tabs = url.includes('/take/') ? await page.locator('.om-tn').allInnerTexts() : [];
 const open = tabs.filter(t => !/ · (\d|сдано|решения нет|не проверено)/.test(t.split('\n')[0])).length;
-check('открыты все задания, кроме двух сданных', open === tabs.length - 2, `открыто ${open} из ${tabs.length}`);
+check('открыты все задания, кроме двух сданных', tabs.length > 0 && open === tabs.length - 2, `открыто ${open} из ${tabs.length}`);
 console.log(`нативных окон: ${dialogs}`);
 await browser.close();
 console.log(`итог: прошло ${results.filter(Boolean).length} / всего ${results.length}`);
