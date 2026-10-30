@@ -1,0 +1,46 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% load olymp_tags %}
+{% comment %}
+Страница телефона после QR (доска UploadBPhone; ночь 30→31.10, Э6). Без входа:
+пропуск — токен в адресе, он ведёт только к листам ОДНОГО задания. Вкладок
+других заданий, как на доске, нет: токен на них не распространяется.
+{% endcomment %}
+{% block title %}Фото решения · задание {{ number }}{% endblock %}
+{% block body_attrs %} class="om-take-body"{% endblock %}
+{% block olymp_content %}
+<div class="om om-phonepage">
+  <header class="tt-bar om-ttbar">{% include 'olympiads/_logo.html' %}<span class="om-ttbar__t">Фото решения</span></header>
+  <p class="meta">{{ olympiad.name_short }} · {{ info.stage_short|lower }} {{ info.season }} · {{ info.grades }} · {{ info.label }}</p>
+  <h1 class="ol-title om-ph-title">Задание {{ number }}</h1>
+  <p class="om-ph-sub">{{ problem.title }}</p>
+  <section class="k-card om-pad om-mt14">
+    {% if sheets %}<div class="om-sheets om-sheets--ph">{% for sheet in sheets %}<figure class="om-sheet om-sheet--real">{% if sheet.mime == 'application/pdf' %}<span class="om-sheet__pdf">{% include 'olympiads/_ico.html' with name='file' %}PDF</span>{% else %}<img src="{% url 'olympiads:phone_sheet' token.token sheet.pk %}" alt="Лист {{ sheet.page }}" loading="lazy">{% endif %}<figcaption>Лист {{ sheet.page }}</figcaption></figure>{% endfor %}</div>{% endif %}
+    {% if left > 0 %}
+    <form method="post" enctype="multipart/form-data" class="om-ph-form" data-autosubmit>
+      {% csrf_token %}
+      <label class="k-btn k-btn--main om-ph-cam">{% include 'olympiads/_ico.html' with name='camera' %}Сфотографировать<input type="file" class="sr-only" name="file" accept="image/*" capture="environment"></label>
+      <label class="k-btn k-btn--plain om-ph-gal">Выбрать из галереи<input type="file" class="sr-only" name="file" accept="image/*,application/pdf" multiple></label>
+      <button type="submit" class="k-btn k-btn--plain" data-nojs>Загрузить</button>
+    </form>
+    {% else %}<p class="meta">Листов уже {{ sheets|length }} — больше к заданию не добавить.</p>{% endif %}
+    {% if error %}<p class="om-up-err om-mt10" role="alert">{{ error }}</p>{% endif %}
+  </section>
+  {% if sheets %}
+  <div class="k-state k-state--ok om-mt14"><div class="k-state__body"><div class="k-state__title">Фото уже на компьютере</div><div class="k-state__note">{% for sheet in sheets %}Лист {{ sheet.page }}{% if not forloop.last %}{% if forloop.revcounter == 2 %} и {% else %}, {% endif %}{% endif %}{% endfor %} · сдать тур можно там</div></div></div>
+  {% endif %}
+</div>
+<script>
+(function () {
+  document.querySelectorAll('[data-nojs]').forEach(function (b) { b.hidden = true; });
+  var form = document.querySelector('[data-autosubmit]');
+  if (!form) return;
+  form.addEventListener('change', function (e) {
+    if (e.target.files && e.target.files.length) {
+      // Отправляем только то поле, которое выбрали: второе пустое — не мешает.
+      form.querySelectorAll('input[type=file]').forEach(function (i) { if (i !== e.target) i.disabled = true; });
+      form.submit();
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -14,6 +14,10 @@ urlpatterns = [
     path('', views.olympiad_list, name='list'),
     path('calendar/', views.calendar, name='calendar'),
     path('compare/', views.compare, name='compare'),
+    # Телефон по QR (Э6): `u/` объявлен ДО `<slug>/` по той же причине.
+    path('u/<str:token>/', views_training.phone_upload, name='phone_upload'),
+    path('u/<str:token>/sheet/<int:sheet_id>/', views_training.phone_sheet,
+         name='phone_sheet'),
     # Тренировка: семь адресов по образцу контрольной. Вход не требуется
     # ни на одном — решать комплект может любой посетитель.
     path('<slug:slug>/variant/<int:pk>/', views_training.training_intro,
@@ -36,6 +40,8 @@ urlpatterns = [
          views_training.training_sheet, name='training_sheet'),
     path('<slug:slug>/variant/<int:pk>/sheet/<int:sheet_id>/delete/',
          views_training.training_sheet_delete, name='training_sheet_delete'),
+    path('<slug:slug>/variant/<int:pk>/sheets/', views_training.training_sheets,
+         name='training_sheets'),
     path('<slug:slug>/variant/<int:pk>/result/',
          views_training.training_result, name='training_result'),
     path('<slug:slug>/follow/', views.follow, name='follow'),

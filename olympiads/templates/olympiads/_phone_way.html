@@ -1,1 +1,11 @@
-{% comment %}Путь «С телефона» (QR-код) — Э6. Пока QR нет, блока нет: путь «с компьютера» на месте.{% endcomment %}
+{% comment %}Путь «С телефона» (Э6, доски TakeTimed и UploadB): QR со ссылкой на страницу телефона
+этого задания. Нет библиотеки QR — блока нет, путь «с компьютера» остаётся.{% endcomment %}
+{% if row.phone %}
+<div class="om-qrway om-desk-only" data-phone data-item="{{ row.item.pk }}" data-token="{{ row.phone.token.token }}" data-sheets-url="{% url 'olympiads:training_sheets' olympiad.slug variant.pk %}?item={{ row.item.pk }}">
+  <div class="om-qr" data-qr>{{ row.phone.svg|safe }}</div>
+  <div class="om-qrway__b">
+    <b class="om-qrway__t">С телефона</b>
+    <span class="meta om-qrway__st" data-phone-state>{% if row.phone.connected %}<i class="ol-dot om-dot-on"></i>телефон подключён{% else %}Наведите камеру на код — фото появятся здесь{% endif %}</span>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,10 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% comment %}Пропуск телефона больше не действует: истёк (30 минут) или тур/задание сдано. Ответ — 410.{% endcomment %}
+{% block title %}Код устарел{% endblock %}
+{% block body_attrs %} class="om-take-body"{% endblock %}
+{% block olymp_content %}
+<div class="om om-phonepage">
+  <header class="tt-bar om-ttbar">{% include 'olympiads/_logo.html' %}<span class="om-ttbar__t">Фото решения</span></header>
+  <div class="k-card om-pad"><div class="om-empty__t">Код больше не действует</div><p class="meta om-mt10">Он живёт 30 минут и гаснет, когда тур сдан. Новый код — на экране компьютера.</p></div>
+</div>
+{% endblock %}

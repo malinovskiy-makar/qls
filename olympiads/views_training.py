@@ -255,6 +255,7 @@ def training_take(request, slug, pk):
             'reference': solution,
             'criteria': criteria,
             'has_criteria': bool(pos and pos.has_criteria),
+            'phone': _phone_way(request, attempt, problem, kind, locked),
             # Поля краткого ответа — только у задания с эталоном ответа
             # (машина его проверит); у остальных, как на макете, только
             # «Решение»: фото или текст.
@@ -286,6 +287,133 @@ def training_take(request, slug, pk):
         'max_sheets': uploads.MAX_SHEETS,
     })
     return render(request, 'olympiads/training_take.html', context)
+
+
+def _phone_way(request, attempt, problem, kind, locked):
+    """Путь «С телефона» для задания: токен и QR. Нет библиотеки QR — None."""
+    from . import phone
+
+    if locked or kind in ('radio', 'checkbox'):
+        return None
+    token = phone.issue(attempt, problem)
+    url = request.build_absolute_uri(reverse('olympiads:phone_upload',
+                                             args=[token.token]))
+    svg = phone.qr_svg(url)
+    if not svg:
+        return None
+    return {'token': token, 'url': url, 'svg': svg,
+            'connected': token.used_at is not None}
+
+
+def training_sheets(request, slug, pk):
+    """Опрос компьютера раз в 3 с: листы задания и подключён ли телефон.
+
+    `closed: true` — попытка сдана или задание сдано: страница перестаёт
+    спрашивать. QR, которому осталось меньше пяти минут, приходит новым.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from problems.models import AssignmentItem
+
+    from . import phone, uploads
+
+    _, variant = _variant_or_404(slug, pk)
+    user, session_key = _who(request)
+    attempt = engine.current_attempt(variant, user, session_key)
+    if attempt is None or engine.finalize_if_expired(attempt) or \
+            not engine.can_accept(attempt, timezone.now()):
+        return JsonResponse({'closed': True, 'sheets': []})
+    item = get_object_or_404(AssignmentItem, pk=request.GET.get('item'),
+                             assignment=engine.training_assignment(variant))
+    problem = item.catalog_problem
+    if not attempt.with_timer and problem.pk in engine.graded_problem_ids(attempt):
+        return JsonResponse({'closed': True, 'sheets': []})
+    way = _phone_way(request, attempt, problem, '', False)
+    return JsonResponse({
+        'closed': False,
+        'connected': bool(way and way['connected']),
+        'token': way['token'].token if way else '',
+        'qr': way['svg'] if way else '',
+        'sheets': [{'id': s.pk, 'page': s.page, 'source': s.source,
+                    'pdf': s.mime == 'application/pdf',
+                    'url': reverse('olympiads:training_sheet', args=[slug, pk, s.pk]),
+                    'delete': reverse('olympiads:training_sheet_delete',
+                                      args=[slug, pk, s.pk])}
+                   for s in uploads.sheets(attempt, problem)],
+    })
+
+
+def _token_or_error(request, token):
+    """(токен, None) или (токен, ответ 410); нет токена — 404."""
+    from . import phone
+    from .models import PhoneUploadToken
+
+    found = (PhoneUploadToken.objects
+             .select_related('attempt', 'attempt__variant',
+                             'attempt__variant__olympiad', 'problem')
+             .filter(token=token).first())
+    if found is None:
+        raise Http404
+    if phone.state(found) != 'ok':
+        return found, render(request, 'olympiads/phone_gone.html', {}, status=410)
+    return found, None
+
+
+def phone_upload(request, token):
+    """Страница телефона после QR (доска UploadBPhone): без входа, только листы
+    одного задания. Та же проверка файлов, что «с компьютера»."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from . import uploads
+
+    found, gone = _token_or_error(request, token)
+    if gone is not None:
+        return gone
+    if found.used_at is None:
+        found.used_at = timezone.now()
+        found.save(update_fields=['used_at'])
+    attempt, problem = found.attempt, found.problem
+    error = ''
+    if request.method == 'POST':
+        for uploaded in request.FILES.getlist('file') or [None]:
+            try:
+                uploads.save_sheet(attempt, problem, uploaded, source='phone')
+            except uploads.UploadError as exc:
+                error = str(exc)
+                break
+        if not error:
+            return redirect('olympiads:phone_upload', token=token)
+    info = navigator.tour_info(attempt.variant)
+    pos = next((i for i in engine.package_items(attempt.variant)
+                if i.problem_id == problem.pk), None)
+    sheets = uploads.sheets(attempt, problem)
+    return render(request, 'olympiads/phone_upload.html', {
+        'token': found, 'info': info, 'olympiad': attempt.variant.olympiad,
+        'problem': problem, 'number': (pos.number if pos else '') or '',
+        'sheets': sheets, 'left': uploads.MAX_SHEETS - len(sheets),
+        'error': error,
+    }, status=400 if error else 200)
+
+
+def phone_sheet(request, token, sheet_id):
+    """Миниатюра листа на телефоне — только листы ЭТОГО задания по токену."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from .models import TrainingUpload
+
+    found, gone = _token_or_error(request, token)
+    if gone is not None:
+        return gone
+    sheet = get_object_or_404(TrainingUpload, pk=sheet_id,
+                              attempt=found.attempt, problem=found.problem)
+    response = FileResponse(sheet.file.open('rb'),
+                            content_type=sheet.mime or 'application/octet-stream')
+    response['Cache-Control'] = 'private, max-age=600'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @require_POST

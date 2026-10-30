@@ -127,6 +127,8 @@ redis==8.1.0
     # via
     #   -r requirements/base.in
     #   channels-redis
+segno==1.6.6
+    # via -r requirements/base.in
 service-identity==26.1.0
     # via twisted
 sniffio==1.3.1

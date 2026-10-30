@@ -49,5 +49,48 @@
     box.addEventListener('dragleave', function () { box.classList.remove('om-drop--on'); });
     box.addEventListener('drop', function (e) { e.preventDefault(); box.classList.remove('om-drop--on'); upload(itemId, e.dataTransfer.files, box); });
   });
+  // ── «С телефона» (Э6): опрос раз в 3 с, пока блок задания на экране ──
+  // Останавливается навсегда, когда сервер ответил `closed` (тур или задание
+  // сдано), и не спрашивает, пока вкладка скрыта.
+  var stopped = false, poll = null;
+  function visiblePhoneBlock() {
+    var pane = root.querySelector('.om-taskpane:not([hidden])');
+    var block = pane && pane.querySelector('[data-phone]');
+    if (!block || block.offsetParent === null) return null;
+    return block;
+  }
+  function addSheet(list, s) {
+    var fig = document.createElement('figure');
+    fig.className = 'om-sheet om-sheet--real';
+    fig.setAttribute('data-sheet', s.id);
+    if (s.pdf) { var p = document.createElement('span'); p.className = 'om-sheet__pdf'; p.textContent = 'PDF'; fig.appendChild(p); }
+    else { var img = document.createElement('img'); img.src = s.url; img.alt = 'Лист ' + s.page; fig.appendChild(img); }
+    var cap = document.createElement('figcaption'); cap.textContent = 'Лист ' + s.page; fig.appendChild(cap);
+    list.appendChild(fig);
+  }
+  function tick() {
+    if (stopped || document.hidden) return;
+    var block = visiblePhoneBlock();
+    if (!block) return;
+    fetch(block.getAttribute('data-sheets-url'), {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.closed) { stopped = true; clearInterval(poll); return; }
+        var st = block.querySelector('[data-phone-state]');
+        if (res.connected && st && !st.querySelector('.om-dot-on')) st.innerHTML = '<i class="ol-dot om-dot-on"></i>телефон подключён';
+        if (res.qr && block.getAttribute('data-token') !== res.token) {
+          if (block.getAttribute('data-token')) block.querySelector('[data-qr]').innerHTML = res.qr;
+          block.setAttribute('data-token', res.token);
+        }
+        var list = root.querySelector('[data-sheets="' + block.getAttribute('data-item') + '"]');
+        if (!list) return;
+        (res.sheets || []).forEach(function (s) {
+          if (!list.querySelector('[data-sheet="' + s.id + '"]')) addSheet(list, s);
+        });
+      })
+      .catch(function () {});
+  }
+  if (root.querySelector('[data-phone]')) poll = setInterval(tick, 3000);
+  window.__omPhonePoll = function () { return {stopped: stopped}; };
 })();
 </script>

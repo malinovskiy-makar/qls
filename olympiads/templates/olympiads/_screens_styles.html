@@ -165,7 +165,7 @@ templates/_tokens.html. Ниже переноса — правила телеф�
 .om .ai-in textarea::placeholder { color: var(--text3); }
 .om .ai-send { width: 32px; height: 32px; border-radius: var(--r-pill); border: 0; background: var(--surface); color: var(--text3); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .om .om-pop { position: absolute; z-index: 5; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--shadow-pop); }
-.om .om-qr { width: 168px; height: 168px; flex-shrink: 0; padding: 10px; background: white; border-radius: var(--r); border: 1px solid var(--border); } /* QR сканируется только тёмным по белому — белый в обеих темах намеренно */
+.om .om-qr { flex-shrink: 0; background: white; border-radius: var(--r); border: 1px solid var(--border); } /* QR сканируется только тёмным по белому — белый в обеих темах намеренно */
 /* Стили отдельных досок (их <helmet>) */
 .om .om-today-l { position: absolute; top: 6px; transform: translateX(-50%); font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; padding: 3px 8px; border-radius: 4px; background: var(--surface); box-shadow: 0 0 0 1px var(--brand-amber); }
 .om .cal-group { font-size: 13px; font-weight: 600; color: var(--text2); padding: 14px 20px 6px; border-top: 1px solid var(--border-soft); }
@@ -531,5 +531,22 @@ body.om-take-body main.page-wrap { padding-top: 0; }
   .om .om-opt { min-height: 44px; align-items: center; }
   .om .om-answer .k-input { min-height: 44px; }
 }
+
+/* ── Фото с телефона по QR (Э6): доски UploadB и UploadBPhone ── */
+.om .om-qrway { display: flex; gap: 16px; align-items: center; padding: 14px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface-2); }
+.om .om-qr { width: 148px; height: 148px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+.om .om-qr svg { width: 100%; height: 100%; display: block; }
+.om .om-qrway__b { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.om .om-qrway__t { font-size: 15px; font-weight: 600; }
+.om .om-qrway__st { display: inline-flex; align-items: center; gap: 6px; }
+.om .om-dot-on { background: var(--accent); }
+.om.om-phonepage { max-width: 480px; margin: 0 auto; }
+.om .om-ph-title { font-size: 24px; margin-top: 4px; }
+.om .om-ph-sub { font-size: 15px; font-weight: 600; }
+.om .om-ph-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.om .om-ph-cam { min-height: 56px; font-size: 17px; font-weight: 700; border-radius: var(--r-panel); }
+.om .om-ph-gal { min-height: 44px; }
+.om .om-sheets--ph { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 0; }
+.om .om-sheets--ph .om-sheet--real { width: auto; height: auto; aspect-ratio: 3 / 4; }
 
 /* @@NEXT@@ */

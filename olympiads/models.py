@@ -1427,3 +1427,33 @@ class TrainingUpload(models.Model):
     def __str__(self):
         return '#{} задача {} лист {}'.format(self.attempt_id, self.problem_id,
                                              self.page)
+
+
+class PhoneUploadToken(models.Model):
+    """Пропуск телефона к ОДНОМУ заданию попытки: QR-код на экране тура (Э6).
+
+    ⚠️ Токен — `secrets.token_urlsafe(24)`, живёт 30 минут, открывает только
+    своё задание своей попытки и гаснет со сдачей попытки (и со сдачей задания
+    в режиме «Без времени»). Входа на телефоне не нужно: токен и есть пропуск,
+    поэтому он короткоживущий и ни к чему, кроме загрузки листов, не ведёт.
+    """
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE, related_name='phone_tokens',
+        verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_phone_tokens', verbose_name='Задача')
+    token = models.CharField('Токен', max_length=64, unique=True)
+    expires_at = models.DateTimeField('Истекает')
+    created_at = models.DateTimeField('Выдан', auto_now_add=True)
+    # Когда телефон впервые открыл страницу — «телефон подключён» на компьютере.
+    used_at = models.DateTimeField('Телефон открыл', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Пропуск телефона'
+        verbose_name_plural = 'Пропуски телефона'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return '#{} задача {}'.format(self.attempt_id, self.problem_id)
