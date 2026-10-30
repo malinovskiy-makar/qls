@@ -1,0 +1,16 @@
+[Unit]
+Description=Вход для VPN: к 8080/8443 пускать только tg-relay (цепочка DOCKER-USER)
+# Правила iptables живут в памяти и после перезагрузки пропадают; цепочка
+# DOCKER-USER появляется только вместе с Docker. Поэтому — после него.
+After=docker.service
+Requires=docker.service
+# Перезапустили Docker — перезапускается и этот юнит: правила ставятся заново.
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/srv/weconomics/app/deploy/web_relay/prod_firewall.sh
+
+[Install]
+WantedBy=multi-user.target
