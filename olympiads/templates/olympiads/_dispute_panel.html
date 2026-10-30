@@ -18,7 +18,7 @@
       <input type="hidden" name="problem_id" value="{{ dispute.check.problem_id }}">
       <input type="hidden" name="code" value="{{ dispute.code }}">
       <input type="hidden" name="back" value="{{ back }}">
-      <div class="ai-sug"><button type="submit" name="message" value="Разберите, пожалуйста, по шагам, почему балл снят.">Разобрать по шагам</button><button type="submit" name="message" value="Мне кажется, балл занижен. Пересмотрите оценку по критериям.">Пересмотреть оценку</button></div>
+      <div class="ai-sug"><button type="submit" name="message" value="Разберите, пожалуйста, по шагам, почему балл снят.">Разобрать по шагам</button><button type="submit" name="message" value="Почему здесь снят балл? Объясните по критериям жюри.">Почему снят балл?</button></div>
       <div class="ai-in"><label class="sr-only" for="dispute-msg">С чем вы не согласны?</label><textarea id="dispute-msg" name="message" rows="1" placeholder="С чем вы не согласны?" data-dispute-text></textarea><button type="submit" class="ai-send" aria-label="Отправить">{% include 'olympiads/_ico.html' with name='upload' %}</button></div>
     </form>
     {% if dispute.check.human_review %}<p class="meta om-mt10">Задание отправлено на проверку человеку</p>{% else %}

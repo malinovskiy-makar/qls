@@ -453,6 +453,8 @@ body.om-take-body main.page-wrap { padding-top: 0; }
 .om .om-intro-side { display: flex; flex-direction: column; gap: 16px; }
 .om .om-tasks__hd { padding: 16px 20px 4px; display: flex; align-items: baseline; gap: 12px; }
 .om .om-tasks__cols { display: flex; padding: 0 20px 6px; font-size: 12.5px; }
+.om .om-tasks__hd { padding-bottom: 8px; }
+.om .om-tasks__col { font-size: 12.5px; }
 .om .om-task-row { padding: 12px 20px; }
 .om .om-task-row__t { font-size: 15px; font-weight: 600; }
 .om .om-task-row__p { white-space: nowrap; }
@@ -465,6 +467,10 @@ body.om-take-body main.page-wrap { padding-top: 0; }
 .om .om-task__hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
 .om .om-task__t { font-size: 19px; font-weight: 600; flex: 1 1 auto; min-width: 0; }
 .om .om-task__s { overflow-wrap: anywhere; }
+/* У7: маркеры списков в условии — внутри блока, а не левее текста. */
+.om .om-task__s ul, .om .om-task__s ol, .om .om-part ul, .om .om-part ol,
+.om .om-ref ul, .om .om-ref ol { padding-left: 1.5em; margin: 6px 0; }
+.om .om-task__s li, .om .om-part li, .om .om-ref li { margin: 2px 0; }
 /* Широкая выключная формула на телефоне листается сама, страница — нет. */
 .om .katex-display { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
 .om .om-sol { margin-top: 16px; padding: 18px 20px 20px; }
@@ -582,7 +588,9 @@ body.om-take-body main.page-wrap { padding-top: 0; }
 .om.om-take.om-with-chat { display: block; }
 .om.om-take.om-with-chat .om-take-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; max-width: none; }
 .om.om-take.om-with-chat .om-take-wrap > .om-tasknav, .om.om-take.om-with-chat .om-take-wrap > .sr-only { grid-column: 1 / -1; }
-.om .om-dispute { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+/* У7: верх прилипающей панели — под шапкой сайта (48 px) или полосой тура (60 px) + 16 px. */
+.om .om-dispute { position: sticky; top: 64px; max-height: calc(100vh - 80px); }
+.om.om-take--timed .om-dispute { top: 76px; max-height: calc(100vh - 92px); }
 .om .om-dispute .ai-body { overflow-y: auto; min-height: 120px; }
 .om .om-dispute .ai-head .k-btn { margin-left: auto; }
 .om .om-dispute__q { font-size: 13px; }
@@ -627,3 +635,6 @@ main.page-wrap:has(.om-with-chat) { max-width: 1240px; }
 .om-dlg .om-amber:hover { background: var(--brand-amber-hover); }
 .om-dlg .k-btn--main { background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg); }
 @media (max-width: 480px) { .om-dlg__go { flex-direction: column-reverse; } .om-dlg__go .k-btn { width: 100%; } }
+
+/* У7: кнопка «только без JS» прячется атрибутом hidden — класс .k-btn его не перебивает. */
+[data-nojs][hidden] { display: none !important; }

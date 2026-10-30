@@ -351,3 +351,40 @@ class HonestStatusTests(TestCase):
         html = self.client.get(self.url('training_result')).content.decode()
         self.assertIn('0 из 12', html)
         self.assertEqual(html.count('решения нет · 0'), 2)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, OLYMPIAD_AI_CHECK=False)
+class LayoutTests(TestCase):
+    """У7: вёрстка входа, загрузки, панели спора и списков в условии."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)
+        cls.variant = fx.kit(cls.olymp, cls.final, '2025/26', tour='2')
+
+    def test_column_caption_is_in_header_row(self):
+        html = self.client.get(reverse('olympiads:training_intro',
+                                       args=['vs', self.variant.pk])).content.decode()
+        head = html[html.index('class="om-tasks__hd"'):]
+        head = head[:head.index('</div>')]
+        self.assertIn('максимум', head)
+        self.assertNotIn('om-tasks__cols', html)
+
+    def test_upload_button_only_without_js(self):
+        self.client.post(reverse('olympiads:training_start', args=['vs', self.variant.pk]),
+                         {'timer': '0'})
+        html = self.client.get(reverse('olympiads:training_take',
+                                       args=['vs', self.variant.pk])).content.decode()
+        for chunk in html.split('<noscript>')[1:]:
+            self.assertIn('</noscript>', chunk)
+        outside = ''.join(c.split('</noscript>', 1)[-1] for c in html.split('<noscript>'))
+        self.assertNotIn('>Загрузить</button>', outside)
+
+    def test_hint_does_not_promise_regrade_and_styles_are_fixed(self):
+        panel = open('olympiads/templates/olympiads/_dispute_panel.html', encoding='utf-8').read()
+        self.assertIn('Почему снят балл?', panel)
+        self.assertNotIn('Пересмотреть оценку', panel)
+        css = open('olympiads/templates/olympiads/_screens_styles.html', encoding='utf-8').read()
+        self.assertIn('.om .om-dispute { position: sticky; top: 64px;', css)
+        self.assertIn('.om .om-task__s ul', css)

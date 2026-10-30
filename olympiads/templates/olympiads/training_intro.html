@@ -41,8 +41,8 @@
 
   <div class="om-intro-grid">
     <section class="k-card om-tasks">
-      <div class="om-tasks__hd"><h2 class="om-h2 om-grow">Задания</h2>{% with pdf=info.pdfs.tasks %}{% if pdf %}<a class="om-link" href="{{ pdf.href }}" target="_blank" rel="noopener">Условия в PDF</a>{% endif %}{% endwith %}</div>
-      <div class="om-tasks__cols meta"><span class="om-grow"></span><span>максимум</span></div>
+      {# У7: ссылка — рядом с заголовком, подпись столбца — в той же строке над баллами. #}
+      <div class="om-tasks__hd"><h2 class="om-h2">Задания</h2>{% with pdf=info.pdfs.tasks %}{% if pdf %}<a class="om-link" href="{{ pdf.href }}" target="_blank" rel="noopener">Условия в PDF</a>{% endif %}{% endwith %}<span class="om-grow"></span><span class="meta om-tasks__col">максимум</span></div>
       {% for row in rows %}
       <div class="om-row om-task-row"><span class="om-stepno" aria-hidden="true">{{ row.number }}</span><span class="om-grow om-task-row__t">{{ row.title }}</span><span class="meta om-task-row__p">{{ row.points|points_label }}</span></div>
       {% endfor %}

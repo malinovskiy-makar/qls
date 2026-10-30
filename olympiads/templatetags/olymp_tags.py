@@ -38,7 +38,7 @@ def points_label(value):
     from olympiads.navigator import _fmt, plural
     whole = float(value)
     word = plural(int(whole), 'балл', 'балла', 'баллов') if whole.is_integer() else 'балла'
-    return '{} {}'.format(_fmt(value), word)
+    return '{}\u00a0{}'.format(_fmt(value), word)
 
 
 @register.filter

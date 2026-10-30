@@ -80,7 +80,8 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
                 <label class="k-btn k-btn--main om-desk-only">Выбрать файлы<input type="file" class="sr-only" accept="image/jpeg,image/png,image/webp,application/pdf" multiple data-upload form="up-{{ row.item.pk }}" name="file"></label>
                 <label class="k-btn k-btn--plain om-phone-only">Из галереи<input type="file" class="sr-only" accept="image/*" multiple data-upload form="up-{{ row.item.pk }}" name="file"></label>
                 <span class="meta om-desk-only">или перетащите сюда</span>
-                <button type="submit" class="k-btn k-btn--plain k-btn--sm" form="up-{{ row.item.pk }}" data-nojs>Загрузить</button>
+                {# У7: выбор файлов сразу загружает (JS); кнопка — только без JS. #}
+                <noscript><button type="submit" class="k-btn k-btn--plain k-btn--sm" form="up-{{ row.item.pk }}">Загрузить</button></noscript>
                 <span class="meta om-up-err" data-up-err role="status"></span>
               </div>
             </div>
