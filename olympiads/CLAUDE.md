@@ -194,3 +194,20 @@ vseros=/olympiads/vseros/ …` (сервер ночи на 8097) — 1280/390 ×
 - Площадка ночи: ключей нет; сервер для снимков — `NIGHT_AI_PROVIDER=fake`
   и `QLS_FAKE_REPLY` из `claude/night_olymp_20261030/tools/fake_reply_59997.json`
   (подставной ответ подписан в `summary`).
+
+## Результат тура и «Оспорить оценку» (Э8, ADR 0177): доски Result, TakeFreeChat
+
+- `training_result.html`: итог тура, время (`navigator.spent_label`), «Два тура»
+  (сумма последних сданных туров той же клетки — `sibling_tours`), очередь ИИ
+  («Проверено N из M», опрос `check-next/` с `X-Requested-With: fetch`; без JS —
+  кнопка, возвращающая на результат), задания строками `<details>` с разбором по
+  критериям, «Решить ещё раз без времени», «Разборы тура» (PDF решений, если есть).
+- «Как решали другие» — `navigator.others_stats` (вошедшие, на время, последняя
+  попытка, без себя, от `OTHERS_MIN = 20`); меньше — блока и колонки медиан нет.
+- Оспаривание: `olympiads/dispute.py` + партиал `_dispute_panel.html` (классы
+  `.ai-*` из «Стола»; без JS — форма, подсказки — кнопки отправки, история — из
+  `ChatTurn` с `mode='dispute'`). Адреса `POST …/dispute/` (JSON при fetch) и
+  `POST …/dispute/human/`. Открытие панели — `?dispute=<задача>[&code=<критерий>]`;
+  без кода подсвечивается первая строка, где балл снят. Чужая задача — 404.
+- `catalog/chat.py`: режим `dispute`, `quote_source='criterion'`, аргумент
+  `extra_system` у `answer()`; в `ChatTurn.Mode` значения нет намеренно.
