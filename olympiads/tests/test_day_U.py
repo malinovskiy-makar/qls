@@ -115,3 +115,54 @@ class OwnPdfTests(TestCase):
         html = self.client.get(reverse('olympiads:detail', args=['vs'])).content.decode()
         self.assertIn('Требования к заключительному этапу', html)
         self.assertNotIn('vso.edsoo.ru', html)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, OLYMPIAD_AI_CHECK=False)
+class AnswerFieldTests(TestCase):
+    """У2: поле «Ответ» — только у теста, по типу задачи, а не по эталону."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from problems.models import ProblemPart
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)
+        cls.variant = fx.kit(cls.olymp, cls.final, '2025/26', tour='2', tasks=2)
+        items = list(cls.variant.items.order_by('order'))
+        cls.open_task = items[0].problem
+        cls.open_task.answer = '1,5'
+        cls.open_task.save(update_fields=['answer'])
+        for label in 'абв':
+            ProblemPart.objects.create(problem=cls.open_task, label=label,
+                                       statement='Вопрос ' + label, answer='12')
+        items[0].has_answer = True
+        items[0].save(update_fields=['has_answer'])
+        cls.test_task = items[1].problem
+        cls.test_task.problem_type = 'тест: числовой ответ'
+        cls.test_task.answer = '42'
+        cls.test_task.save(update_fields=['problem_type', 'answer'])
+
+    def page(self, task):
+        self.client.post(reverse('olympiads:training_start', args=['vs', self.variant.pk]),
+                         {'timer': '0'})
+        url = reverse('olympiads:training_take', args=['vs', self.variant.pk])
+        html = self.client.get(url + '?task=%d' % task).content.decode()
+        start = html.index('data-task="%d"' % task, html.index('id="exam-form"'))
+        end = html.find('class="om-taskpane"', start)
+        return html[start:end if end > 0 else len(html)]
+
+    def test_open_task_with_reference_has_no_answer_fields(self):
+        pane = self.page(1)
+        self.assertNotIn('answer-short', pane)
+        self.assertNotIn('Ответ а', pane)
+        self.assertIn('Решение', pane)
+
+    def test_test_task_has_answer_field(self):
+        self.assertIn('answer-short', self.page(2))
+
+    def test_reference_answer_goes_to_ai_prompt(self):
+        from olympiads import ai_check
+        how = {'maximum': 12, 'approximate': True, 'text': 'Критерии'}
+        prompt = ai_check.build_prompt(self.open_task, list(self.open_task.parts.all()),
+                                       how, 'решение')
+        self.assertIn('ЭТАЛОННЫЙ ОТВЕТ', prompt)
+        self.assertIn('а) 12', prompt)

@@ -181,6 +181,7 @@ def training_take(request, slug, pk):
     stub = soon_page(request)
     if stub is not None:
         return stub
+    from problems import problem_types
     from problems.assignment_rows import (answer_parts, answer_input_name,
                                           display_parts, item_answer_form)
 
@@ -263,13 +264,11 @@ def training_take(request, slug, pk):
             'criteria': criteria,
             'has_criteria': bool(pos and pos.has_criteria),
             'phone': _phone_way(request, attempt, problem, kind, locked),
-            # Поля краткого ответа — только у задания с эталоном ответа
-            # (машина его проверит); у остальных, как на макете, только
-            # «Решение»: фото или текст.
-            'has_answer': (pos.has_answer if pos else bool(
-                (problem.answer or '').strip()
-                or any((p['part'].answer or '').strip()
-                       for p in parts if p['part'] is not None))),
+            # Поля краткого ответа — ТОЛЬКО У ТЕСТА (день 30.10, У2): по типу
+            # задачи, а не по наличию эталона. У развёрнутой задачи ответ на
+            # пункт — не обязательно число, ей — только «Решение»: фото или
+            # текст; эталон уходит в ИИ-проверку (`ai_check.build_prompt`).
+            'answer_fields': problem_types.is_test(problem.problem_type),
         })
 
     try:

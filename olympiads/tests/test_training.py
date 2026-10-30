@@ -72,12 +72,14 @@ class GuestTests(TestCase):
         item = engine.variant_items(self.variant)[0]
         response = self.client.post(
             self.url('training_autosave'),
-            data={'item_id': item.pk, 'answer': 'мой ответ'},
+            data={'item_id': item.pk, 'solution': 'моё решение'},
             content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
+        # День 30.10, У2: у развёрнутой задачи поля краткого ответа нет —
+        # восстанавливается «Решение» текстом.
         again = self.client.get(self.url('training_take'))
-        self.assertContains(again, 'мой ответ')
+        self.assertContains(again, 'моё решение')
         self.assertTrue(attempt.is_guest)
 
     def test_guest_result_is_shown_but_not_tied_to_any_user(self):

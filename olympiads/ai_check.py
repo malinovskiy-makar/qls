@@ -137,6 +137,15 @@ def build_prompt(problem, parts, how, student_text, ocr_text=''):
         if how['rules']:
             lines.append('ПРАВИЛА ЖЮРИ:')
             lines += ['- %s: %s' % (r['code'], r['text']) for r in how['rules']]
+    # Эталонный ответ — для сверки чисел (день 30.10, У2): полей краткого
+    # ответа у развёрнутой задачи больше нет, машина его не сверяет. Эталонное
+    # РЕШЕНИЕ по-прежнему не передаётся (решение ночи 31).
+    reference = [(problem.answer or '').strip()] + [
+        '%s) %s' % ((part.label or '').strip().rstrip(').') or '?', part.answer.strip())
+        for part in parts if (part.answer or '').strip()]
+    reference = [line for line in reference if line]
+    if reference:
+        lines += ['ЭТАЛОННЫЙ ОТВЕТ ЖЮРИ (только для сверки; балл — по критериям):'] + reference
     lines += ['РЕШЕНИЕ УЧЕНИКА:', (student_text or '').strip() or '(текстом не дано)']
     if (ocr_text or '').strip():
         lines += ['ТЕКСТ, РАСПОЗНАННЫЙ С ФОТО ЛИСТОВ:', ocr_text.strip()]

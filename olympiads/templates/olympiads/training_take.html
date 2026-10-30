@@ -65,7 +65,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
           <div class="om-opts">{% for option in row.options %}<label class="ol-opt om-opt"><input type="{{ row.kind }}" name="{{ row.parts.0.name }}" value="{{ option.value }}" {% if option.value in row.chosen %}checked{% endif %}><span>{{ option.label }}</span></label>{% endfor %}</div>
           <textarea class="answer-text" name="{{ row.solution_name }}" hidden>{{ row.solution_value }}</textarea>
           {% else %}
-          {% if row.has_answer %}
+          {% if row.answer_fields %}
           <div class="om-answers">{% for part in row.parts %}<label class="om-answer"><span class="om-answer__l">Ответ{% if part.part %} {{ part.label }}{% endif %}</span><input class="answer-short k-input" type="text" name="{{ part.name }}" value="{{ part.value }}"{% if part.part %} data-part="{{ part.part.pk }}"{% endif %} autocomplete="off"></label>{% endfor %}</div>
           {% endif %}
           <input type="radio" class="om-mode-r sr-only" name="mode-{{ row.item.pk }}" id="m-photo-{{ row.item.pk }}" {% if row.sheets or not row.solution_value %}checked{% endif %}>
