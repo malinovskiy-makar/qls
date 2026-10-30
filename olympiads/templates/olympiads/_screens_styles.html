@@ -549,4 +549,57 @@ body.om-take-body main.page-wrap { padding-top: 0; }
 .om .om-sheets--ph { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 0; }
 .om .om-sheets--ph .om-sheet--real { width: auto; height: auto; aspect-ratio: 3 / 4; }
 
+/* ── Результат тура и «Оспорить оценку» (Э8): доски Result, TakeFreeChat ── */
+.om .om-res-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-top: 6px; }
+.om .om-res-top--two { grid-template-columns: minmax(0, 1fr) 240px; }
+.om .om-res-big { font-size: 40px; margin: 4px 0; }
+.om .om-queue { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.om .om-queue form { margin: 0; }
+.om .om-others__hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.om .om-others__nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.om .om-others__n { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.om .om-res-hd { display: flex; gap: 14px; padding: 14px 20px 6px; font-size: 13px; }
+.om .om-res-c { width: 110px; text-align: right; flex-shrink: 0; }
+.om .om-res-c--act { width: 80px; }
+.om .om-res-row { border-top: 1px solid var(--border-soft); }
+.om .om-res-sum { list-style: none; display: flex; align-items: center; gap: 14px; padding: 14px 20px; cursor: pointer; }
+.om .om-res-sum::-webkit-details-marker { display: none; }
+.om .om-res-t { font-size: 15px; font-weight: 600; }
+.om .om-res-me { font-weight: 600; font-variant-numeric: tabular-nums; }
+.om .om-res-body { padding: 0 20px 16px 62px; }
+.om .om-res-body .om-det { margin: 8px -20px 0 -62px; }
+.om .om-res-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.om .om-res-acts form { margin: 0; }
+.om .om-crit--on { background: var(--accent-tint); margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: var(--r); }
+.om .om-check__acts { display: flex; gap: 10px; margin-top: 14px; }
+.om .om-dispute-btn { color: var(--accent-ink); }
+.om .om-dispute-btn--on { border-color: var(--accent); }
+.om.om-with-chat { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.om.om-take.om-with-chat { display: block; }
+.om.om-take.om-with-chat .om-take-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; max-width: none; }
+.om.om-take.om-with-chat .om-take-wrap > .om-tasknav, .om.om-take.om-with-chat .om-take-wrap > .sr-only { grid-column: 1 / -1; }
+.om .om-dispute { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+.om .om-dispute .ai-body { overflow-y: auto; min-height: 120px; }
+.om .om-dispute .ai-head .k-btn { margin-left: auto; }
+.om .om-dispute__q { font-size: 13px; }
+.om .om-dispute .ai-sug button { cursor: pointer; }
+.om .om-dispute .ai-send { cursor: pointer; }
+main.page-wrap:has(.om-with-chat) { max-width: 1240px; }
+@media (max-width: 720px) {
+  .om .om-res-top--two { grid-template-columns: minmax(0, 1fr); }
+  .om .om-others__nums { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .om .om-res-hd .om-res-c--act, .om .om-res-sum .om-res-c--act { display: none; }
+  .om .om-res-c { width: auto; }
+  .om .om-res-sum { padding: 12px 14px; gap: 10px; min-height: 44px; }
+  .om .om-res-body { padding: 0 14px 14px; }
+  .om .om-res-body .om-det { margin: 8px -14px 0; }
+  .om .om-res-acts .k-btn { width: 100%; min-height: 44px; }
+  .om .om-res-acts form { width: 100%; }
+  .om.om-with-chat, .om.om-take.om-with-chat .om-take-wrap { display: block; }
+  .om .om-dispute { position: static; max-height: none; margin-top: 16px; }
+  .om .om-dispute .ai-sug button, .om .om-dispute .ai-send { min-height: 44px; min-width: 44px; }
+  .om .om-dispute .ai-in textarea { min-height: 44px; }
+  .om .om-check__acts .k-btn { min-height: 44px; }
+}
+
 /* @@NEXT@@ */

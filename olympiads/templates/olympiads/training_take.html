@@ -16,7 +16,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
 {% block title %}{{ info.label }} · {{ olympiad.name_short }} {{ info.season }}{% endblock %}
 {% block body_attrs %}{% if attempt.with_timer %} class="om-take-body"{% endif %}{% endblock %}
 {% block olymp_content %}
-<div class="om om-take{% if attempt.with_timer %} om-take--timed{% else %} om-take--free{% endif %}">
+<div class="om om-take{% if attempt.with_timer %} om-take--timed{% else %} om-take--free{% endif %}{% if dispute %} om-with-chat{% endif %}">
   {% if attempt.with_timer %}
   {# ── Полоса тура вместо шапки сайта (TakeTimed) ── #}
   <header class="tt-bar om-ttbar">
@@ -106,6 +106,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
       </section>
       {% endfor %}
     </form>
+    {% if dispute %}{% with back=request.path|add:'?task='|add:current_str dispute_number=dispute.number %}{% include 'olympiads/_dispute_panel.html' %}{% endwith %}{% endif %}
     {% for row in rows %}{% if not row.locked and not row.is_test %}
     <form method="post" id="up-{{ row.item.pk }}" action="{% url 'olympiads:training_upload' olympiad.slug variant.pk %}" enctype="multipart/form-data" hidden>{% csrf_token %}<input type="hidden" name="item_id" value="{{ row.item.pk }}"><input type="hidden" name="task" value="{{ row.index }}"></form>
     {% endif %}{% endfor %}

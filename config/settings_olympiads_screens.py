@@ -33,3 +33,6 @@ import os  # noqa: E402
 
 if os.environ.get('NIGHT_AI_PROVIDER'):
     AI_PROVIDER = os.environ['NIGHT_AI_PROVIDER']
+    # Чат «Оспорить оценку» ходит через поставщика чата «Стола» (GLM на бою).
+    CATALOG_CHAT_PROVIDER = os.environ['NIGHT_AI_PROVIDER']
+    CATALOG_CHAT_VISION_MODEL = ''

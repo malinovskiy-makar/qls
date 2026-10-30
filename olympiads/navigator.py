@@ -1204,3 +1204,54 @@ def spent_label(attempt):
         return ''
     minutes = int((attempt.submitted_at - attempt.started_at).total_seconds() // 60)
     return minutes_label(max(minutes, 1))
+
+
+# ---------------------------------------------------------------------------
+# Результат тура: «Как решали другие» (Э8)
+# ---------------------------------------------------------------------------
+
+# ⚠️ Меньше 20 учеников — блока и медиан НЕТ: на десятке человек «медиана» и
+# «выше, чем у 71 %» — шум, который школьник прочитает как факт.
+OTHERS_MIN = 20
+
+
+def others_stats(variant, me=None, my_score=None):
+    """Статистика по настоящим сданным попыткам ВОШЕДШИХ учеников на время.
+
+    Гости не входят (их попытка ни за кем не числится), решающий — тоже (это
+    «другие»). От ученика берётся его ПОСЛЕДНЯЯ сданная попытка. Меньше
+    `OTHERS_MIN` учеников — None.
+    """
+    from statistics import median
+
+    from .models import TrainingItemResult
+
+    queryset = (TrainingAttempt.objects
+                .filter(variant=variant, with_timer=True, user__isnull=False,
+                        submitted_at__isnull=False, score__isnull=False)
+                .order_by('user_id', '-submitted_at'))
+    if me is not None:
+        queryset = queryset.exclude(user=me)
+    latest = {}
+    for attempt in queryset:
+        latest.setdefault(attempt.user_id, attempt)
+    if len(latest) < OTHERS_MIN:
+        return None
+    scores = [float(a.score) for a in latest.values()]
+    per_task = defaultdict(list)
+    for row in (TrainingItemResult.objects
+                .filter(attempt__in=[a.pk for a in latest.values()],
+                        score__isnull=False)
+                .values_list('problem_id', 'score')):
+        per_task[row[0]].append(float(row[1]))
+    below = None
+    if my_score is not None:
+        below = round(100 * sum(1 for s in scores if s < float(my_score)) / len(scores))
+    return {
+        'count': len(scores),
+        'median': median(scores),
+        'median_label': _fmt(median(scores)),
+        'below_pct': below,
+        'task_median': {pid: median(vals) for pid, vals in per_task.items()
+                        if len(vals) >= OTHERS_MIN},
+    }

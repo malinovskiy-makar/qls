@@ -51,12 +51,18 @@ FILES_PER_TURN = 3
 QUOTE_MAX = 300
 #: Откуда цитата реплики (24.09.2026): выделенный фрагмент условия или
 #: фрагмент ответа помощника («Ответить», как в ChatGPT и Claude).
-QUOTE_SOURCES = ('statement', 'reply')
-QUOTE_LABELS = {'statement': 'Фрагмент условия', 'reply': 'Фрагмент ответа помощника'}
+QUOTE_SOURCES = ('statement', 'reply', 'criterion')
+QUOTE_LABELS = {'statement': 'Фрагмент условия', 'reply': 'Фрагмент ответа помощника',
+                # «Оспорить оценку» тура олимпиады (30.10.2026): строка критерия жюри.
+                'criterion': 'Строка критерия жюри, о которой спор'}
 CUT_MARK = ' …'
 #: Эталонное решение режима проверки — не больше, чтобы одна реплика не стоила как десять.
 REFERENCE_MAX = 8000
-MODES = ('free', 'theory', 'method', 'check')
+# ⚠️ `dispute` — «Оспорить оценку» тура олимпиады (olympiads/dispute.py,
+# 30.10.2026). В `ChatTurn.Mode` его нет намеренно: значение помещается в
+# поле (10 знаков), а правка choices завела бы миграцию в `problems`, где
+# номера миграций делят несколько веток.
+MODES = ('free', 'theory', 'method', 'check', 'dispute')
 HOMEWORK_MODE = ('РЕЖИМ: ТОЛЬКО НАВОДЯЩИЕ ВОПРОСЫ. Задача входит в домашку '
                  'ученика: не объясняй решение, задавай вопросы и говори, где искать.')
 VISION_MARK = '[расшифровка фото]'
@@ -315,7 +321,8 @@ def _spent(result):
 # ─── Реплика ───────────────────────────────────────────────────────────────
 
 def answer(problem, message, history, user, last_attempt=None, mode='free',
-           attachments=(), thread=None, quote='', quote_source='statement'):
+           attachments=(), thread=None, quote='', quote_source='statement',
+           extra_system=()):
     """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
 
     `attachments` — до FILES_PER_TURN своих вложений; картинки со всех подряд,
@@ -367,7 +374,8 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
         # кэша считается по тексту запроса — та же реплика в другом режиме
         # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
         result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
-                          provider=provider, model=model, system=system_for(problem, mode),
+                          provider=provider, model=model,
+                          system=system_for(problem, mode) + list(extra_system),
                           cache_seconds=0, max_tokens=CHAT_MAX_TOKENS)
         turn.input_tokens = (result.usage or {}).get('input_tokens', 0)
         turn.output_tokens = (result.usage or {}).get('output_tokens', 0)

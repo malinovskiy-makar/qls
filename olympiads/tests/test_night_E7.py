@@ -220,9 +220,11 @@ class CheckTests(TestCase):
         data = {'solution_item_%d' % i.pk: 'решение %d' % n for n, i in enumerate(items)}
         self.client.post(self.url('training_finish'), data)
         self.assertEqual(TrainingCheck.objects.filter(attempt=attempt, status='queued').count(), 2)
-        first = self.client.post(self.url('training_check_next')).json()
+        first = self.client.post(self.url('training_check_next'),
+                                 HTTP_X_REQUESTED_WITH='fetch').json()
         self.assertEqual((first['done'], first['total'], first['finished']), (1, 2, False))
-        second = self.client.post(self.url('training_check_next')).json()
+        second = self.client.post(self.url('training_check_next'),
+                                  HTTP_X_REQUESTED_WITH='fetch').json()
         self.assertEqual((second['done'], second['finished']), (2, True))
         attempt.refresh_from_db()
         self.assertEqual(attempt.score, Decimal('16'))

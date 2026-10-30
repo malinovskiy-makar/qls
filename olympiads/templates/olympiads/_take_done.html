@@ -13,10 +13,11 @@
   {% for group in row.check_parts %}
   {% if group.part %}<div class="cr-part"><span class="om-grow">{{ group.part }})</span><span class="om-score{% if group.score == group.max %} om-score--full{% endif %}">{{ group.score|score }} из {{ group.max|score }}</span></div>{% endif %}
   {% for c in group.rows %}
-  <div class="om-crit" data-crit="{{ c.code }}"><span><span class="math-content">{{ c.text }}</span>{% if c.why and c.verdict != 'ok' %}<span class="om-crit__why">{{ c.why }}</span>{% endif %}</span><span class="om-score{% if c.score == c.max %} om-score--full{% elif c.score == 0 %} om-score--zero{% endif %}">{{ c.score|score }} из {{ c.max|score }}</span></div>
+  <div class="om-crit{% if dispute.check.problem_id == row.problem.pk and dispute.code == c.code %} om-crit--on{% endif %}" data-crit="{{ c.code }}"><span><span class="math-content">{{ c.text }}</span>{% if c.why and c.verdict != 'ok' %}<span class="om-crit__why">{{ c.why }}</span>{% endif %}</span><span class="om-score{% if c.score == c.max %} om-score--full{% elif c.score == 0 %} om-score--zero{% endif %}">{{ c.score|score }} из {{ c.max|score }}</span></div>
   {% endfor %}
   {% endfor %}
   {% if row.check.summary %}<p class="meta om-mt10">{{ row.check.summary }}</p>{% endif %}
+  {% if chat_on and not is_guest %}<div class="om-check__acts">{% if dispute.check.problem_id == row.problem.pk %}<span class="k-btn k-btn--plain om-dispute-btn om-dispute-btn--on">Оспорить оценку</span>{% else %}<a class="k-btn k-btn--plain om-dispute-btn" href="?task={{ row.index }}&amp;dispute={{ row.problem.pk }}#dispute">Оспорить оценку</a>{% endif %}</div>{% endif %}
   {% elif row.check and row.check.status == 'error' %}
   <div class="om-check__hd"><span class="om-big">Без балла</span><span class="meta">{{ row.check.summary }}</span></div>
   {% elif row.check and row.check.status == 'unavailable' %}

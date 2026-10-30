@@ -21,12 +21,14 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from problems.assignment_rows import item_max_score
 
 from . import navigator
 from . import training_engine as engine
+from .criteria import split_solution
 from .models import Olympiad
 from .views import _has_placeholder, soon_page
 
@@ -291,6 +293,9 @@ def training_take(request, slug, pk):
         'free_done': len(done_rows),
         'max_sheets': uploads.MAX_SHEETS,
         'ai_on': ai_check.enabled(),
+        'dispute': _dispute_context(request, attempt, checks),
+        'chat_on': _chat_available(),
+        'current_str': str(current),
     })
     return render(request, 'olympiads/training_take.html', context)
 
@@ -683,11 +688,17 @@ def training_finish(request, slug, pk):
 # ---------------------------------------------------------------------------
 
 def training_result(request, slug, pk):
-    """Разбор последней сданной попытки: балл, ответы, эталоны, решения."""
+    """Результат тура по доске Result: итог, задания с баллами, критерии.
+
+    «Как решали другие» и медианы — только из настоящих сданных попыток
+    вошедших учеников на время и только от 20 человек (`navigator.others_stats`).
+    Пока идёт очередь ИИ-проверки — «Проверено 2 из 4» и опрос `check-next/`.
+    """
     stub = soon_page(request)
     if stub is not None:
         return stub
-    from .models import TrainingAttempt
+    from . import ai_check, dispute
+    from .models import TrainingAttempt, TrainingCheck
 
     olympiad, variant = _variant_or_404(slug, pk)
     user, session_key = _who(request)
@@ -703,13 +714,176 @@ def training_result(request, slug, pk):
     if attempt is None:
         return redirect('olympiads:training_intro', slug=slug, pk=pk)
 
-    from . import ai_check
     # Сдана по таймеру (автосдача) — очередь заводится здесь: идемпотентно.
     ai_check.enqueue(attempt)
+    attempt.refresh_from_db()
     context = _base_context(olympiad, variant, request)
     context.update({'attempt': attempt})
     context.update(engine.attempt_result(attempt))
+
+    info = navigator.tour_info(variant)
+    package = {i.problem_id: i for i in engine.package_items(variant)}
+    checks = {c.problem_id: c for c in attempt.checks.all()}
+    stats = navigator.others_stats(variant, user, attempt.score) if attempt.with_timer else None
+    for row in context['rows']:
+        pos = package.get(row['problem'].pk)
+        check = checks.get(row['problem'].pk)
+        row['number_label'] = (pos.number if pos else '') or str(row['number'])
+        row['check'] = check
+        row['check_parts'] = ai_check.by_part(check) if check else []
+        row['reference'], row['criteria'] = split_solution(row['problem'].solution)
+        row['median'] = (stats['task_median'].get(row['problem'].pk)
+                         if stats else None)
+        row['bar'] = (round(100 * row['score'] / row['max_score'])
+                      if row['score'] is not None and row['max_score'] else 0)
+    waiting = [c for c in checks.values()
+               if c.status in (TrainingCheck.Status.QUEUED, TrainingCheck.Status.RUNNING)]
+    pair = []
+    for other in navigator.sibling_tours(variant):
+        done = navigator.last_result(other, user, session_key)
+        if done is not None and done.score is not None:
+            pair.append({'label': navigator.TOUR_LABELS.get(other.tour, other.tour),
+                         'attempt': done, 'order': navigator.TOUR_ORDER.get(other.tour, 9)})
+    both = None
+    if pair and attempt.score is not None:
+        parts = pair + [{'label': info['label'], 'attempt': attempt,
+                         'order': navigator.TOUR_ORDER.get(variant.tour, 9)}]
+        parts.sort(key=lambda p: p['order'])
+        both = {'score': sum(float(p['attempt'].score) for p in parts),
+                'max': sum(float(p['attempt'].max_score or 0) for p in parts),
+                'terms': ' + '.join(navigator._fmt(p['attempt'].score) for p in parts),
+                'count': len(parts)}
+    solutions = [f for f in info['pdfs'] if 'решени' in f['kind']]
+    open_dispute = _dispute_context(request, attempt, checks)
+    context.update({
+        'info': info,
+        'spent': navigator.spent_label(attempt),
+        'any_ai': any(c.status == TrainingCheck.Status.DONE for c in checks.values()),
+        'waiting': len(waiting),
+        'checks_total': len(checks),
+        'checks_done': len(checks) - len(waiting),
+        'stats': stats,
+        'both': both,
+        'solutions_pdf': solutions[0] if solutions else None,
+        'dispute': open_dispute,
+        'chat_on': _chat_available(),
+    })
     return render(request, 'olympiads/training_result.html', context)
+
+
+def _chat_available():
+    from catalog import chat
+    return chat.is_available()
+
+
+def _dispute_context(request, attempt, checks):
+    """Открытая панель «Оспорить оценку» (`?dispute=<задача>&code=<критерий>`)."""
+    from . import dispute
+
+    if not request.user.is_authenticated or attempt.user_id != request.user.pk:
+        return None
+    try:
+        problem_id = int(request.GET.get('dispute') or 0)
+    except ValueError:
+        return None
+    check = checks.get(problem_id)
+    if check is None or check.status != check.Status.DONE:
+        return None
+    code = request.GET.get('code', '')
+    if not code:
+        # Подсвечиваем первую строку, где балл снят: о ней спорят чаще всего.
+        code = next((r['code'] for r in check.criteria or []
+                     if r['score'] < r['max']), '')
+    pos = next((i for i in engine.package_items(attempt.variant)
+                if i.problem_id == problem_id), None)
+    return {'check': check, 'code': code, 'quote': dispute.quoted(check, code),
+            'number': (pos.number if pos else '') or '',
+            'history': dispute.history(check, request.user)}
+
+
+def _dispute_check(request, variant):
+    """Проверка СВОЕЙ последней попытки по задаче из POST — или None."""
+    from .models import TrainingCheck
+
+    if not request.user.is_authenticated:
+        return None
+    try:
+        problem_id = int(request.POST.get('problem_id') or 0)
+    except ValueError:
+        return None
+    return (TrainingCheck.objects
+            .filter(attempt__variant=variant, attempt__user=request.user,
+                    problem_id=problem_id, status=TrainingCheck.Status.DONE)
+            .select_related('attempt', 'problem').order_by('-created_at').first())
+
+
+@require_POST
+def training_dispute(request, slug, pk):
+    """Реплика «Оспорить оценку» — чат «Стола» в режиме `dispute`. Балл не меняет."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from catalog import chat
+    from legal.guards import AI_CONSENT_TEXT, ai_consent_missing
+    from problems.ai import core
+
+    from . import dispute
+    from .models import TrainingDraft
+
+    _, variant = _variant_or_404(slug, pk)
+    check = _dispute_check(request, variant)
+    wants_json = request.headers.get('x-requested-with') == 'fetch'
+    if check is None:
+        return JsonResponse({'error': 'Оспорить можно только свою проверенную задачу.'},
+                            status=404)
+    back = '{}?dispute={}&code={}#dispute'.format(
+        request.POST.get('back') or reverse('olympiads:training_result', args=[slug, pk]),
+        check.problem_id, request.POST.get('code', ''))
+    if ai_consent_missing(request.user):
+        return JsonResponse({'error': AI_CONSENT_TEXT}, status=403) if wants_json \
+            else redirect(back)
+    message = (request.POST.get('message') or '').strip()[:chat.MESSAGE_MAX]
+    if not message:
+        return JsonResponse({'error': 'Напишите, с чем вы не согласны.'}, status=400) \
+            if wants_json else redirect(back)
+    draft = TrainingDraft.objects.filter(attempt=check.attempt, problem=check.problem,
+                                         part__isnull=True).first()
+    past = [{'role': role, 'text': text} for turn in dispute.history(check, request.user)
+            for role, text in (('me', turn.user_text), ('ai', turn.reply))]
+    try:
+        reply = chat.answer(
+            check.problem, message, past, request.user,
+            last_attempt=dispute.CheckAsAttempt(check, draft.solution_draft if draft else ''),
+            mode=dispute.MODE, quote=dispute.quoted(check, request.POST.get('code', '')),
+            quote_source='criterion', extra_system=[dispute.criteria_block(check)])
+    except core.AiUnavailable as exc:
+        if wants_json:
+            return JsonResponse({'error': str(exc)}, status=503)
+        messages.warning(request, str(exc))
+        return redirect(back)
+    if wants_json:
+        return JsonResponse({'reply': reply})
+    return redirect(back)
+
+
+@require_POST
+def training_dispute_human(request, slug, pk):
+    """«Отправить на проверку человеку»: задача ждёт человека, балл не меняется."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from . import dispute
+
+    _, variant = _variant_or_404(slug, pk)
+    check = _dispute_check(request, variant)
+    if check is None:
+        raise Http404
+    dispute.ask_human(check)
+    messages.success(request, 'Задание отправлено на проверку человеку.')
+    back = request.POST.get('back') or reverse('olympiads:training_result', args=[slug, pk])
+    if not url_has_allowed_host_and_scheme(back, {request.get_host()}, request.is_secure()):
+        back = reverse('olympiads:training_result', args=[slug, pk])
+    return redirect(back)
 
 
 @require_POST
@@ -738,6 +912,10 @@ def training_check_next(request, slug, pk):
     checks = list(attempt.checks.all())
     waiting = [c for c in checks if c.status in (TrainingCheck.Status.QUEUED,
                                                  TrainingCheck.Status.RUNNING)]
+    if request.headers.get('x-requested-with') != 'fetch' and \
+            'application/json' not in request.headers.get('accept', ''):
+        # Без JS — кнопка «Проверить следующее»: обратно на результат.
+        return redirect('olympiads:training_result', slug=slug, pk=pk)
     return JsonResponse({'total': len(checks),
                          'done': len(checks) - len(waiting),
                          'finished': not waiting})

@@ -1,0 +1,54 @@
+{% load olymp_tags %}{% comment %}«Оспорить оценку» (доска TakeFreeChat; ночь 30.10, Э8): чат «Стола» в режиме `dispute`,
+классы панели — как в `catalog/static/catalog/css/stol.css` (.ai-head, .ai-msg, .ai-in). Работает без JS:
+подсказки — кнопки отправки формы, история — из журнала `ChatTurn`. Балл чат не меняет.
+Контекст: dispute, olympiad, variant, back (адрес страницы).{% endcomment %}
+<aside class="ai-panel om-dispute" id="dispute" data-dispute aria-label="Оспорить оценку">
+  <div class="ai-head"><span class="ic" aria-hidden="true">{% include 'olympiads/_ico.html' with name='chat' %}</span><div class="om-grow"><h2>Оценка задания {{ dispute_number }}</h2><small>ИИ · по критериям жюри</small></div><a class="k-btn k-btn--quiet" href="{{ back }}" aria-label="Закрыть">{% include 'olympiads/_ico.html' with name='x' %}</a></div>
+  <div class="ai-body" data-dispute-log>
+    {% for turn in dispute.history %}
+    <div class="ai-msg ai-msg--me">{% if turn.quote %}<div class="ai-quote">{{ turn.quote }}</div>{% endif %}{{ turn.user_text|linebreaksbr }}</div>
+    <div class="ai-msg ai-msg--ai math-content">{{ turn.reply|linebreaksbr }}</div>
+    {% empty %}
+    {% if dispute.quote %}<div class="ai-quote om-dispute__q">{{ dispute.quote }}</div>{% endif %}
+    {% endfor %}
+  </div>
+  <div class="ai-foot">
+    <form method="post" action="{% url 'olympiads:training_dispute' olympiad.slug variant.pk %}" data-dispute-form>
+      {% csrf_token %}
+      <input type="hidden" name="problem_id" value="{{ dispute.check.problem_id }}">
+      <input type="hidden" name="code" value="{{ dispute.code }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <div class="ai-sug"><button type="submit" name="message" value="Разберите, пожалуйста, по шагам, почему балл снят.">Разобрать по шагам</button><button type="submit" name="message" value="Мне кажется, балл занижен. Пересмотрите оценку по критериям.">Пересмотреть оценку</button></div>
+      <div class="ai-in"><label class="sr-only" for="dispute-msg">С чем вы не согласны?</label><textarea id="dispute-msg" name="message" rows="1" placeholder="С чем вы не согласны?" data-dispute-text></textarea><button type="submit" class="ai-send" aria-label="Отправить">{% include 'olympiads/_ico.html' with name='upload' %}</button></div>
+    </form>
+    {% if dispute.check.human_review %}<p class="meta om-mt10">Задание отправлено на проверку человеку</p>{% else %}
+    <form method="post" action="{% url 'olympiads:training_dispute_human' olympiad.slug variant.pk %}" class="om-mt10">{% csrf_token %}<input type="hidden" name="problem_id" value="{{ dispute.check.problem_id }}"><input type="hidden" name="back" value="{{ back }}"><button type="submit" class="k-btn k-btn--plain k-btn--sm">Отправить на проверку человеку</button></form>{% endif %}
+  </div>
+</aside>
+<script>
+(function () {
+  var form = document.querySelector('[data-dispute-form]');
+  if (!form || !window.fetch) return;
+  var log = document.querySelector('[data-dispute-log]');
+  function bubble(cls, text) {
+    var d = document.createElement('div'); d.className = 'ai-msg ' + cls; d.textContent = text;
+    log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+  }
+  form.addEventListener('submit', function (e) {
+    var data = new FormData(form);
+    var text = e.submitter && e.submitter.name === 'message' ? e.submitter.value
+      : (form.querySelector('[data-dispute-text]').value || '').trim();
+    if (!text) { e.preventDefault(); return; }
+    e.preventDefault();
+    data.set('message', text);
+    bubble('ai-msg--me', text);
+    form.querySelector('[data-dispute-text]').value = '';
+    var wait = bubble('ai-msg--ai', '…');
+    fetch(form.action, {method: 'POST', body: data, credentials: 'same-origin',
+      headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (res) { wait.textContent = res.reply || res.error || 'Помощник не ответил.'; })
+      .catch(function () { wait.textContent = 'Не удалось отправить — попробуйте ещё раз.'; });
+  });
+})();
+</script>

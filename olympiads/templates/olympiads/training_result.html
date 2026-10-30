@@ -1,95 +1,101 @@
 {% extends 'olympiads/base_olymp.html' %}
+{% load olymp_tags %}
 {% comment %}
-Разбор. Показываем ВСЁ: свой ответ, правильный ответ и полное решение.
-Скрытых частей здесь нет — это тренировка, а не контрольная.
+Результат тура по доске Result (ночь 30→31.10, Э8). Числа — из движка и
+навигатора: итог попытки, сумма туров клетки, «Как решали другие» (только от
+20 настоящих учеников). Пока идёт очередь ИИ — «Проверено N из M» и опрос.
 {% endcomment %}
-{% block title %}Разбор · {{ olympiad.name_short }} {{ variant.year }}{% endblock %}
+{% block title %}Результат · {{ info.label }} · {{ olympiad.name_short }} {{ info.season }}{% endblock %}
 {% block olymp_content %}
-<nav class="ol-crumbs" aria-label="Хлебные крошки">
-  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
-  <span aria-hidden="true">→</span>
-  <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a>
-  <span aria-hidden="true">→</span>
-  <span>Разбор {{ variant.year }}</span>
-</nav>
-
-<h1 class="ol-title">Разбор</h1>
-<div class="ol-score">
-  <span class="ol-score-big">{{ scored|floatformat:"-2" }}</span>
-  <span class="ol-sub">из {{ max_score|floatformat:"-2" }} баллов</span>
-  {% if attempt.is_auto_submitted %}<span class="ol-verdict ol-verdict--wait">время вышло, сдано автоматически</span>{% endif %}
-</div>
-{% if pending %}
-<p class="ol-mute">
-  Задач, где машина не проверяет ответ: {{ pending }}. Правильный ответ и
-  разбор по ним всё равно ниже — сверьтесь сами.
-</p>
-{% endif %}
-
-{% for row in rows %}
-<section class="ol-task">
-  <div class="ol-task-head">
-    <span class="ol-task-num">{{ row.number }}</span>
-    {% if not row.answered %}
-      <span class="ol-verdict ol-verdict--wait">без ответа</span>
-    {% elif row.pending %}
-      <span class="ol-verdict ol-verdict--wait">проверяет человек</span>
-    {% elif row.score and row.score >= row.max_score %}
-      <span class="ol-verdict ol-verdict--ok">верно</span>
-    {% elif row.score %}
-      <span class="ol-verdict ol-verdict--ok">частично</span>
-    {% else %}
-      <span class="ol-verdict ol-verdict--no">неверно</span>
+<div class="om om-result{% if dispute %} om-with-chat{% endif %}">
+  <div class="om-result__main">
+  <nav class="ol-crumbs" aria-label="Хлебные крошки"><a href="{% url 'olympiads:list' %}">Олимпиады</a> → <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a> → <a href="{% url 'olympiads:training_intro' olympiad.slug variant.pk %}">{{ info.stage_short }} {{ info.season }} · {{ info.grades }}</a> → {{ info.label }}</nav>
+  <div class="om-res-top{% if both %} om-res-top--two{% endif %}">
+    <section class="k-card om-pad">
+      <div class="meta">{{ info.label }} сдан · {% if attempt.with_timer %}на время{% else %}без времени{% endif %}{% if attempt.is_auto_submitted %} · время вышло{% endif %}</div>
+      <div class="om-big om-res-big">{{ scored|score }} из {{ max_score|score }}</div>
+      <div class="meta">{% if attempt.with_timer and spent %}{{ spent }} из {{ info.minutes_label }}{% endif %}{% if any_ai %}{% if attempt.with_timer and spent %} · {% endif %}проверено ИИ по критериям жюри{% endif %}{% if pending %} · ждут проверки: {{ pending }}{% endif %}</div>
+    </section>
+    {% if both %}
+    <section class="k-card k-card--flat om-pad">
+      <div class="meta">{% if both.count == 2 %}Два тура{% else %}Все туры{% endif %}</div>
+      <div class="om-big om-big--sm">{{ both.score|score }} из {{ both.max|score }}</div>
+      <div class="meta">{{ both.terms }}</div>
+    </section>
     {% endif %}
-    <span class="ol-task-pts">
-      {% if row.pending %}— {% else %}{{ row.score|floatformat:"-2" }} {% endif %}из {{ row.max_score|floatformat:"-2" }} б.
-    </span>
   </div>
-  <div class="ol-task-body">{{ row.problem.statement }}</div>
 
-  <div class="ol-answers">
-    {% for part in row.parts %}
-    <div class="ol-answer-row">
-      {% if part.label %}<span class="ol-answer-lab">{{ part.label }}</span>{% endif %}
-      <span class="ol-answer-mine">
-        вы ответили: {% if part.given %}{{ part.given }}{% else %}<span class="ol-mute">ничего</span>{% endif %}
-      </span>
-      {% if part.correct %}
-      <span class="ol-answer-right">правильно: {{ part.correct }}</span>
-      {% else %}
-      <span class="ol-mute">эталон не задан</span>
-      {% endif %}
+  {% if waiting %}
+  <div class="k-card om-pad om-mt14 om-queue" data-queue="{% url 'olympiads:training_check_next' olympiad.slug variant.pk %}">
+    <b>Проверено <span data-queue-done>{{ checks_done }}</span> из {{ checks_total }}</b>
+    <span class="meta">ИИ проверяет решения по критериям жюри, страница обновится сама</span>
+    <form method="post" action="{% url 'olympiads:training_check_next' olympiad.slug variant.pk %}" data-queue-form>{% csrf_token %}<button type="submit" class="k-btn k-btn--plain k-btn--sm" data-nojs>Проверить следующее</button></form>
+  </div>
+  {% endif %}
+
+  {% if stats %}
+  <section class="k-card om-pad om-mt14 om-others">
+    <div class="om-others__hd"><h2 class="om-h2 om-grow">Как решали другие</h2><span class="meta">тур на время на Weconomics</span></div>
+    <div class="om-others__nums">
+      <div><div class="meta">Решали</div><div class="om-others__n">{{ stats.count }}</div></div>
+      <div><div class="meta">Медиана</div><div class="om-others__n">{{ stats.median_label }} из {{ max_score|score }}</div></div>
+      {% if stats.below_pct is not None %}<div><div class="meta">Ваш результат выше, чем у</div><div class="om-others__n">{{ stats.below_pct }} %</div></div>{% endif %}
     </div>
+    {% if stats.below_pct is not None %}<div class="om-bar5 om-mt10"><i style="width: {{ stats.below_pct }}%;"></i></div>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="k-card om-mt14 om-res-tasks">
+    <div class="om-res-hd meta"><span class="om-grow"></span>{% if stats %}<span class="om-res-c">медиана других</span>{% endif %}<span class="om-res-c">у вас</span><span class="om-res-c om-res-c--act"></span></div>
+    {% for row in rows %}
+    <details class="om-res-row"{% if dispute.check.problem_id == row.problem.pk %} open{% endif %}>
+      <summary class="om-res-sum"><span class="om-stepno" aria-hidden="true">{{ row.number_label }}</span><span class="om-grow om-res-t">{{ row.problem.title|default:"Задание" }}</span>{% if stats %}<span class="om-res-c meta">{% if row.median is not None %}{{ row.median|score }} из {{ row.max_score|score }}{% else %}—{% endif %}</span>{% endif %}<span class="om-res-c om-res-me">{% if row.pending %}ждёт проверки{% elif row.score is not None %}{{ row.score|score }} из {{ row.max_score|score }}{% else %}—{% endif %}</span><span class="om-res-c om-res-c--act meta">Критерии</span></summary>
+      <div class="om-res-body">
+        {% if row.check and row.check.status == 'done' %}
+          {% for group in row.check_parts %}
+          {% if group.part %}<div class="cr-part"><span class="om-grow">{{ group.part }})</span><span class="om-score{% if group.score == group.max %} om-score--full{% endif %}">{{ group.score|score }} из {{ group.max|score }}</span></div>{% endif %}
+          {% for c in group.rows %}<div class="om-crit{% if dispute.code == c.code and dispute.check.problem_id == row.problem.pk %} om-crit--on{% endif %}"><span><span class="math-content">{{ c.text }}</span>{% if c.why and c.verdict != 'ok' %}<span class="om-crit__why">{{ c.why }}</span>{% endif %}</span><span class="om-score{% if c.score == c.max %} om-score--full{% elif c.score == 0 %} om-score--zero{% endif %}">{{ c.score|score }} из {{ c.max|score }}</span></div>{% endfor %}
+          {% endfor %}
+          {% if row.check.approximate %}<p class="meta">Оценка ориентировочная: критерии не разобраны по баллам</p>{% endif %}
+          {% if row.check.summary %}<p class="meta om-mt10">{{ row.check.summary }}</p>{% endif %}
+        {% elif row.check and row.check.status == 'error' %}<p class="meta">{{ row.check.summary }}</p>
+        {% elif row.check and row.check.status == 'unavailable' %}<p class="meta">ИИ сейчас недоступен{% if row.check.summary %}: {{ row.check.summary }}{% endif %}</p>
+        {% elif row.comment %}<p class="meta">{{ row.comment }}</p>{% endif %}
+        {% if row.criteria and not row.check %}<details class="om-det"><summary class="om-row"><span class="om-grow om-det__t">Критерии жюри</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.criteria problem=row.problem %}</div></details>{% endif %}
+        {% if row.reference %}<details class="om-det"><summary class="om-row"><span class="om-grow om-det__t">Разбор задачи</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.reference problem=row.problem %}</div></details>{% endif %}
+        {% if row.check.status == 'done' and chat_on and user.is_authenticated and attempt.user_id == user.pk %}<div class="om-mt10"><a class="k-btn k-btn--plain k-btn--sm om-dispute-btn" href="?dispute={{ row.problem.pk }}#dispute">Оспорить оценку</a></div>{% endif %}
+      </div>
+    </details>
     {% endfor %}
-  </div>
+  </section>
 
-  {% if row.solution_given %}
-  <div class="ol-solution">
-    <div class="ol-solution-title">Ваше решение</div>{{ row.solution_given }}
+  <div class="om-res-acts">
+    <a class="k-btn k-btn--main" href="{% url 'olympiads:detail' olympiad.slug %}">К заданиям {{ olympiad.name_short }}</a>
+    <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">{% csrf_token %}<input type="hidden" name="timer" value="0"><button type="submit" class="k-btn k-btn--plain">Решить ещё раз без времени</button></form>
+    {% if solutions_pdf %}<a class="k-btn k-btn--plain" href="{{ solutions_pdf.href }}"{% if solutions_pdf.external %} target="_blank" rel="noopener"{% endif %}>Разборы тура</a>{% endif %}
   </div>
-  {% endif %}
-  {% if row.solution_text %}
-  <div class="ol-solution">
-    <div class="ol-solution-title">Разбор</div>{{ row.solution_text }}
   </div>
-  {% else %}
-  <p class="ol-mute">Разбора этой задачи в банке пока нет.</p>
-  {% endif %}
-</section>
-{% endfor %}
-
-<div class="ol-actions">
-  <a class="ol-btn" href="{% url 'olympiads:training_intro' olympiad.slug variant.pk %}">Прорешать ещё раз</a>
-  <a class="ol-btn ol-btn--second" href="{% url 'olympiads:detail' olympiad.slug %}">К олимпиаде</a>
+  {% if dispute %}{% with back=request.path dispute_number=dispute.number %}{% include 'olympiads/_dispute_panel.html' %}{% endwith %}{% endif %}
 </div>
-
-{% if is_guest %}
-{# Плашка только гостю: вошедшему его попытка уже сохранена. #}
-<div class="ol-guest" role="note">
-  <strong>Результат не сохранён.</strong>
-  Вы решали без входа, поэтому эта попытка нигде за вами не числится и через
-  неделю будет удалена.
-  <a href="/login/">Зарегистрируйтесь</a>, чтобы история попыток сохранялась.
-</div>
+{% if waiting %}
+<script>
+(function () {
+  var box = document.querySelector('[data-queue]');
+  if (!box || !window.fetch) return;
+  document.querySelectorAll('[data-nojs]').forEach(function (b) { b.hidden = true; });
+  var csrf = box.querySelector('[name=csrfmiddlewaretoken]').value;
+  function next() {
+    fetch(box.getAttribute('data-queue'), {method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        box.querySelector('[data-queue-done]').textContent = res.done;
+        if (res.finished) { window.location.reload(); } else { setTimeout(next, 300); }
+      })
+      .catch(function () { setTimeout(next, 3000); });
+  }
+  next();
+})();
+</script>
 {% endif %}
 {% endblock %}
