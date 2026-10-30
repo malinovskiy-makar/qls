@@ -39,7 +39,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
   <div class="om-take-wrap">
     <nav class="om-tasknav" id="qnav" aria-label="Задания тура">
       {% for row in rows %}
-      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}" data-number="{{ row.number }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }}{{ row.points|of_max }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
+      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}" data-number="{{ row.number }}"><span>Задание {{ row.number }}{% if row.status %} · {{ row.status.label }}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
       {% endfor %}
     </nav>
     <span class="sr-only">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</span>

@@ -44,6 +44,8 @@ urlpatterns = [
          views_training.training_sheet_delete, name='training_sheet_delete'),
     path('<slug:slug>/variant/<int:pk>/sheets/', views_training.training_sheets,
          name='training_sheets'),
+    path('<slug:slug>/variant/<int:pk>/recheck/', views_training.training_recheck,
+         name='training_recheck'),
     path('<slug:slug>/variant/<int:pk>/check-next/',
          views_training.training_check_next, name='training_check_next'),
     path('<slug:slug>/variant/<int:pk>/dispute/', views_training.training_dispute,

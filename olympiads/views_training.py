@@ -264,6 +264,9 @@ def training_take(request, slug, pk):
             'result': result,
             'check': check,
             'check_parts': ai_check.by_part(check) if check else [],
+            'status': item_status(result, check, has_answer,
+                                  (float(pos.max_score) if pos and pos.max_score is not None
+                                   else None), waiting_word='сдано'),
             'reference': solution,
             'criteria': criteria,
             'has_criteria': bool(pos and pos.has_criteria),
@@ -736,9 +739,14 @@ def training_result(request, slug, pk):
     package = {i.problem_id: i for i in engine.package_items(variant)}
     checks = {c.problem_id: c for c in attempt.checks.all()}
     stats = navigator.others_stats(variant, user, attempt.score) if attempt.with_timer else None
+    sheet_problems = set(attempt.uploads.values_list('problem_id', flat=True))
+    results = {r.problem_id: r for r in attempt.results.all()}
     for row in context['rows']:
         pos = package.get(row['problem'].pk)
         check = checks.get(row['problem'].pk)
+        row['status'] = item_status(results.get(row['problem'].pk), check,
+                                    row['answered'] or row['problem'].pk in sheet_problems,
+                                    row['max_score'])
         row['number_label'] = (pos.number if pos else '') or str(row['number'])
         row['check'] = check
         row['check_parts'] = ai_check.by_part(check) if check else []
@@ -894,6 +902,68 @@ def training_dispute_human(request, slug, pk):
     if not url_has_allowed_host_and_scheme(back, {request.get_host()}, request.is_secure()):
         back = reverse('olympiads:training_result', args=[slug, pk])
     return redirect(back)
+
+
+def item_status(result, check, has_work, points=None, waiting_word='ждёт проверки'):
+    """Статус сданного задания — ОДИН на плитку, блок и строку результата (день
+    30.10, У5): {'code', 'label'} или None (не сдано).
+
+    «решения нет · 0» — решения не было, модель не звали; «не проверено» —
+    проверка ИИ упала или ИИ недоступен (есть «Проверить ещё раз»); «ждёт
+    проверки» / «сдано» — проверки ещё не было; иначе балл.
+    """
+    from . import ai_check
+    from .templatetags.olymp_tags import of_max, score
+
+    if result is None:
+        return None
+    if not has_work:
+        return {'code': 'no_work', 'label': 'решения нет · 0'}
+    if check is not None and check.status in ai_check.FAILED:
+        return {'code': 'failed', 'label': 'не проверено'}
+    if check is not None and check.status in ('queued', 'running'):
+        return {'code': 'waiting', 'label': 'ждёт проверки'}
+    if result.is_pending or result.score is None:
+        return {'code': 'pending', 'label': waiting_word}
+    return {'code': 'scored', 'label': score(result.score) + of_max(points)}
+
+
+@require_POST
+def training_recheck(request, slug, pk):
+    """«Проверить ещё раз» (день 30.10, У5): упавшая проверка ИИ — снова.
+
+    Только вошедшему и только своя попытка. «Без времени», тур не сдан —
+    проверяем сразу и возвращаем к заданию; иначе — в очередь, на результат.
+    """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
+    from . import ai_check
+    from .models import TrainingAttempt, TrainingCheck
+
+    _, variant = _variant_or_404(slug, pk)
+    if not request.user.is_authenticated:
+        raise Http404
+    try:
+        problem_id = int(request.POST.get('problem') or 0)
+    except ValueError:
+        raise Http404
+    attempt = engine.current_attempt(variant, request.user, '')
+    if attempt is None:
+        attempt = (TrainingAttempt.objects.filter(variant=variant, user=request.user,
+                                                  submitted_at__isnull=False)
+                   .order_by('-submitted_at').first())
+    check = get_object_or_404(TrainingCheck, attempt=attempt, problem_id=problem_id)
+    ai_check.retry(check)
+    if attempt.submitted_at is None and not attempt.with_timer:
+        items = engine.variant_items(variant)
+        index, item = next(((n, i) for n, i in enumerate(items, start=1)
+                            if i.catalog_problem_id == problem_id), (1, None))
+        if item is not None:
+            ai_check.check_item(attempt, item, request.user)
+        return redirect('{}?task={}'.format(
+            reverse('olympiads:training_take', args=[slug, pk]), index))
+    return redirect('olympiads:training_result', slug=slug, pk=pk)
 
 
 @require_POST

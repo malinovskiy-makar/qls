@@ -284,13 +284,37 @@ def check_item(attempt, item, user, timeout=None):
     how = eligible(attempt, item, user)
     if how is None:
         return None
+    # Решения нет — модель не зовём вовсе (день 30.10, У5): итог «решения нет · 0».
+    text, sheets = _work(attempt, item.catalog_problem)
+    if not (text.strip() or sheets):
+        return None
     check, _ = TrainingCheck.objects.get_or_create(
         attempt=attempt, problem=item.catalog_problem,
         defaults={'max_score': Decimal(str(how['maximum'])),
                   'approximate': how['approximate']})
-    if check.status in (TrainingCheck.Status.DONE, TrainingCheck.Status.ERROR):
+    if check.status in (TrainingCheck.Status.DONE, TrainingCheck.Status.ERROR,
+                        TrainingCheck.Status.UNAVAILABLE):
         return check
     return run(check, item, user, how, timeout=timeout)
+
+
+FAILED = ('error', 'unavailable')
+
+
+def retry(check):
+    """«Проверить ещё раз» (день 30.10, У5): ошибка или недоступность — снова в
+    очередь. Проверенное и стоящее в очереди не трогаем. True — поставлено."""
+    from .models import TrainingCheck
+
+    if check.status not in FAILED:
+        return False
+    check.status = TrainingCheck.Status.QUEUED
+    check.score = None
+    check.criteria = []
+    check.summary = ''
+    check.finished_at = None
+    check.save(update_fields=['status', 'score', 'criteria', 'summary', 'finished_at'])
+    return True
 
 
 def run_next(attempt, user):
@@ -351,6 +375,11 @@ def run(check, item, user, how, timeout=None):
     check.cost = cost
     check.finished_at = timezone.now()
     if data is None:
+        # Ответ вне схемы — из кэша вон (день 30.10, У5): иначе «Проверить ещё
+        # раз» с тем же запросом получила бы тот же испорченный ответ.
+        from django.core.cache import cache
+        cache.delete(core._cache_key(PROFILE, core._setting('AI_MODEL', core.DEFAULT_MODEL),
+                                     prompt))
         check.status = TrainingCheck.Status.ERROR
         check.summary = OFF_SCHEMA
         check.criteria = []

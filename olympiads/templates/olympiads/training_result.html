@@ -49,7 +49,7 @@
     <div class="om-res-hd meta"><span class="om-grow"></span>{% if stats %}<span class="om-res-c">медиана других</span>{% endif %}<span class="om-res-c">у вас</span><span class="om-res-c om-res-c--act"></span></div>
     {% for row in rows %}
     <details class="om-res-row"{% if dispute.check.problem_id == row.problem.pk %} open{% endif %}>
-      <summary class="om-res-sum"><span class="om-stepno" aria-hidden="true">{{ row.number_label }}</span><span class="om-grow om-res-t">{{ row.problem.title|default:"Задание" }}</span>{% if stats %}<span class="om-res-c meta">{% if row.median is not None %}{{ row.median|score }}{{ row.max_score|of_max }}{% else %}—{% endif %}</span>{% endif %}<span class="om-res-c om-res-me">{% if row.pending %}ждёт проверки{% elif row.score is not None %}{{ row.score|score }}{{ row.max_score|of_max }}{% else %}—{% endif %}</span><span class="om-res-c om-res-c--act meta">Критерии</span></summary>
+      <summary class="om-res-sum"><span class="om-stepno" aria-hidden="true">{{ row.number_label }}</span><span class="om-grow om-res-t">{{ row.problem.title|default:"Задание" }}</span>{% if stats %}<span class="om-res-c meta">{% if row.median is not None %}{{ row.median|score }}{{ row.max_score|of_max }}{% else %}—{% endif %}</span>{% endif %}<span class="om-res-c om-res-me{% if row.status.code == 'no_work' or row.status.code == 'failed' %} meta{% endif %}">{% if row.status %}{{ row.status.label }}{% else %}—{% endif %}</span><span class="om-res-c om-res-c--act meta">Критерии</span></summary>
       <div class="om-res-body">
         {% if row.check and row.check.status == 'done' %}
           {% for group in row.check_parts %}
@@ -58,8 +58,9 @@
           {% endfor %}
           {% if row.check.approximate %}<p class="meta">Оценка ориентировочная: критерии не разобраны по баллам</p>{% endif %}
           {% if row.check.summary %}<p class="meta om-mt10">{{ row.check.summary }}</p>{% endif %}
-        {% elif row.check and row.check.status == 'error' %}<p class="meta">{{ row.check.summary }}</p>
-        {% elif row.check and row.check.status == 'unavailable' %}<p class="meta">ИИ сейчас недоступен{% if row.check.summary %}: {{ row.check.summary }}{% endif %}</p>
+        {% elif row.status.code == 'failed' %}<p class="meta">Не проверено: {% if row.check.status == 'unavailable' %}ИИ сейчас недоступен{% else %}проверка не удалась{% endif %} — балл не поставлен.</p>
+        <form method="post" action="{% url 'olympiads:training_recheck' olympiad.slug variant.pk %}" class="om-mt10">{% csrf_token %}<input type="hidden" name="problem" value="{{ row.problem.pk }}"><button type="submit" class="k-btn k-btn--main k-btn--sm">Проверить ещё раз</button></form>
+        {% elif row.status.code == 'no_work' %}<p class="meta">Решения нет — задание не проверялось, 0 баллов.</p>
         {% elif row.comment %}<p class="meta">{{ row.comment }}</p>{% endif %}
         {% if row.criteria and not row.check %}<details class="om-det"><summary class="om-row"><span class="om-grow om-det__t">Критерии жюри</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.criteria problem=row.problem %}</div></details>{% endif %}
         {% if row.reference %}<details class="om-det"><summary class="om-row"><span class="om-grow om-det__t">Разбор задачи</span>{% include 'olympiads/_ico.html' with name='down' %}</summary><div class="math-content om-ref">{% include "catalog/_math_text.html" with text=row.reference problem=row.problem %}</div></details>{% endif %}

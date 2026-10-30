@@ -8,7 +8,12 @@
   {% if row.is_test %}<div class="meta">Ответ: {{ row.parts.0.value|default:"—" }}</div>{% endif %}
 </div>
 <div class="k-card om-check" id="check-{{ row.item.pk }}">
-  {% if row.check and row.check.status == 'done' %}
+  {% if row.status.code == 'no_work' %}
+  <div class="om-check__hd"><span class="om-big">Решения нет · 0</span><span class="meta">Задание сдано без решения — проверки не было.</span></div>
+  {% elif row.status.code == 'failed' %}
+  <div class="om-check__hd"><span class="om-big">Не проверено</span><span class="meta">{% if row.check.status == 'unavailable' %}ИИ сейчас недоступен{% else %}Проверка не удалась{% endif %} — балл не поставлен.</span></div>
+  <form method="post" action="{% url 'olympiads:training_recheck' olympiad.slug variant.pk %}" class="om-check__acts">{% csrf_token %}<input type="hidden" name="problem" value="{{ row.problem.pk }}"><button type="submit" class="k-btn k-btn--main">Проверить ещё раз</button></form>
+  {% elif row.check and row.check.status == 'done' %}
   <div class="om-check__hd"><span class="om-big">{{ row.check.score|score }} из {{ row.check.max_score|score }}</span><span class="meta">{% if row.check.approximate %}Оценка ориентировочная: ИИ по тексту критериев жюри{% else %}Проверено ИИ по критериям жюри{% endif %}</span></div>
   {% for group in row.check_parts %}
   {% if group.part %}<div class="cr-part"><span class="om-grow">{{ group.part }})</span><span class="om-score{% if group.score == group.max %} om-score--full{% endif %}">{{ group.score|score }} из {{ group.max|score }}</span></div>{% endif %}
@@ -18,10 +23,6 @@
   {% endfor %}
   {% if row.check.summary %}<p class="meta om-mt10">{{ row.check.summary }}</p>{% endif %}
   {% if chat_on and not is_guest %}<div class="om-check__acts">{% if dispute.check.problem_id == row.problem.pk %}<span class="k-btn k-btn--plain om-dispute-btn om-dispute-btn--on">Оспорить оценку</span>{% else %}<a class="k-btn k-btn--plain om-dispute-btn" href="?task={{ row.index }}&amp;dispute={{ row.problem.pk }}#dispute">Оспорить оценку</a>{% endif %}</div>{% endif %}
-  {% elif row.check and row.check.status == 'error' %}
-  <div class="om-check__hd"><span class="om-big">Без балла</span><span class="meta">{{ row.check.summary }}</span></div>
-  {% elif row.check and row.check.status == 'unavailable' %}
-  <div class="om-check__hd"><span class="om-big">Самопроверка</span><span class="meta">ИИ сейчас недоступен: {{ row.check.summary|default:"проверка не выполнена" }}</span></div>
   {% elif row.result and not row.result.is_pending %}
   <div class="om-check__hd"><span class="om-big">{{ row.result.score|score }}{{ row.points|of_max }}</span>{% if row.result.comment %}<span class="meta">{{ row.result.comment }}</span>{% endif %}</div>
   {% else %}

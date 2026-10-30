@@ -267,3 +267,87 @@ class NoInventedMaximumTests(TestCase):
         self.client.post(reverse('olympiads:training_finish', args=['vs', self.scored.pk]))
         self.assertEqual(float(TrainingAttempt.objects.get(variant=self.scored).max_score), 48.0)
         self.assertIn('12 баллов', self.html(self.scored, 'training_intro'))
+
+
+from .test_night_E7 import CRITERIA_59997, Capture, reply  # noqa: E402
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, AI_PROVIDER='fake',
+                   OLYMPIAD_AI_CHECK=True)
+class HonestStatusTests(TestCase):
+    """У5: «решения нет · 0» без модели; «не проверено» + «Проверить ещё раз»;
+    на результате «решения нет» отдельно от «0 по проверке»."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from legal import consent
+        from problems.models_legal import ConsentRecord
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)
+        cls.variant = fx.kit(cls.olymp, cls.final, '2025/26', tour='2', tasks=3)
+        for item in cls.variant.items.all():
+            item.problem.solution = 'Разбор.\n\n## Критерии оценивания\n' + CRITERIA_59997
+            item.problem.save(update_fields=['solution'])
+        cls.user = User.objects.create_user('honest', password='x')
+        for kind in (ConsentRecord.Kind.PD, ConsentRecord.Kind.AI):
+            consent.grant(cls.user, kind, ConsentRecord.Source.GATE)
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.client.force_login(self.user)
+
+    def url(self, name):
+        return reverse('olympiads:' + name, args=['vs', self.variant.pk])
+
+    def submit(self, index, text=''):
+        from olympiads import training_engine as engine
+        item = engine.variant_items(self.variant)[index]
+        data = {'item_id': item.pk}
+        if text:
+            data['solution_item_%d' % item.pk] = text
+        self.client.post(self.url('training_item_submit'), data)
+        return item
+
+    def task_html(self, index):
+        html = self.client.get(self.url('training_take') + '?task=%d' % index).content.decode()
+        tab = html[html.index('data-task="%d"' % index):]
+        return tab[:tab.index('</a>')], html
+
+    def test_empty_submit_calls_no_model_and_says_no_work(self):
+        fake = Capture(reply())
+        with self.settings(AI_FAKE_REPLY=fake):
+            self.client.post(self.url('training_start'), {'timer': '0'})
+            self.submit(0)
+        self.assertEqual(fake.calls, [])
+        tab, html = self.task_html(1)
+        self.assertIn('решения нет · 0', tab)
+        self.assertIn('Решения нет · 0', html)
+        self.assertNotIn('Без балла', html)
+
+    def test_check_error_says_not_checked_and_retry_fixes_it(self):
+        from olympiads.models import TrainingCheck
+        with self.settings(AI_FAKE_REPLY='{"nonsense": true}'):
+            self.client.post(self.url('training_start'), {'timer': '0'})
+            item = self.submit(0, 'а) решение … б) … в) …')
+        tab, html = self.task_html(1)
+        self.assertIn('не проверено', tab)
+        self.assertIn('Не проверено', html)
+        self.assertIn('Проверить ещё раз', html)
+        self.assertNotIn(' из 12', tab)
+        with self.settings(AI_FAKE_REPLY=reply()):
+            self.client.post(self.url('training_recheck'), {'problem': item.catalog_problem_id})
+        self.assertEqual(TrainingCheck.objects.get(problem=item.catalog_problem).status, 'done')
+        tab, _html = self.task_html(1)
+        self.assertIn('8 из 12', tab)
+
+    def test_result_separates_no_work_from_zero_by_check(self):
+        zero = reply({k: 0 for k in ('K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K10', 'K11', 'K12')})
+        with self.settings(AI_FAKE_REPLY=zero):
+            self.client.post(self.url('training_start'), {'timer': '0'})
+            self.submit(0, 'а) неверно … б) … в) …')
+            self.submit(1)
+            self.submit(2)
+        html = self.client.get(self.url('training_result')).content.decode()
+        self.assertIn('0 из 12', html)
+        self.assertEqual(html.count('решения нет · 0'), 2)

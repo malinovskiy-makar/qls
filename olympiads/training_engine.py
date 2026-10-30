@@ -529,6 +529,20 @@ def _joined_answer(item, values):
     return join_answers(item, values)
 
 
+# Итог задания, к которому решения не было (день 30.10, У5). Экран отличает его
+# от «0 по проверке» по этой строке в `TrainingItemResult.comment`.
+NO_WORK = 'Решения нет'
+
+
+def has_work(attempt, problem):
+    """Есть ли у задания решение: текст, лист, краткий ответ или вариант."""
+    drafts = drafts_map(attempt)
+    if _has_work(attempt, drafts, problem):
+        return True
+    return any((d.answer_draft or '').strip() for (pid, _part), d in drafts.items()
+               if pid == problem.pk)
+
+
 def _grade_one(student, assignment, item, values, answer_text, order, problem,
                maximum, has_work=False):
     """Одна задача: создать решение, проверить, снять числа, откатить.
@@ -543,6 +557,11 @@ def _grade_one(student, assignment, item, values, answer_text, order, problem,
     result = {'problem_id': problem.pk, 'order': order,
               'max_score': maximum, 'score': None, 'pending': True,
               'comment': ''}
+    if not has_work and not any((v or '').strip() for v in values.values()):
+        # Решения нет вовсе (день 30.10, У5): ноль без проверки и без модели —
+        # «решения нет», а не «0 по проверке».
+        result.update(score=0.0, pending=False, comment=NO_WORK)
+        return result
     if has_work and not any((v or '').strip() for v in values.values()):
         # ⚠️ РАЗВЁРНУТОЕ РЕШЕНИЕ БЕЗ КРАТКОГО ОТВЕТА — НЕ НОЛЬ (ночь 30.10).
         # Экран тура по макету даёт открытому заданию только «Решение» —
