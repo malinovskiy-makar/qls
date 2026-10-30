@@ -303,3 +303,77 @@ class StripPointsTests(DayMixin, TestCase):
         self.assertEqual(self.legacy_state(), before)
         out = self.run_cmd('--apply')
         self.assertIn('Пометок убрано: 0', out)
+
+
+class MarkedAnswersTests(DayMixin, TestCase):
+    """Д4: «(отмечено)» → ключ теста в формате банка, отметка из текста убрана."""
+
+    command = 'extract_marked_answers'
+    QUESTION = 'Выберите из списка два блага с наименее эластичным спросом:'
+
+    def options(self, marks=(2, 4)):
+        texts = ['апельсины;', 'бензин;', 'отдых в Турции;', 'соль.']
+        return [(str(i), text + (' (отмечено)' if i in marks else ''), None)
+                for i, text in enumerate(texts, 1)]
+
+    def test_marks_in_parts_become_answer_and_disappear(self):
+        from catalog import testplay
+        problem = self.add(self.QUESTION, self.options())
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.answer, '2, 4')
+        self.assertEqual(problem.problem_type, 'тест: все верные')
+        self.assertFalse(any('отмечено' in p[1] for p in self.parts(problem)))
+        self.assertEqual(list(problem.parts.order_by('order').values_list('answer', flat=True)),
+                         ['неверно', 'верно', 'неверно', 'верно'])
+        self.assertTrue(problem.olympiad_items.get().has_answer)
+        self.assertEqual(testplay.game_of(problem)['correct'], {'2', '4'})
+
+    def test_one_mark_gives_single_answer_test(self):
+        problem = self.add(self.QUESTION, self.options(marks=(3,)))
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual((problem.answer, problem.problem_type), ('3', 'тест: один ответ'))
+
+    def test_several_marks_on_single_answer_test_are_flagged(self):
+        problem = self.add(self.QUESTION, self.options(), problem_type='тест: один ответ')
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.answer, '')
+        self.assertTrue(any('отмечено' in p[1] for p in self.parts(problem)))
+        self.assertEqual(problem.olympiad_items.get().quality, 'flagged')
+
+    def test_existing_answer_is_never_overwritten(self):
+        other = self.add(self.QUESTION, self.options(), answer='1, 3')
+        same = self.add(self.QUESTION, self.options(), answer='2,4')
+        self.run_cmd('--apply')
+        other.refresh_from_db()
+        same.refresh_from_db()
+        self.assertEqual(other.answer, '1, 3')
+        self.assertTrue(any('отмечено' in p[1] for p in self.parts(other)))
+        self.assertEqual(same.answer, '2,4')
+        self.assertFalse(any('отмечено' in p[1] for p in self.parts(same)))
+
+    def test_options_only_in_statement_are_flagged_not_changed(self):
+        statement = self.QUESTION + '\n\n1) апельсины;\n2) бензин; (отмечено)'
+        problem = self.add(statement)
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual((problem.statement, problem.answer), (statement, ''))
+        self.assertEqual(problem.olympiad_items.get().quality, 'flagged')
+
+    def test_mark_in_statement_line_removed_with_part_mark(self):
+        statement = self.QUESTION + '\n\n2) бензин; (отмечено)'
+        problem = self.add(statement, self.options(marks=(2,)))
+        self.run_cmd('--apply')
+        problem.refresh_from_db()
+        self.assertEqual(problem.statement, self.QUESTION + '\n\n2) бензин;')
+
+    def test_legacy_untouched_and_second_run_changes_nothing(self):
+        before = self.legacy_state()
+        self.add(self.QUESTION, self.options())
+        self.run_cmd('--apply')
+        self.assertEqual(self.legacy_state(), before)
+        out = self.run_cmd('--apply')
+        self.assertIn('Тестов с ключом из отметки: 0', out)
+        self.assertIn('Позиций с новой пометкой: 0', out)

@@ -195,3 +195,107 @@ def points_plan(part):
     if float(part['points']) != number:
         return None, None, REASON_POINTS_DIFFER
     return rest, None, None
+
+
+# ── Д4: «(отмечено)» — ключ теста, видимый ученику ───────────────────────
+
+MARK = re.compile(r'\(\s*отмечено\s*\)', re.IGNORECASE)
+_MARK_WITH_SPACE = re.compile(r'[ \t]*\(\s*отмечено\s*\)', re.IGNORECASE)
+# «+» перед вариантом («+1)», «- +б)») — тоже отметка верного; правилом не снимается.
+_PLUS_OPTION = re.compile(r'(?m)^[ \t]*(?:[-*•][ \t]*)?\+[ \t]*\(?[0-9A-Za-zА-Яа-яЁё]{1,3}[).]')
+_PLUS_PART = re.compile(r'\A\s*\+')
+_LINE_LABEL = re.compile(r'\A[ \t]*(?:[-*•][ \t]*)?(?:\*\*|__)?\(?[0-9A-Za-zА-Яа-яЁё]{1,3}[).](?:\*\*|__)?')
+
+REASON_MARK_NO_OPTIONS = 'отмечен вариант, но варианты не пунктами задачи (или метки пунктов повторяются)'
+REASON_MARK_STATEMENT = 'отметка в условии не совпала ни с одним отмеченным пунктом'
+REASON_MARK_PLUS = '«+» перед вариантом: тоже отметка верного, снять правилом нельзя'
+REASON_MARK_SEVERAL = 'отмечено несколько вариантов, а тест на один ответ'
+REASON_MARK_NUMERIC = 'отмечен вариант у теста с числовым ответом'
+REASON_MARK_ANSWER = 'ответ задачи не совпадает с отметкой'
+
+TYPE_SINGLE = 'тест: один ответ'
+TYPE_BOOLEAN = 'тест: верно/неверно'
+TYPE_MULTI = 'тест: все верные'
+_ONE_ANSWER_TYPES = (TYPE_SINGLE, TYPE_BOOLEAN, 'единственный_выбор', 'верно_неверно')
+_MULTI_TYPES = (TYPE_MULTI, 'множественный_выбор')
+
+
+def _bare(text):
+    """Текст варианта для сравнения: без отметки, пробелов и знака в конце."""
+    return squeeze(MARK.sub('', text or '')).rstrip(';.,')
+
+
+def marks_plan(problem, parts):
+    """Ключ теста из «(отмечено)». `problem` — словарь: statement, answer, problem_type.
+
+    Возвращает None (отметок нет), {'reason': …} или правку: новое условие,
+    тексты пунктов без отметки, ответ задачи, ответы пунктов, тип теста.
+    Пишется только в пустые поля; непустой ответ, расходящийся с отметкой, —
+    причина, ничего не меняем.
+    """
+    from problems.answer_check import label_set, normalize_label
+
+    statement = problem['statement'] or ''
+    marked = [p for p in parts if MARK.search(p['statement'] or '')]
+    if not marked and not MARK.search(statement):
+        return None
+    labels = [normalize_label(p['label']) for p in parts]
+    # Отметка только в условии: строка «2) бензин; (отмечено)» отмечает пункт
+    # с той же меткой и тем же текстом.
+    for line in statement.splitlines():
+        head = _LINE_LABEL.match(line)
+        if not MARK.search(line) or not head:
+            continue
+        label = normalize_label(head.group().strip(' \t-*•_').lstrip('('))
+        text = _bare(line[head.end():])
+        for part in parts:
+            if (normalize_label(part['label']) == label and _bare(part['statement']) == text
+                    and part not in marked):
+                marked.append(part)
+    marked.sort(key=parts.index)
+    if len(parts) < 2 or not all(labels) or len(set(labels)) != len(labels) or not marked:
+        return {'reason': REASON_MARK_NO_OPTIONS}
+    if _PLUS_OPTION.search(statement) or any(_PLUS_PART.match(p['statement'] or '')
+                                             for p in parts):
+        return {'reason': REASON_MARK_PLUS}
+    marked_texts = {_bare(p['statement']) for p in marked}
+    for line in statement.splitlines():
+        if MARK.search(line) and _bare(_LINE_LABEL.sub('', line)) not in marked_texts:
+            return {'reason': REASON_MARK_STATEMENT}
+    correct = [p['label'] for p in marked]
+    kind = problem['problem_type'] or ''
+    if kind in ('тест: числовой ответ', 'тест: короткий ответ'):
+        return {'reason': REASON_MARK_NUMERIC}
+    if kind in _ONE_ANSWER_TYPES and len(correct) > 1:
+        return {'reason': REASON_MARK_SEVERAL}
+    if not kind:
+        if len(correct) > 1:
+            kind = TYPE_MULTI
+        elif {_bare(p['statement']).lower() for p in parts} <= {'верно', 'неверно'}:
+            kind = TYPE_BOOLEAN
+        else:
+            kind = TYPE_SINGLE
+    elif kind not in _ONE_ANSWER_TYPES + _MULTI_TYPES:
+        return {'reason': REASON_MARK_NO_OPTIONS}
+    wanted = {normalize_label(label) for label in correct}
+    answer = (problem['answer'] or '').strip()
+    if answer and label_set(answer, [p['label'] for p in parts]) != wanted:
+        return {'reason': REASON_MARK_ANSWER}
+    part_answers = {}
+    for part in parts:
+        verdict = 'верно' if normalize_label(part['label']) in wanted else 'неверно'
+        own = normalize_label(part['answer'])
+        if own and own != verdict:
+            return {'reason': REASON_MARK_ANSWER}
+        if not own:
+            part_answers[part['id']] = verdict
+    return {
+        'statement': _MARK_WITH_SPACE.sub('', statement),
+        'parts': {p['id']: _MARK_WITH_SPACE.sub('', p['statement'])
+                  for p in parts if MARK.search(p['statement'] or '')},
+        'answer': answer or ', '.join(correct),
+        'answer_was_empty': not answer,
+        'part_answers': part_answers,
+        'problem_type': kind,
+        'type_was_empty': not problem['problem_type'],
+    }
