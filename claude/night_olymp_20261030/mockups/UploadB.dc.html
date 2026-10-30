@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Вариант Б — QR-код на компьютере</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="olymp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body { margin: 0; }
+.tt-bar { display: flex; align-items: center; gap: 18px; height: 60px; padding: 0 20px; background: var(--nav-bg); color: #fff; }
+.tt-bar .meta { color: rgba(255,255,255,.7); }
+.qb-sheet { width: 96px; height: 128px; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface-2);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 11px, var(--border-soft) 11px 12px);
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 6px 8px; font-size: 12px; font-weight: 500; color: var(--text2); }
+</style>
+</helmet>
+<div class="pg" data-theme="{{theme}}" style="min-height: 100%;">
+
+  <header class="tt-bar">
+    <a href="#" class="nav-logo" aria-label="Weconomics: на главную" style="margin-right: 0;"><svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" aria-hidden="true"><circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"></circle><path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"></path></svg></a>
+    <span style="font-size: 14px; font-weight: 600; color: rgba(255,255,255,.85);">ВсОШ · заключительный 2025/26 · 11 класс · 2 тур</span>
+    <span class="om-grow"></span>
+    <span><span class="om-timer">2:47:15</span> <span class="meta">осталось</span></span>
+    <span class="meta">сохранено</span>
+    <button type="button" class="nav-icon-btn" aria-label="Сменить тему" onClick="{{toggleTheme}}">{{themeIcon}}</button>
+    <a class="k-btn" href="#" style="background: var(--brand-amber); color: var(--brand-amber-ink); font-weight: 600;">Сдать тур</a>
+  </header>
+
+  <main class="page-wrap" style="padding-top: 24px;">
+    <nav class="om-tasknav" aria-label="Задания тура">
+      <a class="om-tn om-tn--ok" href="#"><span>Задание 5 · ✓ 2 фото</span><b>Инновации и антимонопольное регулирование</b></a>
+      <a class="om-tn om-tn--on" href="#" aria-current="page"><span>Задание 6</span><b>Торговля с ограничениями</b></a>
+      <a class="om-tn" href="#"><span>Задание 7</span><b>Выбираем самое милое животное</b></a>
+      <a class="om-tn" href="#"><span>Задание 8</span><b>Когда брать ипотеку?</b></a>
+    </nav>
+
+    <a class="k-card" href="#" style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; text-decoration: none; color: var(--text);"><span class="om-h2 om-grow">6. Торговля с ограничениями</span><span class="meta">12 баллов · условие</span><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+
+    <section class="k-card" style="margin-top: 16px;">
+      <div style="padding: 16px 20px 0; display: flex; align-items: center; gap: 12px;">
+        <h2 class="om-h2 om-grow">Решение</h2>
+        <div class="om-seg" role="tablist" aria-label="Как сдать решение"><span class="on" role="tab" aria-selected="true">Фото</span><a href="#" role="tab" aria-selected="false">Текст</a></div>
+      </div>
+      <div style="padding: 18px 20px 20px; display: flex; gap: 24px; align-items: flex-start;">
+        <svg class="om-qr" viewBox="0 0 21 21" role="img" aria-label="QR-код: страница загрузки фото для задания 6" shape-rendering="crispEdges">
+          <rect width="21" height="21" fill="#ffffff"></rect>
+          <g fill="#1d1a16">
+            <path d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2z" fill-rule="evenodd"></path>
+            <path d="M14 0h7v7h-7zM15 1v5h5V1zM16 2h3v3h-3z" fill-rule="evenodd"></path>
+            <path d="M0 14h7v7H0zM1 15v5h5v-5zM2 16h3v3H2z" fill-rule="evenodd"></path>
+            <path d="M8 0h1v1H8zM10 1h2v1h-2zM8 2h1v2H8zM11 3h1v1h-1zM9 5h2v1H9zM8 6h1v1H8zM10 7h1v1h-1zM12 8h2v1h-2zM0 8h2v1H0zM3 8h1v2H3zM5 9h2v1H5zM8 9h1v1H8zM15 8h1v1h-1zM17 9h2v1h-2zM20 8h1v2h-1zM1 10h1v2H1zM6 11h2v1H6zM9 11h3v1H9zM13 10h1v2h-1zM16 11h1v1h-1zM18 11h2v1h-2zM0 12h1v1H0zM4 12h1v1H4zM10 13h1v1h-1zM14 13h3v1h-3zM19 13h2v1h-2zM8 14h2v1H8zM12 15h1v2h-1zM15 15h1v1h-1zM17 15h2v2h-2zM20 16h1v1h-1zM9 17h2v1H9zM14 17h2v1h-2zM8 19h1v2H8zM10 19h3v1h-3zM15 19h1v2h-1zM18 19h2v1h-2zM12 20h2v1h-2z"></path>
+          </g>
+        </svg>
+        <div style="flex: 1 1 auto; min-width: 0;">
+          <div style="display: flex; align-items: baseline; gap: 12px;"><span style="font-size: 15px; font-weight: 600;">С телефона</span><span class="ol-status ol-status--confirmed"><i class="ol-dot"></i>телефон подключён</span></div>
+          <div style="display: flex; gap: 10px; margin-top: 12px; align-items: flex-end;">
+            <div class="qb-sheet">Лист 1</div>
+            <div class="qb-sheet">Лист 2</div>
+            <div class="qb-sheet" style="opacity: .55; background-image: none;"><span class="om-bar5" style="display: block; width: 100%; margin-bottom: 6px;"><i style="width: 60%;"></i></span>Лист 3</div>
+          </div>
+        </div>
+        <div class="om-drop" style="flex: 0 0 260px; min-height: 168px; background: var(--surface-2);">
+          <div style="font-size: 15px; font-weight: 600;">С компьютера</div>
+          <button type="button" class="k-btn k-btn--main">Выбрать файлы</button>
+          <span class="meta">или перетащите сюда</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: flex; justify-content: space-between; margin-top: 18px;">
+      <a class="k-btn k-btn--plain" href="#">← Задание 5</a>
+      <a class="k-btn k-btn--main" href="#">Задание 7 →</a>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Тема"},"$preview":{"width":1280,"height":631}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme || this.props.theme || 'light';
+    return {
+      theme: theme,
+      themeIcon: theme === 'dark' ? '☀' : '☾',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>

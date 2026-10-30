@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Страница олимпиады — ВсОШ</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="olymp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body { margin: 0; }
+</style>
+</helmet>
+<div class="pg" data-theme="{{theme}}" style="min-height: 100%;">
+
+  <nav class="site-nav">
+    <a href="#" class="nav-logo" aria-label="Weconomics: на главную"><svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" aria-hidden="true"><circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"></circle><path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.830-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.830-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.390-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"></path></svg></a>
+    <div class="nav-links">
+      <a class="nav-link" href="#">Каталог</a>
+      <a class="nav-link" href="#">Учебник</a>
+      <a class="nav-link is-active" href="#">Олимпиады</a>
+      <a class="nav-link" href="#">Тренажёр ВП</a>
+      <a class="nav-link" href="#">Графики</a>
+      <a class="nav-link" href="#">Wecon Rush</a>
+    </div>
+    <div class="nav-right">
+      <button type="button" class="fb-btn" aria-label="Проблема или предложение"><svg class="om-ic" style="width: 15px; height: 15px; stroke-width: 1.75;" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"></path></svg></button>
+      <button type="button" class="nav-icon-btn" aria-label="Сменить тему" onClick="{{toggleTheme}}">{{themeIcon}}</button>
+      <a class="nav-user" href="#"><span class="nav-ava">ЛМ</span><span>Лиза</span></a>
+      <button type="button" class="nav-logout">Выйти</button>
+    </div>
+  </nav>
+
+  <main class="page-wrap">
+    <div class="ol-crumbs"><a href="#">Олимпиады</a> → ВсОШ</div>
+    <div style="display: flex; gap: 16px; align-items: flex-start;">
+      <span class="ol-logo--empty" aria-hidden="true" style="width: 64px; height: 64px; font-size: 15px;">ВсОШ</span>
+      <div style="flex: 1 1 auto; min-width: 0;">
+        <h1 class="ol-title">Всероссийская олимпиада школьников по экономике</h1>
+        <p class="ol-sub">Министерство просвещения Российской Федерации · государственная · сезон 2026/27</p>
+      </div>
+    </div>
+
+    <dl class="ol-facts" style="grid-template-columns: repeat(5, minmax(0, 0.85fr)) minmax(0, 1.9fr); margin-bottom: 0;">
+      <div><dt>Поступление</dt><dd>БВИ</dd></div>
+      <div><dt>Классы</dt><dd class="num">9–11</dd></div>
+      <div><dt>Этапов</dt><dd class="num">4</dd></div>
+      <div><dt>Заданий у нас</dt><dd class="num">2&nbsp;671</dd></div>
+      <div><dt>Сезонов</dt><dd class="num">31</dd></div>
+      <div><dt>Ближайший этап</dt><dd>Муниципальный<span>до 25 декабря</span></dd></div>
+    </dl>
+
+    <div class="ol-actions">
+      <a class="k-btn k-btn--plain" href="#">Официальный сайт</a>
+      <button type="button" class="k-btn k-btn--plain"><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"></path></svg>В мои олимпиады</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; margin-top: 28px;">
+      <section class="k-card">
+        <div style="padding: 16px 20px 0;"><h2 class="om-h2">Что это даёт</h2></div>
+        <div style="padding: 14px 20px 6px;">
+          <div class="om-info">
+            <div style="font-size: 16px; font-weight: 600; line-height: 1.35;">Без вступительных испытаний — в любом вузе России</div>
+            <p class="meta" style="margin-top: 6px;">Право даёт закон об образовании, подтверждать баллом ЕГЭ не нужно</p>
+          </div>
+          <div style="margin-top: 10px;"><span class="k-chip-kind">диплом заключительного этапа</span></div>
+        </div>
+        <div style="padding: 10px 20px 0;" class="meta">Куда поступают — примеры</div>
+        <div style="padding: 0 20px;">
+          <div style="padding: 9px 0; border-bottom: 1px solid var(--border-soft);"><div style="font-size: 14px; font-weight: 600;">Экономика</div><div class="meta">МГУ, экономический факультет</div></div>
+          <div style="padding: 9px 0; border-bottom: 1px solid var(--border-soft);"><div style="font-size: 14px; font-weight: 600;">Совместная программа по экономике</div><div class="meta">НИУ ВШЭ и РЭШ</div></div>
+          <div style="padding: 9px 0; border-bottom: 1px solid var(--border-soft);"><div style="font-size: 14px; font-weight: 600;">Экономика</div><div class="meta">НИУ ВШЭ, ФЭН</div></div>
+          <div style="padding: 9px 0;"><div style="font-size: 14px; font-weight: 600;">Международная программа по экономике и финансам</div><div class="meta">НИУ ВШЭ, МИЭФ</div></div>
+        </div>
+        <div style="padding: 8px 20px 18px;"><a href="#" style="font-size: 14px; font-weight: 600; text-decoration: none;">Как работает БВИ по закону →</a></div>
+      </section>
+
+      <section class="k-card">
+        <div style="padding: 16px 20px 0;"><h2 class="om-h2">Что решать</h2></div>
+        <div style="padding: 14px 20px 16px;">
+          <div class="meta" style="margin-bottom: 6px;">Продолжить</div>
+          <div style="font-size: 15px; font-weight: 600;">Заключительный 2025/26 · 11 класс</div>
+          <div class="meta" style="margin-top: 2px;">1 тур — 34 из 48 · остался 2 тур</div>
+          <div style="margin-top: 12px;"><a class="k-btn k-btn--main" href="#materials">Продолжить</a></div>
+        </div>
+        <div style="padding: 4px 20px 4px; border-top: 1px solid var(--border-soft);">
+          <div class="om-row" style="padding: 10px 0; border-top: 0;"><span class="om-grow" style="font-size: 14px; font-weight: 600;">Заключительный</span><span class="num" style="font-size: 14px;">30 сезонов</span><span class="meta" style="width: 92px; text-align: right;">с 1995/96</span></div>
+          <div class="om-row" style="padding: 10px 0;"><span class="om-grow" style="font-size: 14px; font-weight: 600;">Региональный</span><span class="num" style="font-size: 14px;">26 сезонов</span><span class="meta" style="width: 92px; text-align: right;">с 1999/2000</span></div>
+        </div>
+        <div style="padding: 10px 20px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--border-soft);">
+          <a href="#materials" style="font-size: 14px; font-weight: 600; text-decoration: none;">Все задания прошлых лет ↓</a>
+          <span class="meta">решено 5 туров</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="om-sec" id="materials">
+      <h2 class="om-h2">Задания прошлых лет</h2>
+      <div class="k-card">
+        <div style="padding: 16px 18px 6px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div class="om-seg" role="tablist" aria-label="Этап"><a href="#" role="tab" aria-selected="false">Региональный</a><span class="on" role="tab" aria-selected="true">Заключительный</span></div>
+          <span class="meta">30 сезонов · с 1995/96</span>
+        </div>
+        <div style="padding: 4px 18px 0;">
+          <table class="om-grid">
+            <thead>
+              <tr><th class="om-ys">Сезон</th><th>9 класс</th><th>10 класс</th><th>11 класс</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="om-ys">2025/26</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell om-cell--part om-cell--on" href="#">1 тур из 2</a></td></tr>
+              <tr><td colspan="4">
+                <div class="om-panel" style="--x: calc(102px + (100% - 102px) * 5 / 6 - 6px);">
+                  <div class="om-panel__hd"><b>11 класс · 2025/26</b><span class="meta">критерии и разборы у всех заданий</span></div>
+                  <div class="om-tour">
+                    <span class="om-tour__t">1 тур</span>
+                    <span class="meta">4 задания · максимум 48 баллов</span>
+                    <span class="om-tour__mine"><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align: -3px;"><path d="M5 12.5 10 17.5 19 7"></path></svg> 34 из 48</span>
+                    <span class="om-acts"><a class="k-btn k-btn--plain k-btn--sm" href="#">PDF</a><a class="k-btn k-btn--main k-btn--sm" href="#">На время</a><a class="k-btn k-btn--plain k-btn--sm" href="#">Без времени</a></span>
+                  </div>
+                  <div class="om-tour">
+                    <span class="om-tour__t">2 тур</span>
+                    <span class="meta">4 задания · максимум 48 баллов</span>
+                    <span class="om-tour__mine"></span>
+                    <span class="om-acts"><a class="k-btn k-btn--plain k-btn--sm" href="#">PDF</a><a class="k-btn k-btn--main k-btn--sm" href="#">На время</a><a class="k-btn k-btn--plain k-btn--sm" href="#">Без времени</a></span>
+                  </div>
+                </div>
+              </td></tr>
+              <tr><td class="om-ys">2024/25</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell om-cell--done" href="#"><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"></path></svg>81 из 96</a></td></tr>
+              <tr><td class="om-ys">2023/24</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell om-cell--done" href="#"><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"></path></svg>63 из 96</a></td></tr>
+              <tr><td class="om-ys">2022/23</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td></tr>
+              <tr><td class="om-ys">2021/22</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td></tr>
+              <tr><td class="om-ys">2020/21</td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td><td><a class="om-cell" href="#">8 заданий</a></td></tr>
+              <tr><td class="om-ys">2019/20</td><td colspan="3"><span class="om-cell om-cell--none">—</span></td></tr>
+              <tr><td class="om-ys">2018/19</td><td><a class="om-cell" href="#">8 заданий</a></td><td colspan="2"><a class="om-cell" href="#"><span class="om-cell__k">10–11 классы</span><span>8 заданий</span></a></td></tr>
+              <tr><td class="om-ys">2017/18</td><td><a class="om-cell" href="#">8 заданий</a></td><td colspan="2"><a class="om-cell" href="#"><span class="om-cell__k">10–11 классы</span><span>8 заданий</span></a></td></tr>
+              <tr><td class="om-ys">2016/17</td><td colspan="3"><a class="om-cell" href="#">10 заданий</a></td></tr>
+              <tr><td class="om-ys">2015/16</td><td colspan="3"><a class="om-cell" href="#"><span class="om-cell__k">9–11 классы</span><span>12 заданий</span></a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="om-more"><a class="k-btn k-btn--plain k-btn--sm" href="#">Ещё 20 сезонов · с 1995/96</a></div>
+      </div>
+    </section>
+
+    <section class="om-sec">
+      <h2 class="om-h2">Этапы</h2>
+      <div class="k-card">
+        <div class="om-row" style="align-items: flex-start; padding: 16px 20px;">
+          <span class="om-stepno" aria-hidden="true">1</span>
+          <div class="om-grow">
+            <div style="display: flex; gap: 12px; align-items: baseline;"><span class="om-grow" style="font-size: 15px; font-weight: 600;">Школьный этап</span><span class="ol-status ol-status--rule"><i class="ol-dot"></i>идёт · до 1 ноября</span></div>
+            <div class="meta" style="margin-top: 4px;">Формат отличается в каждом регионе</div>
+          </div>
+        </div>
+        <div class="om-row" style="align-items: flex-start; padding: 16px 20px;">
+          <span class="om-stepno" aria-hidden="true">2</span>
+          <div class="om-grow">
+            <div style="display: flex; gap: 12px; align-items: baseline;"><span class="om-grow" style="font-size: 15px; font-weight: 600;">Муниципальный этап</span><span class="ol-status ol-status--rule"><i class="ol-dot"></i>до 25 декабря</span></div>
+            <div class="meta" style="margin-top: 4px;">Формат отличается в каждом регионе</div>
+          </div>
+        </div>
+        <div class="om-row" style="align-items: flex-start; padding: 16px 20px;">
+          <span class="om-stepno" aria-hidden="true">3</span>
+          <div class="om-grow">
+            <div style="display: flex; gap: 12px; align-items: baseline;"><span class="om-grow" style="font-size: 15px; font-weight: 600;">Региональный этап</span><span class="ol-status ol-status--rule"><i class="ol-dot"></i>до 1 марта</span></div>
+            <div class="meta" style="margin-top: 4px;">180 мин · максимум 100 баллов · есть тестовая часть</div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px;"><span class="meta">26 сезонов</span><a class="k-btn k-btn--plain k-btn--sm" href="#materials">Задания этапа</a></div>
+          </div>
+        </div>
+        <div class="om-row" style="align-items: flex-start; padding: 16px 20px;">
+          <span class="om-stepno" aria-hidden="true" style="background: var(--btn-bg); color: var(--on-btn);">4</span>
+          <div class="om-grow">
+            <div style="display: flex; gap: 12px; align-items: baseline;"><span class="om-grow" style="font-size: 15px; font-weight: 600;">Заключительный этап</span><span class="ol-status ol-status--awaiting"><i class="ol-dot"></i>ждём объявления</span></div>
+            <div class="meta" style="margin-top: 4px;">2 тура · 210 мин на тур · максимум 48 баллов за тур · без тестовой части</div>
+            <div class="meta" style="margin-top: 2px; color: var(--text);">Льготу при поступлении даёт только диплом этого этапа</div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px;"><span class="meta">30 сезонов</span><a class="k-btn k-btn--plain k-btn--sm" href="#materials">Задания этапа</a></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="om-sec">
+      <h2 class="om-h2">Проходной балл на заключительный этап</h2>
+      <div class="k-card k-card--pad">
+        <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+          <span class="meta om-grow">Доля от максимума</span>
+          <span class="meta" style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 12px; height: 12px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 40%, var(--surface));"></i>9 класс</span>
+          <span class="meta" style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 12px; height: 12px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 70%, var(--surface));"></i>10 класс</span>
+          <span class="meta" style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 12px; height: 12px; border-radius: 3px; background: var(--accent);"></i>11 класс</span>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 18px;">
+          <div class="meta" style="flex: 0 0 34px; height: 160px; position: relative; font-size: 11px;">
+            <span style="position: absolute; top: -8px; right: 0;">100%</span><span style="position: absolute; top: 72px; right: 0;">50%</span><span style="position: absolute; bottom: -8px; right: 0;">0</span>
+          </div>
+          <div style="flex: 1 1 auto; height: 160px; position: relative; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border-soft);">
+            <div style="position: absolute; left: 0; right: 0; top: 80px; border-top: 1px solid var(--border-soft);"></div>
+            <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end;">
+              <div style="display: flex; justify-content: center; align-items: flex-end; gap: 6px; height: 100%;">
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">69%</span><i style="display: block; height: 110px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 40%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">79%</span><i style="display: block; height: 126px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 70%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">88%</span><i style="display: block; height: 141px; border-radius: 4px 4px 0 0; background: var(--accent);"></i></div>
+              </div>
+              <div style="display: flex; justify-content: center; align-items: flex-end; gap: 6px; height: 100%;">
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">76%</span><i style="display: block; height: 122px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 40%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">85%</span><i style="display: block; height: 136px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 70%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">88%</span><i style="display: block; height: 141px; border-radius: 4px 4px 0 0; background: var(--accent);"></i></div>
+              </div>
+              <div style="display: flex; justify-content: center; align-items: flex-end; gap: 6px; height: 100%;">
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">78%</span><i style="display: block; height: 125px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 40%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">87%</span><i style="display: block; height: 139px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--accent) 70%, var(--surface));"></i></div>
+                <div style="width: 42px; text-align: center;"><span class="meta" style="font-size: 12px; font-weight: 600;">77%</span><i style="display: block; height: 123px; border-radius: 4px 4px 0 0; background: var(--accent);"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+          <div style="flex: 0 0 34px;"></div>
+          <div style="flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: center; font-size: 13px; font-weight: 600;"><span>2022</span><span>2024</span><span>2026</span></div>
+        </div>
+        <div class="ol-tablewrap" style="margin-top: 18px;">
+          <table class="ol-table num">
+            <thead><tr><th>В баллах</th><th style="text-align: center;">2022</th><th style="text-align: center;">2024</th><th style="text-align: center;">2026</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight: 600;">9 класс</td><td style="text-align: center;">138 из 200</td><td style="text-align: center;">76 из 100</td><td style="text-align: center;">78 из 100</td></tr>
+              <tr><td style="font-weight: 600;">10 класс</td><td style="text-align: center;">157 из 200</td><td style="text-align: center;">85 из 100</td><td style="text-align: center;">87 из 100</td></tr>
+              <tr><td style="font-weight: 600;">11 класс</td><td style="text-align: center;">176 из 200</td><td style="text-align: center;">88 из 100</td><td style="text-align: center;">77 из 100</td></tr>
+            </tbody>
+          </table>
+        </div>      </div>
+    </section>
+
+    <section class="om-sec">
+      <h2 class="om-h2">Справка</h2>
+      <div class="k-card">
+        <div style="padding: 18px 20px;">
+          <div style="font-size: 15px; font-weight: 600; margin-bottom: 6px;">Описание</div>
+          <p style="font-size: 14.5px; line-height: 1.6; color: var(--text2); max-width: 72ch;">Главная школьная олимпиада страны: её проводит государство, и участвовать в школьном этапе может любой желающий. Этапов четыре — школьный, муниципальный, региональный и заключительный; на каждый следующий проходят лучшие участники предыдущего. С каждым этапом задачи заметно сложнее, а заключительный — один из самых трудных уровней школьной экономики в стране. Его победители и призёры могут бороться за место в сборной России на международной олимпиаде по экономике.</p>
+        </div>
+        <a class="om-row" href="#" style="padding: 14px 20px; text-decoration: none; color: var(--text);"><span class="om-grow" style="font-size: 14px; font-weight: 600;">Региональные организаторы</span><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+        <a class="om-row" href="#" style="padding: 14px 20px; text-decoration: none; color: var(--text);"><span class="om-grow" style="font-size: 14px; font-weight: 600;">Источники</span><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Тема"},"$preview":{"width":1280,"height":3380}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme || this.props.theme || 'light';
+    return {
+      theme: theme,
+      themeIcon: theme === 'dark' ? '☀' : '☾',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>2 тур на время — телефон</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="olymp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body { margin: 0; }
+.tp-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 12px; background: var(--nav-bg); color: #fff; }
+.tp-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pg .tp-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 48px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.1; }
+.tp-tab span { font-size: 11px; font-weight: 500; color: var(--accent-ink); margin-top: 3px; }
+.tp-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tp-shot { aspect-ratio: 3 / 4; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface-2);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 11px, var(--border-soft) 11px 12px);
+  display: flex; align-items: flex-end; padding: 6px 8px; font-size: 12px; font-weight: 500; color: var(--text2); }
+</style>
+</helmet>
+<div class="pg" data-theme="{{theme}}" style="width: 390px; min-height: 100%;">
+
+  <header class="tp-bar">
+    <span style="min-width: 0;"><span class="om-timer" style="font-size: 20px;">2:47:15</span> <span style="font-size: 12px; color: rgba(255,255,255,.7);">осталось</span></span>
+    <span class="om-grow"></span>
+    <button type="button" class="nav-icon-btn" aria-label="Сменить тему" onClick="{{toggleTheme}}" style="width: 40px; height: 40px;">{{themeIcon}}</button>
+    <a class="k-btn" href="#" style="background: var(--brand-amber); color: var(--brand-amber-ink); font-weight: 600; min-height: 40px;">Сдать тур</a>
+  </header>
+
+  <main style="padding: 14px 16px 32px;">
+    <div class="meta" style="margin-bottom: 10px;">ВсОШ · заключительный 2025/26 · 11 класс · 2 тур</div>
+    <nav class="tp-tabs" aria-label="Задания тура">
+      <a class="tp-tab" href="#">5<span>✓ 2 фото</span></a>
+      <a class="tp-tab om-tn--on" href="#" aria-current="page">6</a>
+      <a class="tp-tab" href="#">7</a>
+      <a class="tp-tab" href="#">8</a>
+    </nav>
+
+    <section class="k-card" style="margin-top: 14px;">
+      <div style="padding: 14px 16px 0; display: flex; align-items: baseline; gap: 10px;"><h2 class="om-h2 om-grow" style="font-size: 17px;">6. Торговля с ограничениями</h2><span class="meta" style="white-space: nowrap;">12 баллов</span></div>
+      <div class="om-task" style="padding: 12px 16px 16px; font-size: 15px;">
+        <p>В мире существуют две страны — Альфа и Бета. Они производят и потребляют два товара: <i>X</i> и <i>Y</i>. Технологии стран различаются, кривые производственных возможностей задаются уравнениями: для страны Альфа <i>X</i><sub>A</sub><sup>2</sup> + 2000<i>Y</i><sub>A</sub> = 1&nbsp;200&nbsp;000, для страны Бета <i>X</i><sub>B</sub><sup>2</sup> + 400<i>Y</i><sub>B</sub> = 480&nbsp;000.</p>
+        <p>Предпочтения потребителей в обеих странах одинаковые. Они потребляют товары строго комплектами в пропорции 1:1, то есть функция полезности имеет вид <i>U</i> = min(<i>X</i>, <i>Y</i>).</p>
+        <p>Считайте, что во всех обменах цена товара <i>Y</i> равна 1, а цена товара <i>X</i> обозначается как <i>p</i>. Численные значения цен и объёмов можно округлять до первого знака после запятой.</p>
+        <div class="om-part"><b>а)</b><span>Страны открывают границы и торгуют без ограничений, цена устанавливается на уровне равновесия совершенной конкуренции. Найдите мировую цену <i>p</i>*, объёмы производства, потребления и экспорта (импорта) товара <i>X</i> для каждой страны.</span><span class="om-pts">4</span></div>
+        <div class="om-part"><b>б)</b><span>Правительство страны, ставшей импортёром товара <i>X</i>, начинает «торговую войну», чтобы увеличить собственное производство: вводит потолок цены на импорт на уровне 0,9<i>p</i>*. Выиграют ли потребители в этой стране по сравнению со свободной торговлей?</span><span class="om-pts">4</span></div>
+        <div class="om-part"><b>в)</b><span>Потолок опускают ещё ниже, до 2<i>p</i>*/3. Выиграют ли теперь потребители страны-импортёра по сравнению со свободной торговлей и с прежним потолком?</span><span class="om-pts">4</span></div>
+      </div>
+    </section>
+
+    <section class="k-card" style="margin-top: 14px; padding: 14px 16px 16px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h2 class="om-h2 om-grow" style="font-size: 17px;">Решение</h2>
+        <div class="om-seg" role="tablist" aria-label="Как сдать решение"><span class="on" role="tab" aria-selected="true" style="min-height: 44px;">Фото</span><a href="#" role="tab" aria-selected="false" style="min-height: 44px;">Текст</a></div>
+      </div>
+      <div class="tp-shots" style="margin-top: 14px;">
+        <div class="tp-shot">Лист 1</div>
+        <div class="tp-shot">Лист 2</div>
+        <div class="tp-shot" style="background-image: none; border-style: dashed; justify-content: center; align-items: center; color: var(--text3); font-size: 24px;" aria-label="Место для следующего листа">+</div>
+      </div>
+      <a class="k-btn k-btn--hero" href="#" style="width: 100%; min-width: 0; margin-top: 14px; gap: 10px;"><svg class="om-ic" style="width: 22px; height: 22px;" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Сфотографировать</a>
+      <a class="k-btn k-btn--plain" href="#" style="width: 100%; min-height: 44px; margin-top: 8px;">Выбрать из галереи</a>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px;">
+      <a class="k-btn k-btn--plain" href="#" style="min-height: 44px;">← Задание 5</a>
+      <a class="k-btn k-btn--main" href="#" style="min-height: 44px;">Задание 7 →</a>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Тема"},"$preview":{"width":390,"height":1756}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme || this.props.theme || 'light';
+    return {
+      theme: theme,
+      themeIcon: theme === 'dark' ? '☀' : '☾',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Олимпиады по экономике</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="olymp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body { margin: 0; }
+.hl-name { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.hl-name > span:last-child { min-width: 0; }
+.hl-name b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; }
+</style>
+</helmet>
+<div class="pg" data-theme="{{theme}}" style="min-height: 100%;">
+
+  <nav class="site-nav">
+    <a href="#" class="nav-logo" aria-label="Weconomics: на главную"><svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" aria-hidden="true"><circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"></circle><path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"></path></svg></a>
+    <div class="nav-links">
+      <a class="nav-link" href="#">Каталог</a>
+      <a class="nav-link" href="#">Учебник</a>
+      <a class="nav-link is-active" href="#">Олимпиады</a>
+      <a class="nav-link" href="#">Тренажёр ВП</a>
+      <a class="nav-link" href="#">Графики</a>
+      <a class="nav-link" href="#">Wecon Rush</a>
+    </div>
+    <div class="nav-right">
+      <button type="button" class="fb-btn" aria-label="Проблема или предложение"><svg class="om-ic" style="width: 15px; height: 15px; stroke-width: 1.75;" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"></path></svg></button>
+      <button type="button" class="nav-icon-btn" aria-label="Сменить тему" onClick="{{toggleTheme}}">{{themeIcon}}</button>
+      <a class="nav-user" href="#"><span class="nav-ava">ЛМ</span><span>Лиза</span></a>
+      <button type="button" class="nav-logout">Выйти</button>
+    </div>
+  </nav>
+
+  <main class="page-wrap" style="max-width: 1200px;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <h1 class="ol-title om-grow">Олимпиады по экономике</h1>
+      <a class="k-btn k-btn--plain" href="#"><svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Календарь</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 26px;">
+      <section class="k-card">
+        <div style="padding: 16px 20px 6px; display: flex; align-items: baseline; gap: 12px;"><h2 class="om-h2 om-grow">Ближайшее</h2><a href="#" style="font-size: 14px; font-weight: 600; text-decoration: none;">Весь календарь →</a></div>
+        <div class="om-row" style="padding: 12px 20px; border-top: 0;"><span class="om-date">до 1 ноября</span><span class="om-grow"><span style="display: block; font-size: 14px; font-weight: 600;">ВсОШ · школьный этап заканчивается</span><span class="meta">у каждого региона свои даты</span></span><span class="ol-status ol-status--rule"><i class="ol-dot"></i>идёт</span></div>
+        <div class="om-row" style="padding: 12px 20px;"><span class="om-date">ноябрь</span><span class="om-grow"><span style="display: block; font-size: 14px; font-weight: 600;">Высшая проба · отборочный тур</span><span class="meta">обычно в ноябре, даты не объявлены</span></span><span class="ol-status ol-status--awaiting"><i class="ol-dot"></i>ждём</span></div>
+        <div class="om-row" style="padding: 12px 20px;"><span class="om-date">≈ 19 ноября</span><span class="om-grow"><span style="display: block; font-size: 14px; font-weight: 600;">Вернадский · открывается регистрация</span><span class="meta">по прошлому сезону</span></span><span class="ol-status ol-status--approx"><i class="ol-dot"></i>оценка</span></div>
+        <div class="om-row" style="padding: 12px 20px;"><span class="om-date">до 25 декабря</span><span class="om-grow"><span style="display: block; font-size: 14px; font-weight: 600;">ВсОШ · муниципальный этап</span><span class="meta">у каждого региона свои даты</span></span><span class="ol-status ol-status--rule"><i class="ol-dot"></i>по правилам</span></div>
+        <div style="padding: 8px 20px 16px; border-top: 1px solid var(--border-soft);"><button type="button" class="k-btn k-btn--quiet" aria-expanded="false" style="padding-left: 0;">Ещё 5 событий сезона <svg class="om-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      </section>
+
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <section class="k-card" style="padding: 16px 20px 18px;">
+          <h2 class="om-h2">Продолжить</h2>
+          <div style="font-size: 15px; font-weight: 600; margin-top: 12px;">ВсОШ · заключительный 2025/26</div>
+          <div class="meta" style="margin-top: 2px;">11 класс · 1 тур — 34 из 48 · остался 2 тур</div>
+          <div class="om-bar5" style="margin-top: 10px;"><i style="width: 50%;"></i></div>
+          <div style="margin-top: 14px;"><a class="k-btn k-btn--main" href="#">Решать 2 тур</a></div>
+        </section>
+        <section class="k-card" style="padding: 16px 20px 18px;">
+          <h2 class="om-h2">Мои олимпиады</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"><a class="ol-chip" href="#">ВсОШ</a><a class="ol-chip" href="#">МОШ</a><a class="ol-chip" href="#">Высшая проба</a></div>
+        </section>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 32px;">
+      <button type="button" class="ol-chip" aria-pressed="true">Все</button>
+      <button type="button" class="ol-chip" aria-pressed="false">ВсОШ</button>
+      <button type="button" class="ol-chip" aria-pressed="false">Перечневые</button>
+      <button type="button" class="ol-chip" aria-pressed="false">Международные</button>
+      <button type="button" class="ol-chip" aria-pressed="false">Другие</button>
+      <span style="width: 14px;"></span>
+      <span class="meta">Класс</span>
+      <button type="button" class="ol-chip" aria-pressed="false">≤7</button>
+      <button type="button" class="ol-chip" aria-pressed="false">8</button>
+      <button type="button" class="ol-chip" aria-pressed="false">9</button>
+      <button type="button" class="ol-chip" aria-pressed="false">10</button>
+      <button type="button" class="ol-chip" aria-pressed="false">11</button>
+      <span style="width: 14px;"></span>
+      <button type="button" class="ol-chip" aria-pressed="false">есть задания</button>
+    </div>
+
+    <div class="ol-tablewrap" style="margin-top: 14px;">
+      <table class="ol-table" style="table-layout: fixed;">
+        <colgroup><col style="width: 40%;"><col style="width: 156px;"><col style="width: 84px;"><col style="width: 192px;"><col><col style="width: 56px;"></colgroup>
+        <thead><tr><th>Олимпиада</th><th>Уровень</th><th>Классы</th><th>Материалов на платформе</th><th>Ближайшее</th><th><span class="mute" aria-label="Мои">☆</span></th></tr></thead>
+        <tbody>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">ВсОШ</span><span><b class="om-ell">ВсОШ</b><span class="meta om-ell" style="display: block;">Всероссийская олимпиада школьников по экономике</span></span></a></td><td><span class="k-chip-kind">ВсОШ</span></td><td class="num">9–11</td><td class="num">31 сезон · 2 671</td><td><span style="display: block; font-size: 13px; font-weight: 600;">муниципальный</span><span class="meta">до 25 дек</span></td><td><button type="button" class="k-btn k-btn--quiet" aria-label="Убрать из моих" aria-pressed="true" style="color: var(--accent-ink);">★</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">МОШ</span><span><b class="om-ell">МОШ</b><span class="meta om-ell" style="display: block;">Московская олимпиада школьников по экономике</span></span></a></td><td><span class="k-chip-kind">II уровень</span></td><td class="num">7–11</td><td class="num">18 сезонов · 2 658</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="Убрать из моих" aria-pressed="true" style="color: var(--accent-ink);">★</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">ВП</span><span><b class="om-ell">Высшая проба</b><span class="meta om-ell" style="display: block;">НИУ «Высшая школа экономики»</span></span></a></td><td><span class="k-chip-kind">I уровень</span></td><td class="num">9–11</td><td class="num">20 сезонов · 822</td><td><span style="display: block; font-size: 13px; font-weight: 600;">отборочный</span><span class="meta">обычно в ноябре</span></td><td><button type="button" class="k-btn k-btn--quiet" aria-label="Убрать из моих" aria-pressed="true" style="color: var(--accent-ink);">★</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">СПбГУ</span><span><b class="om-ell">СПбГУ</b><span class="meta om-ell" style="display: block;">Санкт-Петербургский государственный университет</span></span></a></td><td><span class="k-chip-kind">II уровень</span></td><td class="num">8–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Лом</span><span><b class="om-ell">Ломоносов</b><span class="meta om-ell" style="display: block;">МГУ имени М. В. Ломоносова</span></span></a></td><td class="mute">—</td><td class="num">5–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">IEO</span><span><b class="om-ell">IEO</b><span class="meta om-ell" style="display: block;">International Economics Olympiad</span></span></a></td><td><span class="k-chip-kind">международная</span></td><td class="num">9–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">DANO</span><span><b class="om-ell">DANO</b><span class="meta om-ell" style="display: block;">НИУ ВШЭ и Т-Образование</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="num">9–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Плех</span><span><b class="om-ell">Плехановская</b><span class="meta om-ell" style="display: block;">РЭУ имени Г. В. Плеханова</span></span></a></td><td><span class="k-chip-kind">III уровень</span></td><td class="num">8–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">МВ</span><span><b class="om-ell">Миссия выполнима</b><span class="meta om-ell" style="display: block;">Финансовый университет при Правительстве РФ</span></span></a></td><td><span class="k-chip-kind">II уровень</span></td><td class="num">8–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 10px;">РАН<br>ХиГС</span><span><b class="om-ell">РАНХиГС</b><span class="meta om-ell" style="display: block;">Российская академия народного хозяйства и государственной службы при Президенте РФ</span></span></a></td><td><span class="k-chip-kind">III уровень</span></td><td class="num">10–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Конд</span><span><b class="om-ell">Кондратьевская</b><span class="meta om-ell" style="display: block;">Институт экономики РАН и партнёры</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="num">5–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">РЭШ</span><span><b class="om-ell">РЭШ</b><span class="meta om-ell" style="display: block;">Конкурс Российской экономической школы</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="num">10–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Сиб</span><span><b class="om-ell">Сибириада</b><span class="meta om-ell" style="display: block;">Новосибирский государственный университет и партнёры фестиваля</span></span></a></td><td><span class="k-chip-kind">II уровень</span></td><td class="num">7–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">ОЧ</span><span><b class="om-ell">Открытый чемпионат</b><span class="meta om-ell" style="display: block;">Экономико-математическая школа при экономическом факультете МГУ</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="num">7–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Колок</span><span><b class="om-ell">Колокольникова</b><span class="meta om-ell" style="display: block;">ФМШ, Тюменская область</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="num">7–8</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 10px;">ВолНЦ</span><span><b class="om-ell">ВолНЦ РАН</b><span class="meta om-ell" style="display: block;">Вологодский научный центр РАН</span></span></a></td><td><span class="k-chip-kind">вне перечня</span></td><td class="mute">—</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">Верн</span><span><b class="om-ell">Вернадский</b><span class="meta om-ell" style="display: block;">Академическая олимпиада имени В. И. Вернадского</span></span></a></td><td><span class="k-chip-kind">I уровень</span></td><td class="num">9–11</td><td class="mute" style="font-size: 13px;">заданий пока нет</td><td><span style="display: block; font-size: 13px; font-weight: 600;">регистрация</span><span class="meta">≈ 19 ноя</span></td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section class="om-sec">
+      <h2 class="om-h2">Финансовая грамотность и Основы бизнеса</h2>
+      <div class="ol-tablewrap">
+        <table class="ol-table" style="table-layout: fixed;">
+          <colgroup><col style="width: 40%;"><col style="width: 156px;"><col style="width: 84px;"><col style="width: 192px;"><col><col style="width: 56px;"></colgroup>
+          <thead><tr><th>Олимпиада</th><th>Уровень</th><th>Классы</th><th>Материалов на платформе</th><th>Ближайшее</th><th><span class="mute" aria-label="Мои">☆</span></th></tr></thead>
+          <tbody>
+            <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">ВП</span><span><b class="om-ell">ВП: основы бизнеса</b><span class="meta om-ell" style="display: block;">Высшая проба по основам бизнеса</span></span></a></td><td class="mute">—</td><td class="num">9–11</td><td class="num">9 сезонов · 130</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+            <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">ВП</span><span><b class="om-ell">ВП: финграмотность</b><span class="meta om-ell" style="display: block;">Высшая проба по финансовой грамотности</span></span></a></td><td class="mute">—</td><td class="num">9–11</td><td class="num">9 сезонов · 98</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+            <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">МОШ</span><span><b class="om-ell">МОШ: финграмотность</b><span class="meta om-ell" style="display: block;">Московская олимпиада школьников — финансовая грамотность</span></span></a></td><td class="mute">—</td><td class="mute">—</td><td class="num">10 сезонов · 1 281</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+            <tr><td><a class="hl-name" href="#" style="text-decoration: none; color: inherit;"><span class="ol-logo--empty" style="width: 44px; height: 44px; font-size: 11px;">МОШ</span><span><b class="om-ell">МОШ: предпринимательство</b><span class="meta om-ell" style="display: block;">Московская олимпиада школьников — предпринимательство</span></span></a></td><td class="mute">—</td><td class="mute">—</td><td class="num">5 сезонов · 396</td><td class="mute">—</td><td><button type="button" class="k-btn k-btn--quiet" aria-label="В мои">☆</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Тема"},"$preview":{"width":1280,"height":2219}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const theme = s.theme || this.props.theme || 'light';
+    return {
+      theme: theme,
+      themeIcon: theme === 'dark' ? '☀' : '☾',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>
