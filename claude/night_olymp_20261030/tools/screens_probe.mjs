@@ -77,8 +77,10 @@ for (const [width, height] of [[1280, 900], [390, 844]]) {
     const errors = [];
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push(String(e)));
-    if (opts.login) {
-      const [user, pass] = opts.login.split(':');
+    // --login-file=<файл «логин:пароль»> — пароль не попадает в командную строку.
+    const login = opts['login-file'] ? fs.readFileSync(opts['login-file'], 'utf8').trim() : opts.login;
+    if (login) {
+      const [user, pass] = login.split(':');
       await page.goto(BASE + '/login/');
       await page.fill('input[name="username"]', user);
       await page.fill('input[name="password"]', pass);

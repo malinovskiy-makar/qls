@@ -1,34 +1,74 @@
 {% extends 'olympiads/base_olymp.html' %}
+{% comment %}
+Главная раздела по макетам 30.10 (доски Home, HomePhone; ночь 30→31.10, Э3).
+Числа и порядок — `olympiads/navigator.py` (`home_rows`, `upcoming`,
+`home_continue`); фильтры — GET-параметры, работают без JS.
+{% endcomment %}
 {% block title %}Олимпиады по экономике{% endblock %}
+{% block main_class %}page-wrap om-wide{% endblock %}
 {% block olymp_content %}
-<div class="ol-head">
-  <h1 class="ol-title">Это олимпиады по экономике.</h1>
-  <p class="ol-sub">Узнайте все об олимпиадах и их льготах, следите за датами туров и решайте задания прошлых лет.</p>
-</div>
+<div class="om om-home">
+  <div class="om-home-hd">
+    <h1 class="ol-title om-grow">Олимпиады по экономике</h1>
+    <a class="k-btn k-btn--plain om-desk-only" href="{% url 'olympiads:calendar' %}">{% include 'olympiads/_ico.html' with name='clock' %}Календарь</a>
+  </div>
 
-{% include 'olympiads/_dates_feed.html' %}
-{% include 'olympiads/_filters.html' %}
+  <div class="om-home-top{% if not continue and not followed %} om-home-top--one{% endif %}">
+    {% if feed %}
+    <section class="k-card om-feed">
+      <div class="om-feed-hd"><h2 class="om-h2 om-grow">Ближайшее</h2><a class="om-link" href="{% url 'olympiads:calendar' %}">Весь календарь →</a></div>
+      {% for f in feed %}{% include 'olympiads/_feed_row.html' %}{% endfor %}
+      {% if feed_more %}
+      <details class="om-feed-more">
+        <summary class="k-btn k-btn--quiet">Ещё {{ feed_more|length }} {% if feed_more|length == 1 %}событие{% elif feed_more|length < 5 %}события{% else %}событий{% endif %} сезона {% include 'olympiads/_ico.html' with name='down' %}</summary>
+        {% for f in feed_more %}{% include 'olympiads/_feed_row.html' %}{% endfor %}
+      </details>
+      {% endif %}
+    </section>
+    {% endif %}
 
-<div data-group="main">
-  <ul class="ol-grid" id="ol-grid-main">
-    {% for olympiad in main %}{% include 'olympiads/_card.html' %}{% endfor %}
-  </ul>
-</div>
+    {% if continue or followed %}
+    <div class="om-home-side">
+      {% if continue %}
+      <section class="k-card om-pad">
+        <h2 class="om-h2">Продолжить</h2>
+        <div class="om-cont__t">{{ continue.olympiad.name_short }} · {{ continue.stage_season }}</div>
+        <div class="meta">{{ continue.grades }} · {{ continue.sub }}</div>
+        <div class="om-bar5 om-mt10"><i style="width: {{ continue.progress }}%;"></i></div>
+        <div class="om-mt14"><a class="k-btn k-btn--main" href="{% if continue.resume %}{% url 'olympiads:training_take' continue.olympiad.slug continue.tour.pk %}{% else %}{% url 'olympiads:training_intro' continue.olympiad.slug continue.tour.pk %}{% endif %}">Решать {{ continue.tour.label }}</a></div>
+      </section>
+      {% endif %}
+      {% if followed %}
+      <section class="k-card om-pad om-desk-only">
+        <h2 class="om-h2">Мои олимпиады</h2>
+        <div class="om-chips om-mt12">{% for o in followed %}<a class="ol-chip" href="{% url 'olympiads:detail' o.slug %}">{{ o.name_short }}</a>{% endfor %}</div>
+      </section>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
 
-{% if related %}
-<div data-group="related">
-  <p class="ol-divider">Смежные направления</p>
-  <ul class="ol-grid" id="ol-grid-related">
-    {% for olympiad in related %}{% include 'olympiads/_card.html' %}{% endfor %}
-  </ul>
-</div>
-{% endif %}
+  <h2 class="om-h2 om-phone om-ph-all">Все олимпиады</h2>
+  <div class="om-filters ph-chips" data-scroll="x" role="group" aria-label="Фильтры">
+    {% for c in kind_chips %}<a class="ol-chip" href="{{ c.href }}" aria-pressed="{{ c.on|yesno:'true,false' }}">{{ c.label }}</a>{% if forloop.first and user.is_authenticated %}<a class="ol-chip om-phone-inline" href="{{ mine_chip.href }}" aria-pressed="{{ mine_chip.on|yesno:'true,false' }}">Мои</a>{% endif %}{% endfor %}
+    <span class="om-gap" aria-hidden="true"></span><span class="meta">Класс</span>
+    {% for c in grade_chips %}<a class="ol-chip" href="{{ c.href }}" aria-pressed="{{ c.on|yesno:'true,false' }}">{{ c.label }}</a>{% endfor %}
+    <span class="om-gap" aria-hidden="true"></span>
+    <a class="ol-chip" href="{{ tasks_chip.href }}" aria-pressed="{{ tasks_chip.on|yesno:'true,false' }}">есть задания</a>
+  </div>
 
-<div class="ol-picked" id="ol-picked" hidden>
-  <span id="ol-picked-count">Выбрано 0.</span>
-  <a class="ol-btn ol-btn--sm" id="ol-picked-go" href="{% url 'olympiads:compare' %}">Сравнить</a>
-  <span class="ol-picked-hint" id="ol-picked-hint" hidden>Можно сравнить не больше трёх</span>
+  {% if main_rows %}
+  {% include 'olympiads/_home_table.html' with rows=main_rows %}
+  {% endif %}
+  {% if not total_rows %}
+  <div class="k-card om-pad om-mt14"><div class="om-empty__t">Под эти фильтры олимпиад нет</div><a class="om-link" href="{{ reset_href }}">Сбросить фильтры</a></div>
+  {% endif %}
+
+  {% if fin_rows %}
+  <section class="om-sec">
+    <h2 class="om-h2">Финансовая грамотность и Основы бизнеса</h2>
+    {% include 'olympiads/_home_table.html' with rows=fin_rows %}
+  </section>
+  {% endif %}
 </div>
 {% endblock %}
-
-{% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% include 'olympiads/_compare_js.html' %}{% endblock %}

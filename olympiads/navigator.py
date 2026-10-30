@@ -525,6 +525,18 @@ def home_rows(user=None, today=None):
             'nearest': next_event(events, today),
             'followed': olympiad.pk in followed,
         })
+        row = rows[-1]
+        row['seasons_label'] = seasons_label(n_seasons)
+        count = row['problems']
+        row['problems_label'] = '{} {}'.format(
+            '{:,}'.format(count).replace(',', '\u00a0'),
+            plural(count, 'задача', 'задачи', 'задач'))
+        nearest = row['nearest']
+        row['nearest_what'] = ''
+        if nearest is not None:
+            row['nearest_what'] = (stage_short(nearest.stage).lower()
+                                   if nearest.stage else
+                                   nearest.chip_label.lower())
     rows.sort(key=lambda r: (r['section'] != 'main',
                              -r['olympiad'].manual_rank,
                              r['olympiad'].name_short))
@@ -750,13 +762,18 @@ def continue_cell(page):
     target = (going or left or cell['tours'])[0]
     row_label = next((r['label'] for r in grid['rows'] if cell in r['cells']),
                      '')
+    grades = cell['grades_label'] or grades_text(cell['grades']) or 'все классы'
+    total = len(cell['tours'])
     return {
         'title': '{} {} · {}'.format(stage_short(grid['stage']), row_label,
-                                     cell['grades_label'] or
-                                     grades_text(cell['grades']) or 'все классы'),
+                                     grades),
+        'stage_season': '{} {}'.format(stage_short(grid['stage']).lower(),
+                                       row_label),
+        'grades': grades,
         'sub': ' · '.join(parts),
         'tour': target,
         'resume': target['state']['status'] == 'started',
+        'progress': round(100 * len(done) / total) if total else 0,
     }
 
 
@@ -804,3 +821,110 @@ def admission_summary(olympiad, benefits, level=None):
         'none_names': ', '.join(b.program.university_short for b in none),
         'year': real[0].admission_year,
     }
+
+
+# ---------------------------------------------------------------------------
+# Главная: фильтры, лента, «Продолжить» (Э3)
+# ---------------------------------------------------------------------------
+
+KIND_FILTERS = (('vsosh', 'ВсОШ', Olympiad.Kind.VSOSH),
+                ('perechen', 'Перечневые', Olympiad.Kind.PERECHEN),
+                ('international', 'Международные', Olympiad.Kind.INTERNATIONAL),
+                ('other', 'Другие', Olympiad.Kind.OTHER))
+GRADE_FILTERS = (('le7', '≤7'), ('8', '8'), ('9', '9'), ('10', '10'),
+                 ('11', '11'))
+FEED_VISIBLE = 4
+
+
+def logo_text(olympiad):
+    """Текст квадрата на месте логотипа: «ВсОШ», «СПбГУ» — короткое
+    название целиком, если оно не длиннее пяти знаков, иначе буквы."""
+    short = (olympiad.name_short or '').strip()
+    return short if 0 < len(short) <= 5 else olympiad.abbr
+
+
+def level_chip(row):
+    """Чип «Уровень» строки главной: ВсОШ, I–III уровень, международная…"""
+    kind = row['olympiad'].kind
+    if kind == Olympiad.Kind.VSOSH:
+        return 'ВсОШ'
+    if row['level'] in ROMAN:
+        return '{} уровень'.format(ROMAN[row['level']])
+    if kind == Olympiad.Kind.INTERNATIONAL:
+        return 'международная'
+    if kind == Olympiad.Kind.OTHER:
+        return 'вне перечня'
+    return ''
+
+
+def grade_matches(olympiad, code):
+    """Олимпиада принимает класс. «≤7» — `grade_min ≤ 7`.
+
+    ⚠️ Классы неизвестны (оба поля пусты) — под фильтр класса олимпиада не
+    попадает: сказать «тебе подходит» без данных нельзя.
+    """
+    low, high = olympiad.grade_min, olympiad.grade_max
+    if low is None and high is None:
+        return False
+    if code == 'le7':
+        return low is not None and low <= 7
+    grade = int(code)
+    return (low is None or low <= grade) and (high is None or grade <= high)
+
+
+def filter_rows(rows, kind='', grade='', tasks=False, mine=False):
+    kinds = {code: value for code, _label, value in KIND_FILTERS}
+    out = rows
+    if kind in kinds:
+        out = [r for r in out if r['olympiad'].kind == kinds[kind]]
+    if grade in dict(GRADE_FILTERS):
+        out = [r for r in out if grade_matches(r['olympiad'], grade)]
+    if tasks:
+        out = [r for r in out if r['has_tasks']]
+    if mine:
+        out = [r for r in out if r['followed']]
+    return out
+
+
+def event_title(event):
+    """«ВсОШ · школьный этап», «Высшая проба · открывается регистрация»."""
+    what = {OlympiadEvent.Kind.REGISTRATION_OPEN: 'открывается регистрация',
+            OlympiadEvent.Kind.REGISTRATION_CLOSE: 'закрывается регистрация',
+            OlympiadEvent.Kind.RESULTS: 'результаты'}.get(event.kind)
+    if what is None:
+        what = stage_title(event.stage).lower() if event.stage else 'тур'
+    return '{} · {}'.format(event.olympiad.name_short, what)
+
+
+def event_date_label(event):
+    """Короткая дата слева в ленте: «24 сентября» или «—» без даты."""
+    from .models import MONTHS_GENITIVE
+    if event.is_confirmed and event.date_start:
+        day = event.date_start
+        return '{} {}'.format(day.day, MONTHS_GENITIVE[day.month - 1])
+    return '—'
+
+
+STATUS_SHORT = {OlympiadEvent.DateStatus.CONFIRMED: ('confirmed', 'объявлено'),
+                OlympiadEvent.DateStatus.APPROX_LAST_YEAR: ('approx', 'оценка'),
+                OlympiadEvent.DateStatus.AWAITING: ('awaiting', 'ждём')}
+
+
+def feed_rows(events):
+    return [{'event': e, 'title': event_title(e), 'date': event_date_label(e),
+             'sub': '' if e.is_confirmed else e.approx_text,
+             'status': STATUS_SHORT.get(e.date_status, ('awaiting', 'ждём'))}
+            for e in events]
+
+
+def home_continue(user):
+    """Блок «Продолжить» главной — та же сводка, что на странице олимпиады."""
+    attempt = continue_attempt(user)
+    if attempt is None:
+        return None
+    olympiad = attempt.variant.olympiad
+    summary = continue_cell(olympiad_page(olympiad, user))
+    if summary is None:
+        return None
+    summary['olympiad'] = olympiad
+    return summary

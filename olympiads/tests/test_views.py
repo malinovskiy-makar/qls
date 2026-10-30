@@ -34,7 +34,7 @@ class EmptyStateTests(TestCase):
         self.assertEqual(Olympiad.objects.count(), 0)
         response = self.client.get(reverse('olympiads:list'))
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Это олимпиады по экономике.', visible_text(response))
+        self.assertIn('есть задания', visible_text(response))
 
     def test_detail_works_with_nothing_filled(self):
         """Ни событий, ни льгот, ни баллов, ни комплектов — страница работает.
@@ -457,11 +457,11 @@ class OlympiadsAreClosedTests(TestCase):
             self._make_user('olymp_ad', role='teacher', is_staff=True))
         text = visible_text(self.client.get('/olympiads/'))
         self.assertNotIn('Скоро.', text)
-        self.assertIn('Это олимпиады по экономике.', text)
+        self.assertIn('есть задания', text)
 
     @override_settings(OLYMPIADS_PUBLIC=True)
     def test_the_flag_opens_the_section_for_everyone(self):
         """Поднятый флаг — единственное, что нужно для публичного запуска."""
         text = visible_text(self.client.get('/olympiads/'))
         self.assertNotIn('Скоро.', text)
-        self.assertIn('Это олимпиады по экономике.', text)
+        self.assertIn('есть задания', text)

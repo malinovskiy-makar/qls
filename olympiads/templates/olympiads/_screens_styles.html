@@ -330,4 +330,63 @@ templates/_tokens.html. Ниже переноса — правила телеф�
   .om .om-srow__f { width: auto; }
 }
 
+/* ── Главная раздела (Э3): доски Home и HomePhone ── */
+main.om-wide { max-width: 1200px; }
+.om .om-block { display: block; }
+.om .om-min0 { min-width: 0; }
+.om .om-small { font-size: 13px; }
+.om .om-mt10 { margin-top: 10px; } .om .om-mt12 { margin-top: 12px; } .om .om-mt14 { margin-top: 14px; }
+.om .om-pad { padding: 16px 20px 18px; }
+.om .om-home-hd { display: flex; align-items: center; gap: 16px; }
+.om .om-home-top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 26px; }
+.om .om-home-top--one { grid-template-columns: minmax(0, 1fr); }
+.om .om-home-side { display: flex; flex-direction: column; gap: 20px; }
+.om .om-feed-hd { padding: 16px 20px 6px; display: flex; align-items: baseline; gap: 12px; }
+.om .om-frow { padding: 12px 20px; }
+.om .om-feed-hd + .om-frow { border-top: 0; }
+.om .om-frow__t { font-size: 14px; font-weight: 600; }
+.om .om-feed-more { border-top: 1px solid var(--border-soft); }
+.om .om-feed-more summary { list-style: none; cursor: pointer; margin: 8px 20px 12px; padding-left: 0; }
+.om .om-feed-more summary::-webkit-details-marker { display: none; }
+.om .om-feed-more[open] summary .om-ic { transform: rotate(180deg); }
+.om .om-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.om .om-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 32px; }
+.om .om-filters .ol-chip { text-decoration: none; }
+.om .om-gap { width: 14px; }
+.om .om-home-t { margin-top: 14px; }
+.om .om-htable { table-layout: fixed; }
+.om .om-hc-name { width: 40%; } .om .om-hc-level { width: 156px; } .om .om-hc-grades { width: 84px; }
+.om .om-hc-mat { width: 192px; } .om .om-hc-star { width: 56px; }
+.om .hl-name { text-decoration: none; color: inherit; }
+.om .om-hlogo { width: 44px; height: 44px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; border-radius: var(--r-card); text-align: center; line-height: 1.1; }
+.om .om-near { font-size: 13px; font-weight: 600; }
+.om .om-star { margin: 0; }
+.om .om-htable td:last-child, .om .om-htable th:last-child { padding-left: 6px; padding-right: 6px; text-align: center; }
+.om .om-star__b { color: var(--text3); }
+.om .om-star__b--on { color: var(--accent-ink); }
+.om .om-filters .om-phone-inline { display: none; }
+@media (max-width: 720px) {
+  .om .om-desk-only { display: none; }
+  .om .om-filters .om-phone-inline { display: inline-flex; }
+  .om .om-home-top { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 18px; }
+  .om .om-home-side { order: -1; }
+  .om .om-feed-hd { padding: 14px 16px 4px; }
+  .om .om-feed-hd .om-link { padding: 10px 0; }
+  .om .om-frow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 12px 16px; }
+  .om .om-frow .om-date { width: auto; grid-row: 1; }
+  .om .om-frow .ol-status { grid-row: 1; grid-column: 2; }
+  .om .om-frow .om-grow { grid-column: 1 / -1; }
+  .om .om-feed-more summary { margin: 4px 16px 10px; min-height: 44px; }
+  .om .om-ph-all { display: block; margin: 26px 0 10px; }
+  .om .om-filters { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+  .om .om-filters .ol-chip { min-height: 44px; display: inline-flex; align-items: center; flex-shrink: 0; }
+  .om .om-filters .meta { flex-shrink: 0; }
+  .om .om-phone.k-card { margin-top: 10px; }
+  .om .ph-ol { grid-template-columns: minmax(0, 1fr) 44px; padding: 8px 8px 8px 16px; }
+  .om .ph-ol:first-child { border-top: 0; }
+  .om .om-phl { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: center; text-decoration: none; color: var(--text); min-height: 44px; }
+  .om .om-hlogo--ph { width: 40px; height: 40px; font-size: 10px; }
+  .om .ph-ol .om-star__b { min-height: 44px; min-width: 44px; }
+}
+
 /* @@NEXT@@ */

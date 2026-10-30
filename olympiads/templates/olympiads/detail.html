@@ -12,7 +12,7 @@
 <div class="om om-detail">
   <nav class="ol-crumbs" aria-label="Хлебные крошки"><a href="{% url 'olympiads:list' %}">Олимпиады</a> → {{ olympiad.name_short }}</nav>
   <div class="om-head">
-    {% if olympiad.logo %}<img class="om-logo" src="{{ olympiad.logo.url }}" alt="" width="64" height="64">{% else %}<span class="ol-logo--empty om-logo" aria-hidden="true">{{ olympiad.abbr }}</span>{% endif %}
+    {% if olympiad.logo %}<img class="om-logo" src="{{ olympiad.logo.url }}" alt="" width="64" height="64">{% else %}<span class="ol-logo--empty om-logo" aria-hidden="true">{{ logo_text }}</span>{% endif %}
     <div class="om-grow">
       <h1 class="ol-title">{{ olympiad.name_full }}</h1>
       <p class="ol-sub">{{ olympiad.organizer }}{% if olympiad.kind == 'vsosh' %} · государственная{% elif level and level.level %} · {{ level.level }} уровень перечня{% endif %} · сезон {{ academic_year }}</p>

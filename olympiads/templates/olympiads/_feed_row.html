@@ -1,0 +1,2 @@
+{% comment %}Строка ленты «Ближайшее»: дата слева, что за событие, ориентир словами, статус даты.{% endcomment %}
+<div class="om-row om-frow"><span class="om-date">{{ f.date }}</span><span class="om-grow om-min0"><span class="om-block om-frow__t">{{ f.title }}</span>{% if f.sub %}<span class="meta om-block">{{ f.sub }}</span>{% endif %}</span><span class="ol-status ol-status--{{ f.status.0 }}"><i class="ol-dot"></i>{{ f.status.1 }}</span></div>

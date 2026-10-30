@@ -13,7 +13,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from . import navigator, services, training_engine
-from .models import (TAG_LABELS, Olympiad, OlympiadFollow,
+from .models import (Olympiad, OlympiadFollow,
                      RegionalCoordinator, current_academic_year)
 
 
@@ -45,31 +45,53 @@ def _has_placeholder(objects):
 
 
 def olympiad_list(request):
-    """Главный экран раздела: лента ближайших дат, фильтры, карточки."""
+    """Главная раздела по макету 30.10 (доски Home, HomePhone; ночь, Э3).
+
+    Фильтры — GET-параметры (`kind`, `grade`, `tasks`, `mine`): работают без
+    JS и дают ссылку, которой можно поделиться. Числа — из навигатора.
+    """
     stub = soon_page(request)
     if stub is not None:
         return stub
-    olympiads = list(
-        Olympiad.objects.filter(is_published=True)
-        .prefetch_related('levels', 'events', 'variants')
-    )
-    main = sorted(
-        [o for o in olympiads if o.display_group == Olympiad.DisplayGroup.MAIN],
-        key=lambda o: o.sort_key(),
-    )
-    related = sorted(
-        [o for o in olympiads
-         if o.display_group == Olympiad.DisplayGroup.RELATED],
-        key=lambda o: o.sort_key(),
-    )
-    feed_events, feed_has_confirmed = services.upcoming_events(limit=5)
+    user = request.user if request.user.is_authenticated else None
+    rows = navigator.home_rows(user)
+    kind = request.GET.get('kind', '')
+    grade = request.GET.get('grade', '')
+    tasks = request.GET.get('tasks') == '1'
+    mine = request.GET.get('mine') == '1' and user is not None
+    shown = navigator.filter_rows(rows, kind, grade, tasks, mine)
+    for row in rows:
+        row['level_chip'] = navigator.level_chip(row)
+        row['logo_text'] = navigator.logo_text(row['olympiad'])
+    feed = navigator.feed_rows(navigator.upcoming())
+    params = {'kind': kind, 'grade': grade, 'tasks': '1' if tasks else '',
+              'mine': '1' if mine else ''}
+
+    def link(**change):
+        """Адрес чипа: меняет один параметр, остальные оставляет."""
+        merged = dict(params, **change)
+        query = '&'.join('{}={}'.format(k, v) for k, v in merged.items() if v)
+        return '?' + query if query else '?'
+
     return render(request, 'olympiads/list.html', {
-        'main': main,
-        'related': related,
-        'feed_events': feed_events,
-        'feed_has_confirmed': feed_has_confirmed,
-        'tag_labels': TAG_LABELS,
-        'has_placeholder': _has_placeholder(olympiads),
+        'main_rows': [r for r in shown if r['section'] == 'main'],
+        'fin_rows': [r for r in shown if r['section'] == 'fin'],
+        'total_rows': len(shown),
+        'feed': feed[:navigator.FEED_VISIBLE],
+        'feed_more': feed[navigator.FEED_VISIBLE:],
+        'continue': navigator.home_continue(user),
+        'followed': [r['olympiad'] for r in rows if r['followed']],
+        'kind_chips': [{'label': 'Все', 'on': not kind, 'href': link(kind='')}]
+        + [{'label': label, 'on': kind == code,
+            'href': link(kind='' if kind == code else code)}
+           for code, label, _value in navigator.KIND_FILTERS],
+        'grade_chips': [{'label': label, 'on': grade == code,
+                         'href': link(grade='' if grade == code else code)}
+                        for code, label in navigator.GRADE_FILTERS],
+        'tasks_chip': {'on': tasks, 'href': link(tasks='' if tasks else '1')},
+        'mine_chip': {'on': mine, 'href': link(mine='' if mine else '1')},
+        'filtered': any(params.values()),
+        'reset_href': '?',
     })
 
 
@@ -121,6 +143,7 @@ def olympiad_detail(request, slug):
         'regions': list(RegionalCoordinator.objects.all()) if show_regions else [],
         'sources': sorted(sources.values(), key=lambda s: (s.publisher, s.title)),
         'level': navigator.last_approved_level(olympiad),
+        'logo_text': navigator.logo_text(olympiad),
         'academic_year': current_academic_year(),
         'followed': bool(user) and OlympiadFollow.objects.filter(
             user=user, olympiad=olympiad).exists(),
