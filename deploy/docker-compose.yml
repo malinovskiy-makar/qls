@@ -252,9 +252,16 @@ services:
     restart: unless-stopped
     # Здесь порты публиковать НУЖНО: это единственная дверь наружу.
     # 80 и 443 разрешены в ufw.
+    #
+    # 8080 и 8443 — вход для VPN: сюда пересылает машина tg-relay, с PROXY
+    # protocol (deploy/web_relay/README.md). ⚠️ ufw их НЕ закрывает — Docker
+    # обходит ufw. Пускает к ним только tg-relay правило в DOCKER-USER
+    # (deploy/web_relay/prod_firewall.sh и его systemd-юнит).
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"
+      - "8443:8443"
     depends_on:
       - web
     volumes:
