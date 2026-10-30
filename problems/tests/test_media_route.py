@@ -124,7 +124,7 @@ class NoOtherFileServingViewTests(TestCase):
     """
 
     APPS = ('problems', 'catalog', 'teacher', 'student', 'game', 'calc2',
-            'calendar_stub', 'config')
+            'calendar_stub', 'config', 'olympiads')
 
     # путь → почему это безопасно
     ALLOWED = {
@@ -148,6 +148,13 @@ class NoOtherFileServingViewTests(TestCase):
             'целое число; тип из поля mime, проверенного при загрузке; nosniff; '
             'PDF скачиванием. Модуль из одной вьюхи нарочно. Разбор — ADR 0118, '
             'ночь 18.09.2026.',
+        'olympiads/training_files.py':
+            'лист решения тура: хозяину попытки (пользователь или гостевая '
+            'сессия) или по пропуску телефона только листы его задания, иначе '
+            '404 (истёкший пропуск — 410); путь из поля TrainingUpload.file, из '
+            'адреса только целые номера и токен; тип из поля mime, проверенного '
+            'при загрузке; nosniff; PDF скачиванием. Разбор — ADR 0174–0175, '
+            'ночь 30.10.2026.',
     }
 
     def test_no_file_serving_helpers_in_views(self):

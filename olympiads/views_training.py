@@ -17,7 +17,7 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -397,25 +397,6 @@ def phone_upload(request, token):
     }, status=400 if error else 200)
 
 
-def phone_sheet(request, token, sheet_id):
-    """Миниатюра листа на телефоне — только листы ЭТОГО задания по токену."""
-    stub = soon_page(request)
-    if stub is not None:
-        return stub
-    from .models import TrainingUpload
-
-    found, gone = _token_or_error(request, token)
-    if gone is not None:
-        return gone
-    sheet = get_object_or_404(TrainingUpload, pk=sheet_id,
-                              attempt=found.attempt, problem=found.problem)
-    response = FileResponse(sheet.file.open('rb'),
-                            content_type=sheet.mime or 'application/octet-stream')
-    response['Cache-Control'] = 'private, max-age=600'
-    response['X-Content-Type-Options'] = 'nosniff'
-    return response
-
-
 @require_POST
 def training_item_submit(request, slug, pk):
     """«Сдать задание» в режиме «Без времени»: проверить одно задание.
@@ -527,23 +508,6 @@ def _own_attempt_sheet(request, slug, pk, sheet_id):
     if not mine:
         raise Http404
     return sheet
-
-
-def training_sheet(request, slug, pk, sheet_id):
-    """Файл листа — только хозяину попытки. Наружу (в общий media) не отдаётся.
-
-    ⚠️ Пятая файловая вьюха платформы (к четырём из ADR 0118): лист решения —
-    работа ученика, прямой ссылки на файл в хранилище страница не даёт.
-    """
-    stub = soon_page(request)
-    if stub is not None:
-        return stub
-    sheet = _own_attempt_sheet(request, slug, pk, sheet_id)
-    response = FileResponse(sheet.file.open('rb'), content_type=sheet.mime or
-                            'application/octet-stream')
-    response['Cache-Control'] = 'private, max-age=3600'
-    response['X-Content-Type-Options'] = 'nosniff'
-    return response
 
 
 @require_POST

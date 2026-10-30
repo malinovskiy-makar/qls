@@ -6,7 +6,7 @@
 """
 from django.urls import path
 
-from . import views, views_training
+from . import training_files, views, views_training
 
 app_name = 'olympiads'
 
@@ -16,7 +16,7 @@ urlpatterns = [
     path('compare/', views.compare, name='compare'),
     # Телефон по QR (Э6): `u/` объявлен ДО `<slug>/` по той же причине.
     path('u/<str:token>/', views_training.phone_upload, name='phone_upload'),
-    path('u/<str:token>/sheet/<int:sheet_id>/', views_training.phone_sheet,
+    path('u/<str:token>/sheet/<int:sheet_id>/', training_files.phone_sheet,
          name='phone_sheet'),
     # Тренировка: семь адресов по образцу контрольной. Вход не требуется
     # ни на одном — решать комплект может любой посетитель.
@@ -37,7 +37,7 @@ urlpatterns = [
     path('<slug:slug>/variant/<int:pk>/upload/', views_training.training_upload,
          name='training_upload'),
     path('<slug:slug>/variant/<int:pk>/sheet/<int:sheet_id>/',
-         views_training.training_sheet, name='training_sheet'),
+         training_files.training_sheet, name='training_sheet'),
     path('<slug:slug>/variant/<int:pk>/sheet/<int:sheet_id>/delete/',
          views_training.training_sheet_delete, name='training_sheet_delete'),
     path('<slug:slug>/variant/<int:pk>/sheets/', views_training.training_sheets,
