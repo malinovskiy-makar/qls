@@ -63,6 +63,7 @@ _SOLUTION_CRITERIA_START = re.compile(
 
 REASON_NO_FIGURE_FILE = 'рисунок без файла'
 REASON_FEWER_OPTIONS = 'вариантов меньше, чем пунктов'
+REASON_FIGURE_BOTH_FIELDS = 'рисунок указан и в условии, и в решении'
 
 
 def ws(text):
@@ -223,13 +224,28 @@ def build_problem(task, files):
     test = task.get('test') or {}
     reasons = []
     figures, statement_marks, solution_marks, statement_shas = [], [], [], []
+    # ⚠️ Один файл в обоих полях (3 задания эталона, вырезки «_s…» из
+    # разбора) — только в решение: в условии он показал бы ученику картинку
+    # из разбора. Позиция — «под вопросом» до взгляда человека.
+    fields_of = defaultdict(set)
+    for fig in task.get('figures') or []:
+        if fig.get('path'):
+            fields_of[fig['path']].add(fig.get('field'))
+    seen = set()
     for fig in task.get('figures') or []:
         if not fig.get('path'):
             if REASON_NO_FIGURE_FILE not in reasons:
                 reasons.append(REASON_NO_FIGURE_FILE)
             continue
+        if fig['path'] in seen:
+            continue
+        seen.add(fig['path'])
         tikz_hash = hashlib.sha256(fig['path'].encode('utf-8')).hexdigest()
         field = 'solution' if fig.get('field') == 'solution' else 'statement'
+        if len(fields_of[fig['path']]) > 1:
+            field = 'solution'
+            if REASON_FIGURE_BOTH_FIELDS not in reasons:
+                reasons.append(REASON_FIGURE_BOTH_FIELDS)
         figures.append({'field': field, 'path': fig['path'],
                         'tikz_hash': tikz_hash})
         if field == 'statement':

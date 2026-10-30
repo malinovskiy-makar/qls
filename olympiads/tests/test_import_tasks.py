@@ -231,6 +231,19 @@ class NewProblemTests(TasksMixin, TestCase):
         item = OlympiadVariantItem.objects.get(ref_key='k:1')
         self.assertIn(ti.REASON_FEWER_OPTIONS, item.quality_reasons)
 
+    def test_figure_in_both_fields_goes_to_solution_only(self):
+        rel = 'mosh/figures/k/k_1_s1.png'
+        self.write_figure(rel)
+        fig = {'path': rel, 'caption': '', 'page': 1, 'flag': '', 'rejected': None}
+        self.load([make_task('k:1', solution_md='Разбор.', figures=[
+            dict(fig, field='statement'), dict(fig, field='solution')])])
+        item = OlympiadVariantItem.objects.get(ref_key='k:1')
+        figure = ProblemFigure.objects.get(problem=item.problem)
+        self.assertEqual(figure.source_field, 'solution')
+        self.assertNotIn('[[FIGURE:', item.problem.statement)
+        self.assertIn('[[FIGURE:', item.problem.solution)
+        self.assertIn(ti.REASON_FIGURE_BOTH_FIELDS, item.quality_reasons)
+
     def test_figure_lands_with_marker(self):
         rel = 'mosh/figures/k/k_1_1.png'
         self.write_figure(rel)
