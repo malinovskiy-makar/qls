@@ -1,0 +1,23 @@
+{% comment %}Подписи полос календаря: та, что наехала бы на соседнюю, уходит строкой ниже,
+а дорожка подрастает. Без JS подписи стоят в одну строку — как рассчитал сервер.{% endcomment %}
+<script>
+(function () {
+  var LINE = 32;
+  document.querySelectorAll('[data-lane]').forEach(function (lane) {
+    var labels = Array.prototype.slice.call(lane.querySelectorAll('.om-bl'));
+    labels.sort(function (a, b) { return a.offsetLeft - b.offsetLeft; });
+    var rows = [];   // правый край последней подписи в каждой строке
+    labels.forEach(function (label) {
+      var left = label.offsetLeft, right = left + label.offsetWidth + 8;
+      var row = 0;
+      while (rows[row] !== undefined && rows[row] > left) row++;
+      rows[row] = right;
+      if (row) label.style.top = (34 + row * LINE) + 'px';
+    });
+    var undated = lane.querySelector('.om-undated');
+    var extra = Math.max(rows.length - 1, 0) * LINE;
+    if (undated) { undated.style.top = (34 + Math.max(rows.length, labels.length ? 1 : 0) * LINE) + 'px'; extra += labels.length ? LINE - 8 : 0; }
+    if (extra) lane.style.height = (lane.offsetHeight + extra) + 'px';
+  });
+})();
+</script>

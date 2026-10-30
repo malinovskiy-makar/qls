@@ -928,3 +928,207 @@ def home_continue(user):
         return None
     summary['olympiad'] = olympiad
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Календарь сезона полосами (Э4)
+# ---------------------------------------------------------------------------
+
+# Сетка календаря — август…май (доска Calendar): десять месяцев.
+CAL_MONTHS = (8, 9, 10, 11, 12, 1, 2, 3, 4, 5)
+CAL_MONTH_SHORT = {1: 'Янв', 2: 'Фев', 3: 'Мар', 4: 'Апр', 5: 'Май',
+                   8: 'Авг', 9: 'Сен', 10: 'Окт', 11: 'Ноя', 12: 'Дек'}
+_MONTH_STEMS = ('январ', 'феврал', 'март', 'апрел', 'ма[йя]', 'июн', 'июл',
+                'август', 'сентябр', 'октябр', 'ноябр', 'декабр')
+
+
+def _cal_bounds(year):
+    from datetime import date as d
+    start = int(year.split('/')[0])
+    return d(start, 8, 1), d(start + 1, 6, 1)
+
+
+def _month_date(year, month, last=False):
+    """Число месяца сезона: август–декабрь — первый год, январь–май — второй."""
+    import calendar as cal
+    from datetime import date as d
+    start = int(year.split('/')[0])
+    real = start if month >= 8 else start + 1
+    day = cal.monthrange(real, month)[1] if last else 1
+    return d(real, month, day)
+
+
+def months_in_text(text, year):
+    """Где на сетке ориентир словами: (начало, конец) или None.
+
+    ⚠️ ЧИСЕЛ НЕ ВЫДУМЫВАЕМ: берём только то, что ориентир в базе называет
+    сам. «19 ноября» — точка в этот день; «обычно в ноябре», «в марте–апреле» —
+    месяц целиком. Месяца в тексте нет — места на сетке нет.
+    """
+    import re
+    low = (text or '').lower()
+    point = re.search(r'(\d{1,2})\s+(' + '|'.join(_MONTH_STEMS) + r')', low)
+    if point:
+        month = next(i for i, s in enumerate(_MONTH_STEMS, 1)
+                     if re.match(s, point.group(2)))
+        if month in CAL_MONTHS:
+            day = _month_date(year, month).replace(day=int(point.group(1)))
+            return day, day
+    found = []
+    for match in re.finditer('|'.join(_MONTH_STEMS), low):
+        month = next(i for i, s in enumerate(_MONTH_STEMS, 1)
+                     if re.match(s, match.group(0)))
+        if month in CAL_MONTHS:
+            found.append(month)
+    if not found:
+        return None
+    order = [CAL_MONTHS.index(m) for m in found]
+    first, last = CAL_MONTHS[min(order)], CAL_MONTHS[max(order)]
+    return _month_date(year, first), _month_date(year, last, last=True)
+
+
+def _pct(day, lo, hi):
+    return round(100 * (day - lo).days / (hi - lo).days, 2)
+
+
+def _event_word(event):
+    if event.kind == OlympiadEvent.Kind.STAGE:
+        return stage_short(event.stage) if event.stage else 'Тур'
+    return {OlympiadEvent.Kind.REGISTRATION_OPEN: 'Регистрация',
+            OlympiadEvent.Kind.REGISTRATION_CLOSE: 'Конец регистрации',
+            OlympiadEvent.Kind.RESULTS: 'Результаты'}[event.kind]
+
+
+def _short_day(day):
+    from .models import MONTHS_GENITIVE
+    return '{} {}'.format(day.day, MONTHS_GENITIVE[day.month - 1][:3])
+
+
+def calendar_season(year=None, today=None, user=None, only_mine=False):
+    """Сезон полосами: дорожка на олимпиаду, полоса на событие.
+
+    Регистрация «открылась + закрылась» с подтверждёнными датами — одна
+    полоса «Регистрация 20 авг — 21 сен» (как на доске). Событие без
+    подтверждённой даты рисуется НЕ сплошной: пунктир — по прошлому сезону,
+    штриховка — ждём объявления (по обычным срокам). Без месяца в
+    ориентире — строкой «без даты» под дорожкой.
+    """
+    today = today or date.today()
+    year = year or current_academic_year(today)
+    lo, hi = _cal_bounds(year)
+    olympiads = list(visible_olympiads().prefetch_related('levels', 'stages'))
+    events = list(OlympiadEvent.objects
+                  .filter(academic_year=year, olympiad__in=visible_olympiads())
+                  .select_related('stage').order_by('date_start', 'pk'))
+    by_olympiad = defaultdict(list)
+    for event in events:
+        by_olympiad[event.olympiad_id].append(event)
+    followed = set()
+    if user is not None and getattr(user, 'is_authenticated', False):
+        followed = set(user.olympiad_follows.values_list('olympiad_id', flat=True))
+
+    lanes, without = [], []
+    for olympiad in sorted(olympiads, key=lambda o: (-o.manual_rank, o.name_short)):
+        own = by_olympiad.get(olympiad.pk, [])
+        if only_mine and olympiad.pk not in followed:
+            continue
+        if not own and olympiad.pk not in followed:
+            without.append(olympiad)
+            continue
+        bars, undated = [], []
+        opened = {e.kind: e for e in own if e.is_confirmed and e.date_start}
+        pair = None
+        if {OlympiadEvent.Kind.REGISTRATION_OPEN,
+                OlympiadEvent.Kind.REGISTRATION_CLOSE} <= set(opened):
+            pair = (opened[OlympiadEvent.Kind.REGISTRATION_OPEN],
+                    opened[OlympiadEvent.Kind.REGISTRATION_CLOSE])
+        for event in own:
+            if pair and event is pair[1]:
+                continue
+            if event.is_confirmed and event.date_start:
+                start = event.date_start
+                end = (pair[1].date_start if pair and event is pair[0]
+                       else event.date_end or event.date_start)
+                kind = 'ok'
+                sub = (_short_day(start) if start == end
+                       else '{} — {}'.format(_short_day(start), _short_day(end)))
+                events_in = [event] + ([pair[1]] if pair and event is pair[0] else [])
+            else:
+                span = months_in_text(event.approx_text, year)
+                if span is None:
+                    undated.append({'event': event, 'word': _event_word(event),
+                                    'status': event.status_word})
+                    continue
+                start, end = span
+                kind = ('est' if event.date_status ==
+                        OlympiadEvent.DateStatus.APPROX_LAST_YEAR else 'rule')
+                sub = event.approx_text
+                events_in = [event]
+            if end < lo or start >= hi:
+                undated.append({'event': event, 'word': _event_word(event),
+                                'status': 'вне сетки сезона'})
+                continue
+            start, end = max(start, lo), min(end, hi)
+            left = _pct(start, lo, hi)
+            width = max(_pct(end, lo, hi) - left, 0)
+            bars.append({'events': events_in, 'kind': kind,
+                         # Подпись не шире места до правого края дорожки.
+                         'label_room': round(100 - left, 2),
+                         'past': (event.date_end or end) < today and kind == 'ok',
+                         'left': left, 'width': width,
+                         'point': start == end,
+                         'word': 'Регистрация' if len(events_in) == 2
+                         else _event_word(event),
+                         'sub': sub})
+        lanes.append({
+            'olympiad': olympiad,
+            'sub': ('{} {}'.format(len(olympiad.stages.all()),
+                                   plural(len(olympiad.stages.all()), 'этап',
+                                          'этапа', 'этапов'))
+                    if olympiad.kind == Olympiad.Kind.VSOSH
+                    else level_chip({'olympiad': olympiad,
+                                     'level': getattr(last_approved_level(olympiad),
+                                                      'level', None)})),
+            'bars': bars,
+            'undated': undated,
+            'followed': olympiad.pk in followed,
+        })
+
+    today_pct = _pct(today, lo, hi) if lo <= today < hi else None
+    seasons = sorted(set(OlympiadEvent.objects
+                         .filter(olympiad__in=visible_olympiads())
+                         .values_list('academic_year', flat=True)) | {year})
+    from .models import MONTHS_GENITIVE
+    return {
+        'year': year,
+        'seasons': seasons,
+        'months': [CAL_MONTH_SHORT[m] for m in CAL_MONTHS],
+        'lanes': lanes,
+        'without': without,
+        'today_pct': today_pct,
+        'today_label': 'сегодня, {} {}'.format(today.day,
+                                              MONTHS_GENITIVE[today.month - 1]),
+        'events_total': sum(len(by_olympiad.get(l['olympiad'].pk, []))
+                            for l in lanes),
+    }
+
+
+def calendar_search(query, user=None):
+    """«Добавить олимпиаду»: поиск по названию среди олимпиад раздела."""
+    query = (query or '').strip().lower()
+    if not query:
+        return []
+    followed = set()
+    if user is not None and getattr(user, 'is_authenticated', False):
+        followed = set(user.olympiad_follows.values_list('olympiad_id', flat=True))
+    out = []
+    for olympiad in visible_olympiads().prefetch_related('levels'):
+        if query in olympiad.name_short.lower() or query in olympiad.name_full.lower():
+            out.append({'olympiad': olympiad, 'followed': olympiad.pk in followed,
+                        'level': level_chip({'olympiad': olympiad, 'level': getattr(
+                            last_approved_level(olympiad), 'level', None)}),
+                        'grades': ('{}–{}'.format(olympiad.grade_min,
+                                                  olympiad.grade_max)
+                                   if olympiad.grade_min and olympiad.grade_max
+                                   else '')})
+    return out[:8]

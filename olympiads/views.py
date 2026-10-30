@@ -183,32 +183,32 @@ def follow(request, slug):
 
 
 def calendar(request):
-    """Собственный календарь раздела — учебный год с сентября по август.
+    """Календарь сезона полосами по доске Calendar (ночь 30.10, Э4).
 
     Отдельный от `calendar_stub` намеренно, решением владельца: тот
-    календарь про занятия репетитора, этот про туры. Заготовка связки —
-    `services.events_for_external_calendar()`.
+    календарь про занятия репетитора, этот про туры. Дорожки и полосы —
+    `navigator.calendar_season`; «Добавить олимпиаду» — поиск `?q=`,
+    выбранная становится «моей» (POST на `follow`) и встаёт дорожкой.
+    Гостю поиск ведёт на вход.
     """
     stub = soon_page(request)
     if stub is not None:
         return stub
-    year = current_academic_year()
-    chosen = (request.GET.get('olympiad') or '').strip()
-    olympiads = list(
-        Olympiad.objects.filter(is_published=True).order_by('name_short')
-    )
-    known = {o.slug for o in olympiads}
-    if chosen not in known:
-        chosen = ''
-    months, undated, outside = services.calendar_months(year, chosen or None)
+    user = request.user if request.user.is_authenticated else None
+    known = set(navigator.calendar_season()['seasons'])
+    year = request.GET.get('season') or None
+    if year not in known:
+        year = None
+    only_mine = request.GET.get('mine') == '1' and user is not None
+    season = navigator.calendar_season(year, user=user, only_mine=only_mine)
+    query = (request.GET.get('q') or '').strip()[:60]
     return render(request, 'olympiads/calendar.html', {
-        'academic_year': year,
-        'months': months,
-        'undated': undated,
-        'outside': outside,
-        'olympiads': olympiads,
-        'chosen': chosen,
-        'has_placeholder': any(o.is_placeholder for o in olympiads),
+        'season': season,
+        'query': query,
+        'found': navigator.calendar_search(query, user) if user else [],
+        'only_mine': only_mine,
+        'without_names': [o.name_short for o in season['without']][:7],
+        'without_more': max(len(season['without']) - 7, 0),
     })
 
 

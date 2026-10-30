@@ -389,4 +389,39 @@ main.om-wide { max-width: 1200px; }
   .om .ph-ol .om-star__b { min-height: 44px; min-width: 44px; }
 }
 
+/* ── Календарь (Э4): доска Calendar ── */
+.om .om-cal-hd { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.om .om-cal-hd .ol-chip { text-decoration: none; }
+.om .om-cal-sec { margin-top: 26px; }
+.om .om-cal-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.om .om-cal-add { position: relative; width: 320px; max-width: 100%; }
+.om .om-cal-q { width: 100%; min-height: 40px; background: var(--surface); box-sizing: border-box; }
+.om .om-cal-q--guest { display: flex; align-items: center; color: var(--text3); text-decoration: none; }
+.om .om-cal-pop { top: 46px; left: 0; right: 0; padding: 6px 0; }
+.om .om-cal-hit { padding: 8px 12px; }
+.om .om-cal-hit:first-child { border-top: 0; }
+.om .om-cal-hit form { margin: 0; }
+.om .om-cal-hit__t { font-size: 14px; font-weight: 600; }
+.om .om-cal-card { padding-bottom: 8px; overflow: hidden; }
+.om .om-cal-scroll { overflow-x: auto; }
+.om .om-cal { min-width: 860px; }
+.om .om-cal__name a { color: var(--text); text-decoration: none; }
+.om .om-lane { height: 92px; }
+.om .om-bl { overflow: hidden; text-overflow: ellipsis; }
+.om .om-bl span { overflow: hidden; text-overflow: ellipsis; }
+.om .om-bl--past { opacity: .6; }
+.om .om-undated { position: absolute; left: 8px; top: 66px; white-space: nowrap; font-size: 12px; }
+.om .om-cal__todayrow { position: relative; height: 34px; }
+.om .om-today-l { position: absolute; top: 6px; transform: translateX(-50%); font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; padding: 3px 8px; border-radius: 4px; background: var(--surface); box-shadow: 0 0 0 1px var(--brand-amber); }
+.om .om-lg-ok { background: var(--accent); }
+.om .om-lg-est { border: 1.5px dashed var(--accent); background: var(--accent-tint); }
+.om .om-lg-rule { background: repeating-linear-gradient(135deg, var(--text3) 0 2px, transparent 2px 6px); border: 1px solid var(--text3); }
+.om .om-cal-without { padding: 6px 18px 8px; }
+@media (max-width: 720px) {
+  .om .om-cal-add { width: 100%; }
+  .om .om-cal-q { min-height: 44px; }
+  .om .om-cal-hd .ol-chip { min-height: 44px; display: inline-flex; align-items: center; }
+  .om .om-cal-hd .om-seg a, .om .om-cal-hd .om-seg span { min-height: 44px; }
+}
+
 /* @@NEXT@@ */

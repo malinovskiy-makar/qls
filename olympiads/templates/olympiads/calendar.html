@@ -1,93 +1,76 @@
 {% extends 'olympiads/base_olymp.html' %}
+{% comment %}
+Календарь сезона по доске Calendar (ночь 30→31.10, Э4). Полосы и подписи —
+`navigator.calendar_season`; подписи, которые всё-таки наехали бы друг на
+друга, JS разводит по строкам (`_calendar_js.html`).
+{% endcomment %}
 {% block title %}Календарь олимпиад{% endblock %}
 {% block olymp_content %}
+<div class="om om-calpage">
+  <nav class="ol-crumbs" aria-label="Хлебные крошки"><a href="{% url 'olympiads:list' %}">Олимпиады</a> → Календарь</nav>
+  <div class="om-cal-hd">
+    <h1 class="ol-title om-grow">Календарь олимпиад</h1>
+    {% if user.is_authenticated %}<a class="ol-chip" href="?season={{ season.year }}{% if not only_mine %}&amp;mine=1{% endif %}" aria-pressed="{{ only_mine|yesno:'true,false' }}">только мои</a>{% else %}<a class="ol-chip" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">только мои</a>{% endif %}
+    {% if season.seasons|length > 1 %}<div class="om-seg" role="tablist" aria-label="Сезон">{% for s in season.seasons %}{% if s == season.year %}<span class="on" role="tab" aria-selected="true">{{ s }}</span>{% else %}<a href="?season={{ s }}" role="tab" aria-selected="false">{{ s }}</a>{% endif %}{% endfor %}</div>{% endif %}
+  </div>
 
-<nav class="ol-crumbs" aria-label="Хлебные крошки">
-  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
-  <span aria-hidden="true">→</span>
-  <span>Календарь</span>
-</nav>
+  <section class="om-sec om-cal-sec">
+    <div class="om-cal-bar">
+      <h2 class="om-h2 om-grow">Весь сезон {{ season.year }}</h2>
+      <div class="om-cal-add">
+        {% if user.is_authenticated %}
+        <form method="get" action="" role="search">
+          <input type="hidden" name="season" value="{{ season.year }}">
+          <label class="sr-only" for="cal-add">Добавить олимпиаду в календарь</label>
+          <input class="k-input om-cal-q" id="cal-add" name="q" type="search" value="{{ query }}" placeholder="Добавить олимпиаду" autocomplete="off">
+        </form>
+        {% if query %}
+        <div class="om-pop om-cal-pop" role="listbox" aria-label="Найдено">
+          {% for f in found %}
+          <div class="om-row om-cal-hit"><span class="om-grow om-min0"><span class="om-block om-cal-hit__t om-ell">{{ f.olympiad.name_short }}</span>{% if f.level or f.grades %}<span class="meta">{{ f.level }}{% if f.level and f.grades %} · {% endif %}{{ f.grades }}</span>{% endif %}</span>
+            {% if f.followed %}<span class="meta">уже в календаре</span>{% else %}
+            <form method="post" action="{% url 'olympiads:follow' f.olympiad.slug %}">{% csrf_token %}<input type="hidden" name="next" value="{% url 'olympiads:calendar' %}?season={{ season.year }}"><button type="submit" class="k-btn k-btn--{% if forloop.first %}main{% else %}plain{% endif %} k-btn--sm">Добавить</button></form>{% endif %}
+          </div>
+          {% empty %}<div class="om-row om-cal-hit"><span class="meta">Ничего не нашлось</span></div>{% endfor %}
+        </div>
+        {% endif %}
+        {% else %}
+        <a class="k-input om-cal-q om-cal-q--guest" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Добавить олимпиаду</a>
+        {% endif %}
+      </div>
+    </div>
 
-<div class="ol-head">
-  <h1 class="ol-title">Календарь олимпиад</h1>
-  <p class="ol-sub">Учебный год {{ academic_year }}, с сентября по август.</p>
-</div>
-
-<form class="ol-calfilter" method="get">
-  <label for="ol-cal-pick">Показать</label>
-  <select id="ol-cal-pick" name="olympiad">
-    <option value="">все олимпиады</option>
-    {% for olympiad in olympiads %}
-    <option value="{{ olympiad.slug }}"{% if olympiad.slug == chosen %} selected{% endif %}>{{ olympiad.name_short }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit" class="ol-btn ol-btn--sm">Применить</button>
-</form>
-
-<div class="ol-months">
-  {% for month in months %}
-  <section class="ol-month{% if not month.events %} ol-month--empty{% endif %}">
-    <h2 class="ol-month-name">{{ month.name }} <span>{{ month.year }}</span></h2>
-    {% if month.events %}
-    <ul class="ol-month-list">
-      {% for event in month.events %}
-      <li class="ol-cal-ev">
-        <span class="ol-cal-when">{{ event.display_date }}</span>
-        <span class="ol-cal-olymp">{{ event.olympiad.name_short }}</span>
-        <span class="ol-chip-type">{{ event.chip_label }}</span>
-        <span class="ol-status ol-status--{{ event.date_status }}">
-          <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="ol-month-none">пусто</p>
-    {% endif %}
+    <div class="k-card om-cal-card">
+      {% if season.lanes %}
+      <div class="om-cal-scroll" data-scroll="x">
+      <div class="om-cal" data-cal>
+        <div></div>
+        <div class="om-cal__months">{% for m in season.months %}<span>{{ m }}</span>{% endfor %}</div>
+        {% for lane in season.lanes %}
+        <div class="om-cal__name"><a href="{% url 'olympiads:detail' lane.olympiad.slug %}">{{ lane.olympiad.name_short }}</a>{% if lane.sub %}<span>{{ lane.sub }}</span>{% endif %}</div>
+        <div class="om-lane" data-lane>
+          {% for bar in lane.bars %}
+          <span class="om-bar om-bar--{{ bar.kind }}{% if bar.past %} om-bar--past{% endif %}" style="left: {{ bar.left|stringformat:'s' }}%; {% if bar.point %}width: 12px;{% else %}width: {{ bar.width|stringformat:'s' }}%;{% endif %}" data-bar></span><span class="om-bl{% if bar.past %} om-bl--past{% endif %}" style="left: {{ bar.left|stringformat:'s' }}%; max-width: min(240px, calc({{ bar.label_room|stringformat:'s' }}% - 6px));">{{ bar.word }}<span>{{ bar.sub }}</span></span>
+          {% endfor %}
+          {% if season.today_pct is not None %}<i class="om-today" style="left: {{ season.today_pct|stringformat:'s' }}%;" data-today></i>{% endif %}
+          {% if lane.undated %}<span class="om-undated meta">без даты: {% for u in lane.undated %}{{ u.word|lower }}{% if not forloop.last %}, {% endif %}{% endfor %} — {{ lane.undated.0.status }}</span>{% elif not lane.bars %}<span class="om-undated meta">пока без дат</span>{% endif %}
+        </div>
+        {% endfor %}
+        <div></div>
+        <div class="om-cal__todayrow">{% if season.today_pct is not None %}<span class="om-today-l" style="left: {{ season.today_pct|stringformat:'s' }}%;">{{ season.today_label }}</span>{% endif %}</div>
+      </div>
+      </div>
+      {% else %}
+      <div class="om-pad"><div class="om-empty__t">{% if only_mine %}В ваших олимпиадах дат сезона пока нет{% else %}Дат сезона пока нет{% endif %}</div></div>
+      {% endif %}
+      <div class="om-legend">
+        <span><i class="om-lg-ok"></i>объявлено</span>
+        <span><i class="om-lg-est"></i>по прошлому сезону</span>
+        <span><i class="om-lg-rule"></i>по правилам или обычным срокам</span>
+      </div>
+      {% if without_names %}<p class="meta om-cal-without">Пока без дат: {{ without_names|join:", " }}{% if without_more %} и ещё {{ without_more }}{% endif %}</p>{% endif %}
+    </div>
   </section>
-  {% endfor %}
 </div>
-
-{% if outside %}
-<section class="ol-section">
-  <h2 class="ol-section-title">Раньше сентября</h2>
-  <p class="ol-note">Эти даты относятся к сезону {{ academic_year }}, но
-    приходятся на месяцы до его начала — в сетку года они не помещаются.</p>
-  <ul class="ol-vlist">
-    {% for event in outside %}
-    <li class="ol-cal-ev ol-cal-ev--flat">
-      <span class="ol-cal-olymp">{{ event.olympiad.name_short }}</span>
-      <span class="ol-cal-when">{{ event.display_date }}</span>
-      <span class="ol-chip-type">{{ event.chip_label }}</span>
-      <span class="ol-status ol-status--{{ event.date_status }}">
-        <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
-      </span>
-    </li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
-
-<section class="ol-section">
-  <h2 class="ol-section-title">Пока без числа</h2>
-  {% if undated %}
-  <p class="ol-note">У этих туров дата ещё не объявлена, и по месяцам их
-    разложить нельзя — ориентир словами это не дата.</p>
-  <ul class="ol-vlist">
-    {% for event in undated %}
-    <li class="ol-cal-ev ol-cal-ev--flat">
-      <span class="ol-cal-olymp">{{ event.olympiad.name_short }}</span>
-      <span class="ol-cal-when">{{ event.display_date }}</span>
-      <span class="ol-chip-type">{{ event.chip_label }}</span>
-      <span class="ol-status ol-status--{{ event.date_status }}">
-        <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
-      </span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="ol-empty">Все известные события этого сезона стоят с числом.</p>
-  {% endif %}
-</section>
-
+{% include 'olympiads/_calendar_js.html' %}
 {% endblock %}
