@@ -486,3 +486,14 @@ class ForeignTourTests(TestCase):
         self.run_cmd('--apply')
         out = self.run_cmd('--apply')
         self.assertIn('Позиций чужого тура исключено: 0', out)
+
+    def test_tour_sum_ignores_excluded_item_with_its_own_score(self):
+        from olympiads import navigator as nav
+        for number in range(1, 5):
+            title = 'Задание {}'.format(number)
+            self.item('2', number, self.task(title), 12, files=('tasks2.pdf',))
+            self.item('1', number, self.task(title), 2, files=('solutions.pdf',))
+        self.item('1', 9, self.task('Своё 9'), 12)
+        self.run_cmd('--apply')
+        v = nav._annotated(OlympiadVariant.objects.filter(pk=self.kits['1'].pk)).get()
+        self.assertEqual((v.n_items, nav.tour_max_score(v)), (1, 12.0))
