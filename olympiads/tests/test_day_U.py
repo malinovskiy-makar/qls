@@ -226,3 +226,44 @@ class OwnDialogTests(TestCase):
         self.assertIn('stopImmediatePropagation', html)
         self.assertNotIn('window.confirm', html)
         self.assertNotIn('alert(', html)
+
+
+@override_settings(OLYMPIADS_PUBLIC=True, MEDIA_ROOT=MEDIA, OLYMPIAD_AI_CHECK=False)
+class NoInventedMaximumTests(TestCase):
+    """У4: балл позиции неизвестен — числа нет; максимум тура — по правилу навигатора."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.olymp = fx.olympiad('vs')
+        cls.final = fx.stage(cls.olymp)      # максимум этапа 48
+        cls.scored = fx.kit(cls.olymp, cls.final, '2025/26', tour='2', tasks=4, score=12)
+        cls.unscored = fx.kit(cls.olymp, cls.final, '2025/26', tour='1', tasks=4, score=None)
+
+    def html(self, variant, name, timer='0'):
+        self.client.post(reverse('olympiads:training_start', args=['vs', variant.pk]),
+                         {'timer': timer})
+        return self.client.get(reverse('olympiads:' + name, args=['vs', variant.pk])).content.decode()
+
+    def test_item_without_score_has_no_ten_points(self):
+        for name in ('training_intro', 'training_take'):
+            html = self.html(self.unscored, name)
+            self.assertNotIn('10 баллов', html, name)
+            self.assertNotIn('3 балла', html, name)
+
+    def test_tour_without_scores_is_out_of_stage_maximum(self):
+        from olympiads.models import TrainingAttempt
+        self.html(self.unscored, 'training_intro')
+        self.client.post(reverse('olympiads:training_finish', args=['vs', self.unscored.pk]))
+        attempt = TrainingAttempt.objects.get(variant=self.unscored)
+        self.assertEqual(float(attempt.max_score), 48.0)
+        result = self.client.get(reverse('olympiads:training_result',
+                                         args=['vs', self.unscored.pk])).content.decode()
+        self.assertIn('из 48', result)
+        self.assertNotIn('из 40', result)
+
+    def test_scored_tour_is_sum_of_positions(self):
+        from olympiads.models import TrainingAttempt
+        self.html(self.scored, 'training_intro')
+        self.client.post(reverse('olympiads:training_finish', args=['vs', self.scored.pk]))
+        self.assertEqual(float(TrainingAttempt.objects.get(variant=self.scored).max_score), 48.0)
+        self.assertIn('12 баллов', self.html(self.scored, 'training_intro'))

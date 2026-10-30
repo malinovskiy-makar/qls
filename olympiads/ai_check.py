@@ -231,7 +231,12 @@ def eligible(attempt, item, user):
     if kind in ('radio', 'checkbox'):
         return None
     problem = item.catalog_problem
-    how = plan(problem, item_max_score(item))
+    # Максимум — балл позиции пакета; неизвестен — сумма критериев жюри, а
+    # не служебные 10 (день 30.10, У4). Комплект без позиций — как раньше.
+    from . import training_engine as engine
+    points = engine.package_points(attempt.variant)
+    maximum = points.get(problem.pk) if points else item_max_score(item)
+    how = plan(problem, maximum)
     if how is None:
         return None
     return how

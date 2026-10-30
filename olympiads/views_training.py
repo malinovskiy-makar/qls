@@ -104,7 +104,9 @@ def training_intro(request, slug, pk):
         pos = package.get(item.catalog_problem_id)
         rows.append({'item': item, 'number': (pos.number if pos else '') or '',
                      'title': item.catalog_problem.title,
-                     'points': float(item_max_score(item)),
+                     # У4: балл позиции пакета; неизвестен — числа нет.
+                     'points': (float(pos.max_score) if pos and pos.max_score is not None
+                                else None if pos else float(item_max_score(item))),
                      'criteria': bool(pos and pos.has_criteria)})
     ai_on = settings.OLYMPIAD_AI_CHECK
     with_criteria = [r for r in rows if r['criteria']]
@@ -252,7 +254,9 @@ def training_take(request, slug, pk):
             'display_parts': display_parts(item),
             'solution_name': 'solution_item_%d' % item.pk,
             'solution_value': (whole.solution_draft if whole else '') or '',
-            'points': float(item_max_score(item)),
+            # У4: балл позиции пакета; неизвестен — числа нет.
+            'points': (float(pos.max_score) if pos and pos.max_score is not None
+                       else None if pos else float(item_max_score(item))),
             'answered': has_answer,
             'sheets': own_sheets,
             'sheets_left': uploads.MAX_SHEETS - len(own_sheets),
@@ -288,7 +292,9 @@ def training_take(request, slug, pk):
         'seconds_left': engine.seconds_remaining(attempt, now),
         'info': navigator.tour_info(variant),
         'free_score': sum(float(r['result'].score or 0) for r in done_rows),
-        'free_max': sum(float(r['result'].max_score) for r in done_rows),
+        # Максимум сданных — только если балл известен у каждого (У4).
+        'free_max': (sum(r['points'] for r in done_rows)
+                     if all(r['points'] is not None for r in done_rows) else None),
         'free_done': len(done_rows),
         'max_sheets': uploads.MAX_SHEETS,
         'ai_on': ai_check.enabled(),

@@ -44,7 +44,7 @@
       <div class="om-tasks__hd"><h2 class="om-h2 om-grow">Задания</h2>{% with pdf=info.pdfs.tasks %}{% if pdf %}<a class="om-link" href="{{ pdf.href }}" target="_blank" rel="noopener">Условия в PDF</a>{% endif %}{% endwith %}</div>
       <div class="om-tasks__cols meta"><span class="om-grow"></span><span>максимум</span></div>
       {% for row in rows %}
-      <div class="om-row om-task-row"><span class="om-stepno" aria-hidden="true">{{ row.number }}</span><span class="om-grow om-task-row__t">{{ row.title }}</span><span class="meta om-task-row__p">{{ row.points|score }} {% if row.points == 1 %}балл{% elif row.points < 5 %}балла{% else %}баллов{% endif %}</span></div>
+      <div class="om-row om-task-row"><span class="om-stepno" aria-hidden="true">{{ row.number }}</span><span class="om-grow om-task-row__t">{{ row.title }}</span><span class="meta om-task-row__p">{{ row.points|points_label }}</span></div>
       {% endfor %}
     </section>
     {% if siblings or mine_last %}
@@ -52,7 +52,7 @@
       {% for s in siblings %}
       <section class="k-card om-pad">
         <div class="meta">{{ s.label }}</div>
-        <div class="om-big om-big--sm">{{ s.attempt.score|score }} из {{ s.attempt.max_score|score }}</div>
+        <div class="om-big om-big--sm">{{ s.attempt.score|score }}{{ s.attempt.max_score|of_max }}</div>
         <div class="meta">{% if s.attempt.with_timer %}на время{% else %}без времени{% endif %}{% if s.spent %} · {{ s.spent }}{% endif %}</div>
         <a class="om-link om-mt10 om-block" href="{% url 'olympiads:training_result' olympiad.slug s.variant.pk %}">Результат {{ s.label }}а →</a>
       </section>
@@ -60,7 +60,7 @@
       {% if mine_last %}
       <section class="k-card om-pad">
         <div class="meta">Прошлая попытка · {{ info.label }}</div>
-        <div class="om-big om-big--sm">{{ mine_last.score|score }} из {{ mine_last.max_score|score }}</div>
+        <div class="om-big om-big--sm">{{ mine_last.score|score }}{{ mine_last.max_score|of_max }}</div>
         <a class="om-link om-mt10 om-block" href="{% url 'olympiads:training_result' olympiad.slug variant.pk %}">Разбор →</a>
       </section>
       {% endif %}

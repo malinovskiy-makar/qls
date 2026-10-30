@@ -23,7 +23,7 @@
   {% elif row.check and row.check.status == 'unavailable' %}
   <div class="om-check__hd"><span class="om-big">Самопроверка</span><span class="meta">ИИ сейчас недоступен: {{ row.check.summary|default:"проверка не выполнена" }}</span></div>
   {% elif row.result and not row.result.is_pending %}
-  <div class="om-check__hd"><span class="om-big">{{ row.result.score|score }} из {{ row.result.max_score|score }}</span>{% if row.result.comment %}<span class="meta">{{ row.result.comment }}</span>{% endif %}</div>
+  <div class="om-check__hd"><span class="om-big">{{ row.result.score|score }}{{ row.points|of_max }}</span>{% if row.result.comment %}<span class="meta">{{ row.result.comment }}</span>{% endif %}</div>
   {% else %}
   <div class="om-check__hd"><span class="om-big">Самопроверка</span>{% if ai_on and row.has_criteria and is_guest %}<span class="meta"><a class="om-link" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войдите, чтобы ИИ проверил решение</a></span>{% endif %}</div>
   {% endif %}

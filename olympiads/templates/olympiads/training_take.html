@@ -31,7 +31,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
   <div class="om-free-hd">
     <h1 class="ol-title">{{ info.label }}</h1><span class="k-chip-kind">без времени</span>
     <span class="om-grow"></span>
-    {% if free_done %}<span class="om-free-sum"><b>{{ free_score|score }} из {{ free_max|score }}</b> за {{ free_done }} {% if free_done == 1 %}задание{% elif free_done < 5 %}задания{% else %}заданий{% endif %}</span>{% endif %}
+    {% if free_done %}<span class="om-free-sum"><b>{{ free_score|score }}{{ free_max|of_max }}</b> за {{ free_done }} {% if free_done == 1 %}задание{% elif free_done < 5 %}задания{% else %}заданий{% endif %}</span>{% endif %}
     <span id="timer" data-seconds="" hidden></span><span id="save-state" class="meta om-free-save">сохранено</span>
   </div>
   {% endif %}
@@ -39,7 +39,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
   <div class="om-take-wrap">
     <nav class="om-tasknav" id="qnav" aria-label="Задания тура">
       {% for row in rows %}
-      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}" data-number="{{ row.number }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }} из {{ row.result.max_score|score }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
+      <a class="om-tn{% if row.index == current %} om-tn--on{% endif %}{% if row.answered or row.result %} om-tn--ok is-answered{% endif %}" href="?task={{ row.index }}" data-item="{{ row.item.pk }}" data-task="{{ row.index }}" data-number="{{ row.number }}"><span>Задание {{ row.number }}{% if row.result %} · {% if row.result.is_pending %}сдано{% else %}{{ row.result.score|score }}{{ row.points|of_max }}{% endif %}{% elif row.sheets %} · {% include 'olympiads/_ico.html' with name='check' %} {{ row.sheets|length }} фото{% elif row.answered %} · {% include 'olympiads/_ico.html' with name='check' %}{% endif %}</span><b>{{ row.problem.title|default:"Задание" }}</b></a>
       {% endfor %}
     </nav>
     <span class="sr-only">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</span>
@@ -49,7 +49,7 @@ TakeFreePhone (без времени); ночь 30→31.10, Э5.
       {% for row in rows %}
       <section class="om-taskpane" id="item-{{ row.item.pk }}" data-task="{{ row.index }}"{% if row.locked %} data-locked{% endif %}{% if row.index != current %} hidden{% endif %}>
         <div class="k-card om-task">
-          <div class="om-task__hd"><h2 class="om-task__t">{{ row.number }}. {{ row.problem.title|default:"Задание" }}</h2><span class="meta">{{ row.points|score }} {% if row.points == 1 %}балл{% elif row.points < 5 %}балла{% else %}баллов{% endif %}</span></div>
+          <div class="om-task__hd"><h2 class="om-task__t">{{ row.number }}. {{ row.problem.title|default:"Задание" }}</h2><span class="meta">{{ row.points|points_label }}</span></div>
           <div class="math-content om-task__s">{% include "catalog/_math_text.html" with text=row.problem.statement problem=row.problem %}</div>
           {% for part in row.display_parts %}
           <div class="om-part"><b>{{ part.label }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement problem=row.problem %}</span>{% if part.points %}<span class="om-pts">{{ part.points|score }} {% if part.points == 1 %}балл{% elif part.points < 5 %}балла{% else %}баллов{% endif %}</span>{% endif %}</div>

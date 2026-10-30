@@ -22,6 +22,26 @@ def score(value):
 
 
 @register.filter
+def of_max(value):
+    """« из 48» к баллу; максимум неизвестен (None) — пусто (день 30.10, У4)."""
+    if value is None or value == '':
+        return ''
+    from olympiads.navigator import _fmt
+    return ' из ' + _fmt(value)
+
+
+@register.filter
+def points_label(value):
+    """12 → «12 баллов», 1 → «1 балл», 3 → «3 балла»; None → пусто (У4)."""
+    if value is None or value == '':
+        return ''
+    from olympiads.navigator import _fmt, plural
+    whole = float(value)
+    word = plural(int(whole), 'балл', 'балла', 'баллов') if whole.is_integer() else 'балла'
+    return '{} {}'.format(_fmt(value), word)
+
+
+@register.filter
 def get_item(mapping, key):
     """`{{ row.by_grade|get_item:view.grade }}` — словарь по ключу в шаблоне."""
     try:

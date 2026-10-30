@@ -13,7 +13,7 @@
   <div class="om-res-top{% if both %} om-res-top--two{% endif %}">
     <section class="k-card om-pad">
       <div class="meta">{{ info.label }} сдан · {% if attempt.with_timer %}на время{% else %}без времени{% endif %}{% if attempt.is_auto_submitted %} · время вышло{% endif %}</div>
-      <div class="om-big om-res-big">{{ scored|score }} из {{ max_score|score }}</div>
+      <div class="om-big om-res-big">{{ scored|score }}{{ max_score|of_max }}</div>
       <div class="meta">{% if attempt.with_timer and spent %}{{ spent }} из {{ info.minutes_label }}{% endif %}{% if any_ai %}{% if attempt.with_timer and spent %} · {% endif %}проверено ИИ по критериям жюри{% endif %}{% if pending %} · ждут проверки: {{ pending }}{% endif %}</div>
     </section>
     {% if both %}
@@ -38,7 +38,7 @@
     <div class="om-others__hd"><h2 class="om-h2 om-grow">Как решали другие</h2><span class="meta">тур на время на Weconomics</span></div>
     <div class="om-others__nums">
       <div><div class="meta">Решали</div><div class="om-others__n">{{ stats.count }}</div></div>
-      <div><div class="meta">Медиана</div><div class="om-others__n">{{ stats.median_label }} из {{ max_score|score }}</div></div>
+      <div><div class="meta">Медиана</div><div class="om-others__n">{{ stats.median_label }}{{ max_score|of_max }}</div></div>
       {% if stats.below_pct is not None %}<div><div class="meta">Ваш результат выше, чем у</div><div class="om-others__n">{{ stats.below_pct }} %</div></div>{% endif %}
     </div>
     {% if stats.below_pct is not None %}<div class="om-bar5 om-mt10"><i style="width: {{ stats.below_pct }}%;"></i></div>{% endif %}
@@ -49,7 +49,7 @@
     <div class="om-res-hd meta"><span class="om-grow"></span>{% if stats %}<span class="om-res-c">медиана других</span>{% endif %}<span class="om-res-c">у вас</span><span class="om-res-c om-res-c--act"></span></div>
     {% for row in rows %}
     <details class="om-res-row"{% if dispute.check.problem_id == row.problem.pk %} open{% endif %}>
-      <summary class="om-res-sum"><span class="om-stepno" aria-hidden="true">{{ row.number_label }}</span><span class="om-grow om-res-t">{{ row.problem.title|default:"Задание" }}</span>{% if stats %}<span class="om-res-c meta">{% if row.median is not None %}{{ row.median|score }} из {{ row.max_score|score }}{% else %}—{% endif %}</span>{% endif %}<span class="om-res-c om-res-me">{% if row.pending %}ждёт проверки{% elif row.score is not None %}{{ row.score|score }} из {{ row.max_score|score }}{% else %}—{% endif %}</span><span class="om-res-c om-res-c--act meta">Критерии</span></summary>
+      <summary class="om-res-sum"><span class="om-stepno" aria-hidden="true">{{ row.number_label }}</span><span class="om-grow om-res-t">{{ row.problem.title|default:"Задание" }}</span>{% if stats %}<span class="om-res-c meta">{% if row.median is not None %}{{ row.median|score }}{{ row.max_score|of_max }}{% else %}—{% endif %}</span>{% endif %}<span class="om-res-c om-res-me">{% if row.pending %}ждёт проверки{% elif row.score is not None %}{{ row.score|score }}{{ row.max_score|of_max }}{% else %}—{% endif %}</span><span class="om-res-c om-res-c--act meta">Критерии</span></summary>
       <div class="om-res-body">
         {% if row.check and row.check.status == 'done' %}
           {% for group in row.check_parts %}

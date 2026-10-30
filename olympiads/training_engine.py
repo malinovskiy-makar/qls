@@ -461,13 +461,44 @@ def grade_attempt(attempt):
     return rows
 
 
+def package_points(variant):
+    """{задача: балл позиции пакета или None} — балл задания в туре.
+
+    ⚠️ None — «балл неизвестен», и числа на экране нет (день 30.10, У4).
+    Служебная позиция задания (`AssignmentItem.points`) у такой задачи —
+    правило системы (10 задаче, 3 тесту), выдумка для тура: показывать и
+    складывать её нельзя.
+    """
+    return {i.problem_id: (float(i.max_score) if i.max_score is not None else None)
+            for i in package_items(variant)}
+
+
+def tour_maximum(variant):
+    """Максимум тура по правилу навигатора: сумма баллов, если они есть у всех
+    заданий, иначе максимум этапа, иначе None (`navigator.tour_max_score`)."""
+    from . import navigator
+    from .models import OlympiadVariant
+
+    if not package_items(variant):
+        return None
+    annotated = navigator._annotated(OlympiadVariant.objects.filter(pk=variant.pk)).get()
+    return navigator.tour_max_score(annotated)
+
+
 def recount(attempt):
-    """Итог попытки — сумма итогов по задачам (после проверки и после ИИ)."""
+    """Итог попытки — сумма итогов по задачам (после проверки и после ИИ).
+
+    Максимум — максимум тура (`tour_maximum`), а не сумма служебных баллов:
+    у задания без балла там выдуманные 10 (день 30.10, У4). Комплект без
+    позиций пакета (прежние 12) — как раньше, сумма по задачам.
+    """
     from .models import TrainingItemResult
 
     results = list(TrainingItemResult.objects.filter(attempt=attempt))
     attempt.score = sum(float(r.score) for r in results if r.score is not None)
-    attempt.max_score = sum(float(r.max_score) for r in results)
+    maximum = tour_maximum(attempt.variant)
+    attempt.max_score = (maximum if maximum is not None or package_items(attempt.variant)
+                         else sum(float(r.max_score) for r in results))
     attempt.pending_count = sum(1 for r in results if r.is_pending)
     attempt.save(update_fields=['score', 'max_score', 'pending_count'])
 
@@ -553,6 +584,15 @@ def _grade_one(student, assignment, item, values, answer_text, order, problem,
 # Результат для экрана
 # ---------------------------------------------------------------------------
 
+def _shown_max(points, problem_id, stored, item):
+    """Максимум задания для экрана: балл позиции пакета; неизвестен — None."""
+    from problems.assignment_rows import item_max_score
+
+    if problem_id in points:
+        return points[problem_id]
+    return float(stored.max_score) if stored else float(item_max_score(item))
+
+
 def attempt_result(attempt):
     """Разбор попытки: по задаче — что ответил, что верно, полное решение."""
     from problems.assignment_rows import (answer_parts, item_max_score,
@@ -564,6 +604,7 @@ def attempt_result(attempt):
     drafts = drafts_map(attempt)
     results = {r.problem_id: r
                for r in TrainingItemResult.objects.filter(attempt=attempt)}
+    points = package_points(attempt.variant)
 
     rows = []
     for number, item in enumerate(items, start=1):
@@ -597,8 +638,7 @@ def attempt_result(attempt):
             'solution_text': item.solution_text,
             'score': float(stored.score) if stored and stored.score is not None
             else None,
-            'max_score': float(stored.max_score) if stored
-            else float(item_max_score(item)),
+            'max_score': _shown_max(points, problem.pk, stored, item),
             'pending': stored.is_pending if stored else True,
             'comment': stored.comment if stored else '',
         })
@@ -606,6 +646,7 @@ def attempt_result(attempt):
     return {
         'rows': rows,
         'scored': round(float(attempt.score or 0), 2),
-        'max_score': round(float(attempt.max_score or 0), 2),
+        'max_score': (round(float(attempt.max_score), 2)
+                      if attempt.max_score is not None else None),
         'pending': attempt.pending_count,
     }
