@@ -122,19 +122,24 @@ def visible_olympiads():
     return Olympiad.objects.filter(is_published=True, is_placeholder=False)
 
 
+# Позиция тура: задание чужого тура (`excluded`, день 30.10, Д5) раздел не
+# видит — ни в числе заданий, ни в сумме баллов, ни в «Заданий у нас».
+_OWN = Q(items__excluded=False)
+
+
 def _annotated(queryset):
     """Комплекты со счётчиками позиций ОДНИМ запросом (без N+1 на клетку)."""
     return (queryset.select_related('stage')
             .prefetch_related('grades', 'files')
             .annotate(
-                n_items=Count('items', distinct=True),
-                n_solution=Count('items', filter=Q(items__has_solution=True),
+                n_items=Count('items', filter=_OWN, distinct=True),
+                n_solution=Count('items', filter=_OWN & Q(items__has_solution=True),
                                  distinct=True),
-                n_criteria=Count('items', filter=Q(items__has_criteria=True),
+                n_criteria=Count('items', filter=_OWN & Q(items__has_criteria=True),
                                  distinct=True),
-                n_unscored=Count('items', filter=Q(items__max_score__isnull=True),
+                n_unscored=Count('items', filter=_OWN & Q(items__max_score__isnull=True),
                                  distinct=True),
-                items_score=Sum('items__max_score')))
+                items_score=Sum('items__max_score', filter=_OWN)))
 
 
 def tour_max_score(variant):
@@ -407,7 +412,8 @@ def stage_grid(stage, variants, attempts):
 
 def problems_count(variant_ids):
     """Различных задач банка в комплектах — «Заданий у нас»."""
-    return (OlympiadVariantItem.objects.filter(variant_id__in=list(variant_ids))
+    return (OlympiadVariantItem.objects.filter(variant_id__in=list(variant_ids),
+                                               excluded=False)
             .values('problem_id').distinct().count())
 
 
@@ -498,7 +504,7 @@ def home_rows(user=None, today=None):
         if start is not None:
             seasons[olympiad_id].add(start)
     problems = dict(
-        OlympiadVariantItem.objects.filter(variant__in=base)
+        OlympiadVariantItem.objects.filter(variant__in=base, excluded=False)
         .values('variant__olympiad_id')
         .annotate(n=Count('problem_id', distinct=True))
         .values_list('variant__olympiad_id', 'n'))

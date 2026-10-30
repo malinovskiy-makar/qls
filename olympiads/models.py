@@ -1098,6 +1098,14 @@ class OlympiadVariantItem(models.Model):
     # висеть попытки, а пропуск в пакете бывает и ошибкой сборки.
     absent_in_last_import = models.BooleanField(
         'Нет в последнем пакете', default=False)
+    # Задание чужого тура (день 30.10, Д5): лежит в комплекте, но к этому
+    # туру не относится. Позиция НЕ удаляется (на ней могут висеть попытки),
+    # а раздел её не видит: навигатор, тренировка, счётчики. Ставит
+    # `exclude_foreign_tour_items`.
+    excluded = models.BooleanField('Не относится к туру', default=False,
+                                   db_index=True)
+    excluded_reason = models.CharField('Почему не относится', max_length=200,
+                                       blank=True)
     created_at = models.DateTimeField('Заведена', auto_now_add=True)
     updated_at = models.DateTimeField('Изменена', auto_now=True)
 

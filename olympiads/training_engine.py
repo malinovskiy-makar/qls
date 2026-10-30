@@ -57,9 +57,10 @@ def package_items(variant):
     """Позиции комплекта из пакета олимпиад по порядку тура (ночь 30.10, Э5).
 
     Позиция, которой нет в последнем пакете, в тур не идёт: на ней могут
-    висеть старые попытки, но решать её заново незачем.
+    висеть старые попытки, но решать её заново незачем. Задание чужого тура
+    (`excluded`, день 30.10, Д5) — тоже.
     """
-    return list(variant.items.filter(absent_in_last_import=False)
+    return list(variant.items.filter(absent_in_last_import=False, excluded=False)
                 .select_related('problem').order_by('order', 'id'))
 
 
@@ -200,9 +201,16 @@ def training_assignment(variant):
 
 
 def variant_items(variant):
-    """Позиции комплекта по порядку — то, из чего собран экран и проверка."""
+    """Позиции комплекта по порядку — то, из чего собран экран и проверка.
+
+    ⚠️ Только задачи, которые комплект даёт СЕЙЧАС (`variant_problems`).
+    Служебное задание постоянное: позиция задачи, ушедшей из тура (задание
+    чужого тура, Д5), в нём остаётся — удалять её нельзя, на ней висят
+    ответы старых попыток, — но ни экран, ни сумма тура её не видят.
+    """
     assignment = training_assignment(variant)
-    return list(assignment.items
+    wanted = [p.pk for p in variant_problems(variant)]
+    return list(assignment.items.filter(catalog_problem_id__in=wanted)
                 .select_related('catalog_problem')
                 .prefetch_related('catalog_problem__parts')
                 .order_by('order', 'id'))

@@ -377,3 +377,112 @@ class MarkedAnswersTests(DayMixin, TestCase):
         out = self.run_cmd('--apply')
         self.assertIn('Тестов с ключом из отметки: 0', out)
         self.assertIn('Позиций с новой пометкой: 0', out)
+
+
+class ForeignTourTests(TestCase):
+    """Д5: задание чужого тура исключается из тура и из всех счётчиков."""
+
+    def setUp(self):
+        from olympiads.models import Olympiad, OlympiadVariantGrade
+        self.olympiad = make_olympiad('vseros', is_published=True,
+                                      kind=Olympiad.Kind.VSOSH)
+        self.stage = OlympiadStage.objects.create(
+            olympiad=self.olympiad, code='final', name='Заключительный',
+            max_score=48, duration_minutes=210)
+        self.kits = {}
+        for tour in ('1', '2'):
+            kit = OlympiadVariant.objects.create(
+                olympiad=self.olympiad, stage=self.stage, season='2025/26',
+                tour=tour, kit_key='vs-11-' + tour,
+                visibility=OlympiadVariant.Visibility.PUBLISHED)
+            OlympiadVariantGrade.objects.create(variant=kit, grade=11)
+            self.kits[tour] = kit
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.pk = bf.S4_FIRST + 500
+
+    def task(self, title):
+        self.pk += 1
+        return Problem.objects.create(
+            pk=self.pk, title=title, status='draft', hidden_pending_review=True,
+            content_format='markdown',
+            statement='{}: длинное условие задания олимпиады, одинаковое в обеих копиях, '
+                      'с числами 100, 200 и 300 и вопросом в конце.'.format(title))
+
+    def item(self, tour, number, problem, score, files=('tasks.pdf',)):
+        kit = self.kits[tour]
+        return OlympiadVariantItem.objects.create(
+            variant=kit, problem=problem, number=str(number), order=int(number),
+            ref_key='{}:{}'.format(kit.kit_key, number), max_score=score,
+            pages={'source_file': ['{}/{}'.format(kit.kit_key, f) for f in files]})
+
+    def fill(self):
+        """Тур 1 — задания 1–4, тур 2 — 5–8; в каждом ещё и чужие четыре без балла."""
+        for number in range(1, 9):
+            own = '1' if number <= 4 else '2'
+            other = '2' if own == '1' else '1'
+            title = 'Задание {}'.format(number)
+            self.item(own, number, self.task(title), 12)
+            self.item(other, number, self.task(title), None, files=('solutions.pdf',))
+
+    def run_cmd(self, *args):
+        out = StringIO()
+        call_command('exclude_foreign_tour_items', '--report-dir', self.tmp.name,
+                     '--no-snapshot', *args, stdout=out)
+        return out.getvalue()
+
+    def test_tour_keeps_own_four_tasks_and_48(self):
+        from olympiads import navigator as nav
+        self.fill()
+        self.run_cmd('--apply')
+        for tour in ('1', '2'):
+            v = nav._annotated(OlympiadVariant.objects.filter(pk=self.kits[tour].pk)).get()
+            self.assertEqual(v.n_items, 4)
+            self.assertEqual(nav.tour_max_score(v), 48.0)
+
+    def test_excluded_item_is_not_in_training(self):
+        from olympiads import training_engine as engine
+        self.fill()
+        self.run_cmd('--apply')
+        numbers = [i.number for i in engine.package_items(self.kits['2'])]
+        self.assertEqual(numbers, ['5', '6', '7', '8'])
+        self.assertEqual(len(engine.variant_items(self.kits['2'])), 4)
+        self.assertEqual(engine.variant_max_score(self.kits['2']), 48.0)
+
+    def test_tasks_of_only_excluded_items_are_not_counted(self):
+        from olympiads import navigator as nav
+        self.fill()
+        ids = [k.pk for k in self.kits.values()]
+        self.assertEqual(nav.problems_count(ids), 16)
+        self.run_cmd('--apply')
+        self.assertEqual(nav.problems_count(ids), 8)
+
+    def test_score_in_both_and_same_files_is_flagged_not_excluded(self):
+        self.item('1', 1, self.task('Задание 1'), 12)
+        self.item('2', 1, self.task('Задание 1'), 2)
+        self.run_cmd('--apply')
+        self.assertFalse(OlympiadVariantItem.objects.filter(excluded=True).exists())
+        self.assertEqual(set(OlympiadVariantItem.objects.values_list('quality', flat=True)),
+                         {'flagged'})
+
+    def test_score_in_both_but_only_shared_file_is_excluded(self):
+        self.item('1', 1, self.task('Задание 1'), 12)
+        foreign = self.item('2', 1, self.task('Задание 1'), 2, files=('solutions.pdf',))
+        self.item('1', 2, self.task('Задание 2'), None, files=('solutions.pdf',))
+        self.item('2', 2, self.task('Задание 2'), 12, files=('tasks2.pdf',))
+        self.run_cmd('--apply')
+        foreign.refresh_from_db()
+        self.assertTrue(foreign.excluded)
+
+    def test_same_number_other_task_is_not_touched(self):
+        self.item('1', 1, self.task('Спрос'), 12)
+        other = Problem.objects.create(pk=self.pk + 100, title='x', statement='Совсем другое условие про налоги и бюджет страны с иными числами 7 и 9.')
+        self.item('2', 1, other, None)
+        self.run_cmd('--apply')
+        self.assertFalse(OlympiadVariantItem.objects.filter(excluded=True).exists())
+
+    def test_second_run_changes_nothing(self):
+        self.fill()
+        self.run_cmd('--apply')
+        out = self.run_cmd('--apply')
+        self.assertIn('Позиций чужого тура исключено: 0', out)
