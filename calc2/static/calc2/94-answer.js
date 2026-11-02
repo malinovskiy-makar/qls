@@ -98,6 +98,15 @@ const HERO = {
      · доп.wasText — готовая строка под значением («50 + 50» у потерь из двух треугольников).
    Значение строки табло вида «55 (было 45)» в «Ответе» — «55», под ним «45 + 10» (answerCellWas). */
 const HERO_STATE = {
+  taxes: () => {
+    if (!STATE.taxPair || !STATE.taxActive) return null;
+    const g = { g: 'После двух вмешательств' };
+    return [['info-tax', 'Q', null, ['Количество', 'Q'], null, g],
+      ['info-tax', 'P рынка', null, ['Цена рынка', 'Pm', 'P_m'], null, g],
+      ['info-tax', 'P покупателя', null, ['Платит покупатель', 'Pb', 'P_b'], null, g],
+      ['info-tax', 'P продавца', null, ['Получает продавец', 'Ps', 'P_s'], null, g],
+      ['info-tax', 'DWL', null, ['Потери общества', 'DWL'], null, g]];
+  },
   ppfsum: () => [['info-ppfsum', 1], ['info-ppfsum', 2],
     ...((STATE.ppfSumData && STATE.ppfSumData.kinks) || []).map((_, i) => ['info-ppfsum', 3 + i])],
   smallopen: () => {
@@ -808,7 +817,7 @@ function decorateTables() {
   if (tx) {
     const hasTable = [...tx.querySelectorAll('table.tx-table tr:first-child th')].some(th => /^(До|Было)$/.test(plainText(th)));
     const it = STATE.intervType;
-    const h = !hasTable ? '' : (it === 'tax' ? 'До и после налога' : it === 'subsidy' ? 'До и после субсидии' : 'До и после вмешательства');
+    const h = !hasTable ? '' : STATE.taxPair ? 'До и после вмешательств' : (it === 'tax' ? 'До и после налога' : it === 'subsidy' ? 'До и после субсидии' : 'До и после вмешательства');
     if (h) { if (tx.dataset.head !== h) tx.dataset.head = h; } else if (tx.hasAttribute('data-head')) tx.removeAttribute('data-head');
   }
 }
@@ -899,6 +908,7 @@ function answerRow(c, isMath) {
    из бремени, которое сцена уже посчитала (STATE.incBuyer, incSeller —
    40-scenes-market.js). Нет вмешательства или нет исходного рынка — нет секции. */
 function burdenOn() {
+  if (STATE.taxPair) return false;
   const b = +STATE.incBuyer, s = +STATE.incSeller;
   return /^(taxes|tax|tax-adv)$/.test(STATE.sceneKey) && STATE.taxActive && !STATE.taxNoBase
     && isFinite(b) && isFinite(s) && Math.abs(b) + Math.abs(s) > 1e-9;

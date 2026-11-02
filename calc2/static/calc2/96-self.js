@@ -139,14 +139,23 @@ function selfCell(cell, idx) {
   const chk = document.createElement('button'); chk.type = 'button'; chk.className = 'self-check'; chk.textContent = 'Проверить';
   const show = document.createElement('button'); show.type = 'button'; show.className = 'self-show'; show.textContent = 'Показать';
   const pill = document.createElement('span'); pill.className = 'self-pill'; pill.setAttribute('role', 'status');
-  const detail = document.createElement('div'); detail.className = 'self-detail'; detail.setAttribute('aria-live', 'polite');
+  const detail = document.createElement('div'); detail.className = 'self-detail';
+  const detailText = document.createElement('span'); detailText.setAttribute('aria-live', 'polite');
+  const formatHint = 'Впишите число, дробь, корень, точку (x; y) или список через «;».';
+  // Оба возможных пояснения участвуют в размере, но скрыты от экрана и AT.
+  // Вердикт и ошибка формата не меняют высоту соседних строк.
+  for (const text of ['Точно: ' + truth, formatHint]) {
+    const reserve = document.createElement('span'); reserve.className = 'self-detail-reserve';
+    reserve.textContent = text; reserve.setAttribute('aria-hidden', 'true'); detail.append(reserve);
+  }
+  detail.append(detailText);
   const paintVerdict = () => {
     const v = SELF.verdict[id];
     pill.textContent = v === true ? '✓ верно' : (v === false ? '✗ не сходится' : '');
     pill.className = 'self-pill' + (v === true ? ' is-ok' : (v === false ? ' is-bad' : ''));
     inp.classList.toggle('is-ok', v === true); inp.classList.toggle('is-bad', v === false);
     inp.setAttribute('aria-invalid', v === false ? 'true' : 'false');
-    detail.textContent = v === true ? 'Точно: ' + SELF.vtruth[id] : '';
+    detailText.textContent = v === true ? 'Точно: ' + SELF.vtruth[id] : '';
   };
   const check = () => {
     const cur = selfText(cell.querySelector('.ans-val'));
@@ -155,7 +164,7 @@ function selfCell(cell, idx) {
     // сходится»: сколько значений не хватает, не выдаём.
     if (r == null) {
       delete SELF.verdict[id]; paintVerdict(); inp.setAttribute('aria-invalid', 'true');
-      detail.textContent = 'Впишите число, дробь, корень, точку (x; y) или список через «;».';
+      detailText.textContent = formatHint;
       return;
     }
     SELF.verdict[id] = r; SELF.vtruth[id] = cur; paintVerdict(); selfAfterAnswer();

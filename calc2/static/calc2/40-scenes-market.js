@@ -82,6 +82,7 @@ function recompute() {
 
   // Вмешательство государства (шаг 7 — налог, шаг 8 — субсидия).
   // Налог сдвигает S вверх на t, субсидия — вниз на s. Дальше математика общая.
+  delete STATE.taxPair;
   STATE.taxActive = false;
   STATE.taxEq = null;
   /* ⚠️ ХВОСТЫ ПРОШЛОГО ВМЕШАТЕЛЬСТВА ГАСНУТ ЗДЕСЬ, А НЕ «КОГДА-НИБУДЬ».
@@ -131,7 +132,9 @@ function recompute() {
      Отсюда же берётся и краевой случай, который прежде терялся совсем: без
      вмешательства кривые пересекаются вне четверти, а с ним — внутри
      (субсидия 450 на тех же кривых даёт Q = 50). Числа обязаны появиться. */
-  if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S) {
+  if (taxPairOn()) {
+    recomputeTaxPair();
+  } else if (isTaxType && STATE.tax > 0 && STATE.D && STATE.S) {
     const isSub = (STATE.intervType === 'subsidy');
     const pf = pctForm();                         // строка таблицы PCT_FORMS либо null
     const adv = !!pf;
@@ -944,6 +947,7 @@ function offQuadExplainHtml() {
    moveExplanations (86-workspace.js): общий рассказ сцены остаётся на месте,
    а этот абзац приписывается в конец — он про конкретную выбранную форму. */
 function pctFormExplainHtml() {
+  if (STATE.taxPair) return taxPairExplainHtml();
   const pf = pctForm();
   if (!pf || !STATE.taxActive || !STATE.taxEq) return '';
   const isSub = (pf.type === 'subsidy');
@@ -1322,6 +1326,7 @@ function eqSectionTitle() {
      этими числами был бы неправдой, поэтому он меняется вместе с числами. */
   if (STATE.pcActive && STATE.pc) return STATE.pc.isCeiling ? 'Рынок при потолке цены' : 'Рынок при поле цены';
   if (STATE.quotaActive) return 'Рынок при квоте';
+  if (STATE.taxActive && STATE.taxPair) return 'Рынок после вмешательств';
   if (STATE.taxActive) return (STATE.intervType === 'subsidy') ? 'Рынок после субсидии' : 'Рынок после налога';
   return 'Равновесие $D = S$';
 }
@@ -1390,8 +1395,9 @@ function interventionKeyValues() {
     return `<div class="stat"><span>$Q$ (объём торговли)</span><b>${fmt(t.Q)}</b></div>` +
       `<div class="stat"><span>$P_b$ (платит покупатель)</span><b>${fmt(t.Pb)}</b></div>` +
       `<div class="stat"><span>$P_s$ (получает продавец)</span><b>${fmt(t.Ps)}</b></div>` +
-      `<div class="hint">Цена покупателя и цена продавца разошлись на ` +
-      `${sub ? 'субсидию' : 'налог'}, и одной цены на этом рынке больше нет. ` + was + `</div>`;
+      `<div class="hint">` + (STATE.taxPair
+        ? 'Разница между ценами покупателя и продавца равна суммарному действию двух инструментов. '
+        : `Цена покупателя и цена продавца разошлись на ${sub ? 'субсидию' : 'налог'}, и одной цены на этом рынке больше нет. `) + was + `</div>`;
   }
 
   // (3) Квота. Объём задан прямо, а цена не определена — она лежит в коридоре.
@@ -2259,6 +2265,7 @@ function intervOnBuyer() {
 // спрос вниз (D − t): эффективный спрос. Итоговые числа в обоих случаях идентичны —
 // меняется только то, какую кривую рисуем; считаем в recompute одинаково.
 function drawShiftedSupply() {
+  if (STATE.taxPair) { drawTaxPairCurves(); return; }
   /* По признаку «кривая после вмешательства построена», а не «числа сошлись».
      Прежде здесь стоял STATE.taxActive, и на рынке без равновесия кривая не
      рисовалась вовсе — хотя сдвиг и поворот равновесия не спрашивают. */
@@ -2345,6 +2352,7 @@ function taxPivotQ() {
 
 // Центр поворота, если его есть смысл показывать; иначе null.
 function taxPivotPoint() {
+  if (STATE.taxPair) return null;
   // Центр поворота — свойство пары кривых, а не найденного равновесия.
   if (!STATE.taxCurveOn || !pctForm() || !STATE.S || !STATE.taxAfterS) return null;
   const q = taxPivotQ();
@@ -2415,7 +2423,7 @@ function drawTaxAreas() {
   const lowP = Math.min(Pb, Ps), highP = Math.max(Pb, Ps);
   const aTx = d3.area().x(d => sx(d)).y0(sy(lowP)).y1(sy(highP));
   markArea(g.append('path').datum(s1).attr('d', aTx)
-    .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета'),
+    .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.taxPair ? 'Сальдо бюджета' : STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета'),
     { from: 0, to: Q, lo: lowP, hi: highP });
   // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
   const lo = (Q0 == null) ? 0 : Math.min(Q, Q0), hi = (Q0 == null) ? 0 : Math.max(Q, Q0);
@@ -2429,6 +2437,7 @@ function drawTaxAreas() {
 
 // Точки E₀/E₁, проекции, подписи и перетаскиваемый клин налога.
 function drawTaxPoints() {
+  if (STATE.taxPair) { drawTaxPairPoints(); return; }
   if (!STATE.taxActive) return;
   const { Q, Pb, Ps } = STATE.taxEq;
   const ox = sx(0), oy = sy(0);
@@ -2642,6 +2651,7 @@ function syncTaxKind() {
 
 // Показать ровно те уровни каскада, которые заслужены сделанным выбором.
 function applyIntervCascade() {
+  syncTaxPairUI();
   const type = STATE.intervType;
   const comp = (STATE.market !== 'monopoly');
   const isRate = (type === 'tax' || type === 'subsidy');
@@ -3010,6 +3020,7 @@ function updateTaxPanel() {
      с налогом не заводим, он бы разъехался с маршрутами. */
   const sec = document.getElementById(L_INTERV);
   if (sec && sec.classList.contains('scoped-off')) { box.innerHTML = ''; return; }
+  if (STATE.taxPair) { updateTaxPairPanel(box); return; }
   if (!STATE.D || !STATE.S) {
     box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return;
   }

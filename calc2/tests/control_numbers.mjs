@@ -1526,6 +1526,19 @@ e3Values.forEach((v,i)=>cmp('Э3: '+v,r.values[i],v,i===6?.0005:1e-8));
 cmp('Э3: 167,1875 % читаются из дроби',parseShown(r.percent),167.1875,1e-8);
 [true,true,false].forEach((v,i)=>cmp('Э3: Сначала сам — '+['33,3','100/3','33'][i],r.self[i],v,0));
 
+head('Ночь 29.10 · Э4 — два налоговых инструмента');
+r = await run(MKT + `setDS('taxes','Q=180-P','Q=3P-60');
+  setType('subsidy');setTaxForm('unit');setTaxSide('buyer');setTax(12);
+  addSecondTax();setSecondTax({type:'tax',form:'unit',side:'seller',rate:24});
+  return {...STATE.taxEq,budget:STATE.budget,cs:STATE.csTax,ps:STATE.psTax,dwl:STATE.dwl,
+    subsidy:STATE.taxPair.items[0].budget,tax:STATE.taxPair.items[1].budget};`);
+for(const [k,v] of Object.entries({Q:111,Pb:69,Ps:57,Pm:81,budget:1332,cs:6160.5,ps:2053.5,dwl:54,subsidy:-1332,tax:2664}))
+  cmp('Э4 9.13д: '+k,r[k],v,1e-6);
+r = await run(`setType('tax');setTaxForm('vat');setTax(20);
+  setSecondTax({type:'subsidy',form:'subbuyer',rate:10});
+  return {...STATE.taxEq,budget:STATE.budget};`);
+for(const [k,v] of Object.entries({Q:116,Pb:64,Ps:176/3,budget:1856/3}))cmp('Э4 две процентные формы: '+k,r[k],v,1e-6);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

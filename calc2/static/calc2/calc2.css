@@ -3226,8 +3226,9 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 #self-showall { height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .self-on .ans-cell.self-hidden .ans-val, .self-on .ans-cell.self-hidden .ans-was { display: none; }
 .self-box { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.self-detail { font-size: 13px; line-height: 1.55; color: var(--text2); overflow-wrap: anywhere; }
-.self-detail:empty { display: none; }
+.self-detail { display: grid; font-size: 13px; line-height: 1.55; color: var(--text2); overflow-wrap: anywhere; }
+.self-detail > span { grid-area: 1 / 1; }
+.self-detail-reserve { visibility: hidden; }
 .self-inp { width: 100%; height: 34px; text-align: center; font-size: 19px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--r); color: var(--text); }
 .self-inp.is-ok { border-color: var(--green-border); }
 .self-inp.is-bad { border-color: var(--error); }
@@ -4311,3 +4312,15 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 .mono-verdict-sub { font-weight: 400; margin-top: 2px; }
 /* Своя левая часть в поле («Q = 100 − 2P», ADR 0157) — приставка уходит, иначе «Q = Q = …». */
 #tools-panel .fc-card > .crow-formula.fc-pre-own > .fc-prefix { display: none; }
+
+/* Э4: второй инструмент повторяет принятый каскад первого. */
+#tax-pair-controls { margin-top: 16px; }
+.tax-second { border-top: 1px solid var(--border); padding-top: 16px; }
+.tax-second-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; font-size:14px; }
+.tax-second-forms, .tax-second [data-tax2-side], .tax-second-rate { margin-top:12px; }
+.tax-second-value { display:flex; align-items:center; gap:6px; justify-content:space-between; }
+.tax-second-equation { display:inline-flex; align-items:center; gap:4px; }
+#tools-panel .tax-second [data-tax2-side] { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#tools-panel .tax-second [data-tax2-side] > .seg { margin:0; }
+#tax-remove-second { width:auto; flex:none; }
+#tax-pair-controls [hidden], #tax-pair-controls[hidden] { display:none !important; }

@@ -1660,6 +1660,7 @@
                      style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
             </div>
           </div>
+          <div id="tax-pair-controls" hidden></div>
           <!-- Поле регулируемой цены (потолок / пол) -->
           <div class="field" id="pc-field" style="margin-top:8px;display:none;">
             <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
@@ -2235,6 +2236,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/20-plane.js' %}"></script>
 <script src="{% calc2_static 'calc2/30-curves.js' %}"></script>
 <script src="{% calc2_static 'calc2/40-scenes-market.js' %}"></script>
+<script src="{% calc2_static 'calc2/41-market-policies.js' %}"></script>
 <script src="{% calc2_static 'calc2/42-scenes-mono.js' %}"></script>
 <script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
 <script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>

@@ -517,7 +517,7 @@ function modelAnswerPoints() {
       if (STATE.monoTax) add(STATE.monoTax.Qt, STATE.monoTax.Pt);
       if (STATE.monoFloor) add(STATE.monoFloor.Q, STATE.monoFloor.price);
       if (STATE.monoQuota) add(STATE.monoQuota.Q, STATE.monoQuota.price);
-    } else if (STATE.taxEq) { add(STATE.taxEq.Q, STATE.taxEq.Pb); add(STATE.taxEq.Q, STATE.taxEq.Ps); }
+    } else if (STATE.taxEq) { add(STATE.taxEq.Q, STATE.taxEq.Pb); add(STATE.taxEq.Q, STATE.taxEq.Ps); add(STATE.taxEq.Q, STATE.taxEq.Pm); }
     if (STATE.ext) add(STATE.ext.Qopt, STATE.ext.Popt);
   }
   if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.lrOn && STATE.lr) {

@@ -90,7 +90,7 @@ window.__sp = {
     await __sp.wait(80);
     const lab = it.querySelector('g.cross-label text');
     const pin = it.querySelector('g.cross-pin');
-    const res = { label: lab ? lab.textContent : '(нет подписи)', pin: pin ? (pin.classList.contains('is-off') ? 'off' : 'on') : 'нет' };
+    const res = { label: lab ? lab.textContent.replaceAll('−', '-') : '(нет подписи)', pin: pin ? (pin.classList.contains('is-off') ? 'off' : 'on') : 'нет' };
     it.dispatchEvent(new PointerEvent('pointerleave'));
     STATE.hoverCross = null;
     return res;
@@ -125,7 +125,7 @@ async function answer(re, text) {
     const pill = c ? c.querySelector('.self-pill') : null;
     const toastEl = document.querySelector('.toast, #toast');
     return { verdict: pill ? (pill.classList.contains('is-ok') ? '✓' : (pill.classList.contains('is-bad') ? '✗' : '—')) : '(нет)',
-             toast: toastEl ? toastEl.textContent : '' };
+             toast: toastEl ? toastEl.textContent : '', detail: c.querySelector('.self-detail [aria-live]')?.textContent || '' };
   }, i);
 }
 
@@ -155,7 +155,7 @@ if (want('Б')) {
   }
   const r = await answer(X, 'абв');
   eq('x²−4, ось x: «абв» — вердикта нет', r.verdict, '—');
-  ok('«абв» — подсказка формата', /Впишите числа через «;», точку как \(x; y\) или «нет»/.test(r.toast), r.toast);
+  ok('«абв» — подсказка формата', /Впишите число, дробь, корень, точку \(x; y\) или список через «;»/.test(r.detail), r.detail);
   for (const [g, w] of [['(0; −4)', '✓'], ['(0;-4)', '✓'], ['(0; 4)', '✗']]) eq('x²−4, минимум: «' + g + '»', (await answer(MIN, g)).verdict, w);
   for (const [g, w] of [['нет', '✓'], ['Нет', '✓'], ['(0; 1)', '✗']]) eq('x²−4, максимум: «' + g + '»', (await answer(MAX, g)).verdict, w);
   // Ответ ячейки поменялся (другая формула) — её вердикт снимается.
@@ -256,6 +256,9 @@ if (want('Г')) {
   await answer('Пересекаетось:y', '4');
   const h1 = (await geo()).map(x => x.h);
   ok('высота строки до и после вердикта одна (✓ и ✗)', h0.length && h0.every((h, i) => Math.abs(h - h1[i]) < 0.5), h0.map(Math.round).join(',') + ' → ' + h1.map(Math.round).join(','));
+  await answer('Пересекаетось:x', 'абв');
+  const h2 = (await geo()).map(x => x.h);
+  ok('подсказка формата тоже не сдвигает строки', h0.every((h,i) => Math.abs(h-h2[i]) < 0.5));
   const note = await ev(() => document.getElementById('self-note').textContent);
   eq('пояснение у математики', note, 'Впишите ответ: числа через «;», точку как (x; y) или «нет».');
   await ev(async () => { await __sp.open('sd'); });
