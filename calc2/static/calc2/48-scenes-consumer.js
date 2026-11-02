@@ -27,7 +27,7 @@ function consumerUtility() {
 function consumerOptimum(f, px, py, I) {
   const r = optimizeAlongConstraint(f, px, py, I);
   if (!r) return null;
-  return { x: r.a, y: r.b, U: r.value, mrs: r.mrs, xInt: r.aMax, yInt: r.bMax, px, py, I };
+  return { x: r.a, y: r.b, U: r.value, mrs: STATE.consType === 'compl' ? null : r.mrs, xInt: r.aMax, yInt: r.bMax, px, py, I };
 }
 
 /* Включение разложения Слуцкого. Вынесено из обработчика галочки, потому что
@@ -94,14 +94,23 @@ function drawBudgetLine(opt, color, dashed, label) {
 
 // Кривая безразличия (или изокванта) заданного уровня.
 function drawLevelCurve(f, level, color, width, opacity, dash) {
-  const pts = traceLevelCurve(f, level, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+  /* У комплементов линия уровня многозначна по x: обычная трассировка y(x)
+     теряет вертикальный луч. Вершина и оба луча задаются самим min(x/a,y/b).
+     Изокванты используют прежний общий трассировщик. */
+  const corner = STATE.mode === 'consumer' && STATE.consType === 'compl';
+  const a = Math.abs(STATE.consA) > 1e-9 ? STATE.consA : 1;
+  const b = Math.abs(STATE.consB) > 1e-9 ? STATE.consB : 1;
+  const pts = corner
+    ? [[a * level, Math.max(b * level, CONFIG.Pmax)], [a * level, b * level], [Math.max(a * level, CONFIG.Qmax), b * level]]
+    : traceLevelCurve(f, level, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width || 2.2).attr('opacity', opacity == null ? 1 : opacity).attr('d', line);
   if (dash) p.attr('stroke-dasharray', dash);
   // запись для .tex: формулы y = f(x) у линии уровня нет, в файл идут узлы трассировки
-  markNumeric(p, 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
+  markNumeric(p, corner ? 'линия уровня min(x/a,y/b): вертикальный и горизонтальный лучи через (aU,bU)'
+    : 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
 }
 
 // Точка выбора с проекциями и подписью.
@@ -195,7 +204,7 @@ function updateConsumerPanel() {
   let html = '';
   html += `<div class="stat"><span>Оптимум $(x^*; y^*)$</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
-  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
+  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${b.mrs === null ? 'не определена' : fmt(b.mrs)}</b></div>`;
   // Строка подписана словами и формулой, а не одной мелкой дробью (сессия 7, А3.3; Notion …81fd…).
   html += `<div class="stat"><span>Отношение цен $P_x/P_y$</span><b>${fmt(b.px / b.py)}</b></div>`;
   html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}; ${fmt(b.yInt)}</b></div>`;
@@ -227,7 +236,7 @@ function updateConsumerPanel() {
     html += `<div class="stat"><span>A: старый выбор ${nb(`(Px=${fmt(b.px)})`)}</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
     html += `<div class="stat"><span>B: компенсация ${nb(`($I'$=${fmt(s.Icomp)})`)}</span><b>(${fmt(s.comp.x)}; ${fmt(s.comp.y)})</b></div>`;
     html += `<div class="stat"><span>C: новый выбор ${nb(`(Px=${fmt(s.px1)})`)}</span><b>(${fmt(s.fin.x)}; ${fmt(s.fin.y)})</b></div>`;
-    const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
+    const sg = (v) => (v > 0 ? '+' : '') + fmt(v).replace(/-/g, '−');
     html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>замещ.</th><th>доход</th><th>итог</th></tr>';
     html += `<tr><td>Δx</td><td>${sg(s.subX)}</td><td>${sg(s.incX)}</td><td>${sg(s.totX)}</td></tr>`;
     html += `<tr><td>Δy</td><td>${sg(s.subY)}</td><td>${sg(s.incY)}</td><td>${sg(s.totY)}</td></tr>`;

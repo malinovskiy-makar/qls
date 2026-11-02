@@ -1198,7 +1198,7 @@ function texToCanvasText(raw) {
 }
 
 function renderLabelText(sel, txt) {
-  const s = texToCanvasText(txt);
+  const s = texToCanvasText(txt).replace(/-(?=\s*\d)/g, '−');
   /* ⚠️ ИСХОДНАЯ РАЗМЕТКА ПОДПИСИ ОСТАЁТСЯ ПРИ УЗЛЕ.
      Нарисованная подпись разложена на tspan'ы, и собрать из них разметку
      обратно нельзя: «60» с подстрочным «b» читается как «60b», то есть
@@ -3180,6 +3180,7 @@ function drawElasticityZones() {
 function drawElasticityPoint() {
   const e = STATE.elast; if (!e || isNaN(e.p)) return;
   const ox = sx(0), oy = sy(0), g = svg.append('g');
+  const atUnit = e.unit && Math.abs(e.q - e.unit.Q) < 1e-6 * Math.max(1, Math.abs(e.q));
   // Единичная точка эластичности.
   if (e.unit) {
     const [ux, uy] = toPx(e.unit.Q, e.unit.P);
@@ -3197,7 +3198,7 @@ function drawElasticityPoint() {
   dash(px, py, px, oy); dash(px, py, ox, py);
   axisValueX(g, px, oy, fmt(e.q), '');
   axisValueY(g, ox, py, fmt(e.p), '');
-  g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
+  if (!atUnit) g.append('text').attr('x', px + 9).attr('y', py - 9).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.ink)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('|Ed|=' + fmt(e.absEd));
   const hit = g.append('circle').attr('cx', px).attr('cy', py).attr('r', 13).attr('fill', 'transparent').style('cursor', 'grab');
   attachElastDrag(hit);

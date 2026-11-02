@@ -428,7 +428,7 @@ function drawBundleRay(g, f, color, curves) {
     g.append('circle').attr('cx', sx(x)).attr('cy', sy(y)).attr('r', 5)
       .attr('fill', COL.halo).attr('stroke', col).attr('stroke-width', 2.4);
     haloText(g, sx(x) + 9, sy(y) - 9,
-             (c.name ? c.name + ' ' : '') + '(' + fmt(x) + '; ' + fmt(y) + ')', 'start', 'auto');
+             'Комплект' + (list.length > 1 && c.name ? ' (' + c.name + ')' : '') + ' (' + fmt(x) + '; ' + fmt(y) + ')', 'start', 'auto');
   });
   void b; void color;
 }
@@ -461,8 +461,8 @@ function updatePpfPanel() {
   const linear = /линей/i.test(type);
 
   let html = `<div class="stat"><span>Тип КПВ</span><b>${type}</b></div>`;
-  html += `<div class="stat"><span>$X_{max}$ (весь ресурс на X)</span><b>${fmt(maxX)}</b></div>`;
-  html += `<div class="stat"><span>$Y_{max}$ (весь ресурс на Y)</span><b>${fmt(maxY)}</b></div>`;
+  html += `<div class="stat"><span>$X_{\\mathrm{max}}$ (весь ресурс на X)</span><b>${fmt(maxX)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{\\mathrm{max}}$ (весь ресурс на Y)</span><b>${fmt(maxY)}</b></div>`;
   if (at.length) {
     const mid = at[Math.floor(at.length / 2)];
     html += `<div class="stat"><span>Альт. издержки X в середине</span><b>${fmt(mid.oppX)} Y за ед. X</b></div>`;
@@ -470,7 +470,7 @@ function updatePpfPanel() {
   }
   if (STATE.ppfF2) {
     const m2x = ppfXmaxOf(evalPpf2), m2y = evalPpf2(0);
-    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{max}$ / $Y_{max}$</span>`
+    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{\\mathrm{max}}$ / $Y_{\\mathrm{max}}$</span>`
           + `<b>${fmt(m2x)} / ${fmt(m2y)}</b></div>`;
     const k2 = Math.abs(ppfSlopeOf(evalPpf2, m2x * 0.5));
     html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: альтернативные издержки X</span><b>${fmt(k2)} Y за ед. X</b></div>`;
@@ -488,7 +488,7 @@ function updatePpfPanel() {
   html += '<div class="sb-note"><b>Как это получилось</b>';
   html += '<p><b>Где кончается кривая?</b> Граница возможностей это все наборы, при которых ресурс израсходован '
         + 'полностью. Концы кривой и есть крайние случаи: весь ресурс на один товар. '
-        + `Здесь это $X_{max} = ${fmt(maxX)}$ и $Y_{max} = ${fmt(maxY)}$; они найдены численно, `
+        + `Здесь это $X_{\\mathrm{max}} = ${fmt(maxX)}$ и $Y_{\\mathrm{max}} = ${fmt(maxY)}$; они найдены численно, `
         + 'как точки пересечения кривой с осями.</p>';
   html += '<p><b>Откуда берутся альтернативные издержки?</b> Это наклон касательной в точке. Берём две близкие '
         + 'точки слева и справа и делим прирост Y на прирост X, поэтому счёт одинаково '
@@ -2342,8 +2342,8 @@ function updatePpfSumPanel() {
   const ord = d.order || [];
   let html = '';
   html += `<div class="stat"><span>Складываем кривых</span><b>${d.n}</b></div>`;
-  html += `<div class="stat"><span>$X_{max}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
-  html += `<div class="stat"><span>$Y_{max}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
+  html += `<div class="stat"><span>$X_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
   (d.kinks || []).forEach((k, i) => {
     html += `<div class="stat"><span>Точка излома ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
   });
@@ -2416,8 +2416,8 @@ function updatePpfSumPanel() {
           + 'наращивают X одновременно, а не по очереди. Так бывает у дуг и парабол.</p>';
   }
 
-  html += `<p>Концы суммарной кривой это просто суммы концов: $X_{max} = ${fmt(d.Xtot)}$ `
-        + `и $Y_{max} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
+  html += `<p>Концы суммарной кривой это просто суммы концов: $X_{\\mathrm{max}} = ${fmt(d.Xtot)}$ `
+        + `и $Y_{\\mathrm{max}} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
   /* ⚠️ АБЗАЦА «ФОРМА КРИВОЙ» ЗДЕСЬ БОЛЬШЕ НЕТ, И ВОЗВРАЩАТЬ ЕГО НЕЛЬЗЯ.
      Запись — величина, а не разбор: она стоит блоком «Итоговая функция»
      первой карточкой «Ключевых значений» (см. setFinalFunctions выше).

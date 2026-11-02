@@ -1260,8 +1260,9 @@ function drawDiscr1() {
   const og = svg.append('g'), [px, py] = toPx(d1.Qcomp, Pq);
   og.append('line').attr('x1', px).attr('y1', py).attr('x2', px).attr('y2', oy).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
   og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4).attr('fill', COL.tax).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-  axisValueX(og, px, oy, fmt(d1.Qcomp), 'comp');
-  haloText(og, sx(d1.Qcomp * 0.45), sy(Math.max(0, (Pq + mcAt(d1.Qcomp * 0.45)) / 2)), 'Прибыль', 'middle', 'middle');
+  axisValueX(og, px, oy, fmt(d1.Qcomp), 'к');
+  const labelQ = d1.Qcomp * 0.45;
+  haloText(og, sx(labelQ), sy((evalCurve(D, labelQ) + mcAt(labelQ)) / 2), 'Прибыль', 'middle', 'middle');
 }
 
 function updateDiscr1Panel() {
@@ -1684,7 +1685,7 @@ function updateDiscr3Panel() {
       html += `<div class="stat"><span>Внутри: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
     else
       html += '<div class="stat"><span>Внутри</span><b>рынка нет (выпуск 0): $P_w$ выше резервной цены покупателя</b></div>';
-    html += `<div class="stat"><span>Экспорт q₂ (по Pw)</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
+    html += `<div class="stat"><span>Экспорт $q_2$</span><b>${fmt(d.q2)} при $P_w = ${fmt(d.P2)}$</b></div>`;
     html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
     html += `<div class="stat"><span>$MR_1 = P_w = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;
     html += '<div class="hint">Мировой рынок для малой фирмы совершенно эластичен: продать за границей можно ' +
@@ -1937,7 +1938,7 @@ function updateKinkPanel() {
   if (k.vcM != null) html += `<div class="stat"><span>$VC$</span><b>${fmt(k.vcM)}</b></div>`;
   if (k.Qc != null) html += `<div class="stat"><span>Конкурентный выпуск</span><b>${fmt(k.Qc)}</b></div>`;
   if (k.dwl != null) html += `<div class="stat"><span>$DWL$</span><b>${fmt(k.dwl)}</b></div>`;
-  html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q = ${fmt(k.Qstar)}</b></div>`;
+  html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} при $Q = ${fmt(k.Qstar)}$</b></div>`;
   // Таблица всех кандидатов с прибылью (видно сравнение).
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th>Кандидат</th><th>Q</th><th>π</th></tr>';
   k.cands.forEach(c => {

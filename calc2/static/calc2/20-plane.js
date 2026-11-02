@@ -12,6 +12,13 @@ let sx, sy;                       // D3-шкалы: данные -> пиксел
 function computeSize() {
   // Бумажный прогон выгрузки .tex: поле графика постоянного размера (72-export-tex.js).
   if (typeof texPaperActive === 'function' && texPaperActive()) { texPaperComputeSize(); return; }
+  // Верх сайта может включать полосу рабочей версии. Фиксированные 48 px
+  // уводили низ колонок под край экрана и под кнопку чата.
+  const app = document.querySelector('.app');
+  if (app && window.innerWidth >= 760) {
+    const top = Math.max(0, app.getBoundingClientRect().top + window.scrollY) + 'px';
+    if (app.style.getPropertyValue('--calc2-app-top') !== top) app.style.setProperty('--calc2-app-top', top);
+  }
   const wrap = document.getElementById('graph-wrap');
   W = wrap.clientWidth;
   H = wrap.clientHeight;
@@ -951,7 +958,7 @@ function drawAxes(xLabel, yLabel, opts) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', sx(t)).attr('y', oy + 8)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t).replace(/-/g, '−'));
   });
   // Деления и числа на оси Y.
   if (atZeroX) yTicks().forEach(t => {
@@ -962,7 +969,7 @@ function drawAxes(xLabel, yLabel, opts) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 8).attr('y', sy(t))
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t).replace(/-/g, '−'));
   });
   // Единственный «0» в начале координат (только если начало видно).
   if (atZeroX && atZeroY) {

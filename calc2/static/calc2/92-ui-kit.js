@@ -706,7 +706,8 @@ const SC_PROWS = {
   // Д3: вмешательство государства. Буква ставки и «%» — от каскада (rateLetter, shortRegulatorName), цена — от
   // подписи каскада (pc-letter: Pc у потолка, Pf у пола).
   'tax-field': ['Ставка', 't', 'd3'],
-  'pc-field': ['Цена', () => ((document.getElementById('pc-letter') || {}).textContent || 'P'), 'd3'],
+  // Обозначение берём из модели: textContent готового KaTeX содержит три копии записи.
+  'pc-field': ['Цена', () => STATE.intervType === 'floor' ? 'P_f' : 'P_c', 'd3'],
   'quota-field': ['Объём квоты', 'Q_{\\text{к}}', 'd3'], 'quota-price-field': ['Цена внутри коридора', 'P_k', 'd3'],
   // Д4: малая открытая экономика. Слова квоты — от направления торговли (openQuotaName: «Квота ввоза / вывоза»).
   'open-tariff-field': ['Тариф', 't', 'd4'],

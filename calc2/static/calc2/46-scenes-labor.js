@@ -685,10 +685,8 @@ function drawLaborBilateral() {
     .attr('text-anchor', narrow ? 'end' : 'middle').attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.warn)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
     .text('Диапазон возможных исходов');
-  if (!narrow) gg.append('text').attr('x', (ox + xMax) / 2).attr('y', (yLo + yHi) / 2 + 15)
-    .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.inkSoft)
-    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 3)
-    .text('Конкретная точка зависит от переговорной силы, а её модель не определяет');
+  // Пояснение о переговорной силе уже находится в «Разборе»: длинная копия
+  // на холсте пересекала кривые и закрывала диапазон исходов (Э1).
   // Две граничные точки: решение монопсониста (при МРОТ — с МРОТ) и решение профсоюза.
   if (bindLo) {
     laborPoint(gg, mn.Llo, mn.Wlo, COL.S, 'M', { lIdx: 'м', wText: null });

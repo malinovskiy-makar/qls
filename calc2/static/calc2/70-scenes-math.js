@@ -581,7 +581,7 @@ function planeTicksX(g, mx, oy) {
     g.append('text').attr('x', mx(t)).attr('y', oy + 7).attr('class', 'axis-num')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t).replace(/-/g, '−'));
   });
 }
 function planeTicksY(g, my, ox) {
@@ -592,7 +592,7 @@ function planeTicksY(g, my, ox) {
     g.append('text').attr('x', ox - 6).attr('y', my(t)).attr('class', 'axis-num')
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t).replace(/-/g, '−'));
   });
 }
 
@@ -637,6 +637,15 @@ function mathLine(g, f, mx, my, color, width, dash, rec) {
   }
   const p = g.append('path').datum(pts).attr('fill', 'none')
     .attr('stroke', color).attr('stroke-width', width || 2.5).attr('d', line);
+  // Каждая панель имеет собственные шкалы; режем путь по её полю, а не по CONFIG.
+  const clipId = 'math-line-clip-' + svg.selectAll('clipPath').size();
+  let defs = svg.select('defs');
+  if (defs.empty()) defs = svg.append('defs');
+  defs.append('clipPath').attr('id', clipId).append('rect')
+    .attr('x', Math.min(...mx.range())).attr('y', Math.min(...my.range()))
+    .attr('width', Math.abs(mx.range()[1] - mx.range()[0]))
+    .attr('height', Math.abs(my.range()[1] - my.range()[0]));
+  p.attr('clip-path', 'url(#' + clipId + ')');
   if (dash) p.attr('stroke-dasharray', dash);
   mathMark(p, rec);
   return pts;
@@ -952,7 +961,8 @@ function drawMathTangent(f) {
   // Подписи панелей крупнее и в цвет своей кривой: сразу видно, где сама
   // функция, а где производная.
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
-    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
+    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 4).text('f(x), сама функция');
   /* ⚠️ Подпись панели идёт через ОБЩИЙ разбор, а не через .text().
      Прямой .text() печатал «$f'(x)$, производная» вместе с долларами: KaTeX
      на холсте нет, и снимать разделители умеет только renderLabelText. */
@@ -981,7 +991,8 @@ function drawMathTangent(f) {
       .attr('fill', COL.reg).attr('opacity', 0.14)
       .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3'),
     'треугольник приращений Δx и Δy: по трём вершинам', 'треугольник приращений');
-    gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
+    const dxY = dodgeLabel((s1.mx(xa) + s1.mx(xb)) / 2, s1.my(ya) + 13, s1.my(0), 60);
+    gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', dxY)
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δx = ' + fmt(dx));
@@ -1102,6 +1113,7 @@ function labelCurveMath(g, f, mx, my, txt, color, key) {
         g.append('text').attr('class', 'curve-name')
           .attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
           .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
+          .style('font-family', /^[А-Яа-яЁё ]+$/.test(txt) ? 'var(--font-ui)' : null)
           .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6),
         txt);
       return;
@@ -1421,7 +1433,7 @@ function updateMathPanel() {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
-      html += `<div class="stat"><span>Касательная</span><b>y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})</b></div>`;
+      html += `<div class="stat"><span>Касательная</span><b>$y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}\\,(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})$</b></div>`;
       // Экстремумы f — ПОСЛЕ прежних строк: их номера держит паритет со старым экраном.
       { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b), '', 'Экстремумы функции'); }
       // Разбор: откуда взялось это число и что показывает треугольник.

@@ -21,7 +21,8 @@ function texFallback(expr) {
    прочие переменные — курсивом. Правим только ЗАПИСЬ: разбор и счёт формулы идут мимо этой функции. Имя функции
    («\mathrm{f}\left(») не трогаем. */
 function texVarsItalic(tex) {
-  return String(tex).replace(/\\mathrm\{([A-Za-z])\}(?!\\left)/g, ' $1');
+  return String(tex).replace(/\\mathrm\{([A-Za-z])\}(?!\\left)/g, ' $1')
+    .replace(/(\d)~\s+(?=[A-Za-z](?![A-Za-z]))/g, '$1');
 }
 function mathToTex(expr) {
   const s = String(expr || '').trim();

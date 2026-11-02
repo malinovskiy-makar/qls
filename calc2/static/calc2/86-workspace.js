@@ -284,6 +284,7 @@ function conditionNotesToExplain(to) {
   };
   const items = [];
   root.querySelectorAll('.hint, .hint-pop [data-explain]').forEach(n => {
+    if (n.classList.contains('hint-keep')) return; // Живое показание остаётся рядом с регулятором.
     if (n.closest('.sb-note-src') || n.classList.contains('sb-note-src') || sceneHidden(n)) return;
     const c = n.cloneNode(true);
     c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());

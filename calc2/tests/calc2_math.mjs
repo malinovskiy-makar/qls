@@ -1522,8 +1522,8 @@ const CASES = [
           xt.value = '1'; xt.dispatchEvent(new Event('input', { bubbles: true }));
           yt.value = '1'; yt.dispatchEvent(new Event('input', { bubbles: true }));
           var texts = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent; });
-          var ppf = texts.filter(function (s) { return s.indexOf('КПВ (') === 0; })[0] || '';
-          var ktv = texts.filter(function (s) { return s.indexOf('КТВ (') === 0; })[0] || '';
+          var ppf = texts.filter(function (s) { return s.indexOf('Комплект (КПВ) (') === 0; })[0] || '';
+          var ktv = texts.filter(function (s) { return s.indexOf('Комплект (КТВ) (') === 0; })[0] || '';
           /* Дробная часть на экране отделяется ЗАПЯТОЙ (Б15), поэтому разбор
              числа с холста обязан её понимать: со старым классом [-\\d.] из
              «66,67» вычитывалось «67». */

@@ -716,8 +716,10 @@ function spreadLabels() {
   });
   if (items.length < 2) return;
 
-  const hit = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 2
-                     && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 2;
+  // Нужен зазор, а не разрешённое наложение на 2 px: в WebKit строки ATC/AVC
+  // высотой 14,6 px при шаге 13 формально проходили прежний порог (Э1).
+  const hit = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > -2
+                     && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > -2;
   const m = CONFIG.margin;
   /* ⚠️ ПЛАВАЮЩИЕ БЛОКИ — ТАКОЕ ЖЕ ЗАНЯТОЕ МЕСТО, ЧТО И ЧУЖАЯ ПОДПИСЬ (п. 39).
      Стопка кнопок масштаба лежит НАД холстом и вне SVG, поэтому разведение

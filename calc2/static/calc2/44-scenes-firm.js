@@ -334,16 +334,18 @@ function drawCostCurves() {
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит
   // через них. Показываем только НАСТОЯЩИЙ внутренний минимум: край отрезка
   // сканирования экономической точкой не является (Б26).
-  const mark = (pt, color, label) => {
+  const mark = (pt, color, label, below = false) => {
     if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
     const [px, py] = toPx(pt.Q, pt.val);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px).attr('y', py - 9)
+    g.append('text').attr('x', px).attr('y', py + (below ? FS.small + 5 : -9))
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (STATE.showATC && costHas('ATC')) mark(realMin(STATE.minATC), COL.costATC, 'безубыточность');
+  // При положительной прибыли её прямоугольник лежит выше min ATC.
+  // Подпись под минимумом остаётся за пределами этой заливки.
+  if (STATE.showATC && costHas('ATC')) mark(realMin(STATE.minATC), COL.costATC, 'безубыточность', true);
   if (STATE.showAVC && costHas('AVC')) mark(realMin(STATE.minAVC), COL.costAVC, 'закрытие');
 }
 
@@ -817,6 +819,8 @@ function redrawProduction() {
   const gBot = panel(t2, yBot0, 'MP и AP');
   curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP, null, 'MP');
   curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP, null, 'AP');
+  if (STATE.showMP) labelCurveMath(gBot, prodMP, lx, t2, 'MP', COL.prodMP);
+  if (STATE.showAP) labelCurveMath(gBot, prodAP, lx, t2, 'AP', COL.prodAP);
   // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
   const vline = (L, color, label, row) => {
     if (L == null) return;

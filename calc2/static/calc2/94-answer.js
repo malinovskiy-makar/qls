@@ -248,7 +248,9 @@ function notationTex(t) {
   if (/^[A-Z]{2,4}$/.test(s)) return '\\mathrm{' + s + '}' + sup;
   const m = /^([A-Za-z])([A-Za-z0-9А-Яа-я]{0,4})$/.exec(s);
   if (!m) return null;
-  const sub = m[2] ? '_{' + (/[А-Яа-я]/.test(m[2]) ? '\\text{' + m[2] + '}' : m[2]) + '}' : '';
+  const idx = /^(min|max)$/.test(m[2]) ? '\\mathrm{' + m[2] + '}'
+    : (/[А-Яа-я]/.test(m[2]) ? '\\text{' + m[2] + '}' : m[2]);
+  const sub = m[2] ? '_{' + idx + '}' : '';
   return m[1] + sub + sup;
 }
 
