@@ -585,7 +585,6 @@ function drawMonoCeilingLine() {
 function monopolyTax(shift) {
   const D = STATE.D, m = STATE.mono;
   if (!D || !m) return null;
-  const mcEff = (q) => mcAt(q) + shift;                          // MC, сдвинутая на ставку
   /* MR = MC ± ставка — максимумом прибыли по кандидатам, а не первым корнем (ADR 0157):
      граница выпуска — у НАСТОЯЩЕЙ MC, ставка входит в прибыль слагаемым −shift·Q. */
   const Qt = monoBestOutput(q => marginalRevenue(D, q), mcAt, D, { shift }).Q;
@@ -594,18 +593,24 @@ function monopolyTax(shift) {
   const rate = Math.abs(shift), isTax = (shift > 0);
   const budget = (isTax ? 1 : -1) * rate * Qt;                  // +сбор / −расход = ставка·Q
   const csM = integrate(q => evalCurve(D, q) - Pt, 0, Qt);       // CS при новой цене
-  /* VC — НАСТОЯЩИЕ издержки ресурсов, под социальной MC: ставка на них не
-     влияет. PS — между ФАКТИЧЕСКОЙ границей монополиста (MC+t при налоге,
-     MC−s при субсидии) и его ценой: деньги бюджета лежат между MC и MC±ставка
-     и в излишек производителя НЕ входят, это перевод, а не излишек.
-     Отсюда тождество CS + PS + сбор + DWL = весь общественный излишек
-     (при субсидии расход вычитается). */
+  /* VC — издержки ресурсов. PS включает полученную субсидию и вычитает
+     уплаченный налог: TR − VC − бюджет. Обнуление MC−s теряло ту часть
+     субсидии, которая превышает издержки. CS + PS + бюджет = SW. */
   const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qt);
-  const psM = integrate(q => Pt - mcFloor(mcEff(q)), 0, Qt);
+  const psM = Pt * Qt - vcM - budget;
   // DWL — против эффективного выпуска (D = СОЦИАЛЬНАЯ MC, без ставки): вмешательство его увеличивает.
   let dwl = null;
   if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcFloor(mcAt(q)), lo, hi); }
   return { isTax, shift, rate, Qt, Pt, budget, csM, vcM, psM, dwl, mcAtQt: mcAt(Qt) };
+}
+
+// Нижний край денежной полосы; спрос и реальные издержки остаются в первой четверти.
+function monoBudgetFloor() {
+  const t = STATE.mode === 'market' && STATE.market === 'monopoly' && STATE.monoTax;
+  if (!t || t.isTax || !(t.Qt > 0)) return 0;
+  let low = 0;
+  for (let i = 0; i <= 100; i++) low = Math.min(low, mcFloor(mcAt(t.Qt * i / 100)) + t.shift);
+  return low < 0 ? low * 1.12 : 0;
 }
 
 // Оптимум монополиста при поле цены Pf (минимальная допустимая цена).
@@ -940,10 +945,10 @@ function updateNaturalPanel() {
 function drawMonoTaxAreas() {
   const t = STATE.monoTax, m = STATE.mono;
   if (!t || !m) return;
-  const D = STATE.D, g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const D = STATE.D, g = svg.append('g').attr('clip-path', 'url(#budget-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
-  const mcEff = (d) => mcAt(d) + t.shift;      // фактическая граница монополиста
-  const mcE = mcFormula(), mcEffE = mcE ? '(' + mcE + ') + (' + t.shift + ')' : null;   // те же границы строкой (запись для .tex)
+  const mcEff = (d) => mcFloor(mcAt(d)) + t.shift;
+  const mcE = mcFormula(), mcEffE = mcE ? 'max(0, (' + mcE + ')) + (' + t.shift + ')' : null;
   if (t.Qt > 1e-6) {
     const s1 = samp(0, t.Qt);
     // VC — под СОЦИАЛЬНОЙ MC: издержки ресурсов настоящие, ставка их не меняет.
@@ -953,17 +958,17 @@ function drawMonoTaxAreas() {
     }
     // PS — между фактической границей (MC ± ставка) и ценой монополиста.
     if (STATE.showMonoPS) {
-      const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcEff(d)))).y1(sy(t.Pt));
-      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'), { from: 0, to: t.Qt, lo: mcEffE, hi: t.Pt, floor0: 'lo' });
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcEff(d))).y1(sy(t.Pt));
+      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR − VC − бюджет)'), { from: 0, to: t.Qt, lo: mcEffE, hi: t.Pt });
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pt (низ) и спросом (верх)
       const a = d3.area().x(d => sx(d)).y0(sy(t.Pt)).y1(d => sy(evalCurve(D, d)));
       markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек потребителя (CS)'), { from: 0, to: t.Qt, lo: t.Pt, hi: D });
     }
     // Деньги бюджета — полоса между MC и MC±ставка на [0,Qt]; её площадь = ставка·Qt = бюджет.
-    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(mcFloor(mcEff(d))));
+    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(mcEff(d)));
     markArea(g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета'),
-      { from: 0, to: t.Qt, lo: mcE, hi: mcEffE, floor0: true });
+      { from: 0, to: t.Qt, lo: mcE ? 'max(0, (' + mcE + '))' : null, hi: mcEffE });
   }
   // DWL — между D и социальной MC от Qt до конкурентного Qc.
   if (m.Qc != null) {

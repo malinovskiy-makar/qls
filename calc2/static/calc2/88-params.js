@@ -890,7 +890,7 @@ function ppfSetSingle(maxX, maxY) {
   const inp = document.getElementById('inp-ppf'); if (inp) inp.value = formula;
   STATE.ppfFormula = formula;
   _wantRangeAnim = true;   // смена формы → плавный переезд осей (с дебаунсом)
-  redrawAll();
+  redrawKeepingWindow();
 }
 // Задать КПВ страны (1/2) в режиме суммы — ТОТ ЖЕ путь, что applyPpfSum.
 function ppfSetSum(which, maxX, maxY) {
@@ -906,7 +906,7 @@ function ppfSetSum(which, maxX, maxY) {
   if (which === 1) STATE.ppf1 = formula; else STATE.ppf2 = formula;
   STATE.ppfSumData = null;   // форс пересчёт суммы (как applyPpfSum)
   _wantRangeAnim = true;     // смена формы страны → плавный переезд осей (с дебаунсом)
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 // Один сцен-слайдер (метка + число сверху, range снизу). onInput(value) применяет состояние.
@@ -1076,6 +1076,9 @@ function updatePult() {
   showPult(true);
   // Ползунки кривых — под свои карточки «Функций» (92-ui-kit.js).
   if (typeof placeCurveSliders === 'function') placeCurveSliders();
+  // После новой формулы чипы могут пересобраться уже ПОСЛЕ scSync текущего
+  // кадра. Их подписи и оформление нужны сразу, без следующей перерисовки.
+  if (typeof scPchips === 'function') scPchips();
 }
 
 /* ── ЖИВОЕ ПРИМЕНЕНИЕ ФОРМУЛ (редизайн 10.2026, фаза 4) ──────────────────
@@ -1083,7 +1086,7 @@ function updatePult() {
    раздел 6). Теперь запись уходит в модель при наборе — тем же дребезгом
    220 мс, что у остальных полей формул (onFormulaInput), — но ТОЛЬКО верная.
    Неверная или недописанная остаётся черновиком в поле: поле помечено, под
-   ним сказано, что не так, а модель и график держат последнюю верную запись.
+   ним сказано, что не так, а модель и график держат запись до начала правки.
    Иначе каждый промежуточный символ («100 −») опустошал бы сцену.
    Применение — те же функции, что у кнопок: своей математики здесь нет. */
 /* Группа полей применяется одной функцией: только когда верны ВСЕ поля
@@ -1091,9 +1094,19 @@ function updatePult() {
 function liveFormula(fields, apply) {
   const list = fields.filter(Boolean);
   const run = () => {
-    let bad = false;
-    list.forEach(el => { const err = formulaInputError(el); markFormulaField(el, err); if (err) bad = true; });
-    if (!bad) apply();
+    const drafts = [];
+    list.forEach(el => {
+      const err = formulaInputError(el);
+      if (err) {
+        drafts.push({el, value: el.value, err, applying: el._formulaApplying});
+        el._formulaApplying = true; // временная подстановка — не новая запись из истории
+        el.value = el._formulaEditBase ? el._formulaEditBase.value : el._formulaCommitted;
+      }
+    });
+    try { if (list.every(el => !formulaInputError(el))) apply(); }
+    finally { drafts.forEach(({el, value, err, applying}) => {
+      el.value = value; el._formulaApplying = applying; markFormulaField(el, err);
+    }); }
   };
   list.forEach(el => onFormulaInput(el, run));
 }
@@ -1270,7 +1283,7 @@ function wireControls() {
     if (e) e.addEventListener('change', () => {
       const v = parseFloat(e.value);
       if (isNaN(v)) return;
-      STATE[key] = v; _wantRangeAnim = true; redrawAll();
+      STATE[key] = v; _wantRangeAnim = true; redrawKeepingWindow();
     });
   });
   const consType = document.getElementById('cons-type');
@@ -1278,8 +1291,7 @@ function wireControls() {
   const consCustom = document.getElementById('cons-custom');
   if (consCustom) {
     const applyU = () => { STATE.consCustom = (consCustom.value || '').trim(); redrawAll(); };
-    consCustom.addEventListener('change', applyU);
-    consCustom.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyU(); });
+    onFormulaInput(consCustom, applyU);
   }
   attachFormulaHelp('fh-cons', 'fp-cons', 'cons-custom', 'UTIL');
   const consFan = document.getElementById('chk-cons-fan');
@@ -1292,7 +1304,7 @@ function wireControls() {
     STATE.consPx1 = v;
     if (px1S) px1S.value = v; if (px1I) px1I.value = v;
     const l = document.getElementById('cons-px1-val'); if (l) l.textContent = fmt(v);
-    _wantRangeAnim = true; redrawAll();
+    _wantRangeAnim = true; redrawKeepingWindow();
   };
   if (px1S) px1S.addEventListener('input', () => applyPx1(parseFloat(px1S.value)));
   if (px1I) px1I.addEventListener('change', () => applyPx1(parseFloat(px1I.value)));
@@ -1508,7 +1520,7 @@ function wireControls() {
   attachFormulaHelp('fh-iso', 'fp-iso', 'inp-iso', 'ISO');
   [['iso-w', 'isoW'], ['iso-r', 'isoR'], ['iso-c', 'isoC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
-    if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawAll(); } });
+    if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawKeepingWindow(); } });
   });
 
   // Режим КПВ: одна строка на любую форму уравнения (Фаза 11), вторая кривая
@@ -1634,14 +1646,14 @@ function wireControls() {
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
   liveFormula([ppftInp], applyPpfTrade);
   // Смена мировой цены полем — анимируем переезд осей (как и ползунком).
-  if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; applyPpfTrade(); });
+  if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; redrawKeepingWindow(applyPpfTrade); });
   // Задача 2: ползунок мировой цены Px/Py — основное управление, синхронен с полем.
   const ppftSlider = document.getElementById('ppft-price-slider');
   if (ppftSlider) ppftSlider.addEventListener('input', () => {
     const v = parseFloat(ppftSlider.value); if (isNaN(v)) return;
     STATE.ppftPrice = v;       // фактическое значение зажмётся в recomputePpfTrade
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей (см. applyTradeRanges)
-    redrawAll();
+    redrawKeepingWindow();
   });
 
   // ЧК5: две страны (эндогенная мировая цена). Сценарий А/Б задаёт карточка
@@ -1662,20 +1674,20 @@ function wireControls() {
     const v = parseFloat(tbPrice.value);
     STATE.tbManualPrice = (!isNaN(v) && v > 0) ? v : null;
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей
-    redrawAll();
+    redrawKeepingWindow();
   });
   const tbSlider = document.getElementById('tb-price-slider');
   if (tbSlider) tbSlider.addEventListener('input', () => {
     const v = parseFloat(tbSlider.value); if (isNaN(v)) return;
     STATE.tbManualPrice = v;   // фактическое значение зажмётся в recomputeTradeB
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей
-    redrawAll();
+    redrawKeepingWindow();
   });
   const tbReset = document.getElementById('btn-tb-reset');
   if (tbReset) tbReset.addEventListener('click', () => {
     STATE.tbManualPrice = null;   // вернуться к равновесной; ползунок/поле обновит syncTbPriceUI
     _wantRangeAnim = true;        // равновесная Pw тоже меняет масштаб — плавно
-    redrawAll();
+    redrawKeepingWindow();
   });
 
   // Готовые сцены раздаёт окно сценариев (#scene-picker) — второго списка кнопок нет.
@@ -1954,7 +1966,7 @@ function wireControls() {
       if (isNum && isNaN(v)) return;
       STATE.macro[model][key] = v;
       _wantRangeAnim = true;
-      redrawAll();
+      if (isNum) redrawKeepingWindow(); else redrawAll();
     };
     /* Числовое поле оставляем на `change`: там дребезг только мешал бы —
        набранное «12» на полпути читалось бы как «1». Поле ФОРМУЛЫ слышит
@@ -1986,7 +1998,7 @@ function wireControls() {
       if (isNaN(v) || v < 0) return;
       STATE.macro[model][key] = v;
       if (sl) sl.value = v; if (inp) inp.value = v; if (lab) lab.textContent = fmt(v);
-      _wantRangeAnim = true; redrawAll();
+      _wantRangeAnim = true; redrawKeepingWindow();
     };
     if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));
     if (inp) inp.addEventListener('change', () => apply(parseFloat(inp.value)));

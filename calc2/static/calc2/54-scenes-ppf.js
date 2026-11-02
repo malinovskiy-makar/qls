@@ -1422,11 +1422,9 @@ function ppfPieceAt(p, X) {
   return p.yConst + F.f(p.c, ppfClamp(X - p.xConst, 0, F.Xmax(p.c)));
 }
 
-/* Собрать запись из готовых участков. Форма та же, что у линейной записи
-   (combinedPpfLinearRecord): фигурная скобка, условие участком.
-   ⚠️ Границ у записи столько же, сколько участков, а ИЗЛОМОВ на один меньше:
-   последняя граница — это выход кривой на ось X, там кривая кончается, а не
-   ломается. Правило то же, что записано у линейной формы. */
+/* Собрать запись из готовых участков. Стык двух формул не обязательно
+   является изломом: проверяем односторонние наклоны. При смене семейства
+   (парабола → прямая) сохраняем полезную границу участка, называя её точно. */
 function ppfPiecesRecord(pieces, kind) {
   const ps = pieces.filter(p => p.x1 - p.x0 > 1e-7);
   if (!ps.length) return null;
@@ -1458,9 +1456,18 @@ function ppfPiecesRecord(pieces, kind) {
     return NaN;
   };
   const bounds = ps.map(p => ({ x: p.x1, y: ppfPieceAt(p, p.x1) }));
+  const kinks = bounds.slice(0, -1).flatMap((b, i) => {
+    const left = ps[i], right = ps[i + 1];
+    const h = Math.min(left.x1 - left.x0, right.x1 - right.x0) * 1e-6;
+    const dl = (b.y - ppfPieceAt(left, b.x - h)) / h;
+    const dr = (ppfPieceAt(right, b.x + h) - b.y) / h;
+    const smooth = Math.abs(dl - dr) <= 1e-4 * Math.max(1, Math.abs(dl), Math.abs(dr));
+    if (smooth && left.kind === right.kind) return [];
+    return [smooth ? Object.assign({}, b, {kind: 'join'}) : b];
+  });
   const n = ps.length;
   return { latex, expr, evalY, pieces: ps, bounds,
-           kinks: bounds.slice(0, -1), Xtot, Ytot: ppfPieceAt(ps[0], ps[0].x0),
+           kinks, Xtot, Ytot: ppfPieceAt(ps[0], ps[0].x0),
            type: kind + ' (' + n + (n === 1 ? ' кусок)' : (n < 5 ? ' куска)' : ' кусков)')) };
 }
 
@@ -2345,7 +2352,8 @@ function updatePpfSumPanel() {
   html += `<div class="stat"><span>$X_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
   html += `<div class="stat"><span>$Y_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
   (d.kinks || []).forEach((k, i) => {
-    html += `<div class="stat"><span>Точка излома ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
+    const label = STATE.ppfSumKinks[i] && STATE.ppfSumKinks[i].kind === 'join' ? 'Граница участка' : 'Точка излома';
+    html += `<div class="stat"><span>${label} ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
   });
   /* ТИП АЛЬТЕРНАТИВНЫХ ИЗДЕРЖЕК КАЖДОЙ КРИВОЙ. Этого в панели не было вовсе, а
      ученику оно нужно раньше самой записи: именно от типа издержек зависит и

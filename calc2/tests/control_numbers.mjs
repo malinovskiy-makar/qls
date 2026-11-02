@@ -463,7 +463,9 @@ cmp('PS', r.ps, 1325, 1e-3);
    ================================================================ */
 const AREA = `
   var areaOf = function (legend) {
-    var el = document.querySelector('#chart [data-legend="' + legend + '"]');
+    var el = legend === 'Излишек производителя (TR - VC)'
+      ? document.querySelector('#chart [data-legend^="Излишек производителя"]')
+      : document.querySelector('#chart [data-legend="' + legend + '"]');
     if (!el) return 0;
     var pts = [];
     String(el.getAttribute('d') || '').replace(

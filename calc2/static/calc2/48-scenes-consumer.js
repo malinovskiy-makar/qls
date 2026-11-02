@@ -156,7 +156,7 @@ function setConsumerNum(key, value, inputId) {
   STATE[key] = Math.round(value * 1000) / 1000;
   const e = document.getElementById(inputId); if (e) e.value = STATE[key];
   _wantRangeAnim = true;   // масштаб может поехать — плавно, с дебаунсом
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 // Полная перерисовка режима «Потребитель».
@@ -204,7 +204,7 @@ function updateConsumerPanel() {
   let html = '';
   html += `<div class="stat"><span>Оптимум $(x^*; y^*)$</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
-  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${b.mrs === null ? 'не определена' : fmt(b.mrs)}</b></div>`;
+  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${b.mrs === null || Number.isNaN(b.mrs) ? 'не определена' : (Number.isFinite(b.mrs) ? fmt(b.mrs) : (b.mrs < 0 ? '−∞' : '∞'))}</b></div>`;
   // Строка подписана словами и формулой, а не одной мелкой дробью (сессия 7, А3.3; Notion …81fd…).
   html += `<div class="stat"><span>Отношение цен $P_x/P_y$</span><b>${fmt(b.px / b.py)}</b></div>`;
   html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}; ${fmt(b.yInt)}</b></div>`;

@@ -491,6 +491,7 @@ function renderCurveList() {
           if (!rowTag) paintNotation(nm, curveShortName(curve));
           syncQpLine();
           if (typeof row._syncPrefix === 'function') row._syncPrefix();
+          requestFormulaFit();
           redrawAll();
           if (typeof updatePult === 'function') updatePult();
         }

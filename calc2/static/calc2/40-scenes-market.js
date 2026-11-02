@@ -3426,6 +3426,12 @@ function updateExtPanel() {
             'общественная выгода выше частной.'
           : 'Рынок уже в общественном оптимуме: расхождения нет.'))}</div>`;
     if (e.applyPigou && e.pigouEq && Math.abs(e.corrective) > 1e-9) {
+      const q = e.pigouEq.Q, pb = evalCurve(STATE.D, q), ps = evalCurve(STATE.S, q);
+      const cs = integrate(x => evalCurve(STATE.D, x) - pb, 0, q);
+      const surplus = integrate(x => ps - evalCurve(STATE.S, x), 0, q);
+      html += `<div class="stat"><span>$CS$ при Пигу</span><b>${fmt(cs)}</b></div>`;
+      html += `<div class="stat"><span>$PS$ при Пигу</span><b>${fmt(surplus)}</b></div>`;
+      html += `<div class="stat"><span>Бюджет при Пигу</span><b>${fmt(e.corrective * q)}</b></div>`;
       html += `<div class="stat" style="margin-top:4px;"><span>Новое равновесие</span><b>Q = ${fmt(e.pigouEq.Q)}, P = ${fmt(e.pigouEq.P)}</b></div>`;
       html += `<div class="hint">${(e.corrective > 0) ? 'Налог Пигу поднял издержки' : 'Субсидия опустила издержки'}, рынок пришёл в оптимум, DWL устранён.</div>`;
     }

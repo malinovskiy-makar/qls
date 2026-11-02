@@ -15,6 +15,14 @@ function redrawAll() {
      ниже начинается счёт, который этой областью и пользуется. */
   bumpModelSpan();
   redrawScene();
+  // Сначала готов расчёт, затем окно по его ключевым точкам. Если оно
+  // изменилось, холст пересобирается сразу — без ожидания следующего жеста.
+  const beforeWindow = [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax].join('|');
+  if (typeof growWindowToModel === 'function') growWindowToModel();
+  if (beforeWindow !== [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax].join('|')) {
+    redrawScene();
+    _sceneRangedFrame = false;
+  }
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
   // Все слои уже собраны. Итоговый шрифт нужен ДО замера рамок: в WebKit
@@ -59,11 +67,7 @@ function redrawAll() {
      же причине, что и разметка обозначений: сцены дописывают разбор позже, и
      проход, стоящий раньше, мерил бы не всю врезку. */
   if (typeof fitPanelMath === 'function') fitPanelMath();
-  /* И самым последним — авто-расширение окна: оно смотрит на то, что сцена уже
-     нарисовала и посчитала. Сжать окно оно не может, поэтому решение 20.08
-     («окно идёт за формулой, а не за буквой») остаётся в силе: рычаг
-     по-прежнему видимо двигает кривую внутри выбранного окна. */
-  if (typeof growWindowToModel === 'function') growWindowToModel();
+  if (typeof syncFormulaEditBases === 'function') syncFormulaEditBases();
   // История и автосохранение (91-session.js): сверка состояния после затишья,
   // а не на каждом кадре протяжки.
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();

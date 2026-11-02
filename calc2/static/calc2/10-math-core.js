@@ -953,12 +953,18 @@ function traceLevelCurve(f, level, aMax, bMax, steps) {
     box = new Map();
     _levelCache.set(f, box);
   }
-  const out = [];
-  for (let i = 0; i <= N; i++) {
-    const a = aMax * i / N;
-    const b = solveLevelB(f, level, a, bMax);
-    out.push((b == null) ? null : [a, b]);
-  }
+  const samples = Array.from({length: N + 1}, (_, i) => ({a: aMax * i / N}));
+  // Сетка не обязана попасть в пересечение с осью. Находим оба конца
+  // уровня отдельно, иначе кривая через угловой оптимум обрывалась раньше него.
+  [0, bMax].forEach(b => {
+    const a = solveLevelB((y, x) => f(x, y), level, b, aMax);
+    if (a != null) samples.push({a, b});
+  });
+  samples.sort((u, v) => u.a - v.a);
+  const out = samples.map(p => {
+    const b = p.b == null ? solveLevelB(f, level, p.a, bMax) : p.b;
+    return b == null ? null : [p.a, b];
+  });
   if (box.size > 32) box.clear();
   box.set(key, out);
   return out;
@@ -979,7 +985,10 @@ function partialB(f, a, b) {
 // MRS = (∂f/∂a)/(∂f/∂b) — сколько b компенсирует единицу a на том же уровне.
 function mrsAt(f, a, b) {
   const pa = partialA(f, a, b), pb = partialB(f, a, b);
-  return (isFinite(pa) && isFinite(pb) && Math.abs(pb) > 1e-12) ? pa / pb : NaN;
+  if (!isFinite(pa) || !isFinite(pb)) return NaN;
+  const zero = 1e-9 * Math.max(1, Math.abs(pa), Math.abs(pb));
+  if (Math.abs(pb) <= zero) return Math.abs(pa) <= zero ? NaN : Math.sign(pa) * Infinity;
+  return pa / pb;
 }
 
 // Максимум f(a, b) при линейном ограничении priceA·a + priceB·b = income.

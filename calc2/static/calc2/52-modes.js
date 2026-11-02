@@ -18,6 +18,7 @@ function setRanges(qmax, pmax, opts) {
   const sym = !!(opts && opts.symmetric);
   CONFIG.Qmin = STATE.firstQuad ? 0 : (sym ? -qmax : -qmax * 0.08);
   CONFIG.Pmin = STATE.firstQuad ? 0 : (sym ? -pmax : -pmax * 0.08);
+  if (typeof monoBudgetFloor === 'function') CONFIG.Pmin = Math.min(CONFIG.Pmin, monoBudgetFloor());
   syncViewFields();
   // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
@@ -88,6 +89,7 @@ function updateResetViewBtn() {
 
 // Пользователь сам выбрал масштаб: авто-подгонка сцены отступает.
 function markViewDirty() {
+  cancelRangeAnim();
   STATE.viewDirty = true;
   STATE.zoomLock = true;
   updateResetViewBtn();
@@ -174,7 +176,7 @@ function scheduleRangeAnim(qmax, pmax) {
   clearTimeout(_rangeSchedT);
   _rangeSchedT = setTimeout(() => {
     _rangeSchedT = null;
-    if (_rangeAnimating) return;
+    if (_rangeAnimating || STATE.zoomLock) return;
     const [q, p] = _rangeSchedTarget;
     animateRanges(q, p);
   }, RANGE_DEBOUNCE);
@@ -277,9 +279,10 @@ function boundsOfDrawn(baseQ, baseP) {
 
    Сам признак объявлен рядом с прочими флагами масштаба, выше по файлу: его
    читает и applyTradeRanges, которая стоит раньше этого места. */
-function redrawKeepingWindow() {
+function redrawKeepingWindow(action = redrawAll) {
+  const was = _paramOnlyRedraw;
   _paramOnlyRedraw = true;
-  try { redrawAll(); } finally { _paramOnlyRedraw = false; }
+  try { action(); } finally { _paramOnlyRedraw = was; }
 }
 
 function applyAutoRanges(qmax, pmax) {
@@ -480,14 +483,54 @@ function panByPixels(dxPx, dyPx, panel) {
    Жёсткие числа остаются запасным вариантом, когда кривых ещё нет вовсе.
    Этим пользуются ДВОЕ: кнопка «Вернуть исходный вид» (она ставит ровно эти
    границы) и авто-расширение окна (оно берёт из них только больший край). */
-function wantedRanges() {
-  const fallbackQ = (STATE.mode === 'costs') ? 10 : 100;
-  const fallbackP = (STATE.mode === 'costs') ? 50 : 100;
+function wantedRanges(fit = false) {
+  const defaultQ = (STATE.mode === 'costs') ? 10 : 100;
+  const defaultP = (STATE.mode === 'costs') ? 50 : 100;
+  const fallbackQ = fit ? defaultQ : Math.min(defaultQ, CONFIG.Qmax);
+  const fallbackP = fit ? defaultP : Math.min(defaultP, CONFIG.Pmax);
   const c = curveAxisBounds();
-  const baseQ = (c && c.qmax > fallbackQ) ? padMax(c.qmax) : fallbackQ;
-  const baseP = (c && c.pmax > fallbackP) ? padMax(c.pmax) : fallbackP;
+  // Новая формула и «Вписать» могут сжимать окно. Запас 100×100 нужен
+  // только при отсутствии данных, а не как нижний предел масштаба.
+  const points = modelAnswerPoints();
+  const answerQ = Math.max(0, ...points.map(p => p[0]));
+  const answerP = Math.max(0, ...points.map(p => p[1]));
+  const q = Math.max(c ? c.qmax : 0, answerQ);
+  const p = Math.max(c ? c.pmax : 0, answerP);
+  const baseQ = fit
+    ? (Math.max(c && c.qmax > 0 ? niceMax(c.qmax) : 0, answerQ > 0 ? padMax(answerQ) : 0) || fallbackQ)
+    : (q > fallbackQ * (1 + 1e-9) ? padMax(q) : fallbackQ);
+  const baseP = fit
+    ? (Math.max(c && c.pmax > 0 ? niceMax(c.pmax) : 0, answerP > 0 ? padMax(answerP) : 0) || fallbackP)
+    : (p > fallbackP * (1 + 1e-9) ? padMax(p) : fallbackP);
   const b = boundsOfDrawn(baseQ, baseP);
   return { qmax: b ? b.qmax : baseQ, pmax: b ? b.pmax : baseP };
+}
+
+// Ключевые значения расчёта независимо от текущего кадра. keyTargets
+// намеренно отсекает невидимые точки и потому не может находить окно для них.
+function modelAnswerPoints() {
+  const out = [], add = (x, y) => { if (Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]); };
+  if (STATE.mode === 'market') {
+    if (STATE.eq) add(STATE.eq.Q, STATE.eq.P);
+    if (STATE.market === 'monopoly') {
+      if (STATE.mono) { add(STATE.mono.Qm, STATE.mono.Pm); add(STATE.mono.Qc, STATE.mono.Pc); }
+      if (STATE.monoTax) add(STATE.monoTax.Qt, STATE.monoTax.Pt);
+      if (STATE.monoFloor) add(STATE.monoFloor.Q, STATE.monoFloor.price);
+      if (STATE.monoQuota) add(STATE.monoQuota.Q, STATE.monoQuota.price);
+    } else if (STATE.taxEq) { add(STATE.taxEq.Q, STATE.taxEq.Pb); add(STATE.taxEq.Q, STATE.taxEq.Ps); }
+    if (STATE.ext) add(STATE.ext.Qopt, STATE.ext.Popt);
+  }
+  if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.lrOn && STATE.lr) {
+    add(STATE.lr.Q, STATE.lr.P); add(STATE.lr.Q, STATE.lr.atc);
+  }
+  return out;
+}
+
+let _formulaFitRequested = false;
+function requestFormulaFit() {
+  STATE.zoomLock = false; STATE.viewDirty = false;
+  _formulaFitRequested = true;
+  cancelRangeAnim();
 }
 
 /* ⚠️ ОКНО РАСШИРЯЕТСЯ, НО НЕ СЖИМАЕТСЯ (решение владельца 01.09).
@@ -532,6 +575,8 @@ let _sceneRangedFrame = false;
 function growWindowToModel() {
   const sceneTook = _sceneRangedFrame;
   _sceneRangedFrame = false;
+  const fit = _formulaFitRequested;
+  _formulaFitRequested = false;
   if (sceneTook) return;
   if (_rangeAnimating) return;            // кадром анимации распоряжается сама анимация
   if (STATE.mode === 'math') return;
@@ -541,13 +586,16 @@ function growWindowToModel() {
      показываются и после ручного сдвига или масштаба (решение 13.10). */
   if (STATE.mode === 'graph') { graphShowKeyPoints(); return; }
   if (STATE.zoomLock) return;
-  const w = wantedRanges();
-  growRanges(w.qmax, w.pmax);
+  const w = wantedRanges(fit);
+  if (fit) setRanges(w.qmax, w.pmax);
+  else growRanges(w.qmax, w.pmax);
+  // Полоса субсидии — денежный перевод ниже MC, даже когда MC−s < 0.
+  // При регуляторе нижний край только расширяется, как верхние границы.
+  if (typeof monoBudgetFloor === 'function') CONFIG.Pmin = Math.min(CONFIG.Pmin, monoBudgetFloor());
 }
 
 function resetZoom() {
-  STATE.zoomLock = false;
-  STATE.viewDirty = false;
+  requestFormulaFit();
   tanResetWindows();
   resetPanelWins();      // окна панелей тоже возвращаются к тому, что даёт сцена
   if (STATE.mode === 'math') {
@@ -579,7 +627,7 @@ function resetZoom() {
     /* Порядок Н20 · Н21 живёт в wantedRanges — там же, откуда его берёт
        авто-расширение окна. Возврат ставит эти границы РОВНО, то есть умеет и
        сжать: человек попросил вернуть исходный вид. */
-    const w = wantedRanges();
+    const w = wantedRanges(true);
     setRanges(w.qmax, w.pmax);
   }
   syncViewFields();

@@ -500,7 +500,7 @@ function setLaborMin(p) {
   p = Math.max(0, Math.min(p, maxP));
   setLaborMinFields(p);
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // плавный масштаб, если МРОТ двинул рамку
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 /* --- Профсоюз (ЧК4): отрисовка MRL, точек, безработицы, DWL --- */
@@ -604,7 +604,7 @@ function setUnionWage(p) {
   p = Math.max(0, Math.min(p, maxP));
   setUnionWageFields(p);
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // плавный масштаб, если зарплата двинула рамку
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 // Переключатель модели профсоюза: монополист / диктат зарплаты (ЧК4).

@@ -1661,20 +1661,79 @@ function markFormulaField(inp, err) {
   if (!inp) return;
   inp.classList.toggle('bad', !!err);
   inp.setAttribute('aria-invalid', err ? 'true' : 'false');
-  if (typeof fieldProblem === 'function' && !inp.dataset.texUnknown) fieldProblem(inp, err ? (err + '. График держит последнюю верную запись.') : '');
+  if (typeof fieldProblem === 'function' && !inp.dataset.texUnknown) fieldProblem(inp, err ? (err + '. График держит запись до правки.') : '');
+}
+
+const FORMULA_EDIT_FIELDS = new Set();
+function syncFormulaEditBases() {
+  FORMULA_EDIT_FIELDS.forEach(inp => {
+    if (!inp.isConnected) { FORMULA_EDIT_FIELDS.delete(inp); return; }
+    if (inp._formulaApplying) return;
+    // Смена модели, сброс, история и ссылка присваивают полям значение сами.
+    // Их запись начинает новую правку, старый черновик к ней не относится.
+    if (inp._formulaScene !== STATE.sceneKey || inp.value !== inp._formulaDraft) {
+      if (inp._formulaCancel) inp._formulaCancel();
+      delete inp._formulaEditBase;
+      inp._formulaCommitted = inp.value;
+      inp._formulaDraft = inp.value;
+      inp._formulaScene = STATE.sceneKey;
+    }
+  });
 }
 
 function onFormulaInput(inp, rawApply) {
   if (!inp || typeof rawApply !== 'function') return;
-  const apply = () => { const err = formulaInputError(inp); markFormulaField(inp, err); if (!err) rawApply(); };
+  FORMULA_EDIT_FIELDS.add(inp);
+  inp._formulaCommitted = inp.value; inp._formulaDraft = inp.value; inp._formulaScene = STATE.sceneKey;
+  const begin = () => {
+    if (!inp._formulaEditBase) inp._formulaEditBase = {value: inp._formulaCommitted};
+    inp._formulaDraft = inp.value;
+  };
+  const apply = (commit = false) => {
+    begin();
+    const draft = inp.value, err = formulaInputError(inp);
+    inp._formulaApplying = true;
+    try {
+      if (err) inp.value = inp._formulaEditBase.value;
+      if (draft !== inp._formulaCommitted) requestFormulaFit();
+      rawApply();
+    } finally {
+      if (err) inp.value = draft;
+      inp._formulaApplying = false;
+      inp._formulaDraft = inp.value;
+      markFormulaField(inp, err);
+    }
+    if (!err && commit) { inp._formulaCommitted = inp.value; delete inp._formulaEditBase; }
+  };
   let timer = null;
-  const now = () => { if (timer) { clearTimeout(timer); timer = null; } apply(); };
+  inp._formulaCancel = () => { clearTimeout(timer); timer = null; };
+  const now = (ev) => {
+    if (ev) ev.stopImmediatePropagation(); // старые Enter/change не обходят проверку поля
+    if (timer) { clearTimeout(timer); timer = null; }
+    apply(true);
+  };
   inp.addEventListener('input', () => {
+    begin();
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; apply(); }, FORMULA_INPUT_DELAY);
   });
-  inp.addEventListener('change', now);
-  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') now(); });
+  inp.addEventListener('change', now, true);
+  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') now(ev); }, true);
+  const wrap = inp.closest('.f-wrap') || inp;
+  wrap.addEventListener('focusin', ev => {
+    if (ev.relatedTarget && wrap.contains(ev.relatedTarget)) return;
+    if (!inp.classList.contains('bad')) {
+      delete inp._formulaEditBase;
+      inp._formulaCommitted = inp.value;
+      inp._formulaDraft = inp.value;
+      inp._formulaScene = STATE.sceneKey;
+    }
+  });
+  wrap.addEventListener('focusout', ev => {
+    if (ev.relatedTarget && wrap.contains(ev.relatedTarget)) return;
+    if (timer) { clearTimeout(timer); timer = null; apply(true); }
+    else if (!inp.classList.contains('bad')) { inp._formulaCommitted = inp.value; delete inp._formulaEditBase; }
+  });
 }
 
 const FORMULA_FIELDS = [];

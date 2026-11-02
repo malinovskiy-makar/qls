@@ -98,6 +98,8 @@ const HERO = {
      · доп.wasText — готовая строка под значением («50 + 50» у потерь из двух треугольников).
    Значение строки табло вида «55 (было 45)» в «Ответе» — «55», под ним «45 + 10» (answerCellWas). */
 const HERO_STATE = {
+  ppfsum: () => [['info-ppfsum', 1], ['info-ppfsum', 2],
+    ...((STATE.ppfSumData && STATE.ppfSumData.kinks) || []).map((_, i) => ['info-ppfsum', 3 + i])],
   smallopen: () => {
     const o = STATE.open;
     if (!o || o.error) return null;
@@ -174,6 +176,10 @@ const HERO_STATE = {
       ['info-ext', /^Оптимум/, null, null, null, o],
       ['info-ext', /^Внешние (издержки|выгоды) в оптимуме$/, null, [(e.extOpt < 0 ? 'Внешние выгоды' : 'Внешние издержки'), ''], null, o],
       ['info-ext', /^SW в оптимуме$/, null, ['Общественное благосостояние', 'SW'], null, o],
+      ...(e.applyPigou ? [
+        ['info-ext', /^CS при Пигу$/, null, ['Излишек потребителя', 'CS'], null, o],
+        ['info-ext', /^PS при Пигу$/, null, ['Излишек производителя', 'PS'], null, o],
+        ['info-ext', /^Бюджет при Пигу$/, null, null, null, o]] : []),
       ['info-ext', /^DWL/, null, ['Потери общества', 'DWL'], null, o],
       ['info-ext', /^Корректирующ/, null, null, null, o]];
   },

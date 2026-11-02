@@ -1,0 +1,113 @@
+/* Э2: независимые контрольные примеры и действия в действующих полях ввода. */
+import * as pw from 'playwright';
+import {keepAnswerOpen, answerShown} from './answer_open.mjs';
+const base=process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
+let total=0, bad=0;
+for (const engine of (process.env.ENGINES || 'chromium').split(',')) {
+  const browser=await pw[engine].launch(); keepAnswerOpen(browser);
+  const page=await browser.newPage({viewport:{width:1440,height:950},reducedMotion:'reduce'});
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  const check=(name,ok,detail)=>{total++; if(!ok)bad++; console.log(`${ok?'OK':'FAIL'} ${engine}: ${name}${!ok?' '+JSON.stringify(detail):''}`);};
+  await page.goto(base+'/calc2/',{waitUntil:'load'});
+  await page.waitForFunction(()=>typeof pickScene==='function');
+  check('Ответ открыт',await answerShown(page));
+  const results=await page.evaluate(async()=>{
+    const out=[], ck=(name,ok,detail)=>out.push({name,ok:!!ok,detail});
+    const near=(a,b,t=1e-5)=>Number.isFinite(a)&&Math.abs(a-b)<t;
+    const wait=()=>new Promise(r=>setTimeout(r,400));
+    let lastEdited=null;
+    const scene=s=>{lastEdited=null;resetSceneMemory(); pickScene(s);};
+    const ds=(s,d,c)=>{scene(s); updateCurveExpr(STATE.curves.find(x=>x.role==='demand'),d); updateCurveExpr(STATE.curves.find(x=>x.role==='supply'||x.role==='mc'),c); redrawAll();};
+    const enter=(el,v,event='input')=>{el.dispatchEvent(new FocusEvent('focusin',{bubbles:true,relatedTarget:lastEdited}));lastEdited=el; el.value=v; el.dispatchEvent(new Event(event,{bubbles:true}));};
+    const plain=el=>{const n=el.cloneNode(true);n.querySelectorAll('.katex-mathml').forEach(x=>x.remove());return n.textContent;};
+    ds('mono','180-Q','30'); setType('subsidy'); setTax(150); redrawAll(); await wait();
+    const t=STATE.monoTax;
+    ck('субсидия: Q=150, P=30',t&&near(t.Qt,150)&&near(t.Pt,30),t);
+    ck('субсидия: PS=22500, бюджет=-22500',t&&near(t.psM,22500,.01)&&near(t.budget,-22500,.01),t);
+    const budget=document.querySelector('#chart [data-legend="Расход бюджета"]');
+    ck('субсидия: заливка целиком до MC−s=−120',budget&&(()=>{const b=budget.getBBox();const clip=budget.closest('[clip-path]'); const id=clip?.getAttribute('clip-path')?.match(/#([^)]*)/)[1];const r=id&&document.querySelector('#'+id+' rect');return CONFIG.Pmin < -120 && b.y+b.height>=sy(-120)-1 && r&&+r.getAttribute('y')+ +r.getAttribute('height')>=sy(-120)-1;})());
+    const subsidyTex=buildTex('',''), ts=buildTex._stats;
+    ck('субсидия в .tex: полная полоса 150×150, без потери записи',
+      subsidyTex.includes('(axis cs:0,-120)')&&subsidyTex.includes('(axis cs:150,-120)')&&subsidyTex.includes('ymin=-134.4')&&
+      ['curvesNoRecPoly','curvesNoRecSampled','curvesMismatch','areasNoRecPoly','areasNoRecSampled','areasMismatch'].every(k=>!ts[k]),ts);
+    ds('sd','Q=100-2P','P=Q');
+    ck('SW считается из точных слагаемых',near(STATE.sw,7500/9,.0001)&&fmtSum(STATE.cs,STATE.ps)===fmt(7500/9),{sw:STATE.sw,shown:fmtSum(STATE.cs,STATE.ps)});
+    scene('consumer'); STATE.consType='custom';STATE.consCustom='4*x^2+y^2';STATE.consPx=1;STATE.consPy=2;STATE.consI=100;redrawAll();await wait();
+    ck('выпуклая полезность: угол (100;0)',near(STATE.cons.base.x,100)&&near(STATE.cons.base.y,0),STATE.cons.base);
+    ck('MRS: бесконечность, на экране нет NaN',STATE.cons.base.mrs===Infinity&&/∞/.test(plain(document.querySelector('#info-consumer')))&&!/NaN/.test(plain(document.querySelector('#info-consumer'))));
+    const pts=traceLevelCurve(consumerUtility().f,40000,CONFIG.Qmax,CONFIG.Pmax*6,220);
+    ck('кривая полезности доходит до (100;0)',pts.some(p=>p&&near(p[0],100)&&near(p[1],0)),pts.filter(Boolean).slice(-2));
+    const consumerWindow=[CONFIG.Qmax,CONFIG.Pmax];
+    setConsumerNum('consPx',2,'cons-px');await wait();
+    ck('цена блага меняет выбор, но не сжимает окно',near(STATE.cons.base.x,50)&&CONFIG.Qmax>=consumerWindow[0]&&CONFIG.Pmax>=consumerWindow[1],{x:STATE.cons.base.x,win:[CONFIG.Qmax,CONFIG.Pmax],before:consumerWindow});
+    scene('ppfsum');STATE.ppfSumCount=2;ppfSumSet(0,'16-X^2');ppfSumSet(1,'12-4X');recomputePpfSum();redrawAll();await wait();
+    ck('обе границы суммы КПВ: (2;24), (5;12)',[[2,24],[5,12]].every(p=>STATE.ppfSumData.kinks.some(k=>near(k[0],p[0])&&near(k[1],p[1]))),STATE.ppfSumData.kinks);
+    ck('обе границы суммы КПВ есть в главном ответе',/2;\s*24/.test(plain(document.querySelector('#ans-hero')))&&/5;\s*12/.test(plain(document.querySelector('#ans-hero'))),plain(document.querySelector('#ans-hero')));
+    ppfSumSet(1,'36-X^2');recomputePpfSum();redrawAll();await wait();
+    ck('гладкий стык (8;20) не назван изломом',!STATE.ppfSumData.kinks.some(k=>near(k[0],8)&&near(k[1],20)),STATE.ppfSumData.kinks);
+    ds('sd','100-Q','Q');renderCurveList();
+    const input=role=>document.querySelector('#curve-expr-'+STATE.curves.find(c=>c.role===role).id);
+    enter(input('demand'),'Q=4-P'); enter(input('supply'),'Q=3P');await wait();
+    ck('новая малая формула сжимает окно',near(STATE.eq.Q,3)&&near(STATE.eq.P,1)&&CONFIG.Qmax<20&&CONFIG.Pmax<20,{eq:STATE.eq,win:[CONFIG.Qmax,CONFIG.Pmax]});
+    enter(input('demand'),'Q=1000-P');enter(input('supply'),'Q=P');await wait();
+    ck('новая формула показывает (500;500) с запасом',CONFIG.Qmax>550&&CONFIG.Pmax>550&&sx(500)<sx.range()[1]-5&&sy(500)>sy.range()[1]+5,{win:[CONFIG.Qmax,CONFIG.Pmax],point:[sx(500),sy(500)]});
+    const old=[CONFIG.Qmax,CONFIG.Pmax];updateCurveExpr(STATE.curves.find(c=>c.role==='demand'),'100-Q');redrawKeepingWindow();await wait();
+    ck('ползуночный пересчёт не сжимает окно',CONFIG.Qmax>=old[0]&&CONFIG.Pmax>=old[1]);
+    setRanges(2,2);markViewDirty();redrawAll();resetZoom();await wait();
+    ck('Вписать возвращает равновесие внутрь',STATE.eq.Q<CONFIG.Qmax*.95&&STATE.eq.P<CONFIG.Pmax*.95&&sx(STATE.eq.Q)<sx.range()[1]-5&&sy(STATE.eq.P)>sy.range()[1]+5);
+    markViewDirty(); enter(input('demand'),'Q=4-P');enter(input('supply'),'Q=3P');await wait();
+    ck('новая формула снимает старый ручной масштаб',!STATE.zoomLock&&CONFIG.Qmax<20&&CONFIG.Pmax<20,{lock:STATE.zoomLock,win:[CONFIG.Qmax,CONFIG.Pmax]});
+    scene('costs');const tc=document.querySelector('#inp-tc');enter(tc,'Q^2+10Q+100','change');redrawAll();resetZoom();await wait();
+    // Поле цены — через штатный обработчик, имя состояния не предполагается.
+    const price=document.querySelector('#lr-price-input');if(price){enter(price,'40','change');resetZoom();await wait();}
+    ck('Вписать показывает выбор фирмы при P=40',STATE.lr&&near(STATE.lr.Q,15)&&CONFIG.Qmax>15&&CONFIG.Pmax>40, {lr:STATE.lr,win:[CONFIG.Qmax,CONFIG.Pmax]});
+    scene('ext');const msc=document.querySelector('#inp-msc'); const original=STATE.mscExpr;
+    enter(msc,'Q+200');await wait();ck('правильная промежуточная формула живая',STATE.mscExpr==='Q+200');
+    enter(msc,'Q+');await wait();
+    ck('ошибка возвращает MSC к записи до правки',STATE.mscExpr===original&&msc.getAttribute('aria-invalid')==='true',{original,now:STATE.mscExpr,error:msc.closest('.f-wrap')?.textContent});
+    enter(msc,'Q+30');await wait();msc.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+    enter(msc,'Q+300');await wait();enter(msc,'Q+');await wait();
+    ck('Enter начинает новую транзакцию поля',STATE.mscExpr==='Q+30',STATE.mscExpr);
+    scene('mono-d3');
+    const da=document.querySelector('#inp-d3-1'), db=document.querySelector('#inp-d3-2');
+    const originalA=STATE.d3D1, originalB=STATE.d3D2;
+    enter(da,'180-Q');await wait();enter(da,'180-');await wait();
+    ck('ошибка первого рынка возвращает его исходную формулу',STATE.d3D1===originalA,STATE.d3D1);
+    enter(db,'120-Q');await wait();enter(db,'120-');await wait();
+    redrawAll();await wait();
+    ck('два ошибочных поля сохраняют обе исходные формулы',STATE.d3D1===originalA&&STATE.d3D2===originalB,[STATE.d3D1,STATE.d3D2]);
+    enter(da,'160-Q');await wait();da.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+    enter(da,'160-');await wait();
+    ck('группа принимает верное поле при ошибочном соседнем',STATE.d3D1==='160-Q'&&STATE.d3D2===originalB,[STATE.d3D1,STATE.d3D2]);
+    ck('ошибки обоих полей остаются видимыми',da.getAttribute('aria-invalid')==='true'&&db.getAttribute('aria-invalid')==='true');
+    redrawAll();enter(db,'140-Q');await wait();enter(db,'140-');await wait();
+    ck('перерисовка между ошибками не принимает неверный черновик',STATE.d3D1==='160-Q'&&STATE.d3D2===originalB,[STATE.d3D1,STATE.d3D2]);
+    scene('ext');enter(document.querySelector('#inp-msc'),'Q+300');scene('mono');await wait();
+    ck('отложенный ввод прежней модели отменён при переходе',STATE.sceneKey==='mono'&&STATE.mono&&STATE.mscExpr!=='Q+300',STATE.mscExpr);
+    scene('mono');
+    const mid=STATE.curves.find(c=>c.role==='mc').id;
+    document.querySelector(`.curve-row[data-cid="${mid}"] .fc-eye`).click();await wait();
+    ck('проверено состояние без оптимума',!STATE.mono);
+    document.querySelector(`.curve-row[data-cid="${mid}"] .fc-eye`).click();await wait();
+    const shifts=[...document.querySelectorAll('.pchip[data-pult-box="params-curves"]')];
+    ck('после ошибки обе строки Сдвиг сохраняют подписи',shifts.length===2&&shifts.every(c=>c.querySelector('.sc-pname')?.textContent==='Сдвиг'&&c.classList.contains('sc-pchip')),shifts.map(c=>c.textContent));
+    const mi=document.querySelector('#curve-expr-'+mid);
+    enter(mi,'Q^2');await wait();enter(mi,'30');await wait();
+    const rebuilt=[...document.querySelectorAll('.pchip[data-pult-box="params-curves"]')];
+    ck('после пересборки ползунков вид и подписи сохранены',rebuilt.length===2&&rebuilt.every(c=>c.querySelector('.sc-pname')?.textContent==='Сдвиг'&&c.classList.contains('sc-pchip')),rebuilt.map(c=>c.textContent));
+    scene('ext');STATE.applyPigou=false;redrawAll();await wait();
+    ck('без Пигу у оптимума нет условных CS, PS и бюджета',![...document.querySelectorAll('#info-ext .stat')].some(r=>/^(CS|PS|Бюджет)/.test(plain(r))));
+    STATE.applyPigou=true;redrawAll();await wait();
+    const extRows=[...document.querySelectorAll('#info-ext .stat')].map(plain);
+    ck('с Пигу у оптимума есть CS, PS и бюджет',/CS/.test(extRows.join('|'))&&/PS/.test(extRows.join('|'))&&/Бюджет/.test(extRows.join('|')),extRows);
+    for (const label of ['CS при Пигу','PS при Пигу','Бюджет при Пигу']) {
+      const row=[...document.querySelectorAll('#info-ext .stat')].find(r=>plain(r.querySelector('span'))===label);
+      ck(label+' = 800',row&&near(Number(plain(row.querySelector('b')).replace(/[\s=]/g,'').replace(',','.')),800),row&&plain(row));
+    }
+    return out;
+  });
+  for(const r of results)check(r.name,r.ok,r.detail);
+  check('нет ошибок JavaScript',!errors.length,errors);
+  await browser.close();
+}
+console.log(`Э2: ${total-bad}/${total}, ошибок ${bad}`);process.exitCode=bad?1:0;
