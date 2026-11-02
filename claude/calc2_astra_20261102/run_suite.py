@@ -9,6 +9,19 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITES = {
+    'e9': [
+        'calc2/tests/astra_islm_probe.mjs',
+        'calc2/tests/astra_adas_probe.mjs',
+        'calc2/tests/astra_adas_edges.mjs',
+        'calc2/tests/astra_adas_asymptote.mjs',
+        'calc2/tests/astra_adas_formula.mjs',
+        'calc2/tests/astra_adas_flow.mjs',
+        'calc2/tests/control_numbers.mjs',
+        'calc2/tests/redesign/parity_quick.mjs',
+        'calc2/tests/redesign/axis_labels_probe.mjs',
+        'calc2/tests/tex/ci_quick.mjs',
+        'calc2/tests/redesign/session_probe.mjs',
+    ],
     'e8': [
         'calc2/tests/astra_label_settle.mjs',
         'calc2/tests/astra_islm_probe.mjs',

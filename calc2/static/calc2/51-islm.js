@@ -45,7 +45,7 @@ function islmSolve(raw, fixed=null){
     const derivative=(v)=>{try{return Number(math.derivative(mdExpr,v).evaluate({...scope,Y,r}));}catch(e){const d=1e-4*Math.max(1,v==='Y'?Y:r);return v==='Y'?(md(Y+d,r)-md(Y-d,r))/(2*d):(md(Y,r+d)-md(Y,r-d))/(2*d);}};
     const mdY=derivative('Y'),mdR=derivative('r'),den=h*mdR-c.d*mdY,kG=Math.abs(den)>1e-12?mdR/den:null,kT=kG==null?null:-c.b*kG;
     return{config:c,A,h,eq,yAt,md,mdExpr,isCurve,lmCurve,isRecord,lmRecord,kG,kT,kHold:1/h,kTHold:-c.b/h};
-  }catch(e){return{error:e.message};}
+  }catch(e){return{error:/^[А-ЯЁ]/.test(e.message)?e.message:mathErrorRu(e.message)};}
 }
 let _islmCache=null;
 function islmScenario(P){

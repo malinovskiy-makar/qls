@@ -1657,7 +1657,7 @@ function formulaInputError(inp) {
   return null;
 }
 const LHS_FIELD_IDS = new Set(['inp-d3-1', 'inp-d3-2', 'inp-d3-mc', 'inp-ki-1', 'inp-ki-2', 'inp-ki-3',
-  'inp-kp-1', 'inp-kp-2', 'inp-kink-mc', 'ma-lafd', 'ma-lafs', 'ma-ad', 'ma-sras']);
+  'inp-kp-1', 'inp-kp-2', 'inp-kink-mc', 'ma-lafd', 'ma-lafs', 'ma-ad', 'ma-sras', 'adas-shock-ad', 'adas-shock-sras']);
 function markFormulaField(inp, err) {
   if (!inp) return;
   inp.classList.toggle('bad', !!err);

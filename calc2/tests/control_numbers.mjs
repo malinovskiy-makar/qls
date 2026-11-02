@@ -1585,6 +1585,15 @@ cmp('Э8 ЦБ Y',r.eq.Q,593,1e-7);cmp('Э8 ЦБ r',r.eq.P,13,1e-7);
 r=await run(`STATE.macro.islm.shock.G=2;redrawAll();return STATE.islmResult;`);
 cmp('Э8 14.56а ΔMs',r.requiredDeltaMs,8,1e-7);
 
+head('Ночь 29.10 · Э9 — AD–AS с шоком');
+r=await run(`resetSceneMemory();pickScene('adas');STATE.macro.adas={...STATE.macro.adas,ad:'Y=400+1600/P',sras:'Y=2500*P-500',lrasMode:'initial',shock:{kind:'ad',ad:'Y=400+4275/P'}};redrawAll();return STATE.adasResult;`);
+for(const[tag,e,w]of[['base',r.base,{Q:2000,P:1}],['sr',r.sr,{Q:3250,P:1.5}],['lr',r.lr,{Q:2000,P:171/64}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.52 '+tag+' '+k,e[k],v,1e-6);
+cmp('Э9 14.52 SR изменениеY,%',r.srChange.Y,62.5,1e-6);cmp('Э9 14.52 SR инфляция,%',r.srChange.P,50,1e-6);cmp('Э9 14.52 LR инфляция,%',r.lrChange.P,167.1875,1e-6);cmp('Э9 14.52 разрыв,%',r.gapPct,62.5,1e-6);
+for(const[sras,V,p]of[['P=1',1.3,30],['Y=100*P',1.69,69]]){r=await run(`STATE.macro.adas={adMode:'mv',M:100,V:1,sras:${JSON.stringify(sras)},lrasMode:'initial',shock:{kind:'ad',M:100,V:${V}}};redrawAll();return STATE.adasResult;`);cmp('Э9 14.53 V'+V+' выпуск',r.sr.Q,130,1e-6);cmp('Э9 14.53 V'+V+' инфляцияLR,%',r.lrChange.P,p,1e-6);}
+r=await run(`STATE.macro.adas={adMode:'mv',M:256,V:1,srasMode:'labor',production:'16*sqrt(L)',laborSupply:'8*w/P',shock:{kind:'ad',M:576,V:1}};redrawAll();return STATE.adasResult;`);
+for(const[tag,e,w]of[['base',r.base,{Q:64,P:4}],['sr',r.sr,{Q:96,P:6}],['lr',r.lr,{Q:64,P:9}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 '+tag+' '+k,e[k],v,1e-6);
+for(const[tag,l,w]of[['base',r.labor.base,{L:16,realW:2,nominalW:8}],['sr',r.labor.sr,{L:36,realW:4/3,nominalW:8}],['lr',r.labor.lr,{L:16,realW:2,nominalW:18}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 труд '+tag+' '+k,l[k],v,1e-6);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

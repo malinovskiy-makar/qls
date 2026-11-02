@@ -116,6 +116,7 @@ function recomputeMacro() {
   const fail = (msg) => { STATE.macroErr = msg; };
 
   if (m === 'adas') {
+    renderAdasControls();if(adasAdvanced(P)){recomputeAdasAdvanced();return;}
     const sras = macroCurveAny(P.sras, V), ad = macroCurveAny(P.ad, V);
     if (sras.error || ad.error) return fail(sras.error || ad.error);
     const lras = makeVerticalCurve(P.lras);
@@ -246,8 +247,8 @@ function drawMacroCurve(c, color, dash, label) {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5), label);
     return;
   }
-  const pts = [];
-  for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(c, q); pts.push(isNaN(v) ? null : [q, v]); }
+  const pts = STATE.macroModel==='adas'?curvePoints({fn:Y=>{const v=evalCurve(c,Y);return Number.isFinite(v)?v:NaN;}}):[];
+  if(STATE.macroModel!=='adas')for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(c, q); pts.push(Number.isFinite(v) ? [q, v] : null); }
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
   if (dash) p.attr('stroke-dasharray', '6 4');
   // запись для .tex: формула человека; у x = g(y) — «по вертикали», как её и вводят
@@ -344,6 +345,11 @@ function redrawMacro() {
     g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Было');
   }
+  if(r.advanced){
+    const a=STATE.adasResult,points=a.shock?[[a.base,'E₀'],[a.sr,'E₁'],[a.lr,'E₂']]:[[a.base,'E₀']],groups=[];
+    for(const [p,label]of points){const same=groups.find(g=>Math.abs(g.p.Q-p.Q)<1e-7&&Math.abs(g.p.P-p.P)<1e-7);if(same)same.label+=' = '+label;else groups.push({p,label});}
+    groups.forEach(g=>drawEquilibriumAt(g.p.Q,g.p.P,g.label));updateMacroPanel();return;
+  }
   if(r.parameterized&&STATE.islmResult.shock)drawEquilibriumAt(r.base.Q,r.base.P,'E₀');
   if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : r.parameterized&&STATE.islmResult.shock?'E₁':'E');
   updateMacroPanel();
@@ -365,6 +371,8 @@ function updateMacroPanel() {
   const box = document.getElementById('info-macro'); if (!box) return;
   const r = STATE.macroRes;
   if(!r&&STATE.macroModel==='islm'&&macroP().input==='params')setFinalFunctions([]);
+  if(!r&&STATE.macroModel==='adas'&&adasAdvanced(macroP()))setFinalFunctions([]);
+  if(r?.advanced){box.innerHTML=adasPanelHtml(STATE.adasResult);return;}
   if(r?.parameterized){box.innerHTML=islmPanelHtml(STATE.islmResult);return;}
   if (!r) { box.innerHTML = '<div class="warn">' + (STATE.macroErr || 'Задайте параметры модели.') + '</div>'; return; }
   const P = macroP();
@@ -442,6 +450,7 @@ function updateMacroPanel() {
 function setMacroModel(m) {
   STATE.macroModel = m;
   if(m==='islm')renderIslmControls(true);
+  if(m==='adas')renderAdasControls(true);
   cancelRangeAnim();
   Object.keys(MACRO).forEach(k => {
     const b = document.getElementById('mm-' + k); if (b) b.classList.toggle('active', k === m);

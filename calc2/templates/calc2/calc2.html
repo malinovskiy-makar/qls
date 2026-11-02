@@ -1318,12 +1318,17 @@
       </div>
 
       <div id="macro-pane-adas" style="margin-top:10px;">
-        <div class="field"><label>Потенциальный выпуск Y* (LRAS, вертикаль)</label>
-          <input type="number" id="ma-lras" step="1" value="100"></div>
-        <div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div>
-        <div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div>
-        <div class="hint">Разрыв выпуска отмечается на оси Y: рецессионный, если фактический
-          выпуск ниже потенциального, инфляционный, если выше.</div>
+        <div id="adas-ad-mode"></div>
+        <div id="adas-ad-formula"><div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div></div>
+        <div id="adas-mv" class="islm-grid"></div>
+        <div id="adas-sras-mode"></div>
+        <div id="adas-sras-formula"><div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div></div>
+        <div id="adas-labor"></div>
+        <div id="adas-lras-mode"></div>
+        <div id="adas-lras-number"><div class="field"><label>Потенциальный выпуск Y* (LRAS, вертикаль)</label><input type="number" id="ma-lras" step="1" value="100"></div></div>
+        <div id="adas-lras-auto" class="adas-auto">LRAS определяется равновесием рынка труда.</div>
+        <button type="button" class="btn-sm" id="adas-add-shock">+ шок</button>
+        <div id="adas-shock"></div>
       </div>
       <div id="macro-pane-phillips" style="display:none;margin-top:10px;">
         <div class="row">
@@ -2258,6 +2263,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>
 <script src="{% calc2_static 'calc2/51-islm.js' %}"></script>
 <script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
+<script src="{% calc2_static 'calc2/53-adas.js' %}"></script>
 <script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
 <script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
 <script src="{% calc2_static 'calc2/57-distributions.js' %}"></script>

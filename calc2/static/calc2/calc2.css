@@ -4362,3 +4362,8 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 .islm-shock-head { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0; }
 #islm-shock { border-top:1px solid var(--border);margin-top:10px; }
 #islm-hold-rate { flex:0 0 auto; }
+
+/* Э9: те же сегменты и поля в существующей карточке макромодели. */
+.adas-seg { margin:10px 0 7px; }
+.adas-seg .seg-btn { min-width:0;white-space:normal; }
+.adas-auto { font-size:13px;color:var(--muted);line-height:1.45;margin:10px 0; }

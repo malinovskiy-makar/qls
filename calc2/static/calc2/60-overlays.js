@@ -3194,6 +3194,7 @@ function sceneReserved() {
   if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
   if (STATE.mode === 'labor') s.add('w');
   if (STATE.mode === 'inequality') {s.add('alpha');s.add('α');}
+  if (STATE.mode === 'macro' && STATE.macroModel === 'adas') {s.add('Y');s.add('P');s.add('L');s.add('w');}
   if (STATE.mode === 'macro' && STATE.macroModel === 'islm') {s.add('Y');s.add('r');s.add('i');}
   return s;
 }
