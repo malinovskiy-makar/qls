@@ -256,7 +256,7 @@ function updatePlantsPanel(){
   const r=plantsAt(Number(STATE.plQ));let html='';const stat=(name,value)=>'<div class="stat"><span>'+name+'</span><b>'+value+'</b></div>';
   if(r){
     html+=stat('Совокупный выпуск Q',fmt(r.Q));r.qs.slice(0,2).forEach((q,i)=>html+=stat('Завод '+(i+1)+': Q'+(i+1),fmt(q)));
-    html+=stat('Совокупные предельные издержки MC',Number.isFinite(r.m)?fmt(r.m):'—');
+    html+=stat('Совокупные предельные издержки MC',Number.isFinite(r.m)?fmt(r.m):'–');
     r.qs.slice(2).forEach((q,i)=>html+=stat('Завод '+(i+3)+': Q'+(i+3),fmt(q)));
     html+=stat('Совокупные издержки TC', (r.approx?'≈ ':'')+fmt(r.tcDirect));
     if(r.fc)html+=stat('Невозвратные постоянные издержки',fmt(r.fc));
@@ -270,7 +270,7 @@ function updatePlantsPanel(){
     if(r.approx)html+='<div class="hint">Численный перебор с шагом '+fmt(r.step)+' и уточнением раздела. Результат приближённый.</div>';
   }else html+='<div class="warn">'+(Number(STATE.plQ)>p.capacity?'Выпуск больше суммарной мощности заводов ('+fmt(p.capacity)+'). Уменьшите Q или увеличьте мощность.':'Не удалось найти допустимый раздел выпуска. Проверьте области определения формул и мощности.')+'</div>';
   setFinalFunctions([plantsFinalRecord(p)]);
-  html+='<div class="hint">TC — минимум суммы затрат при делении общего выпуска. Равенство MC относится только к работающим заводам, которые не достигли мощности. При квазипостоянных затратах сравнивается также закрытие завода; скачки TC считаются отдельно от интеграла MC.</div>';
+  html+='<div class="hint">TC – минимум суммы затрат при делении общего выпуска. Равенство MC относится только к работающим заводам, которые не достигли мощности. При квазипостоянных затратах сравнивается также закрытие завода; скачки TC считаются отдельно от интеграла MC.</div>';
   box.innerHTML=html;
 }
 function renderPlantRows(force=false){

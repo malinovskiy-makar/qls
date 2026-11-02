@@ -256,10 +256,10 @@ function firmFinalRecord(m){
 function updateFirmSupplyPanel(box){
   const m=STATE.firmSupply;if(m.error){box.innerHTML='<div class="warn">'+ffEsc(m.error)+'</div>';return;}
   const r=STATE.firmSupplyResult||m.at(STATE.lrPrice),stat=(label,value,main=false)=>'<div class="stat'+(main?' ans-main':'')+'"><span>'+label+'</span><b>'+value+'</b></div>';
-  let html=stat('Выпуск Q'+(r.tie?' — безразлично':''),firmOutputText(r),true)+stat(r.unattained?'Верхняя грань прибыли':'Прибыль Π',r.unbounded?'∞':fmt(r.profit),true)+stat('Цена P',fmt(r.P));
+  let html=stat('Выпуск Q'+(r.tie?' – безразлично':''),firmOutputText(r),true)+stat(r.unattained?'Верхняя грань прибыли':'Прибыль Π',r.unbounded?'∞':fmt(r.profit),true)+stat('Цена P',fmt(r.P));
   html+=stat(m.config.period==='lr'?'Цена ухода с рынка (min ATC)':m.avoidable?'Цена закрытия (с квазипостоянными)':'Цена закрытия (min AVC)',m.priceIndependent?(r.tie?'Все цены: безразличие':r.Q===0?'При любой цене фирма закрыта':'При любой цене фирма работает'):m.shutdown===Infinity?'Нет производства':fmt(m.shutdown));
   html+=stat('Постоянные затраты FC',fmt(m.fc));
-  if(m.config.mode==='mc')html+='<div class="hint">TC — интеграл MC от нуля; других издержек нет.</div>';
+  if(m.config.mode==='mc')html+='<div class="hint">TC – интеграл MC от нуля; других издержек нет.</div>';
   if(m.autoCap!=null)html+=stat('Предел убывающей MC',fmt(m.autoCap));
   if(m.tax.type!=='none'){const budget=(1-m.tax.alpha)*r.P*(r.Q||0)+m.tax.unit*(r.Q||0)+(r.Q>0||!m.avoidable?m.tax.lump:0);html+=stat('Налог фирме / субсидия (−)',Number.isFinite(budget)?fmt(budget):'Не ограничен');}
   if(STATE.lr?.note)html+='<div class="hint">'+STATE.lr.note+'</div>';

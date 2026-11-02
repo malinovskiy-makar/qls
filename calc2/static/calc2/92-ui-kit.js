@@ -645,6 +645,7 @@ function paintCard(field) {
 
 /* Карточки моделей сессии 5 (README 8): поле → обозначение, имя, приставка, цвет, «⋯». */
 const SC_CARDS = [
+  ...['A','B'].flatMap(key=>['D','S'].map(role=>({m:'bigopen',input:'big-'+key+'-'+role,sym:role+'_'+key,name:(role==='D'?'Спрос':'Предложение')+' страны '+key,prefix:()=>formPrefix('big-'+key+'-'+role),col:role}))),
   { m: 'firmmarket', input: 'firm-market-demand', sym: 'D', name: 'Спрос рынка', prefix: () => formPrefix('firm-market-demand'), col: 'D' },
   { m: 'ppf', input: 'inp-ppf', sym: '\\text{КПВ}', name: 'Производственные возможности', slot: 'ppf-color1', col: () => STATE.ppfColor1 || COL.D, menu: ['ppf-name1-row'] },
   { m: 'ppf', input: 'inp-ppf2b', sym: '\\text{КПВ}_2', name: 'Для сравнения', slot: 'ppf-color2', col: () => STATE.ppfColor2 || COL.S, menu: [() => { const i = document.getElementById('inp-ppf-name2'); return i && i.closest('.field'); }] },
@@ -758,7 +759,7 @@ const SC_SEGS = [['cm-tc', 'costs'], ['ki-indiv', 'mono-kink'], ['un-monopoly', 
    'labor' — все четыре модели рынка труда. */
 const SC_ON = new Set(['ppf', 'ppfsum', 'trade', 'tradeprice', 'prod', 'costs', 'plants', 'isoquant', 'mono-d3', 'mono-kink', 'mono-nat', 'labor', 'smallopen', 'consumer', 'adas', 'islm', 'phillips', 'money', 'loanable', 'fx', 'laffer', 'ineq', 'm-graph', 'm-math', 'm-minmax', 'm-constraint',
   // Детали этапа Д (сессия 6): d1 — ползунки сдвига под карточками.
-  'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'firmmarket']);
+  'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'firmmarket', 'bigopen']);
 const scOn = (m) => SC_ON.has(m);
 function scProw(id) { const r = SC_PROWS[id]; return r && scOn(r[2]) ? r : null; }
 function scParamAnchor(el) {

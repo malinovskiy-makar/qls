@@ -125,6 +125,9 @@ function applyRedistribution(shares, pops=shares.map(()=>1/shares.length)) {
 
 // Пересчёт неравенства БЕЗ рисования — складываем кривую и коэффициенты в STATE.
 function recomputeInequality() {
+  // Доли могут стать неравными или временно ошибочными при ручном вводе.
+  // Сегмент «Равные группы» должен отражать их до любого раннего выхода.
+  ineqRenderRows(document.getElementById('ineq-groups-table'),false);
   STATE.ineqLorenz=null;STATE.ineqStats=null;STATE.ineqWarn=null;STATE.ineqShares=null;STATE.ineqShareN=0;STATE.ineqRedist=null;STATE.ineqSortNote=false;
   const calc=ineqCalculate(),r=calc.result;STATE.ineqDistribution=r;STATE.ineqCountries=calc.countries;
   renderIneqCountryControls();

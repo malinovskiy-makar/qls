@@ -6,6 +6,7 @@
    блоки результатов → в плавающее табло справа.
    --------------------------------------------------------------------- */
 const SCENE_NAMES = {
+  bigopen: 'Большие открытые экономики',
   firmmarket: 'Рынок и фирма в СК',
   sd: 'Спрос и предложение', sdsum: 'Сложение спросов и предложений',
   tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
@@ -45,7 +46,7 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 // info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
 // «Площади», рядом с кнопкой, которая её посчитала.
-const RESULT_IDS = ['info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+const RESULT_IDS = ['info-bigtrade', 'info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];

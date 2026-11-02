@@ -45,13 +45,14 @@ function tradeAutark(D,S,w){
   const Pp=firmMarketBisect(excess,0,hi),Pc=tradeBuyer(w,Pp);
   return{Pc,Pp,Qd:D.at(Pc),Qs:S.at(Pp),Im:0,Ex:0,mode:'closed'};
 }
-function tradeCountry(Dexpr,Sexpr,Pw,policy={},ban='free'){
-  const D=tradeCurve(Dexpr,true),S=tradeCurve(Sexpr,false),w=tradeChannels(policy,Pw);
+function tradeCountry(Dexpr,Sexpr,Pw,policy={},ban='free',options={}){
+  const D=typeof Dexpr==='string'?tradeCurve(Dexpr,true):Dexpr,S=typeof Sexpr==='string'?tradeCurve(Sexpr,false):Sexpr,w=tradeChannels(policy,Pw);
   if(D.error||S.error||w.error)return{error:D.error||S.error||w.error};
   if(!(Pw>=0)||!Number.isFinite(Pw))return{error:'Мировая цена должна быть неотрицательной.'};
   const freeD=D.at(Pw),freeS=S.at(Pw),freeImport=freeD>=freeS,solutions=[];
   const finish=r=>{
     const domestic=Math.min(r.Qd,r.Qs),budget=(r.Pc-r.Pp)*domestic+(r.Pc-Pw)*r.Im+(Pw-r.Pp)*r.Ex;
+    if(options.details===false)return{...r,Pw,domestic,budget:policy.kind==='quota'?0:budget,rent:policy.kind==='quota'?budget:0,channels:w};
     const cs=integrate(q=>evalCurve(D.curve,q)-r.Pc,0,r.Qd),ps=integrate(q=>r.Pp-evalCurve(S.curve,q),0,r.Qs);
     const csFree=integrate(q=>evalCurve(D.curve,q)-Pw,0,freeD),psFree=integrate(q=>Pw-evalCurve(S.curve,q),0,freeS);
     return{...r,Pw,domestic,budget:policy.kind==='quota'?0:budget,rent:policy.kind==='quota'?budget:0,cs,ps,sw:cs+ps+(policy.kind==='quota'?0:budget),
@@ -60,7 +61,7 @@ function tradeCountry(Dexpr,Sexpr,Pw,policy={},ban='free'){
   };
   if(policy.kind==='quota'){
     const limit=CalcNumber.parse(String(policy.quota??0))?.value;if(!(limit>=0))return{error:'Квота должна быть неотрицательной.'};
-    const aut=tradeAutark(D,S,w.domestic);if(!aut)return{error:'Автаркическое равновесие не найдено.'};
+    const aut=options.autark||tradeAutark(D,S,w.domestic);if(!aut)return{error:'Автаркическое равновесие не найдено.'};
     const forbidden=freeImport?ban==='noimport':ban==='noexport',amount=forbidden?0:Math.min(limit,Math.abs(freeD-freeS));
     const f=P=>D.at(P)-S.at(P)-(freeImport?amount:-amount),P=amount===0?aut.Pc:firmMarketBisect(f,Math.min(Pw,aut.Pc),Math.max(Pw,aut.Pc));
     return finish({Pc:P,Pp:P,Qd:D.at(P),Qs:S.at(P),Im:freeImport?amount:0,Ex:freeImport?0:amount,mode:amount===0?'closed':freeImport?'import':'export'});
@@ -69,7 +70,7 @@ function tradeCountry(Dexpr,Sexpr,Pw,policy={},ban='free'){
   if(ban!=='noimport'){const Pc=tradeBuyer(w.imports,Pw);add(Pc,tradeSeller(w.domestic,Pc),'import');}
   if(ban!=='noexport'){const Pp=tradeSeller(w.exports,Pw);add(tradeBuyer(w.domestic,Pp),Pp,'export');}
   if(!solutions.length){
-    const aut=tradeAutark(D,S,w.domestic);if(!aut)return{error:'Равновесие без торговли не найдено.'};
+    const aut=options.autark||tradeAutark(D,S,w.domestic);if(!aut)return{error:'Равновесие без торговли не найдено.'};
     const importClosed=ban==='noimport'||aut.Pc<=tradeBuyer(w.imports,Pw)+1e-7;
     const exportClosed=ban==='noexport'||aut.Pp>=tradeSeller(w.exports,Pw)-1e-7;
     if(!importClosed||!exportClosed)return{error:'Не найден согласованный режим торговли.'};
@@ -144,6 +145,7 @@ function tradeMonoNumeric(D,cost,Pw,w,limit){
 }
 
 function tradePolicyState(prefix){
+  if(prefix==='bigA'||prefix==='bigB'){const c=STATE.bigTrade?.[prefix.slice(-1)]||{};return{policy:{kind:'none',target:'trade',form:'unit',rate:10,quota:20,...c.policy},ban:c.ban||'free',legacy:false};}
   if(prefix==='open')return{policy:STATE.openPolicy||{kind:STATE.openTool==='tariff'?'tax':STATE.openTool==='quota'?'quota':'none',target:'trade',form:'unit',rate:STATE.openTariff??10,quota:STATE.openQuota??20},ban:STATE.openBan||'free',legacy:!STATE.openPolicy};
   return{policy:STATE.monoTrade||{kind:'none',target:'trade',form:'unit',rate:10,quota:20},ban:STATE.monoTradeBan||'free',legacy:!STATE.monoTrade};
 }
@@ -152,6 +154,7 @@ function setTradePolicy(prefix,patch,ban){
   const policy={...old.policy,...patch};
   if(patch.target)policy.form='unit';
   if(prefix==='open'){STATE.openPolicy=policy;STATE.openBan=ban||old.ban;STATE.openTool='none';}
+  else if(prefix==='bigA'||prefix==='bigB'){const key=prefix.slice(-1);STATE.bigTrade={...STATE.bigTrade,[key]:{...STATE.bigTrade[key],policy,ban:ban||old.ban}};}
   else{STATE.monoTrade=policy;STATE.monoTradeBan=ban||old.ban;}
   redrawAll();
 }
@@ -165,16 +168,16 @@ function tradeControlsHTML(prefix,withKind=true){
     '<div class="field trade-quota-value"><label for="'+prefix+'-policy-quota">Квота</label><input id="'+prefix+'-policy-quota" type="text" inputmode="decimal" data-plain="1" value="20"></div>';
 }
 function renderTradePolicyControls(){
-  for(const prefix of['open','mono']){
+  for(const prefix of['open','mono','bigA','bigB']){
     const host=document.getElementById(prefix+'-policy-controls');if(!host)continue;
-    const on=prefix==='open'?STATE.sceneKey==='smallopen':STATE.sceneKey==='monoexport';host.style.display=on?'':'none';
+    const big=prefix.startsWith('big'),on=big?STATE.sceneKey==='bigopen':prefix==='open'?STATE.sceneKey==='smallopen':STATE.sceneKey==='monoexport';host.style.display=on?'':'none';
     if(!host._wired){
       host.innerHTML=tradeControlsHTML(prefix,prefix!=='open');host._wired=true;
       host.querySelectorAll('[data-trade-key]').forEach(b=>b.addEventListener('click',()=>{const key=b.dataset.tradeKey,value=b.dataset.tradeValue;setTradePolicy(prefix,key==='ban'?{}:{[key]:value},key==='ban'?value:null);}));
       for(const key of['rate','quota'])host.querySelector('#'+prefix+'-policy-'+key).addEventListener('change',e=>setTradePolicy(prefix,{[key]:e.target.value}));
     }
     if(!on)continue;
-    const {policy:p,ban,legacy}=tradePolicyState(prefix),active=p.kind==='tax'||p.kind==='subsidy',r=prefix==='open'?STATE.open?.tradeResult:STATE.discr3?.tradeResult;
+    const {policy:p,ban,legacy}=tradePolicyState(prefix),active=p.kind==='tax'||p.kind==='subsidy',r=big?STATE.bigTradeResult?.countries?.[prefix.slice(-1)]:prefix==='open'?STATE.open?.tradeResult:STATE.discr3?.tradeResult;
     host.querySelectorAll('[data-trade-key]').forEach(b=>b.classList.toggle('active',(b.dataset.tradeKey==='ban'?ban:p[b.dataset.tradeKey])===b.dataset.tradeValue));
     host.querySelector('.trade-details').style.display=active?'':'none';host.querySelector('.trade-quota-value').style.display=p.kind==='quota'&&!(prefix==='open'&&legacy)?'':'none';
     host.querySelector('.trade-value').style.display=prefix==='open'&&legacy?'none':'';

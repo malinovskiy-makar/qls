@@ -162,7 +162,7 @@ function discriminationTable(d) {
     ['Объём группы 1',a.q1,b.q1],['Объём группы 2',a.q2,b.q2],['Общий выпуск',a.Qtot,b.Qtot],
     ['Прибыль',a.profit,b.profit],['Прирост прибыли',c.delta,0],
     ['$CS_1$',a.cs[0],b.cs[0]],['$CS_2$',a.cs[1],b.cs[1]],['$DWL$',a.dwl,b.dwl]];
-  const number=v=>v==null?'—':fmt(v);
+  const number=v=>v==null?'–':fmt(v);
   const absent=[b.q1<1e-9?'1':'',b.q2<1e-9?'2':''].filter(Boolean);
   return '<table class="tx-table d3-comparison"><caption>Сравнение способов продажи</caption>'
     +'<thead><tr><th></th><th>Дискриминация</th><th>Единая цена</th></tr></thead><tbody>'

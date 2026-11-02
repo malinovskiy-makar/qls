@@ -285,6 +285,7 @@ function panelZoomBy(id, factor, px, py) {
   if (!((nx1 - nx0) > 1e-9) || !((ny1 - ny0) > 1e-9)) return false;
   if (!isFinite(nx0) || !isFinite(nx1) || !isFinite(ny0) || !isFinite(ny1)) return false;
   (STATE.panelWin || (STATE.panelWin = {}))[id] = { x0: nx0, x1: nx1, y0: ny0, y1: ny1 };
+  if(typeof bigTradeSyncPriceWindow==='function')bigTradeSyncPriceWindow(id);
   return true;
 }
 
@@ -297,6 +298,7 @@ function panelPanBy(id, dxPx, dyPx) {
   const dx = (x1 - x0) * dxPx / w, dy = (y1 - y0) * dyPx / h;
   (STATE.panelWin || (STATE.panelWin = {}))[id] =
     { x0: x0 - dx, x1: x1 - dx, y0: y0 + dy, y1: y1 + dy };
+  if(typeof bigTradeSyncPriceWindow==='function')bigTradeSyncPriceWindow(id);
   return true;
 }
 

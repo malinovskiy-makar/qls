@@ -72,6 +72,7 @@ function redrawAll() {
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
   renderFirmMarketControls();
+  renderBigTradeControls();
   renderTradePolicyControls();
   // И только теперь — вопросики: знак без живой подсказки прячется. Раньше
   // applyCardScope нельзя, иначе проход не увидит спрятанного соседа.
@@ -101,6 +102,7 @@ function redrawScene() {
   resetDrawnKeyPoints();   // и пары нарисованных ключевых точек — тоже заново
   computeSize();
   makeScales();
+  if (STATE.sceneKey === 'bigopen') { redrawBigTrade(); return; }
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
   if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
@@ -1034,6 +1036,7 @@ function drawLegend() {
   if (!STATE.showLegend) return;
   const seen = currentAreas();
   if (!seen.length) return;
+  if(STATE.sceneKey==='bigopen'&&STATE.bigTrade?.view!=='world'&&W<500){bigTradeSmallLegend(seen);return;}
   const m = CONFIG.margin;
   /* А27 · А59. Легенда кричала громче графика: кегль 18.7 против 10 у делений
      осей и 14 у подписей кривых, коробка 75×112 при поле 262×344 — девять
@@ -3881,6 +3884,13 @@ function snapTargets(panelId) {
 
 function snapTargetsAll() {
   const out = [];
+  if(STATE.sceneKey==='bigopen'){
+    const r=STATE.bigTradeResult,prepared=_bigTradeCache?.prepared;if(!r||r.error||!prepared)return out;
+    if(STATE.bigTrade?.view==='world'){
+      if(r.Pw!==null)out.push({name:'Pw',f:()=>r.Pw,panel:'big-world'});
+    }else for(const key of['A','B'])for(const role of['D','S'])out.push({name:role+'_'+key,f:Q=>evalCurve(prepared[key][role].curve,Q),color:COL[role],panel:'big-'+key});
+    return out;
+  }
   if (STATE.sceneKey === 'firmmarket') {
     const r=STATE.firmMarketResult;
     if (r?.firm&&!r.firm.error) {

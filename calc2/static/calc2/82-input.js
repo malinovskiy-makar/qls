@@ -1657,6 +1657,7 @@ function formulaInputError(inp) {
   return null;
 }
 const LHS_FIELD_IDS = new Set(['inp-d3-1', 'inp-d3-2', 'inp-d3-mc', 'inp-ki-1', 'inp-ki-2', 'inp-ki-3',
+  'big-A-D', 'big-A-S', 'big-B-D', 'big-B-S',
   'inp-kp-1', 'inp-kp-2', 'inp-kink-mc', 'ma-lafd', 'ma-lafs', 'ma-ad', 'ma-sras', 'adas-shock-ad', 'adas-shock-sras']);
 function markFormulaField(inp, err) {
   if (!inp) return;
@@ -1792,6 +1793,7 @@ function liveFormulaTexts() {
    FORMULA_EXAMPLES; поле, которого здесь нет, общей оснастки не получает
    (имена, заголовки и списки чисел формулами не являются). */
 const FORMULA_FIELD_KINDS = {
+  'big-A-D': 'DEMAND', 'big-A-S': 'SUPPLY', 'big-B-D': 'DEMAND', 'big-B-S': 'SUPPLY',
   'firm-market-demand': 'DEMAND',
   'inp-msb': 'DEMAND', 'inp-msc': 'SUPPLY',   // общественные кривые внешних эффектов
   'inp-d3-1': 'DEMAND', 'inp-d3-2': 'DEMAND', 'inp-d3-mc': 'MC',

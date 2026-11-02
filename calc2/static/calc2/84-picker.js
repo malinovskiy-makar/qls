@@ -311,6 +311,10 @@ const SCENE_ROUTE = {
 
   /* --- Блок 7 · Международная торговля -------------------------------- */
   smallopen:  { run: () => loadScene('smallopen'),  lock: [L_INTERV] },
+  bigopen: { base:'market', run:()=>{
+    STATE.bigTrade=bigTradeDefaults();STATE.curves=[];STATE.scenario='none';setMode('market');setMarket('comp');
+    for(const key of['A','B'])for(const role of['D','S'])document.getElementById('big-'+key+'-'+role).value=STATE.bigTrade[key][role];
+  },lock:[L_INTERV,'sec-curves','sec-eq','sec-mono'] },
   monoexport: { run: () => loadScene('monoexport'), lock: [L_MONOSUB, L_INTERV] },
 
   /* --- Блок 8 · Выбор потребителя ------------------------------------- */

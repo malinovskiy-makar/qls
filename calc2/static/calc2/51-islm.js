@@ -17,7 +17,7 @@ function islmSolve(raw, fixed=null){
   try{
     const c={...islmDefaults(),...raw};for(const k of['a','b','I0','d','G','T','Xn','Ms','P']){c[k]=islmScalar(c[k]);if(!Number.isFinite(c[k]))throw Error('Нужно число для '+k+'.');}
     if(c.b<0||c.b>=1)throw Error('Предельная склонность к потреблению b должна быть от 0 до 1, не включая 1.');
-    if(c.d<0)throw Error('Чувствительность инвестиций d должна быть неотрицательной.');if(c.P<=0||c.Ms<0)throw Error('Уровень цен P должен быть положительным, предложение денег — неотрицательным.');
+    if(c.d<0)throw Error('Чувствительность инвестиций d должна быть неотрицательной.');if(c.P<=0||c.Ms<0)throw Error('Уровень цен P должен быть положительным, предложение денег – неотрицательным.');
     const A=c.a-c.b*c.T+c.I0+c.G+c.Xn,h=1-c.b;
     const isExpr=macroSimplify('('+CalcNumber.expression(A)+'-('+CalcNumber.expression(c.d)+')*r)/('+CalcNumber.expression(h)+')');
     const yAt=r=>(A-c.d*r)/h;

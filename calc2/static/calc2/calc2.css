@@ -4390,6 +4390,8 @@ body.self-on:not(.self-all) .firm-market-price-mask { display: inline; }
 .trade-policy-controls .field label { flex: 1; }
 .trade-policy-controls .field input { width: 92px; min-width: 0; }
 .trade-direction { margin: 6px 0; }
+.bigtrade-view { align-self: center; flex: 0 0 auto; margin: 4px 12px; max-width: calc(100% - 24px); }
+#sec-bigtrade > .sc-sec { margin-top: 16px; }
 @media (max-width: 759px) {
   .trade-policy-controls .field input { min-height: 44px; }
 }

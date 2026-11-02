@@ -1071,25 +1071,27 @@ cmp('«Неравенство»: сам ползунок α на месте', r.
    СЕССИЯ 01.09 (3) · ПОЛЯ ВВОДА И СПИСКИ.
    ================================================================ */
 head('Сессия 01.09 (3) · выделение в поле формулы видно');
+// Проверяем видимый спрос этой сцены. Первый .f-slot страницы может
+// принадлежать скрытой модели (четыре поля bigopen стоят раньше рынка).
 r = await run(`resetSceneMemory(); pickScene('sd'); redrawAll();
-  var inp = document.querySelector('.f-slot input[type=text]');
+  var inp = document.getElementById('curve-expr-1');
   inp.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   inp.focus();
   return { woke: 1 };`);
 await page.waitForTimeout(700);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp && inp._mf;
   if (!mf) return { noMf: 1 };
   mf.blur();
   return { blurred: 1 };`);
 await page.waitForTimeout(200);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp._mf;
   mf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   mf.focus();
   return { ok: 1 };`);
 await page.waitForTimeout(500);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp._mf, sr = mf.shadowRoot;
   var box = sr.querySelector('.ML__selection');
   var cs = box ? getComputedStyle(box) : null;
@@ -1663,6 +1665,19 @@ for(const[target,kind,form,rate,want]of[
 ]){
  r=await run(`return tradeMono('100-Q','Q',50,${JSON.stringify({target,kind,form,rate})});`);
  ['Q','Qd','Pc','Ex','budget'].forEach((key,i)=>cmp('Э12 монополист '+[target,kind,form,key].join('/'),r[key],want[i],1e-6));
+}
+
+head('Ночь 29.10 · Э13 — две большие экономики');
+for(const[tag,A,B,want]of[
+ ['Свободная',{}, {},[45,30,45,45,0,0,0]],
+ ['ТарифA10',{policy:{kind:'tax',rate:10}}, {},[40,20,50,40,200,0,50]],
+ ['Максимум сборов',{policy:{kind:'tax',rate:15}}, {},[37.5,15,52.5,37.5,225,0,112.5]],
+ ['СубсидияB',{}, {policy:{kind:'subsidy',rate:10}},[40,40,40,50,0,-400,50]],
+ ['Обе страны',{policy:{kind:'tax',rate:10}},{policy:{kind:'tax',rate:5}},[42.5,15,52.5,37.5,150,75,112.5]],
+ ['Запретительный',{policy:{kind:'tax',rate:30}}, {},[null,0,60,30,0,0,450]],
+]){
+ r=await run(`resetSceneMemory();pickScene('bigopen');STATE.bigTrade={...bigTradeDefaults(),A:{...bigTradeDefaults().A,...${JSON.stringify(A)}},B:{...bigTradeDefaults().B,...${JSON.stringify(B)}}};redrawAll();const x=STATE.bigTradeResult;return[x.Pw,x.volume,x.countries.A.Pc,x.countries.B.Pc,x.countries.A.budget,x.countries.B.budget,x.worldLoss];`);
+ want.forEach((v,i)=>cmp('Э13 '+tag+' '+['Pw','T','PA','PB','budgetA','budgetB','worldLoss'][i],r[i],v,1e-6));
 }
 
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));

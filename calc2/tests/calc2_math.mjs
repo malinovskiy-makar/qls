@@ -3081,7 +3081,7 @@ const CASES = [
           return { moved: moved, noScale: noScale.length, scenes: scenes.length };`,
     checks: [['сдвинутых чисел на осях', 'moved', 0, 0],
              ['сцен без разметки шкалы', 'noScale', 0, 0],
-             ['сцен всего', 'scenes', 44, 0]],   // +3: 'taxes' (объединённый сюжет налогов), 'quota' и 'sdsum' (сложение)
+             ['сцен всего', 'scenes', 46, 0]],   // Э11/Э13: добавлены firmmarket и bigopen; прежние 44 сцены остаются.
   },
 
   {
@@ -5357,7 +5357,7 @@ const CASES = [
        клавиатуру. Ширина поля формулы одна для ВСЕХ строк. */
     name: 'Приёмка · конструктор кусочной: колонки участка не ужимаются',
     run: `resetSceneMemory(); pickScene('sd'); redrawAll();
-          openPiecewise(document.querySelector('.f-slot > input'), 'Q');
+          openPiecewise(document.getElementById('curve-expr-1'), 'Q');
           PW.n = 5; renderPw();
           var card = document.querySelector('#pw-modal .modal-card');
           var slots = [], bounds = [], overflow = 0;

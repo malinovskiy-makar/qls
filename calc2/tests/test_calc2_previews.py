@@ -3,7 +3,7 @@
 Файл calc2/static/calc2/previews.json собирает заранее
 calc2/tests/previews/make_previews.mjs из записи при рисовании стандартного
 старта каждой модели. Здесь сверяется только СОСТАВ: ключи файла — ровно
-рабочие карточки .scard экрана выбора в шаблоне (42), ни одной лишней, ни
+рабочие карточки .scard экрана выбора в шаблоне (44), ни одной лишней, ни
 одной недостающей, у «скоро» превью нет; у каждого превью есть пути, нет
 текста, цвета — именами токенов; ручных схем .scard-spec в шаблоне нет.
 Свежесть (старт модели поменялся, а превью нет) сторожит браузерный
@@ -20,7 +20,8 @@ APP = os.path.dirname(HERE)
 TEMPLATE = os.path.join(APP, "templates", "calc2", "calc2.html")
 PREVIEWS = os.path.join(APP, "static", "calc2", "previews.json")
 REBUILD = "node calc2/tests/previews/make_previews.mjs"
-WORKING = 42
+# Э11 и Э13: включены карточки рынка фирмы и двух больших стран.
+WORKING = 44
 LIMIT = 150 * 1024
 
 
@@ -44,7 +45,7 @@ class PickerPreviewsTests(SimpleTestCase):
         self.working, self.soon, self.src = _picker_cards()
 
     def test_keys_are_exactly_the_working_cards(self):
-        self.assertEqual(len(self.working), WORKING, msg="рабочих карточек в шаблоне не 42")
+        self.assertEqual(len(self.working), WORKING, msg=f"рабочих карточек в шаблоне не {WORKING}")
         keys = set(self.data)
         missing = sorted(set(self.working) - keys)
         extra = sorted(keys - set(self.working))

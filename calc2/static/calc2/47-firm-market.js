@@ -112,7 +112,7 @@ function firmMarketScaledRecord(m,n){
 }
 function updateFirmMarketPanel(r){
   const box=document.getElementById('info-costs'),stat=(group,label,value)=>'<div class="stat ans-main" data-ans-group="'+group+'"><span>'+label+'</span><b>'+value+'</b></div>';
-  const price=document.getElementById('firm-market-price-value');if(price)price.textContent=r.found?fmt(r.P):'—';
+  const price=document.getElementById('firm-market-price-value');if(price)price.textContent=r.found?fmt(r.P):'–';
   let html='';
   if(r.error)html='<div class="warn">'+ffEsc(r.error)+'</div>';
   else{

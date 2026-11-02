@@ -29,6 +29,11 @@ function selfNum(t) { const p = CalcNumber.parse(t); return p ? p.value : null; 
 function selfParse(t) {
   let s = String(t == null ? '' : t).trim().toLowerCase();
   if (!s) return null;
+  if (s === 'не определена' || s === 'не определено') return {literal:'undefined',items:[],precision:[]};
+  if (s.startsWith('[') && s.endsWith(']')) {
+    const n=s.slice(1,-1).split(';').map(CalcNumber.parse);
+    return n.length===2&&n.every(Boolean)&&n[0].value<=n[1].value?{interval:true,pts:false,items:n.map(x=>[x.value]),precision:n.map(x=>[x])}:null;
+  }
   if (s === 'нет') return { pts: null, items: [], precision: [] };
   s = s.replace(/;$/, '');
   const split = str => {
@@ -70,6 +75,8 @@ function selfAccept(a, b) {
 function checkGuess(answer, truth) {
   const a = selfParse(answer), b = selfParse(truth);
   if (a == null || b == null) return null;
+  if(a.literal||b.literal)return a.literal===b.literal;
+  if(a.interval||b.interval)return !!a.interval===!!b.interval&&a.precision.every((p,i)=>selfAccept(p[0],b.precision[i][0]));
   if (a.items.length !== b.items.length) return false;
   if (!b.items.length) return true;
   if (a.pts !== b.pts) return false;

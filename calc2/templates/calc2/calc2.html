@@ -285,9 +285,9 @@
           <span class="scard-name">Малая открытая экономика</span>
           <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, потери общества.</span>
         </button>
-        <button class="scard soon" data-scene="bigopen" disabled>
-          <span class="scard-head"><span class="scard-name">Большие открытые экономики</span><span class="scard-soon">Скоро</span></span>
-          <span class="scard-desc">Три графика: два внутренних рынка и мировой, встреча экспорта и импорта.</span>
+        <button class="scard" data-scene="bigopen">
+          <span class="scard-name">Большие открытые экономики</span>
+          <span class="scard-desc">Две страны определяют мировую цену. Вмешательства, торговля и благосостояние.</span>
         </button>
         <button class="scard" data-scene="monoexport">
           <span class="scard-name">Монополист и внешний рынок</span>
@@ -484,6 +484,17 @@
          первой видимой из реестра INPUT_CARDS. -->
     <div class="section" id="sec-input">
       <div class="section-title">Функции</div>
+    <div class="section" id="sec-bigtrade" style="display:none;">
+      <div class="sc-sec">Страна A</div>
+      <div class="field"><label for="big-A-D">Спрос A</label><input id="big-A-D" type="text" value="Q = 120 - P"></div>
+      <div class="field"><label for="big-A-S">Предложение A</label><input id="big-A-S" type="text" value="Q = P"></div>
+      <div class="trade-policy-controls" id="bigA-policy-controls"></div>
+      <div class="sc-sec">Страна B</div>
+      <div class="field"><label for="big-B-D">Спрос B</label><input id="big-B-D" type="text" value="Q = 60 - P"></div>
+      <div class="field"><label for="big-B-S">Предложение B</label><input id="big-B-S" type="text" value="Q = P"></div>
+      <div class="trade-policy-controls" id="bigB-policy-controls"></div>
+      <div id="info-bigtrade"></div>
+    </div>
     <div class="section" id="sec-curves">
       <!-- Своего заголовка у блока нет: его называет карточка «Ввод функций».
 
@@ -718,7 +729,7 @@
             <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
           <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
             <input type="text" id="inp-d3-mc" value="20" autocomplete="off">
-            <div class="hint">Можно задать MC или общие затраты: например, TC = 30Q + 200. Q — общий выпуск для двух групп.</div></div>
+            <div class="hint">Можно задать MC или общие затраты: например, TC = 30Q + 200. Q – общий выпуск для двух групп.</div></div>
           <div class="hint d3-world-hint">Два мини-графика рынков стоят бок о бок.</div>
           <div id="mono-policy-controls" class="trade-policy-controls" style="display:none;"></div>
           <div class="error" id="d3-error" style="display:none;"></div>
@@ -1913,6 +1924,10 @@
     </div>
   <!-- 760–1239 px: главные числа строкой над холстом, «Ответ» выезжает (фаза 10). -->
   <div class="ans-strip" id="ans-strip" aria-hidden="true"></div>
+  <div class="seg bigtrade-view" id="bigtrade-view" style="display:none;" aria-label="Вид рынков">
+    <button type="button" class="seg-btn" data-big-view="world">Мировой рынок</button>
+    <button type="button" class="seg-btn active" data-big-view="countries">Две страны</button>
+  </div>
   <div class="graph-wrap" id="graph-wrap">
     <!-- А58. Печатная шапка и подвал: на экране их нет, на листе они несут
          название модели и ключевые значения. Заполняются перед печатью. -->
@@ -2277,6 +2292,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
 <script src="{% calc2_static 'calc2/53-adas.js' %}"></script>
 <script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
+<script src="{% calc2_static 'calc2/55-big-trade.js' %}"></script>
 <script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
 <script src="{% calc2_static 'calc2/57-distributions.js' %}"></script>
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
