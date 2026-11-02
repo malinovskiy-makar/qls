@@ -662,7 +662,7 @@ const SC_CARDS = [
   // сцена (applyD3WorldLabels) — они остаются спрятанными, карточка берёт смысл по состоянию.
   { m: 'mono-d3', input: 'inp-d3-1', sym: () => (STATE.d3World ? 'D' : 'D_1'), name: () => (STATE.d3World ? 'Внутренний спрос' : 'Спрос рынка 1'), prefix: () => formPrefix('inp-d3-1'), col: 'D', keepLabel: true },
   { m: 'mono-d3', input: 'inp-d3-2', sym: () => (STATE.d3World ? 'P_w' : 'D_2'), name: () => (STATE.d3World ? 'Мировая цена' : 'Спрос рынка 2'), prefix: () => (STATE.d3World ? 'P_w =' : formPrefix('inp-d3-2')), col: () => (STATE.d3World ? 'reg' : 'D'), keepLabel: true },
-  { m: 'mono-d3', input: 'inp-d3-mc', sym: '\\mathrm{MC}', name: () => (STATE.d3World ? 'Предельные издержки от общего выпуска' : 'Предельные издержки'), prefix: '\\mathrm{MC} =', col: 'S', keepLabel: true },
+  { m: 'mono-d3', input: 'inp-d3-mc', sym: () => d3CostMode()==='tc'?'\\mathrm{TC}':'\\mathrm{MC}', name: () => d3CostMode()==='tc'?'Общие издержки от общего выпуска':'Предельные издержки от общего выпуска', prefix: () => splitCurveLhs(STATE.d3MC).lhs?'':'\\mathrm{MC} =', col: 'S', keepLabel: true },
   { m: 'mono-kink', input: 'inp-ki-1', sym: 'D_1', name: 'Спрос 1', prefix: () => formPrefix('inp-ki-1'), col: 'D' },
   { m: 'mono-kink', input: 'inp-ki-2', sym: 'D_2', name: 'Спрос 2', prefix: () => formPrefix('inp-ki-2'), col: 'D' },
   { m: 'mono-kink', input: 'inp-ki-3', sym: 'D_3', name: 'Спрос 3, необязательно', prefix: () => formPrefix('inp-ki-3'), col: 'D' },

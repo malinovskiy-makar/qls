@@ -3906,8 +3906,8 @@ function snapTargetsAll() {
     if (d.found) {
       out.push({ name: 'D₁', f: (q) => evalCurve(d.c1, q), color: COL.D, panel: 'mini-1' });
       out.push({ name: 'D₂', f: (q) => evalCurve(d.c2, q), color: COL.D, panel: 'mini-2' });
-      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-1' });
-      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-2' });
+      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q+d.q2), color: COL.S, panel: 'mini-1' });
+      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q+d.q1), color: COL.S, panel: 'mini-2' });
       return out;
     }
     return out;
@@ -3974,12 +3974,15 @@ function snapTargetsAll() {
   if (STATE.mode === 'macro')      { macroSnapTargets(out); return out; }
   if (STATE.mode === 'consumer')   { consumerSnapTargets(out); return out; }
   if (STATE.mode === 'inequality') { ineqSnapTargets(out); return out; }
+  const d1=STATE.mode==='market'&&STATE.market==='monopoly'&&STATE.monoMode==='discr1';
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
+    if(d1&&c.role==='tc')return; // TC не рисуется на ценовой оси и не расширяет её.
     /* Цвет и сама кривая нужны взведению (фаза 3): загоревшаяся точка красится
        цветом своей кривой, а полоса попадания должна знать, какую кривую
        взводит. Раньше сюда попадало только имя и функция. */
     out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q), color: c.color, curve: c });
   });
+  if(d1&&!mcSourceCurve()&&curveByRole('tc'))out.push({name:'MC',f:mcAt,color:COL.S});
   return out;
 }
 

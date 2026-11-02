@@ -1231,7 +1231,7 @@ function curveOpacity(curve) {
 }
 
 // Рисуем все видимые кривые внутри «окна» первой четверти.
-function drawCurves() {
+function drawCurves(include) {
   /* ⚠️ СЛОЙ ПОД КРИВЫЕ, ИДУЩИЕ ПО САМОЙ ОСИ, — ОТДЕЛЬНЫЙ, А НЕ ВЛОЖЕННЫЙ.
      Вложенная обрезка ПЕРЕСЕКАЕТСЯ с родительской, а не заменяет её: группа
      внутри `curves` со своим окном получала бы всё то же тесное окно и
@@ -1246,7 +1246,7 @@ function drawCurves() {
   STATE.curves.forEach(curve => {
     /* Пустая строка — это заведённое кнопкой ПОЛЕ, а не кривая: пока формулу
        не набрали, рисовать нечего (решение владельца 22.08). */
-    if (!curve.visible || !curve.expr) return;
+    if (!curve.visible || !curve.expr || (include && !include(curve))) return;
     const pts = curvePoints(curve);
     const w = curveWidth(curve);
     /* ── УЧАСТОК, КОТОРОГО НЕТ (решение владельца 25.08) ──────────────

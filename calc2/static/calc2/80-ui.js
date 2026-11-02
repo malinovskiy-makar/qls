@@ -295,6 +295,7 @@ function curveHumanName(c) {
 }
 // Приставка поля: буква вертикальной оси для P(Q), горизонтальной для Q(P).
 function curvePrefix(c) {
+  if(STATE.sceneKey==='mono-d1'&&c.role==='tc')return '\\mathrm{TC} =';
   const ax = (name, dflt) => { const m = /^[A-Za-z]+/.exec(String(name || '')); return m ? m[0] : dflt; };
   return c.srcForm === 'QP' ? ax(STATE.axisXDefault, 'Q') + ' =' : ax(STATE.axisYDefault, 'P') + ' =';
 }

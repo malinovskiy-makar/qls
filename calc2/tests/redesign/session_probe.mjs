@@ -285,13 +285,26 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
         typeof b==='object'?a&&Object.keys(a).length===Object.keys(b).length&&Object.keys(b).every(key=>same(a[key],b[key])):a===b;
       return same(st.prod,expected);
     })();
+    // Э5 добавляет сравнение режимов и уточняет линейный раздел до точного.
+    // Снимок не переписываем: все прежние поля сверяются с допуском 1e-6,
+    // новые итоги отдельно — с аналитическим решением стартовых функций.
+    const discriminationExact = k === 'mono-d3' && (() => {
+      const actual={...st.discr3};delete actual.comparison;
+      const same=(a,b)=>typeof b==='number'?Number.isFinite(a)&&Math.abs(a-b)<1e-6:
+        b&&typeof b==='object'?a&&Object.keys(a).length===Object.keys(b).length&&Object.keys(b).every(key=>same(a[key],b[key])):a===b;
+      const c=st.discr3?.comparison,u=c?.uniform,d=c?.discrimination;
+      return same(actual,rec.start.state.discr3)&&c?.fc===0&&d?.profit===2050&&d?.dwl===1025
+        &&Math.abs(u?.P-170/3)<1e-6&&Math.abs(u?.profit-6050/3)<1e-6&&Math.abs(c?.delta-100/3)<1e-6;
+    })();
     /* Производное от размера холста (место легенды, касательные «Касательной»,
        пересечения) сверка не сравнивает — тот же список, что VIEW_KEYS в
        compare.mjs: холст нового экрана другого размера, а старт тот же. */
     const real = Object.keys(d).filter(x => !['crosses', 'sceneKey', 'legendSpot', 'tanTop', 'tanBot'].includes(x) && !/Sig$/.test(x)
       /* areaHidden — ключ этапа Г (14.10): в записях старта его нет, на старте он пуст. */
       && !(x === 'areaHidden' && !(x in rec.start.state) && Array.isArray(st.areaHidden) && !st.areaHidden.length)
-      && !(x === 'prod' && productionExact));
+      && !(x === 'prod' && productionExact)
+      && !(x === 'discr3' && discriminationExact));
+    if (k === 'mono-d3' && !discriminationExact && !real.includes('discr3')) real.push('discr3: не сошлось аналитическое решение');
     if (k === 'prod' && !productionExact && !real.includes('prod')) real.push('prod: не сошлось аналитическое решение');
     if (real.length) { bad++; fails.push('заполненное хранилище: ' + k + ' старт разошёлся: ' + real.slice(0, 5).join(', ')); }
   }

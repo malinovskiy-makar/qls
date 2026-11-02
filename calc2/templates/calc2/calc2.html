@@ -706,6 +706,7 @@
           <div class="hint">Совершенная (1-й степени) дискриминация: монополист продаёт каждую единицу
             по её цене спроса до точки, где спрос&nbsp;=&nbsp;MC. Весь излишек достаётся фирме:
             <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.</div>
+          <div class="hint">Чтобы учесть постоянные издержки, у кривой затрат выберите роль TC в меню «⋯» и введите общие затраты. На графике появится их производная MC.</div>
         </div>
         <!-- Панель дискриминации 3-й степени (Задача 5): два рынка + общий MC. -->
         <div id="mono-d3-pane" style="display:none;margin-top:8px;">
@@ -714,8 +715,9 @@
           <div class="field"><label>Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
             <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
           <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
-            <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
-          <div class="hint">Два мини-графика рынков стоят бок о бок.</div>
+            <input type="text" id="inp-d3-mc" value="20" autocomplete="off">
+            <div class="hint">Можно задать MC или общие затраты: например, TC = 30Q + 200. Q — общий выпуск для двух групп.</div></div>
+          <div class="hint d3-world-hint">Два мини-графика рынков стоят бок о бок.</div>
           <div class="error" id="d3-error" style="display:none;"></div>
           <div id="info-d3" style="margin-top:8px;"></div>
         </div>
@@ -2238,6 +2240,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/40-scenes-market.js' %}"></script>
 <script src="{% calc2_static 'calc2/41-market-policies.js' %}"></script>
 <script src="{% calc2_static 'calc2/42-scenes-mono.js' %}"></script>
+<script src="{% calc2_static 'calc2/43-discrimination.js' %}"></script>
 <script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
 <script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
 <script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>

@@ -420,8 +420,12 @@ function recompute() {
          прибыли кусок из четвёртой четверти (для D = 100 − Q и MC = Q − 30 это
          ровно 450 при верной прибыли 3775). Нижняя граница — max(0, MC), та же,
          что у ЗАЛИВКИ в drawDiscr1: число и картинка обязаны совпадать. */
-      const profit = integrate(q => evalCurve(STATE.D, q) - mcFloor(mcAt(q)), 0, Qcomp);
-      STATE.discr1 = { Qcomp, profit };   // CS=0, DWL=0
+      const surplus = integrate(q => evalCurve(STATE.D, q) - mcFloor(mcAt(q)), 0, Qcomp);
+      const tc = !mcSourceCurve() && curveByRole('tc');
+      const fc = tc ? evalCurve(tc,0) : 0;
+      const profit = tc ? integrate(q=>evalCurve(STATE.D,q),0,Qcomp)-evalCurve(tc,Qcomp) : surplus;
+      STATE.discr1 = { Qcomp, profit };
+      if(tc)Object.assign(STATE.discr1,{fc,surplus});   // CS=0, DWL=0
     }
   }
 

@@ -1779,7 +1779,13 @@ function fieldActive(el) {
 }
 
 function liveFormulaTexts() {
-  return FORMULA_FIELDS.filter(fieldActive).map(i => i.value);
+  return FORMULA_FIELDS.filter(fieldActive).map(i => {
+    // TC=… и прочие имена формульных полей — не свободные параметры.
+    if(LHS_FIELD_IDS.has(i.id)){
+      const s=splitCurveLhs(i.value);if(!s.error&&s.lhs)return s.rhs;
+    }
+    return i.value;
+  });
 }
 
 /* Какой набор примеров и какая переменная у поля. Ключи — те же, что в

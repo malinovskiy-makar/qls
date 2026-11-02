@@ -1539,6 +1539,22 @@ r = await run(`setType('tax');setTaxForm('vat');setTax(20);
   return {...STATE.taxEq,budget:STATE.budget};`);
 for(const [k,v] of Object.entries({Q:116,Pb:64,Ps:176/3,budget:1856/3}))cmp('Э4 две процентные формы: '+k,r[k],v,1e-6);
 
+head('Ночь 29.10 · Э5 — дискриминация, единая цена, TC');
+r = await run(`resetSceneMemory();pickScene('mono-d3');STATE.d3D1='180-Q';STATE.d3D2='120-Q';STATE.d3MC='30';redrawAll();return STATE.discr3.comparison;`);
+for(const [tag,x,w] of [['дискриминация',r.discrimination,{P1:105,P2:75,q1:75,q2:45,profit:7650,dwl:3825}],
+  ['единая цена',r.uniform,{P:90,q1:90,q2:30,profit:7200,dwl:3600}]])
+  for(const[k,v]of Object.entries(w))cmp('Э5 6.25 '+tag+': '+k,x[k],v,1e-6);
+for(const[i,v]of [2812.5,1012.5].entries())cmp('Э5 6.25 CS'+(i+1)+' дискриминация',r.discrimination.cs[i],v,1e-6);
+for(const[i,v]of [4050,450].entries())cmp('Э5 6.25 CS'+(i+1)+' единая',r.uniform.cs[i],v,1e-6);
+cmp('Э5 6.25 прирост прибыли',r.delta,450,1e-6);
+r = await run(`STATE.d3MC='TC=30*Q+200';redrawAll();return STATE.discr3.comparison;`);
+cmp('Э5 FC в дискриминации',r.discrimination.profit,7450,1e-6);cmp('Э5 FC при единой цене',r.uniform.profit,7000,1e-6);
+r = await run(`STATE.d3D2='40-Q';STATE.d3MC='30';redrawAll();return STATE.discr3.comparison;`);
+cmp('Э5 выпадение второй группы: цена',r.uniform.P,105,1e-6);cmp('Э5 выпадение второй группы: q2',r.uniform.q2,0,1e-6);cmp('Э5 выпадение второй группы: прирост',r.delta,25,1e-6);
+r = await run(`resetSceneMemory();pickScene('mono-d1');updateCurveExpr(curveByRoleAny('demand'),'120-Q');
+  var cost=mcSourceCurveAny();updateCurveExpr(cost,'Q^2+30*Q+200');setRole(cost,'tc');redrawAll();return STATE.discr1;`);
+cmp('Э5 6.27 выпуск',r.Qcomp,30,1e-6);cmp('Э5 6.27 прибыль с FC',r.profit,1150,1e-6);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
