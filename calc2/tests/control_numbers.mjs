@@ -1630,6 +1630,41 @@ for(const[tag,tc,D,n,period,want]of[
  for(const[k,v]of Object.entries(want))cmp('Э11 '+tag+' '+k,r[k],v,1e-6);
 }
 
+head('Ночь 29.10 · Э12 — три канала торговли');
+for(const[target,kind,rate,ban,want]of[
+ ['producer','tax',20,'free',[80,60,40,60,0,20,1200]],
+ ['producer','tax',40,'free',[80,40,40,20,20,0,800]],
+ ['internal','tax',10,'free',[90,80,30,100,0,70,300]],
+ ['consumer','tax',10,'free',[90,80,30,100,0,70,300]],
+ ['trade','tax',15,'free',[65,65,55,70,0,15,225]],
+ ['trade','subsidy',10,'free',[90,90,30,120,0,90,-900]],
+ ['producer','subsidy',10,'free',[80,90,40,120,0,80,-1200]],
+ ['consumer','subsidy',10,'free',[70,80,50,100,0,50,-500]],
+ ['internal','tax',20,'free',[100,80,20,100,0,80,400]],
+ ['producer','tax',25,'free',[80,55,40,50,0,10,1250]],
+ ['producer','tax',45,'noimport',[90,45,30,30,0,0,1350]],
+ ['producer','tax',45,'free',[80,35,40,10,30,0,450]],
+]){
+ r=await run(`return tradeCountry('Q=120-P','Q=2*P-60',80,${JSON.stringify({target,kind,rate,form:'unit'})},${JSON.stringify(ban)});`);
+ ['Pc','Pp','Qd','Qs','Im','Ex','budget'].forEach((key,i)=>cmp('Э12 экспорт '+[target,kind,rate,ban,key].join('/'),r[key],want[i],1e-6));
+}
+for(const[target,kind,want]of[
+ ['trade','tax',[40,40,60,40,20,200]],['producer','tax',[30,20,70,20,50,200]],
+ ['consumer','tax',[40,30,60,30,30,600]],['internal','tax',[30,20,70,20,50,200]],
+ ['trade','subsidy',[20,20,80,20,60,-600]],['producer','subsidy',[30,40,70,40,30,-400]],
+]){
+ r=await run(`return tradeCountry('100-Q','Q',30,${JSON.stringify({target,kind,rate:10,form:'unit'})});`);
+ ['Pc','Pp','Qd','Qs','Im','budget'].forEach((key,i)=>cmp('Э12 импорт '+[target,kind,key].join('/'),r[key],want[i],1e-6));
+}
+for(const[target,kind,form,rate,want]of[
+ ['producer','tax','unit',10,[40,25,75,15,400]],['internal','tax','unit',10,[50,20,80,30,200]],
+ ['trade','subsidy','unit',10,[60,20,80,40,-400]],['trade','tax','unit',10,[40,30,70,10,100]],
+ ['internal','tax','buyer',37.5,[50,10,90,40,337.5]],
+]){
+ r=await run(`return tradeMono('100-Q','Q',50,${JSON.stringify({target,kind,form,rate})});`);
+ ['Q','Qd','Pc','Ex','budget'].forEach((key,i)=>cmp('Э12 монополист '+[target,kind,form,key].join('/'),r[key],want[i],1e-6));
+}
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

@@ -561,6 +561,7 @@ function openQuotaName() {
 }
 
 function recomputeOpenEconomy() {
+  if(STATE.openPolicy||STATE.openBan&&STATE.openBan!=='free'){recomputeTradeOpen();return;}
   const D = STATE.D, S = STATE.S, Pw = STATE.openPw;
   if (!STATE.openPwSet) return;   // ноль — тоже цена: «мир отдаёт даром»
   const Qd = qtyAtPrice(D, Pw, true), Qs = qtyAtPrice(S, Pw, false);
@@ -653,6 +654,7 @@ function recomputeOpenEconomy() {
 
 // Заливки открытой экономики: излишки, деньги (бюджет/рента) и два треугольника потерь.
 function drawOpenAreas() {
+  if(STATE.open?.tradeResult){drawTradeCountryAreas(STATE.open.tradeResult,STATE.D,STATE.S);return;}
   const o = STATE.open; if (!o || o.error) return;
   const D = STATE.D, S = STATE.S;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
@@ -701,6 +703,7 @@ function drawOpenAreas() {
 
 // Линии цен (мировая — перетаскиваемая, внутренняя — при вмешательстве) и полоса торговли.
 function drawOpenLines() {
+  if(STATE.open?.tradeResult){drawTradeCountryLines(STATE.open.tradeResult);return;}
   const o = STATE.open; if (!o) return;
   const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), g = svg.append('g');
   const yPw = sy(o.Pw);
@@ -769,6 +772,7 @@ function setOpenPw(p) {
 
 // Переключатель инструмента: без вмешательства / тариф / квота.
 function setOpenTool(tool) {
+  delete STATE.openPolicy;delete STATE.openBan;
   STATE.openTool = (tool === 'tariff' || tool === 'quota') ? tool : 'none';
   [['oi-none', 'none'], ['oi-tariff', 'tariff'], ['oi-quota', 'quota']]
     .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.classList.toggle('active', v === STATE.openTool); });
@@ -790,6 +794,7 @@ function syncOpenQuotaLabel() {
 
 // Табло открытой экономики: направление торговли, выигрыш, разбивка потерь.
 function updateOpenPanel() {
+  if(STATE.open?.tradeResult){updateTradePanel('info-open',STATE.open.tradeResult);return;}
   const box = document.getElementById('info-open'); if (!box) return;
   syncOpenQuotaLabel();
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }

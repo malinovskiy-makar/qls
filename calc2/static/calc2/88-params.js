@@ -1356,8 +1356,8 @@ function wireControls() {
   const opwS = document.getElementById('open-pw-slider'), opwI = document.getElementById('open-pw-input');
   if (opwS) opwS.addEventListener('input', () => setOpenPw(parseFloat(opwS.value)));
   if (opwI) opwI.addEventListener('change', () => { const v = parseFloat(opwI.value); if (!isNaN(v)) setOpenPw(v); });
-  [['oi-none', 'none'], ['oi-tariff', 'tariff'], ['oi-quota', 'quota']]
-    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setOpenTool(v)); });
+  [['oi-none', 'none'], ['oi-tariff', 'tax'], ['oi-subsidy','subsidy'], ['oi-quota', 'quota']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setTradePolicy('open',{kind:v})); });
   const setOpenNum = (key, sliderId, inputId, valId) => {
     const sl = document.getElementById(sliderId), inp = document.getElementById(inputId), lab = document.getElementById(valId);
     const apply = (v) => {

@@ -72,6 +72,7 @@ function redrawAll() {
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
   renderFirmMarketControls();
+  renderTradePolicyControls();
   // И только теперь — вопросики: знак без живой подсказки прячется. Раньше
   // applyCardScope нельзя, иначе проход не увидит спрятанного соседа.
   if (typeof syncHintDots === 'function') syncHintDots();

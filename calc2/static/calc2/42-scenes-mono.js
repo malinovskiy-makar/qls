@@ -1325,6 +1325,7 @@ function allocateMR(c1, c2, Qtot) {
 // Пересчёт дискриминации 3-й степени: сканируем суммарный Q, на каждом делим по MR₁=MR₂,
 // общий MR (max активной отрасли) приравниваем к MC(Qtot). Работает для const и f(Q) MC.
 function recomputeDiscr3() {
+  if(STATE.d3World&&(STATE.monoTrade||STATE.monoTradeBan&&STATE.monoTradeBan!=='free')){recomputeTradeMono();return;}
   STATE.discr3 = null;
   const errBox = document.getElementById('d3-error');
   const c1 = makeCurve(STATE.d3D1), c2 = makeCurve(STATE.d3D2), cost = discriminationCost(STATE.d3MC), cm = cost.curve || {error:cost.error};
@@ -1533,6 +1534,7 @@ function redrawDiscr3() {
    точки, площади, ключевые точки и колесо мыши работают общим механизмом, и
    clearPanels() здесь не зовётся ([ADR 0083]). */
 function drawMonoExport() {
+  if(STATE.discr3?.tradeResult){drawTradeMono();return;}
   const d = STATE.discr3;
   if (!d || (!d.found && !d.unbounded)) {
     svg.selectAll('*').remove();
@@ -1657,6 +1659,7 @@ function drawMonoExport() {
 }
 
 function updateDiscr3Panel() {
+  if(STATE.discr3?.tradeResult){updateTradePanel('info-d3',STATE.discr3.tradeResult,true);return;}
   const box = document.getElementById('info-d3'); if (!box) return;
   const d = STATE.discr3;
   const world = !!STATE.d3World;

@@ -98,6 +98,7 @@ const HERO = {
      · доп.wasText — готовая строка под значением («50 + 50» у потерь из двух треугольников).
    Значение строки табло вида «55 (было 45)» в «Ответе» — «55», под ним «45 + 10» (answerCellWas). */
 const HERO_STATE = {
+  monoexport: () => STATE.discr3?.tradeResult?tradeHero('info-d3',STATE.discr3.tradeResult,true):null,
   firmmarket: () => [['info-costs', '*']],
   costs: () => STATE.firmSupply ? [['info-costs', '*']] : null,
   taxes: () => {
@@ -112,6 +113,7 @@ const HERO_STATE = {
   ppfsum: () => [['info-ppfsum', 1], ['info-ppfsum', 2],
     ...((STATE.ppfSumData && STATE.ppfSumData.kinks) || []).map((_, i) => ['info-ppfsum', 3 + i])],
   smallopen: () => {
+    if(STATE.open?.tradeResult)return tradeHero('info-open',STATE.open.tradeResult);
     const o = STATE.open;
     if (!o || o.error) return null;
     const qds = [['Величина спроса', 'Qd', 'Q_d'], ['Величина предложения', 'Qs', 'Q_s']];
