@@ -29,6 +29,7 @@
 */
 import { chromium } from 'playwright';
 import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import { parseShown, shownEquivalent, readShownText } from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const ONLY = process.env.ONLY || '';     // буква раздела: ONLY=Б — только он
@@ -52,17 +53,16 @@ function ok(label, cond, detail) {
   total++; if (!cond) bad++;
   console.log('  ' + (cond ? 'OK  ' : 'FAIL') + ' ' + label + (detail ? '  — ' + detail : ''));
 }
-function eq(label, got, want) { ok(label, got === want, 'ожидалось «' + want + '», получилось «' + got + '»'); }
+function eq(label, got, want) { ok(label, typeof got === 'string' && typeof want === 'string' ? shownEquivalent(got, want) : got === want, 'ожидалось «' + want + '», получилось «' + got + '»'); }
 const want = (sec) => !ONLY || ONLY.includes(sec);
 
 // Помощники внутри страницы: тексты «Ответа», жесты окна.
 const INPAGE = `
+window.__readShownText = ${readShownText.toString()};
 window.__ma = {
   wait: (ms) => new Promise(r => setTimeout(r, ms || 120)),
   // Текст узла без невидимой половины KaTeX; пробелы и вид минуса не важны.
-  t: (el) => { if (!el) return ''; const c = el.cloneNode(true);
-    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
-    return c.textContent.replace(/[\\s\\u00a0\\u202f\\u2009\\u200b]+/g, '').replace(/-/g, '−'); },
+  t: (el) => __readShownText(el).replace(/[\\s\\u00a0\\u202f\\u2009\\u200b]+/g, '').replace(/-/g, '−'),
   // Строки табло своей модели (в «Построении графиков» — #info-graph).
   rows: () => [...document.querySelectorAll(STATE.mode === 'graph' ? '#info-graph .stat' : '#info-math .stat')]
     .map(s => ({ lab: __ma.t(s.querySelector(':scope > span')), val: __ma.t(s.querySelector(':scope > b')) })),
@@ -301,7 +301,9 @@ if (want('Е')) {
     const mx = c.find(x => /^Локальныймаксимум/.test(x.lab)), mn = c.find(x => /^Локальныйминимум/.test(x.lab));
     ok(key + ': ячейка «Локальный максимум»', !!mx, mx ? mx.val : c.map(x => x.lab).join(', '));
     ok(key + ': ячейка «Локальный минимум»', !!mn, mn ? mn.val : '');
-    const fmtOk = (v) => v === 'нет' || /^\(−?[\d,]+;−?[\d,]+\)(;\(−?[\d,]+;−?[\d,]+\))*$/.test(v);
+    const fmtOk = (v) => v === 'нет' || /^\(.+\)$/.test(v) && v.slice(1,-1).split(');(').every(p => {
+      const xy=p.split(';');return xy.length===2&&xy.every(n=>Number.isFinite(parseShown(n)));
+    });
     if (mx) ok(key + ': максимум в формате «(x; y)» или «нет»', fmtOk(mx.val), mx.val);
     if (mn) ok(key + ': минимум в формате «(x; y)» или «нет»', fmtOk(mn.val), mn.val);
   }

@@ -7,6 +7,7 @@
 const svg = d3.select('#chart');   // корневой SVG-элемент
 let W = 0, H = 0;                  // размеры области графика в пикселях
 let sx, sy;                       // D3-шкалы: данные -> пиксели
+let _coordMarginLeft = 0;          // измеренное место под точную подпись ключевой координаты
 
 // Размер SVG берём из контейнера (обновляется при изменении окна).
 function computeSize() {
@@ -108,7 +109,7 @@ function fitMargins() {
      Число подобрано замером живых подписей по всем сценам, а не на глаз:
      scripts/calc2_coordlabel_probe.js считает, сколько подписей залезло правее
      оси, и при этом запасе их ноль. */
-  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
+  m.left = Math.max(_coordMarginLeft, 30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
 
   /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
      «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
@@ -143,6 +144,20 @@ function fitLeftForLabels(values) {
   const need = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
   if (need > CONFIG.margin.left) { CONFIG.margin.left = need; makeScales(); }
   return CONFIG.margin.left;
+}
+
+/* Э3: радикал шире обычного деления. Замеряем уже набранные подписи,
+   затем один раз перестраиваем шкалы; цена остаётся слева от своей оси. */
+function fitCoordinateMargin() {
+  const node=svg.node();if(!node)return false;
+  let width=0;
+  node.querySelectorAll('text.coord-num').forEach(label=>{
+    if(label.getAttribute('text-anchor')!=='middle')width=Math.max(width,label.getBoundingClientRect().width);
+  });
+  const limit=Math.max(0,W-Math.min(240,W*.6));
+  const need=Math.min(limit,Math.ceil(width)+18);
+  if(need<=CONFIG.margin.left+1)return false;
+  _coordMarginLeft=need;return true;
 }
 
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
@@ -371,61 +386,23 @@ function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
    само раздвинется под новые, более длинные числа. */
 const NBTHIN = ' ';        // узкий неразрывный пробел — разделитель разрядов
 
-/* ⚠️ ЧИСЛО НА ЭКРАНЕ ОКРУГЛЯЕТСЯ РОВНО В ОДНОМ МЕСТЕ (канон 2.2).
-   Глубина округления — здесь и больше нигде: любое «Math.round(v*100)/100»,
-   написанное рядом с выводом, рано или поздно разъедется с этим. */
-const SHOWN_DECIMALS = 2;
-const SHOWN_POW = Math.pow(10, SHOWN_DECIMALS);
-function roundShown(v) { return Math.round(v * SHOWN_POW) / SHOWN_POW; }
-
 /* Э2, решение 29.10: итог складывается из точных величин. Округление —
    только последняя операция показа, иначе 7500/9 превращалось в 833,34. */
 function fmtSum(...parts) {
   const s = parts.reduce((acc, v) => acc + (isFinite(v) ? v : NaN), 0);
-  return fmt(s, sumDecimals(parts));
+  return fmt(s);
 }
-/* Та же оговорка для разности: столбец «Δ» в таблице «До / После / Δ» обязан
-   сходиться с двумя соседними столбцами, а не считаться по сырым значениям. */
-function shownDiff(after, before) { return roundShown(after) - roundShown(before); }
+/* Э3: разность тоже считается до преобразования в запись для экрана. */
+function shownDiff(after, before) { return after - before; }
 function fmtDiff(after, before) {
   const d = shownDiff(after, before);
-  return (d > 0 ? '+' : '') + fmt(d, sumDecimals([after, before]));
+  if (d <= 0) return fmt(d);
+  const r=CalcNumber.classify(d);
+  return r.kind==='approx' ? r.text.replace('≈ ', '≈ +') : '+'+CalcNumber.factor(d);
 }
 
-/* ⚠️ У СУММЫ ТА ЖЕ ГЛУБИНА, ЧТО У СЛАГАЕМЫХ (канон 2.2).
-   «290,65 + 290,65 = 581,3» арифметически верно и всё равно читается как
-   ошибка: в столбце два знака у слагаемых и один у итога, глаз ищет
-   пропавшую копейку. Незначащий ноль печатается только там, где рядом
-   стоят числа с этим разрядом; одиночное «50» так и остаётся «50».
-   shownDecimals отвечает на вопрос «сколько знаков fmt напечатает САМ»,
-   поэтому padding никогда не срезает значащую цифру. */
-function shownDecimals(v) {
-  const r = roundShown(v);
-  if (!isFinite(r)) return 0;
-  let frac = Math.round(Math.abs(r) * SHOWN_POW) % SHOWN_POW;
-  let d = SHOWN_DECIMALS;
-  while (d > 0 && frac % 10 === 0) { frac /= 10; d--; }
-  return d;
-}
-function sumDecimals(parts) {
-  return parts.reduce((d, v) => isFinite(v) ? Math.max(d, shownDecimals(v)) : d, 0);
-}
-
-function fmt(v, minDecimals) {
-  const r = roundShown(v);
-  if (!isFinite(r)) return String(v);
-  const sign = r < 0 ? '-' : '';
-  const a = Math.abs(r);
-  const whole = Math.floor(a);
-  let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
-  const want = Math.max(shownDecimals(r), minDecimals || 0);
-  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15).
-  if (want > 0) {
-    const frac = String(Math.round((a - whole) * SHOWN_POW))
-                   .padStart(SHOWN_DECIMALS, '0');
-    s += ',' + frac.slice(0, want);
-  }
-  return sign + s;
+function fmt(v) {
+  return CalcNumber.format(v);
 }
 
 /* То же число для ЧИСЛОВОГО ПОЛЯ. Поле type=number принимает только машинную
@@ -433,8 +410,7 @@ function fmt(v, minDecimals) {
    недопустимым, и браузер молча очищает поле. Поэтому показ и заполнение
    поля — две разные записи одного числа. */
 function fmtInput(v) {
-  const r = Math.round(v * 100) / 100;
-  return isFinite(r) ? String(r) : '';
+  return Number.isFinite(v) ? String(v) : '';
 }
 
 /* Шаг делений из «красивой» лесенки 1–2–5. Считается только от размаха окна,

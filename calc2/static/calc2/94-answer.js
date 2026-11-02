@@ -194,8 +194,7 @@ function areasHead() {
 
 /* Число из текста строки табло: «1 168,75», «−10». Не число — NaN. */
 function ansNum(s) {
-  const t = String(s == null ? '' : s).replace(/[\s   ]/g, '').replace(/−/g, '-').replace(',', '.');
-  return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : NaN;
+  return CalcNumber.parse(s)?.value ?? NaN;
 }
 /* «до» и изменение арифметикой: «70 − 10» (решение 13.10, ADR 0149). Разность — по ПОКАЗАННЫМ числам, иначе
    выражение не сходится с тем, что человек видит. Не числа — пусто. */
@@ -203,7 +202,9 @@ function answerCellWas(beforeText, afterText) {
   const a = ansNum(afterText), b = ansNum(beforeText);
   if (!isFinite(a) || !isFinite(b)) return '';
   const d = a - b;
-  return String(beforeText).trim() + (d >= 0 ? ' + ' : ' − ') + fmt(Math.abs(d));
+  const before=CalcNumber.factor(b),delta=CalcNumber.factor(Math.abs(d));
+  const approximate=/≈/.test(beforeText)||/≈/.test(afterText)||/≈/.test(before)||/≈/.test(delta);
+  return (approximate?'≈ ':'')+before.replace(/^≈\s*/,'')+(d>=0?' + ':' − ')+delta.replace(/^≈\s*/,'');
 }
 
 /* Заголовки групп «Ответа» по блоку табло. Блок без записи идёт без
@@ -261,10 +262,7 @@ function notationTex(t) {
 }
 
 function plainText(el) {
-  if (!el) return '';
-  const c = el.cloneNode(true);
-  c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
-  return c.textContent.replace(/[\s   ​]+/g, ' ').trim();
+  return CalcNumber.readText(el);
 }
 function statRows(blk) {
   return blk ? [...blk.querySelectorAll('.stat')].filter(s => !s.closest('.ans-hero')) : [];
@@ -336,16 +334,21 @@ function labelCopy(lab) {
    влез даже в строку целиком) — только между ними; «нет» — приглушённо;
    прочее (фраза, «L = 10, MP = 300») — копией табло. Текст значения тот же,
    что у строки-источника: по нему сверяют паритет и «Сначала сам». */
-const ANS_ITEM = /^\(?[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(;[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?)?\)?(°|∘|\s?%)?$/;
+function answerNumberItem(text) {
+  if (CalcNumber.parse(text)) return true;
+  if (!text.startsWith('(') || !text.endsWith(')')) return false;
+  const pair=text.slice(1,-1).split(';');
+  return pair.length===2 && pair.every(value=>CalcNumber.parse(value)!=null);
+}
 function answerValueInto(v, srcEl, srcText) {
   const raw = srcEl ? plainText(srcEl) : String(srcText || '');
+  v.dataset.valueText = raw;
   if (/^нет$/i.test(raw)) { v.textContent = 'нет'; v.classList.add('ans-val--none'); return; }
-  const pureNum = /^[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(\s?%)?$/.test(raw);
+  const pureNum = CalcNumber.parse(raw) != null;
   if (typeof katexInto === 'function' && pureNum) {
     /* Пробелы — неразрывные (~), чтобы в тексте осталось «1 250», как в
        строке-источнике; запятая дроби без отбивки. */
-    const tx = raw.replace(/^-/, '−').replace(/[\s\u00a0\u202f\u2009]+/g, '~').replace(/,/g, '{,}').replace(/%/g, '\\%').replace(/−/g, '\\text{−}');
-    katexInto(v, '\\mathrm{' + tx + '}');
+    katexInto(v, statToTex(raw));
     return;
   }
   // Список чисел или точек через «;»: делим по «;» вне скобок.
@@ -358,7 +361,7 @@ function answerValueInto(v, srcEl, srcText) {
   }
   items.push(cur.trim());
   if (items.length > 1 && typeof katexInto === 'function' && typeof statToTex === 'function'
-      && items.every(it => ANS_ITEM.test(it.replace(/;\s+/g, ';')))) {
+      && items.every(answerNumberItem)) {
     v.innerHTML = '';
     /* Перенос только между точками: класс, а не :has() — и WebKit, в отличие от
        Chromium, при nowrap по <wbr> НЕ переносит (Safari резал строку краем
@@ -872,20 +875,21 @@ function answerRow(c, isMath) {
   }
   const v = document.createElement('span'); v.className = 'ans-val';
   answerValueInto(v, c.val || null, c.valText);
+  if (/^≈/.test(v.dataset.valueText||'')) line.querySelector('.ans-eq')?.remove();
   line.appendChild(v);
   d.append(l, line);
   /* Изменение — арифметикой «50 − 10»: число до и изменение со знаком, и само
      выражение равно значению в строке (решение владельца 13.10, Notion …81a2…;
      прежде «было 50 · −10», ADR 0144). Знак — настоящий минус U+2212. */
-  const delta = c.tx ? /^([+−-])\s*(.+)$/.exec(String(c.tx.delta || '').trim()) : null;
+  const txWas = c.tx ? answerCellWas(c.tx.before, c.tx.after) : '';
   if (c.was) {
     // «до» и изменение, собранные по строке табло или по числу «до» (answerCells, ADR 0158).
     const w = document.createElement('div'); w.className = 'ans-was';
     w.textContent = c.was;
     d.appendChild(w);
-  } else if (c.tx && c.tx.before && (delta || /^0([,.]0*)?$/.test(String(c.tx.delta || '').trim()))) {
+  } else if (txWas) {
     const w = document.createElement('div'); w.className = 'ans-was';
-    w.textContent = c.tx.before + (delta ? (delta[1] === '+' ? ' + ' : ' − ') + delta[2] : ' + 0');
+    w.textContent = txWas;
     d.appendChild(w);
   }
   return d;
@@ -917,7 +921,7 @@ function buildBurden() {
   const sub = STATE.intervType === 'subsidy';
   const tot = Math.abs(b) + Math.abs(s);
   const pb = Math.abs(b) / tot * 100, ps = 100 - pb;
-  const pct = (x) => fmt(Math.round(x)) + '\u202f%';
+  const pct = (x) => CalcNumber.format(x, {percent:true});
   box.innerHTML = '';
   const h = document.createElement('h3'); h.className = 'col-sub'; h.textContent = sub ? 'Кому достаётся субсидия' : 'Кто несёт налог';
   const bar = document.createElement('div'); bar.className = 'burden-bar';

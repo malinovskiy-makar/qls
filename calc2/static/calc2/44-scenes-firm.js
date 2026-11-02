@@ -685,8 +685,26 @@ function prodEval(L) {
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
-// Предельный продукт MP = dQ/dL — центральная разность (как везде в движке).
+// Для гладкой формулы берём производную без шума разностей. Численный
+// запасной путь остаётся для формул, которые Math.js не дифференцирует.
+let _prodDerivativeSource = null, _prodDerivatives = [];
+function prodDerivative(L, order) {
+  if (_prodDerivativeSource !== STATE.prodExpr) {
+    _prodDerivativeSource = STATE.prodExpr;
+    const first = derivativeExpr(STATE.prodExpr, 'L');
+    const second = first && derivativeExpr(first, 'L');
+    _prodDerivatives = [first, second].map(expr => expr ? compileFormula(expr).compiled : null);
+  }
+  const compiled = _prodDerivatives[order - 1];
+  if (!compiled) return NaN;
+  try {
+    const value = compiled.evaluate(scopeFor(STATE.prodExpr, { L, x: L, Q: L }));
+    return Number.isFinite(value) ? value : NaN;
+  } catch (e) { return NaN; }
+}
 function prodMP(L) {
+  const exact = prodDerivative(L, 1);
+  if (Number.isFinite(exact)) return exact;
   const h = Math.max(1e-5, L * 1e-5 || 1e-5), lo = Math.max(0, L - h);
   const a = prodEval(L + h), b = prodEval(lo);
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((L + h) - lo);
@@ -699,7 +717,7 @@ function prodAP(L) { const q = prodEval(L); return (isNaN(q) || L <= 0) ? NaN : 
    TP при L = 6,57». У TP = L² предельный продукт растёт всюду: максимум MP
    оказывался на правом краю сетки. И то, и другое — край цикла, выданный за
    экономическую величину. */
-function maxOf(f, lo, hi) {
+function maxOf(f, lo, hi, derivative) {
   let bestQ = null, bestV = -Infinity, lowV = Infinity;
   const scan = (a, b, n) => {
     for (let i = 0; i <= n; i++) {
@@ -716,6 +734,13 @@ function maxOf(f, lo, hi) {
   const st = (hi - lo) / 2000;
   const interior = (bestQ > lo + 2 * st) && (bestQ < hi - 2 * st);
   scan(Math.max(lo, bestQ - st), Math.min(hi, bestQ + st), 400);
+  if (interior && derivative) {
+    const a = Math.max(lo, bestQ - st), b = Math.min(hi, bestQ + st);
+    if (derivative(a) > 0 && derivative(b) < 0) {
+      const q = bisect(derivative, a, b), v = q == null ? NaN : f(q);
+      if (Number.isFinite(v) && v >= bestV - 1e-10 * scale) { bestQ = q; bestV = v; }
+    }
+  }
   return { L: bestQ, val: bestV, kind: interior ? 'interior' : 'boundary' };
 }
 // Показывать числом можно только настоящий внутренний максимум.
@@ -732,9 +757,9 @@ function recomputeProduction() {
   let Lmax = CONFIG.Qmax;
   const zero = findRootIn((l) => prodEval(l), CONFIG.Qmax * 0.02, CONFIG.Qmax * 20);
   if (zero != null && zero > 0) Lmax = zero;
-  const maxTP = maxOf(prodEval, 0, Lmax);           // максимум выпуска
-  const maxMP = maxOf(prodMP, 1e-3, Lmax);          // точка перегиба TP — начало убывающей отдачи
-  const maxAP = maxOf(prodAP, 1e-3, Lmax);          // максимум AP: там AP = MP
+  const maxTP = maxOf(prodEval, 0, Lmax, prodMP);   // максимум выпуска
+  const maxMP = maxOf(prodMP, 1e-3, Lmax, L => prodDerivative(L, 2)); // перегиб TP
+  const maxAP = maxOf(prodAP, 1e-3, Lmax, L => (L * prodMP(L) - prodEval(L)) / (L * L)); // AP = MP
   const mpAtMaxAP = maxAP ? prodMP(maxAP.L) : NaN;
   STATE.prod = { Lmax, maxTP, maxMP, maxAP, mpAtMaxAP };
 }

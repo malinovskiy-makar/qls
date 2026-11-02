@@ -27,7 +27,7 @@ function inequalitySharesFromInput() {
     const sum = g.reduce((a, b) => a + b, 0);
     if (!(sum > 0)) return null;
     let warn = null;
-    if (Math.abs(sum - 100) > 0.5) warn = 'Сумма долей = ' + fmt(sum) + '% (нормировано до 100%).';
+    if (Math.abs(sum - 100) > 0.5) warn = 'Сумма долей = ' + CalcNumber.format(sum,{percent:true}) + ' (нормировано до 100%).';
     return { shares: g.map(v => Math.max(0, v) / sum), N, warn, reordered, sortedGroups: g };
   }
   if (STATE.ineqInput === 'incomes') {

@@ -355,6 +355,10 @@ const TexExport = (function () {
     };
     while (i < s.length) {
       const ch = s[i];
+      // Точные числовые подписи — тот же набор дробей/радикалов, что в ответе.
+      // Координаты кривых в addplot остаются машинными числами.
+      const exact = /^(?:(?:\d[\d\u202f]*)?√\d+(?:\/\d+)?|\d[\d\u202f]*\/\d[\d\u202f]*)/.exec(s.slice(i));
+      if (exact && !prevSym) { atom(); out += CalcNumber.texText(exact[0]); i += exact[0].length; prevSym = false; continue; }
       if (/[A-Za-z]/.test(ch)) { let run = ''; while (i < s.length && /[A-Za-z]/.test(s[i])) run += s[i++]; const t = latinTex(run); atom(); out += t; hasSub = /_\{/.test(t); prevSym = true; continue; }
       if (/[0-9]/.test(ch)) {
         let run = '';

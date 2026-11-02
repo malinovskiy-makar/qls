@@ -19,6 +19,7 @@
    ⚠️ Расходится число — сломан движок, а не прибор. */
 import { chromium } from 'playwright';
 import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import { parseShown, shownEquivalent, shownChangeEquivalent, installShownReader } from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const browser = keepAnswerOpen(await chromium.launch());
@@ -27,6 +28,7 @@ const errs = [];
 page.on('pageerror', e => errs.push(e.message));
 await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
+await installShownReader(page);
 
 let bad = 0, total = 0;
 const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 62 - s.length)));
@@ -51,7 +53,7 @@ async function answer(code) {
   await page.waitForTimeout(500);
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   return page.evaluate(() => {
-    const t = (el) => { if (!el) return ''; const c = el.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+    const t = window.__readShownText;
     const shown = (el) => { for (let n = el; n && n.id !== 'params-panel'; n = n.parentElement) { if (n.hidden) return false; const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
     const groups = [...document.querySelectorAll('#ans-hero > .ans-group')].map(g => ({
       head: t(g.querySelector('.ans-ghead')),
@@ -67,8 +69,8 @@ async function answer(code) {
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ]+/g, '');
 /* Значение: число — с допуском 0,011 (84,375 печатается то 84,37, то 84,38 — шум интеграла; запись чисел — сессия
    «Числа»), иначе — текст без пробелов. */
-const numOf = (s) => { const x = norm(s).replace(/−/g, '-').replace(',', '.'); return /^-?\d+(\.\d+)?$/.test(x) ? parseFloat(x) : NaN; };
-const same = (a, b) => (isFinite(numOf(a)) && isFinite(numOf(b))) ? Math.abs(numOf(a) - numOf(b)) <= 0.011 : norm(a) === norm(b);
+const numOf = parseShown;
+const same = (a, b) => (isFinite(numOf(a)) && isFinite(numOf(b))) ? Math.abs(numOf(a) - numOf(b)) <= 0.011 : shownEquivalent(a, b);
 /* Ожидание группы: [заголовок, [[подпись-регэксп, значение, было?], …]] — строки по порядку, «было» — если задано. */
 function checkGroup(tag, a, gi, want) {
   const g = a.groups[gi];
@@ -77,7 +79,7 @@ function checkGroup(tag, a, gi, want) {
   want[1].forEach(([re, v, was], i) => {
     const c = g.cells[i];
     ok(tag + ': «' + want[0] + '», строка ' + (i + 1) + ' ' + re + ' = ' + v + (was != null ? ' (' + was + ')' : ''),
-      !!c && re.test(c.lab + ' ' + c.not) && same(c.val, v) && (was == null || norm(c.was) === norm(was)), c);
+      !!c && re.test(c.lab + ' ' + c.not) && same(c.val, v) && (was == null || shownChangeEquivalent(c.was, was)), c);
   });
   ok(tag + ': «' + want[0] + '» — строк ' + want[1].length, g.cells.length === want[1].length, g.cells.map(c => c.lab + ' = ' + c.val));
 }

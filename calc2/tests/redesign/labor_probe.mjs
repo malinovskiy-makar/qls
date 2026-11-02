@@ -40,6 +40,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { answerShown } from '../answer_open.mjs';
+import { parseShown, shownNumbers, shownEquivalent, installShownReader } from '../parse_shown.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..', '..');
@@ -65,7 +66,7 @@ function ok(label, cond, detail) {
 const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 60 - s.length)));
 const near = (a, b, t) => a != null && isFinite(a) && Math.abs(a - b) <= (t == null ? 0.01 : t);
 /* Число из записи интерфейса: пробелы тысяч, запятая, минус U+2212. */
-const num = (s) => { const m = /[−-]?[\d\s   ]*\d(?:[.,]\d+)?/.exec(String(s || '')); return m ? parseFloat(m[0].replace(/[\s   ]/g, '').replace(',', '.').replace('−', '-')) : NaN; };
+const num = (s) => Number.isFinite(parseShown(s)) ? parseShown(s) : shownNumbers(s)[0]?.value ?? NaN;
 
 let browser = null, engName = '', ctxCount = 0;
 async function newCtx(opts) {
@@ -87,6 +88,7 @@ async function openModel(key, init, url) {
     } catch (e) {}
   }, init || null);
   const page = await ctx.newPage();
+  await installShownReader(page);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
   await page.goto(url || (BASE + '/calc2/?m=' + key), { waitUntil: 'load', timeout: 40000 });
@@ -110,7 +112,7 @@ async function setCurves(page, [d, s]) {
 /* Табло «Рынок труда» и колонка «Ответ»: строки (подпись, значение, видна ли), подсказки, подзаголовки; главные
    числа «Ответа»; видимый текст колонки. */
 const answer = (page) => page.evaluate(() => {
-  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[​]/g, '').replace(/\s+/g, ' ').trim(); };
+  const tx = window.__readShownText;
   const vis = (e) => !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
   const box = document.getElementById('info-labor');
   return {
@@ -131,11 +133,11 @@ function checkRows(name, a, want) {
   const flat = (x) => String(x).replace(/[\s\u00a0\u202f\u2009]+/g, '');
   want.forEach(([re, v], i) => {
     const s = a.stats[i];
-    const valOk = !!s && (typeof v === 'string' ? flat(s.val) === flat(v) : near(num(s.val), v, Math.max(0.011, Math.abs(v) * 0.0005)));
+    const valOk = !!s && (typeof v === 'string' ? shownEquivalent(s.val, v) : near(num(s.val), v, Math.max(0.011, Math.abs(v) * 0.0005)));
     ok(name + ': строка ' + (i + 1) + ' ' + re + ' = ' + v, !!s && re.test(s.lab) && valOk, s ? s.lab + ' = ' + s.val : 'нет строки');
     /* Строка «55 (было 45)», ставшая главной, в «Ответе» — значение 55 и «45 + 10» под ним (ADR 0158, 24.10). */
     const heroVal = (x) => typeof x === 'string' ? flat(x).replace(/\(было[^)]*\)$/, '') : x;
-    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => typeof v === 'string' ? flat(h.val) === heroVal(v) : near(num(h.val), v, 0.011))), JSON.stringify(s));
+    if (s) ok(name + ': строка ' + (i + 1) + ' видна в «Ответе»', s.shown || (s.hero && a.hero.some(h => typeof v === 'string' ? shownEquivalent(h.val, heroVal(v)) : near(num(h.val), v, 0.011))), JSON.stringify(s));
   });
 }
 const canvasMRL = (page) => page.evaluate(() => {

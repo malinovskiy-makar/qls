@@ -1740,18 +1740,17 @@ function quadBreaks(c, hi) {
    расходилась бы на тысячные и обвиняла бы сложение вместо округления.
    Поэтому дробь раскрываем только когда это точно, иначе оставляем делением. */
 function sumSegExpr(A, C) {
-  const r9 = (v) => Math.round(v * 1e9) / 1e9;
   const slope = 1 / A, free = -C / A;
   const rs = Math.round(slope * 1e6) / 1e6, rf = Math.round(free * 1e6) / 1e6;
   if (Math.abs(rs - slope) < 1e-12 && Math.abs(rf - free) < 1e-12) return fmtLinear(rs, rf, 'Q', 6);
-  const a = r9(A), c = r9(C);
+  const a = A, c = C, n = v => CalcNumber.expression(v,{atomic:true});
   const inner = (sign) => {
     // sign = +1 → «Q − C», sign = −1 → «C − Q»
     if (c === 0) return sign > 0 ? 'Q' : '-Q';
-    if (sign > 0) return c < 0 ? ('Q + ' + (-c)) : ('Q - ' + c);
-    return c < 0 ? ('-Q - ' + (-c)) : (c + ' - Q');
+    if (sign > 0) return c < 0 ? ('Q + ' + n(-c)) : ('Q - ' + n(c));
+    return c < 0 ? ('-Q - ' + n(-c)) : (n(c) + ' - Q');
   };
-  return (a > 0) ? ('(' + inner(1) + ')/' + a) : ('(' + inner(-1) + ')/' + (-a));
+  return (a > 0) ? ('(' + inner(1) + ')/' + n(a)) : ('(' + inner(-1) + ')/' + n(-a));
 }
 
 /* Суммарная кривая по точкам — запасной путь для нелинейных групп.
@@ -3092,7 +3091,7 @@ function updateTaxPanel() {
   // Название формы стоит рядом с числом: «τ = 50 %» без слова «акциз» не
   // отличить от «τ = 50 %» у НДС, а точки у них разные.
   let html = `<div class="stat"><span>${adv ? ('Ставка τ · ' + pf.label) : (isSub ? 'Субсидия s' : 'Налог t')}</span>` +
-             `<b>${fmt(STATE.tax)}${adv ? ' %' : ''}</b></div>`;
+             `<b>${CalcNumber.format(STATE.tax,{percent:adv})}</b></div>`;
   if (noBase) {
     html += '<table class="tx-table"><tr><th></th><th>После вмешательства</th></tr>';
     rows.forEach(([k, b]) => { html += `<tr><td>${k}</td><td>${fmt(b)}</td></tr>`; });
@@ -3104,8 +3103,7 @@ function updateTaxPanel() {
   } else {
     html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
     rows.forEach(([k, a, b]) => {
-      // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
-      // двумя числами, которые человек видит слева от него (п. 1).
+      // Δ считается из исходных чисел; запись всех трёх значений — общая (Э3).
       const ds = fmtDiff(b, a);
       html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
     });
@@ -3649,8 +3647,7 @@ function updatePcPanel() {
   let html = `<div class="stat"><span>${isCeiling ? 'Потолок Pc' : 'Пол Pf'}</span><b>${fmt(pc.Preg)}</b></div>`;
   html += '<table class="tx-table"><tr><th></th><th>До</th><th>После</th><th>Δ</th></tr>';
   rows.forEach(([k, a, b]) => {
-    // Δ считается из ОКРУГЛЁННЫХ соседей: иначе столбец не сходится с теми
-    // двумя числами, которые человек видит слева от него (п. 1).
+    // Δ считается из исходных чисел; запись всех трёх значений — общая (Э3).
     const ds = fmtDiff(b, a);
     html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
   });

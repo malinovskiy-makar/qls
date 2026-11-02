@@ -15,7 +15,7 @@ CASES = [
      'const psM = Pt * Qt - vcM - budget;', 'const psM = Pt * Qt - vcM;',
      'субсидия: PS=22500'),
     ('rounded-sw', '20-plane.js',
-     'acc + (isFinite(v) ? v : NaN)', 'acc + (isFinite(v) ? roundShown(v) : NaN)',
+     'acc + (isFinite(v) ? v : NaN)', 'acc + (isFinite(v) ? Math.round(v * 100) / 100 : NaN)',
      'SW считается из точных слагаемых'),
     ('no-shrink', '52-modes.js',
      'if (fit) setRanges(w.qmax, w.pmax);', 'if (fit) growRanges(w.qmax, w.pmax);',

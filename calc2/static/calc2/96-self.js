@@ -16,14 +16,7 @@
 // вердикт снимается сам (selfCell), а не от любой правки модели.
 const SELF = { on: false, all: false, typed: {}, open: {}, verdict: {}, vtruth: {} };
 
-/* Допуск (README макета, 9): ответ и число ячейки читаются одинаково —
-   убрать пробелы (в том числе U+202F и U+00A0), «−» → «-», запятая → точка.
-   Верно, если |a − b| ≤ max(0,011; 0,0005·|b|). */
-function selfNum(t) {
-  const s = String(t == null ? '' : t).replace(/[\s   ]+/g, '').replace(/[−–]/g, '-').replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
-  return parseFloat(s);
-}
+function selfNum(t) { const p = CalcNumber.parse(t); return p ? p.value : null; }
 /* ОТВЕТ — НЕ ТОЛЬКО ОДНО ЧИСЛО (решение владельца 09.10, ADR 0143).
    Ответом считается: число; список чисел через «;»; точка «(x; y)»; список
    точек через «;»; «нет» (пустой список). Одно число — частный случай списка,
@@ -33,27 +26,44 @@ function selfNum(t) {
    внутри скобок; регистр «нет» не важен. Хвост «°» («∘») или «%» у числа ячейки
    (угол наклона, ставка) — подпись единицы, а не часть ответа.
    Вернёт { pts: bool, items: [[x], …] | [[x, y], …] } или null — не разобрали. */
-const SELF_NUM = '-?\\d+(?:[.,]\\d+)?';
 function selfParse(t) {
-  let s = String(t == null ? '' : t).replace(/[\s\u00a0\u202f\u2009\u200b]+/g, '').replace(/[−–\u2014]/g, '-').toLowerCase();
+  let s = String(t == null ? '' : t).trim().toLowerCase();
   if (!s) return null;
-  if (s === 'нет') return { pts: null, items: [] };
+  if (s === 'нет') return { pts: null, items: [], precision: [] };
   s = s.replace(/;$/, '');
-  const num = (x) => parseFloat(x.replace(',', '.'));
-  const PT = new RegExp('^\\((' + SELF_NUM + ');(' + SELF_NUM + ')\\)$');
-  const N1 = new RegExp('^(' + SELF_NUM + ')[°∘%]?$');   // ∘ — градус, набранный KaTeX
-  if (s.charAt(0) === '(') {
-    const parts = s.match(/\([^()]*\)/g);
-    if (!parts || parts.join(';') !== s) return null;
-    const items = [];
-    for (const p of parts) { const m = PT.exec(p); if (!m) return null; items.push([num(m[1]), num(m[2])]); }
-    return { pts: true, items };
-  }
-  const items = [];
-  for (const p of s.split(';')) { const m = N1.exec(p); if (!m) return null; items.push([num(m[1])]); }
-  return { pts: false, items };
+  const split = str => {
+    const parts = []; let depth = 0, cur = '';
+    for (const c of str) {
+      if (c === '(') depth++;
+      if (c === ')' && --depth < 0) return null;
+      if (c === ';' && depth === 0) { parts.push(cur.trim()); cur = ''; } else cur += c;
+    }
+    if (depth) return null;
+    parts.push(cur.trim()); return parts;
+  };
+  const parts = split(s); if (!parts) return null;
+  const point = p => p.startsWith('(') && p.endsWith(')') ? split(p.slice(1,-1)) : null;
+  const pts = parts.some(p => point(p)?.length === 2);
+  const parsed = parts.map(p => {
+    const coords = pts ? point(p) : [p];
+    if (!coords || coords.length !== (pts ? 2 : 1)) return null;
+    const n = coords.map(CalcNumber.parse); return n.every(Boolean) ? n : null;
+  });
+  if (parsed.some(p => !p)) return null;
+  return {pts, items:parsed.map(p => p.map(n => n.value)), precision:parsed};
 }
-function selfClose(a, b) { return Math.abs(a - b) <= Math.max(0.011, 0.0005 * Math.abs(b)); }
+function selfClose(a, b) { return Math.abs(a - b) <= Math.max(2e-8, 8 * Number.EPSILON * Math.abs(b)); }
+function selfAccept(a, b) {
+  if (Number.isInteger(b.value) && !b.approximate) return a.value === b.value;
+  if (selfClose(a.value, b.value)) return true;
+  // У ответа с «≈» известны только показанные тысячные. Более подробная
+  // запись человека должна попадать в тот же интервал округления.
+  if (b.approximate && (a.digits == null || a.digits >= 3)) return Math.abs(a.value-b.value) <= .0005 + 1e-12;
+  if (a.digits == null || a.digits < 1) return false;
+  const power = Math.pow(10, Math.min(a.digits, 12));
+  const rounded = Math.sign(b.value) * Math.round(Math.abs(b.value) * power) / power;
+  return selfClose(a.value, rounded);
+}
 /* Сравнение как мультимножеств: порядок не важен, число значений обязано
    совпасть, каждая координата — с прежним допуском. «нет» = пустой список.
    null — ответ человека не разобрался (вердикта нет). */
@@ -64,8 +74,8 @@ function checkGuess(answer, truth) {
   if (!b.items.length) return true;
   if (a.pts !== b.pts) return false;
   const used = new Array(b.items.length).fill(false);
-  return a.items.every(g => {
-    const k = b.items.findIndex((w, i) => !used[i] && w.every((v, j) => selfClose(g[j], v)));
+  return a.items.every((g, gi) => {
+    const k = b.items.findIndex((w, i) => !used[i] && w.every((v, j) => selfAccept(a.precision[gi][j], b.precision[i][j])));
     if (k < 0) return false;
     used[k] = true;
     return true;
@@ -76,10 +86,7 @@ function selfIsAnswer(truth) { return selfParse(truth) != null; }
 
 // Текст узла без невидимой половины KaTeX (calc2/CLAUDE.md, ловушки).
 function selfText(el) {
-  if (!el) return '';
-  const c = el.cloneNode(true);
-  c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
-  return c.textContent.replace(/\s+/g, ' ').trim();
+  return CalcNumber.readText(el);
 }
 
 /* Обозначение величины строки («x», «Q*»): по нему узнаётся ось. У
@@ -132,18 +139,25 @@ function selfCell(cell, idx) {
   const chk = document.createElement('button'); chk.type = 'button'; chk.className = 'self-check'; chk.textContent = 'Проверить';
   const show = document.createElement('button'); show.type = 'button'; show.className = 'self-show'; show.textContent = 'Показать';
   const pill = document.createElement('span'); pill.className = 'self-pill'; pill.setAttribute('role', 'status');
+  const detail = document.createElement('div'); detail.className = 'self-detail'; detail.setAttribute('aria-live', 'polite');
   const paintVerdict = () => {
     const v = SELF.verdict[id];
     pill.textContent = v === true ? '✓ верно' : (v === false ? '✗ не сходится' : '');
     pill.className = 'self-pill' + (v === true ? ' is-ok' : (v === false ? ' is-bad' : ''));
     inp.classList.toggle('is-ok', v === true); inp.classList.toggle('is-bad', v === false);
+    inp.setAttribute('aria-invalid', v === false ? 'true' : 'false');
+    detail.textContent = v === true ? 'Точно: ' + SELF.vtruth[id] : '';
   };
   const check = () => {
     const cur = selfText(cell.querySelector('.ans-val'));
     const r = checkGuess(inp.value, cur);
     // Не разобрали — подсказка формата, вердикта нет. Неверно — только «не
     // сходится»: сколько значений не хватает, не выдаём.
-    if (r == null) { toast('Впишите числа через «;», точку как (x; y) или «нет»'); return; }
+    if (r == null) {
+      delete SELF.verdict[id]; paintVerdict(); inp.setAttribute('aria-invalid', 'true');
+      detail.textContent = 'Впишите число, дробь, корень, точку (x; y) или список через «;».';
+      return;
+    }
     SELF.verdict[id] = r; SELF.vtruth[id] = cur; paintVerdict(); selfAfterAnswer();
     /* Перерисовки здесь НЕТ намеренно: подпись ключевой точки собирается при
        каждом наведении и сама видит новый вердикт; перерисовка лишь будила бы
@@ -156,7 +170,7 @@ function selfCell(cell, idx) {
   line.append(inp, chk);
   row.append(pill, show);
   box._paint = paintVerdict;
-  box.append(line, row);
+  box.append(line, row, detail);
   cell.appendChild(box);
   paintVerdict();
 }
@@ -224,8 +238,7 @@ function selfCanvas() {
     // Подпись может нести индекс («60_b», «40₁» — индекс отдельным узлом):
     // число — первый узел текста.
     const first = t.firstChild ? (t.firstChild.textContent || '') : '';
-    const m = /^\s*(-?[\d\s\u202f.,\u2212]+)/.exec(first);
-    const v = m ? selfNum(m[1]) : null;
+    const v = selfNum(first);
     if (v == null) return;
     // Ось подписи: у вертикальной оси подпись стоит левее поля графика.
     const r = t.getBoundingClientRect();
@@ -247,9 +260,10 @@ function selfCanvas() {
     let out = null;
     if (/^\s*(Δy|Δ\s*y)\s*=/.test(s)) out = 'Δy = ?';
     else if (/f\s*['′]/.test(s) && /=/.test(s)) out = s.replace(/=.*$/, '= ?');
-    else if (/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/.test(s)) out = s.replace(/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/g, '(?; ?)');
+    else if (/\([^();]+;[^();]+\)/.test(s)) out = s.replace(/\(([^();]+);([^();]+)\)/g,
+      (match, x, y) => selfNum(x) != null && selfNum(y) != null ? '(?; ?)' : match);
     else if (/^\s*S\s*[₀-₉\d]*\s*=/.test(s)) out = s.replace(/=.*$/, '= ?');
-    else if (/^\s*(дефицит|избыток)\b/i.test(s)) out = s.replace(/[−\-]?\d[\d\s.,\u202f]*/g, '?');
+    else if (/^\s*(дефицит|избыток)\s/i.test(s)) out = s.replace(/^(\s*(?:дефицит|избыток))\s+.*$/i, '$1 ?');
     if (out != null && out !== s) selfMaskText(t, out);
   });
 }
@@ -286,18 +300,19 @@ function selfOpenValues() {
     const p = selfParse(selfText(c.querySelector('.ans-val')));
     if (!p) return;
     const not = selfNot(c).charAt(0).toLowerCase();
-    if (p.pts) { p.items.forEach(it => o.pts.push(it)); return; }
+    if (p.pts) { p.precision.forEach(it => o.pts.push(it)); return; }
     const box = (not && not === xL) ? o.X : ((not && not === yL) ? o.Y : o.any);
-    p.items.forEach(it => box.push(it[0]));
+    p.precision.forEach(it => box.push(it[0]));
   });
   return o;
 }
 function selfPointOpen(x, y) {
   if (!selfMasked()) return true;
   const o = selfOpenValues();
-  if (o.pts.some(([a, b]) => selfClose(x, a) && selfClose(y, b))) return true;
-  const zero = (v) => Math.abs(v) <= 0.011;
-  const hit = (v, list) => list.some(w => selfClose(v, w));
+  const match = (value, shown) => shown.approximate ? Math.abs(value-shown.value)<=.0005+1e-12 : selfClose(value,shown.value);
+  if (o.pts.some(([a, b]) => match(x, a) && match(y, b))) return true;
+  const zero = (v) => Math.abs(v) <= 2e-8;
+  const hit = (v, list) => list.some(w => match(v, w));
   return (zero(x) || hit(x, o.X.concat(o.any))) && (zero(y) || hit(y, o.Y.concat(o.any)));
 }
 

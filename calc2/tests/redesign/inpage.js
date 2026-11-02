@@ -211,7 +211,9 @@
   /* ── Текст без невидимой половины KaTeX (calc2/CLAUDE.md, ловушки) ── */
   function text(el) {
     if (!el) return '';
+    if (el.dataset && el.dataset.valueText !== undefined) return el.dataset.valueText;
     const c = el.cloneNode(true);
+    c.querySelectorAll('[data-value-text]').forEach(n => { n.textContent = n.dataset.valueText; });
     c.querySelectorAll('.katex-mathml, annotation, .stat-sign, button').forEach(x => x.remove());
     return c.textContent.replace(/[\s   ]+/g, ' ').trim();
   }

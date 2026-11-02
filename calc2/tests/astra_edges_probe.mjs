@@ -1,6 +1,7 @@
 /* Э2: независимые контрольные примеры и действия в действующих полях ввода. */
 import * as pw from 'playwright';
 import {keepAnswerOpen, answerShown} from './answer_open.mjs';
+import {installShownReader} from './parse_shown.mjs';
 const base=process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 let total=0, bad=0;
 for (const engine of (process.env.ENGINES || 'chromium').split(',')) {
@@ -10,6 +11,7 @@ for (const engine of (process.env.ENGINES || 'chromium').split(',')) {
   const check=(name,ok,detail)=>{total++; if(!ok)bad++; console.log(`${ok?'OK':'FAIL'} ${engine}: ${name}${!ok?' '+JSON.stringify(detail):''}`);};
   await page.goto(base+'/calc2/',{waitUntil:'load'});
   await page.waitForFunction(()=>typeof pickScene==='function');
+  await installShownReader(page);
   check('Ответ открыт',await answerShown(page));
   const results=await page.evaluate(async()=>{
     const out=[], ck=(name,ok,detail)=>out.push({name,ok:!!ok,detail});
@@ -19,7 +21,7 @@ for (const engine of (process.env.ENGINES || 'chromium').split(',')) {
     const scene=s=>{lastEdited=null;resetSceneMemory(); pickScene(s);};
     const ds=(s,d,c)=>{scene(s); updateCurveExpr(STATE.curves.find(x=>x.role==='demand'),d); updateCurveExpr(STATE.curves.find(x=>x.role==='supply'||x.role==='mc'),c); redrawAll();};
     const enter=(el,v,event='input')=>{el.dispatchEvent(new FocusEvent('focusin',{bubbles:true,relatedTarget:lastEdited}));lastEdited=el; el.value=v; el.dispatchEvent(new Event(event,{bubbles:true}));};
-    const plain=el=>{const n=el.cloneNode(true);n.querySelectorAll('.katex-mathml').forEach(x=>x.remove());return n.textContent;};
+    const plain=window.__readShownText;
     ds('mono','180-Q','30'); setType('subsidy'); setTax(150); redrawAll(); await wait();
     const t=STATE.monoTax;
     ck('субсидия: Q=150, P=30',t&&near(t.Qt,150)&&near(t.Pt,30),t);
@@ -102,7 +104,7 @@ for (const engine of (process.env.ENGINES || 'chromium').split(',')) {
     ck('с Пигу у оптимума есть CS, PS и бюджет',/CS/.test(extRows.join('|'))&&/PS/.test(extRows.join('|'))&&/Бюджет/.test(extRows.join('|')),extRows);
     for (const label of ['CS при Пигу','PS при Пигу','Бюджет при Пигу']) {
       const row=[...document.querySelectorAll('#info-ext .stat')].find(r=>plain(r.querySelector('span'))===label);
-      ck(label+' = 800',row&&near(Number(plain(row.querySelector('b')).replace(/[\s=]/g,'').replace(',','.')),800),row&&plain(row));
+      ck(label+' = 800',row&&near(__parseShown(plain(row.querySelector('b')).replace(/=/g,'')),800),row&&plain(row));
     }
     return out;
   });

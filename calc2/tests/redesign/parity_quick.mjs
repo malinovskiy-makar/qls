@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url';
 import { fateOf } from './fates.mjs';
 import * as layerNew from './layer_new.mjs';
 import { keepAnswerOpen, answerShown } from '../answer_open.mjs';
+import {shownEquivalent,shownNumbers} from '../parse_shown.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
@@ -175,11 +176,21 @@ for (const key of keys) {
       if ((REDEFINED[key] || []).includes(String(r.label).trim())) return;   // ADR 0143, см. выше
       const q = c && c.rows.find(x => String(x.i) === String(r.i));
       if (!q) { bad++; issues.push(key + ': ' + b.id + ' строка «' + r.label + '» не показана'); return; }
-      if (REFORMATTED[key] && REFORMATTED[key].test(String(r.label).trim())) {
-        if (numsOf(q.value) !== numsOf(r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» числа ' + r.value + ' → ' + q.value); }
+      // Старое Q / P — пара, а не дробь. Новые дроби внутри координат
+      // разделяются пробелами вокруг внешней косой черты.
+      if (/Q\s*\/\s*P/.test(r.label)) {
+        const actual=q.value.split(/\s+\/\s+/), expected=r.value.split('/');
+        if(actual.length!==2||expected.length!==2||actual.some((n,i)=>!shownEquivalent(n,expected[i]))) {
+          bad++;issues.push(key+': '+b.id+' «'+r.label+'» '+r.value+' → '+q.value);
+        }
         return;
       }
-      if (norm(q.value) !== norm(r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» ' + r.value + ' → ' + q.value); }
+      if (REFORMATTED[key] && REFORMATTED[key].test(String(r.label).trim())) {
+        const actual=shownNumbers(q.value), expected=(norm(r.value).match(/-?\d+(?:,\d+)?/g)||[]);
+        if (actual.length!==expected.length||actual.some((n,i)=>!shownEquivalent(n.raw,expected[i]))) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» числа ' + r.value + ' → ' + q.value); }
+        return;
+      }
+      if (!shownEquivalent(q.value,r.value)) { bad++; issues.push(key + ': ' + b.id + ' «' + r.label + '» ' + r.value + ' → ' + q.value); }
     });
     (b.final || []).forEach((f, i) => {
       checks++;

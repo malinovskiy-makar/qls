@@ -10,6 +10,7 @@
 */
 import { chromium } from 'playwright';
 import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import {parseShown,shownEquivalent,installShownReader} from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
@@ -28,6 +29,7 @@ await page.fill('#id_password', PASS);
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle' }), page.click('button[type=submit]')]);
 await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
+await installShownReader(page);
 
 let bad = 0, total = 0;
 { const sh = await answerShown(page); total++; if (!sh) bad++; console.log('  ' + (sh ? 'OK  ' : 'FAIL') + ' предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
@@ -35,7 +37,9 @@ const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4)
 function head(s) { console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 62 - s.length))); }
 function cmp(label, got, want, tol) {
   total++;
-  const ok = (typeof got === 'number' && isFinite(got)) ? Math.abs(got - want) <= tol : (got === want);
+  const parsed = typeof got === 'string' && typeof want === 'number' ? parseShown(got) : got;
+  const ok = (typeof parsed === 'number' && isFinite(parsed)) ? Math.abs(parsed - want) <= tol
+    : typeof got === 'string' && typeof want === 'string' ? shownEquivalent(got,want) : got === want;
   if (!ok) bad++;
   console.log('  ' + (ok ? 'OK  ' : 'FAIL') + ' ' + label.padEnd(46)
     + 'ожидалось ' + String(want).padEnd(12) + 'получилось ' + num(got));
@@ -1512,6 +1516,15 @@ for (const [tool, money] of [['tariff', 200], ['quota', 200]]) {
   cmp(tag + ': импорт', r.vol, 20, 1e-4); cmp(tag + ': ' + (tool === 'tariff' ? 'бюджет' : 'рента'), r.money, money, 1e-3);
   cmp(tag + ': потери', r.dwl, 100, 1e-3); cmp(tag + ': CS', r.cs1, 1800, 1e-3); cmp(tag + ': PS', r.ps1, 800, 1e-3);
 }
+
+head('Ночь 29.10 · Э3 — единая запись чисел');
+r = await run(`return { values:[.625,100/3,171/64,1/7,5*Math.sqrt(2),2+Math.sqrt(21)/3,Math.cbrt(10),-100/3,1332].map(fmt),
+  self:['33,3','100/3','33'].map(v=>checkGuess(v,'100/3')),
+  percent:CalcNumber.format(167.1875,{percent:true}) };`);
+const e3Values=[.625,100/3,171/64,1/7,5*Math.sqrt(2),2+Math.sqrt(21)/3,Math.cbrt(10),-100/3,1332];
+e3Values.forEach((v,i)=>cmp('Э3: '+v,r.values[i],v,i===6?.0005:1e-8));
+cmp('Э3: 167,1875 % читаются из дроби',parseShown(r.percent),167.1875,1e-8);
+[true,true,false].forEach((v,i)=>cmp('Э3: Сначала сам — '+['33,3','100/3','33'][i],r.self[i],v,0));
 
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));

@@ -240,10 +240,10 @@ function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
   const u = String(unit || '');
-  const plain = name + ' = ' + fmt(value) + (u ? ' ' + u : '');
+  const plain = name + ' = ' + CalcNumber.format(value,{percent:u==='%'}) + (u && u!=='%' ? ' '+u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katexInto(lab, texifyName(name) + ' = ' + fmt(value) + (u === '%' ? '\\,\\%' : ''));
+    katexInto(lab, texifyName(name) + ' = ' + CalcNumber.format(value,{tex:true,percent:u==='%' }));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -264,7 +264,9 @@ function texifyName(name) {
      \\text{} целиком — на экране стояло бы «D_1» с настоящим подчёркиванием
      вместо индекса (замер 25.08). */
   // Готовая запись TeX («P_{x_1}», «\Delta G» — строки параметров сессии 6) — как есть.
-  if (/^[A-Za-z]_\{.+\}$/.test(s) || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s) || /^[A-Za-z]_[a-z]\/[A-Za-z]_[a-z]$/.test(s)) return s;
+  if (/^[A-Za-z]_\{.+\}$/.test(s)
+      || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s)
+      || /^[A-Za-z]_[a-z]\/[A-Za-z]_[a-z]$/.test(s)) return s;
   const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
   if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
   /* Экономическое сокращение из заглавных (MC, ATC, DWL, MSB…) — одно обозначение
@@ -873,8 +875,7 @@ function shortRegulatorName(id, raw) {
 // Линейная КПВ из перехватов: Y = maxY − (maxY/maxX)·X (переменная X, как требует compilePpf).
 function ppfLinearFormula(maxX, maxY) {
   maxX = Math.max(1, maxX); maxY = Math.max(0, maxY);
-  const slope = Math.round((maxY / maxX) * 1000) / 1000;
-  return fmt(Math.round(maxY * 100) / 100) + ' - ' + slope + '*X';
+  return fmtLinear(-maxY / maxX, maxY, 'X');
 }
 // Перехваты {maxX,maxY} произвольной формулы КПВ (через существующие хелперы движка).
 function ppfInterceptsOf(formulaStr) {
@@ -987,7 +988,7 @@ function ineqMasterScale(s) {         // применить масштаб s →
   if (STATE.ineqInput === 'incomes') {
     const mean = base.reduce((a, b) => a + b, 0) / n;
     const eff = base.map(v => Math.max(0, mean + s * (v - mean)));
-    STATE.ineqIncomes = eff.map(v => fmt(v)).join(', ');
+    STATE.ineqIncomes = eff.map(String).join(', ');
     const inc = document.getElementById('ineq-incomes'); if (inc) inc.value = STATE.ineqIncomes;
   } else {
     const mean = 100 / n;                            // равное распределение долей
@@ -1003,7 +1004,7 @@ function ineqMasterApply(sliderVal) { // движение мастера (отв
   // Живой readout % — сразу (это сам регулятор). Тяжёлый пересчёт (доли + таблица +
   // перерисовка + Джини/Робин Гуд) — троттлом, чтобы числа и кривая обновлялись
   // СОГЛАСОВАННО и без мигания при живом кручении (Фаза 5).
-  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = Math.round(sliderVal) + '%';
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = CalcNumber.format(sliderVal, {percent:true});
   _ineqThrottle(() => {
     const s = sliderVal / 100;
     if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
@@ -1021,7 +1022,7 @@ function buildIneqMasterChip(box) {
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
   // Цвет дорожки — общий --accent (сессия 6, Г1: «Сила неравенства» — строка ползунка обычного вида, была синяя).
   addPultXChip(box, 'Сила неравенства', pct, null, 0, 200, 1, v => ineqMasterApply(v),
-               'ineq-master-slider', v => fmt(v) + '%');
+               'ineq-master-slider', v => CalcNumber.format(v,{percent:true}));
   const val = document.getElementById('ineq-master-slider-val');
   // Отвязанный мастер процентов не показывает: профиль правили руками, и доля
   // от прежней базы к нему уже не относится. Щелчок по слову всё равно

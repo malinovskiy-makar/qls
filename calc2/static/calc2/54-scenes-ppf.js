@@ -1002,16 +1002,13 @@ function detectCombinedKinks(f1, f2, xmax1, xmax2) {
    ломаную значило бы нарисовать не ту кривую. */
 function ppfCoefTex(b) {
   if (Math.abs(b - 1) < 1e-12) return 'X';
-  return fmt(b) + 'X';
+  return CalcNumber.factor(b) + 'X';
 }
 
-/* ⚠️ ЧИСЛО ДЛЯ MATH.JS ПЕЧАТАЕТСЯ ЧИСЛОМ, А НЕ ЧЕРЕЗ fmt.
-   `fmt` округляет для ПОКАЗА (и ставит русскую запятую), а эту строку потом
-   разбирает Math.js и вставляет обратно в поле формулы. Округляем до девятого
-   знака — ровно как в записи суммарного спроса. */
+/* Машинная запись сохраняет дроби и радикалы. Скобки обязательны: это
+   число может стать множителем, знаменателем или показателем степени. */
 function ppfNum(v) {
-  const r = ppfSnap(v);
-  return (r < 0) ? '(' + r + ')' : String(r);
+  return CalcNumber.expression(v, {atomic:true});
 }
 
 /* ⚠️ ШУМ НАИМЕНЬШИХ КВАДРАТОВ ДО ЗАПИСИ ДОХОДИТЬ НЕ ДОЛЖЕН.
@@ -1022,6 +1019,8 @@ function ppfNum(v) {
    миллионной доли, и в остальных случаях округляем до шестого знака. */
 function ppfSnap(v) {
   if (!isFinite(v)) return v;
+  const exact=CalcNumber.classify(v);
+  if(exact.kind!=='approx')return CalcNumber.parse(exact.text)?.value ?? v;
   const near = Math.round(v);
   if (Math.abs(v - near) <= 1e-6 * Math.max(1, Math.abs(v))) return near;
   return Math.round(v * 1e6) / 1e6;

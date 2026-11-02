@@ -390,23 +390,20 @@ function refreshLinearForParams() {
 
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
 // varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
-/* dec — глубина округления. По умолчанию два знака, как было у всех прежних
-   вызовов. Перетаскивание просит три (решение владельца 19.08) и передаёт их
-   ЯВНО: печатать глубже, чем хранится в curve.linear, нельзя — запись и
-   расчёт разошлись бы в последнем разряде, а это ровно та беда, из-за которой
-   округление в движке вообще появилось. */
-function fmtLinear(a, b, varName, dec) {
+/* Э3: запись коэффициента не отбрасывает точность. Скобки нужны только
+   составному коэффициенту; десятичная и дробная записи сами однозначны. */
+function fmtLinear(a, b, varName) {
   const V = varName || 'Q';
-  const pow = Math.pow(10, (dec === undefined ? 2 : dec));
-  const r = (v) => Math.round(v * pow) / pow; a = r(a); b = r(b);
-  if (a === 0) return `${b}`;
+  const n = v => CalcNumber.expression(v);
+  const coefficient = v => { const s=n(v); return /\s[+−-]\s/.test(s)?'('+s+')':s; };
+  if (a === 0) return n(b);
   if (a < 0) {
-    const aa = Math.abs(a), aPart = aa === 1 ? V : `${aa}*${V}`;
-    return b === 0 ? `-${aPart}` : `${b} - ${aPart}`;
+    const aa = Math.abs(a), aPart = aa === 1 ? V : `${coefficient(aa)}*${V}`;
+    return b === 0 ? `-${aPart}` : `${n(b)} - ${aPart}`;
   }
-  const aPart = a === 1 ? V : `${a}*${V}`;
+  const aPart = a === 1 ? V : `${coefficient(a)}*${V}`;
   if (b === 0) return aPart;
-  return b > 0 ? `${aPart} + ${b}` : `${aPart} - ${Math.abs(b)}`;
+  return b > 0 ? `${aPart} + ${n(b)}` : `${aPart} - ${coefficient(Math.abs(b))}`;
 }
 
 /* --- Фаза 1б. Ввод Q(P): приведение к каноническому виду P = f(Q) ----------

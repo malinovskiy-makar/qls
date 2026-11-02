@@ -274,12 +274,25 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
     await L.settle(p); await p.evaluate(() => redrawAll()); await L.settle(p);
     const st = await p.evaluate(() => window.__RD.stateDump());
     const d = L.stateDiff(rec.start.state, st);
+    // Э3 уточняет сеточные максимумы производственной функции. Исторический
+    // JSON не переписываем: он содержит L=14.99997502 и MP=225.0007495.
+    // Вычисляемую часть теперь проверяем по аналитическому решению исходной
+    // TP=30L²−L³; все входы и остальные поля по-прежнему сверяются со снимком.
+    const productionExact = k === 'prod' && (() => {
+      const expected={Lmax:30,maxAP:{L:15,kind:'interior',val:225},
+        maxMP:{L:10,kind:'interior',val:300},maxTP:{L:20,kind:'interior',val:4000},mpAtMaxAP:225};
+      const same=(a,b)=>typeof b==='number'?Number.isFinite(a)&&Math.abs(a-b)<2e-8:
+        typeof b==='object'?a&&Object.keys(a).length===Object.keys(b).length&&Object.keys(b).every(key=>same(a[key],b[key])):a===b;
+      return same(st.prod,expected);
+    })();
     /* Производное от размера холста (место легенды, касательные «Касательной»,
        пересечения) сверка не сравнивает — тот же список, что VIEW_KEYS в
        compare.mjs: холст нового экрана другого размера, а старт тот же. */
     const real = Object.keys(d).filter(x => !['crosses', 'sceneKey', 'legendSpot', 'tanTop', 'tanBot'].includes(x) && !/Sig$/.test(x)
       /* areaHidden — ключ этапа Г (14.10): в записях старта его нет, на старте он пуст. */
-      && !(x === 'areaHidden' && !(x in rec.start.state) && Array.isArray(st.areaHidden) && !st.areaHidden.length));
+      && !(x === 'areaHidden' && !(x in rec.start.state) && Array.isArray(st.areaHidden) && !st.areaHidden.length)
+      && !(x === 'prod' && productionExact));
+    if (k === 'prod' && !productionExact && !real.includes('prod')) real.push('prod: не сошлось аналитическое решение');
     if (real.length) { bad++; fails.push('заполненное хранилище: ' + k + ' старт разошёлся: ' + real.slice(0, 5).join(', ')); }
   }
   console.log('заполненное хранилище: моделей с иным стартом ' + bad + ' из ' + keys2.length);

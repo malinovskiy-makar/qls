@@ -8,6 +8,7 @@
    заголовок графика и свои точки рисуются НЕ внутри сцены, а обёрткой после неё:
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
+  _coordMarginLeft=0;
   syncParams();          // формулы могли завести или потерять буквы-параметры
   refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
   /* Естественная область модели считается раз на кадр (см. modelSpanQ). Метку
@@ -28,6 +29,9 @@ function redrawAll() {
   // Все слои уже собраны. Итоговый шрифт нужен ДО замера рамок: в WebKit
   // смена шрифта после разведения снова сталкивала ATC и AVC (Э1).
   typesetChartLabels();
+  if (fitCoordinateMargin()) {
+    redrawScene(); drawOverlays(); applyLabelSize(); typesetChartLabels();
+  }
   unclipLabels();        // подпись, которую режет её же обрезка, переезжает наружу
   keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
@@ -674,13 +678,15 @@ function typesetStats(root) {
        видимую часть. Проверку на «не помещается» делаем ДО остального: длинная
        фраза с формулой внутри («эластичный, |E_d| > 1») это тоже KaTeX. */
     const own = !!val.querySelector('.katex');
+    delete val.dataset.valueText;
     const raw = (own ? katexVisibleText(val) : (val.textContent || '')).trim();
+    val.dataset.valueText = raw;
     if (!raw) { if (own) row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
     // Составное значение и фраза не помещаются в ячейку для числа (Б39, Б40).
     if (restatWide(row, lab, val, raw, own)) { addStatSign(row, val, raw); return; }
     if (own) { row.classList.add('stat-eq', 'stat-own'); addStatSign(row, val, raw); return; }
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
-    const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
+    const numeric = /^[(\[]?\s*[-−+]?[\d.,√≈∞]/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
       try {
         if (!katexInto(val, statToTex(raw))) throw new Error('katex');
@@ -704,6 +710,7 @@ function typesetStats(root) {
    Единственное исключение — значение со СВОИМ равенством внутри («SW = CS +
    PS»): второй знак дал бы «SW = = CS + PS». */
 function addStatSign(row, val, raw) {
+  if (/^≈/.test(String(raw||'').trim())) { row.classList.add('stat-nosign'); return; }
   if (!row || !val) return;
   if (row.querySelector(':scope > .stat-sign')) return;
   if (String(raw || '').indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
@@ -717,7 +724,7 @@ function addStatSign(row, val, raw) {
 /* Значение табло в запись для KaTeX. Числа и разделители оставляем как есть,
    проценты и градусы экранируем, юникодный минус переводим в математический. */
 function statToTex(s) {
-  return String(s)
+  return CalcNumber.texText(String(s)
     .replace(/−/g, '-')
     /* Пробел разрядов («1 250») — неразрывный пробел KaTeX «~», у которого в тексте
        есть символ: «\\,» даёт только отступ, и «Ответ», читающий текст строки,
@@ -731,7 +738,7 @@ function statToTex(s) {
     .replace(/([A-Za-zА-Яа-я ]{2,})/g, (w) => '\\text{' + w + '}')
     // Градусы — ПОСЛЕ обёртки слов: иначе «circ» из \circ заворачивался в
     // \text{circ}, и угол наклона печатался как «63,4 3 textcirc».
-    .replace(/°/g, '^{\\circ}');
+    .replace(/°/g, '^{\\circ}'));
 }
 
 /* Строка табло, в которую значение не помещается (Б39, Б40).
@@ -755,9 +762,7 @@ function statToTex(s) {
    копию узла и выбрасываем из неё MathML: он и есть тот невидимый двойник,
    из-за которого textContent приходит утроенным. */
 function katexVisibleText(val) {
-  const clone = val.cloneNode(true);
-  clone.querySelectorAll('.katex-mathml').forEach(e => e.remove());
-  return clone.textContent || '';
+  return CalcNumber.readText(val);
 }
 
 function restatWide(row, lab, val, raw, own) {
@@ -4755,7 +4760,7 @@ function buildMarkRow(mk) {
       // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
       const letter = axisLetter(key);
       const n = makeEditableValue({
-        get: () => (isFinite(src[key]) ? Math.round(src[key] * 1000) / 1000 : ''),
+        get: () => (Number.isFinite(src[key]) ? src[key] : ''),
         tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
         title: 'Координата ' + letter,
         set: (v) => {

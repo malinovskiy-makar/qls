@@ -14,6 +14,7 @@
 //   (нет CDN Math.js/D3 или сервер не отдал страницу) → вызывающий тест пропускает.
 import { chromium } from 'playwright';
 import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import { installShownReader } from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
@@ -1527,9 +1528,8 @@ const CASES = [
           /* Дробная часть на экране отделяется ЗАПЯТОЙ (Б15), поэтому разбор
              числа с холста обязан её понимать: со старым классом [-\\d.] из
              «66,67» вычитывалось «67». */
-          var nums = function (s) { var m = s.match(/([-\\d.,]+); ([-\\d.,]+)/);
-            var n = function (t) { return parseFloat(String(t).replace(',', '.')); };
-            return m ? [n(m[1]), n(m[2])] : [-1, -1]; };
+          var nums = function (s) { var m = s.match(/\\(([^();]+); ([^();]+)\\)/);
+            return m ? [__parseShown(m[1]), __parseShown(m[2])] : [-1, -1]; };
           return { chk: chk, off: off, on: STATE.bundleOn ? 1 : 0,
                    px: nums(ppf)[0], py: nums(ppf)[1],
                    tx: nums(ktv)[0], ty: nums(ktv)[1],
@@ -3884,8 +3884,7 @@ const CASES = [
              формулой, и у готового KaTeX textContent это тройка «MathML +
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
-            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return __parseShown(__readShownText(e));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, price: nums[0], qd: nums[1], qs: nums[2], gap: nums[3], dwl: nums[4],
@@ -3910,8 +3909,7 @@ const CASES = [
              формулой, и у готового KaTeX textContent это тройка «MathML +
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
-            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return __parseShown(__readShownText(e));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, Q: nums[0], P: nums[1],
@@ -6036,14 +6034,18 @@ const CASES = [
           /* Исходники калькулятора: ищем текст врезки во всех файлах сразу. */
           var srcs = Array.prototype.map.call(document.querySelectorAll('script[src]'),
             function (t) { return t.src; }).filter(function (u) { return u.indexOf('/calc2/') >= 0; });
-          var joined = '';
+          var joined = '', readCount = 0;
           for (var i = 0; i < srcs.length; i++) {
-            try { joined += await (await fetch(srcs[i])).text(); } catch (e) { joined += ''; }
+            try { var response = await fetch(srcs[i]); var source = await response.text();
+              if (response.ok && source.trim()) { joined += source; readCount++; }
+            } catch (e) { joined += ''; }
           }
           var inSrc = (joined.indexOf('сложить по вертикали') >= 0
                        || joined.indexOf('Вертикальная сумма') >= 0) ? 1 : 0;
           return {
-            srcFiles: srcs.length,
+            // Новые модули не должны ломать инвентаризацию. Проверяем
+            // успешное чтение КАЖДОГО подключённого файла, а не старый потолок.
+            srcFiles: srcs.length >= 22 && readCount === srcs.length ? 1 : 0,
             noVertSrc: inSrc ? 0 : 1,
             noVert: parts.indexOf('сложить по вертикали') < 0 ? 1 : 0,
             noVertSum: parts.indexOf('Вертикальная сумма') < 0 ? 1 : 0,
@@ -6063,7 +6065,7 @@ const CASES = [
                 сцену, а убрать врезку велено ВЕЗДЕ. Проверка зубастости это и
                 поймала: врезка, возвращённая в соседнюю сцену, проходила мимо
                 экранной проверки незамеченной. */
-             ['файлы calc2 прочитаны', 'srcFiles', 22, 8],
+             ['все подключённые файлы calc2 прочитаны', 'srcFiles', 1, 0],
              ['текста нет и в исходниках calc2', 'noVertSrc', 1, 0],
              ['слов «Вертикальная сумма» нет', 'noVertSum', 1, 0],
              ['формулы Минковского нет', 'noMink', 1, 0],
@@ -6275,6 +6277,7 @@ const browser = await chromium.launch({ args: ['--force-color-profile=srgb'] });
 keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
+await installShownReader(page);
 
 // логин
 try {

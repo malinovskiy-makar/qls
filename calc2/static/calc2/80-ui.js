@@ -66,12 +66,7 @@ function priceLetters() {
    форматтером calc2 (fmt — запятая), простая дробь со знаменателем до 12 — дробью:
    «P = 50 − \frac{1}{2}Q», «P = \frac{1}{3}Q». Прежде здесь стояло «0.33·Q» с точкой. */
 function niceNumTex(v) {
-  const a = Math.abs(v);
-  for (let d = 2; d <= 12; d++) {
-    const n = Math.round(a * d);
-    if (n % d !== 0 && Math.abs(a * d - n) < 1e-9) return '\\frac{' + n + '}{' + d + '}';
-  }
-  return fmt(a);
+  return CalcNumber.factor(Math.abs(v), {tex:true});
 }
 function linearTexNice(a, b, V) {
   const v = V || 'Q', P = 'P = ';

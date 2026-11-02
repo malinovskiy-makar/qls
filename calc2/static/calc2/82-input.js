@@ -27,14 +27,15 @@ function texVarsItalic(tex) {
 function mathToTex(expr) {
   const s = String(expr || '').trim();
   if (!s) return '';
-  try { return texVarsItalic(math.parse(s).toTex({ parenthesis: 'auto' })); }
+  const options = {parenthesis:'auto',handler:node => node.isConstantNode && typeof node.value === 'number' ? CalcNumber.factor(node.value,{tex:true}) : undefined};
+  try { return texVarsItalic(math.parse(s).toTex(options)); }
   catch (e) {
     /* Предпросмотр показывает то, что считает движок. Запись, которую Math.js
        не берёт как есть («100-ax», вставленный из буфера LaTeX), он берёт
        после общей подготовки — той же, что стоит перед разбором. Сначала
        пробуем исходный текст: подготовка раскрывает неявное умножение, и
        показывать «a*x» там, где человек набрал «ax», незачем. */
-    try { const t = prepExpr(s); if (t !== s) return texVarsItalic(math.parse(t).toTex({ parenthesis: 'auto' })); }
+    try { const t = prepExpr(s); if (t !== s) return texVarsItalic(math.parse(t).toTex(options)); }
     catch (e2) {}
     return texFallback(s);
   }
@@ -369,7 +370,7 @@ function pwSetCount(n) {
 function pwAddRow(quiet) {
   if (PW.n >= 12) return;
   const last = PW.rows[PW.n - 1] || { f: '', a: '', b: '' };
-  const num = (t) => { const x = parseFloat(String(t).replace(',', '.')); return isFinite(x) ? x : null; };
+  const num = (t) => CalcNumber.parse(t)?.value ?? null;
   let to = num(last.b);
   if (to == null) {
     const a = num(last.a), prev = PW.rows[PW.n - 2];
@@ -397,7 +398,7 @@ function pwRemoveRow(i) {
 function pwCheck() {
   const rows = pwRows();
   const v = pwVar();
-  const num = (t) => { const x = parseFloat(String(t).replace(',', '.')); return isFinite(x) ? x : null; };
+  const num = (t) => CalcNumber.parse(t)?.value ?? null;
   const out = { error: '', bad: [], notes: [] };
   const err = (i, what, msg) => { if (!out.error) out.error = msg; out.bad.push([i, what]); };
   rows.forEach((r, i) => {
@@ -1264,7 +1265,7 @@ function katexSafe(src) {
    экране остаётся исходный текст, как и было. */
 function katexInto(el, tex, opts) {
   if (!el) return false;
-  const raw = String(tex == null ? '' : tex);
+  const raw = CalcNumber.texText(String(tex == null ? '' : tex));
   if (typeof katex === 'undefined') { el.textContent = raw; return false; }
   try {
     katex.render(katexSafe(raw), el, Object.assign({ throwOnError: false, displayMode: false }, opts || {}));
@@ -2065,8 +2066,9 @@ function makeEditableValue(opts) {
 
   const parse = (raw) => {
     if (!isNum) return raw;
-    const v = parseFloat(String(raw).replace(',', '.'));
-    if (!isFinite(v)) return null;
+    const parsed = CalcNumber.parse(raw);
+    if (!parsed) return null;
+    const v = parsed.value;
     if (opts.min != null && v < opts.min) return null;
     if (opts.max != null && v > opts.max) return null;
     return v;
@@ -2076,7 +2078,7 @@ function makeEditableValue(opts) {
     if (el.classList.contains('editing')) return;
     const before = opts.get();
     el.classList.add('editing');
-    el.textContent = isNum ? String(shown()).replace(/ /g, '') : String(before == null ? '' : before);
+    el.textContent = isNum ? fmtInput(before) : String(before == null ? '' : before);
     el.contentEditable = 'plaintext-only';
     if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';   // Firefox
     el.focus();

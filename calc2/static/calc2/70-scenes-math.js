@@ -116,19 +116,9 @@ const ANS_PROBE = [-7.31, -2.17, -0.53, 0.37, 1.13, 2.71, 4.49, 9.07];
 let _ansSeg = null;            // отрезок текущего кадра (ставит refreshAnswerSeg)
 const _ansCache = new Map();
 
-/* Число ответа: запятая, настоящий минус, ТРИ знака после запятой (лишние
-   нули срезаются). Корни и вершины — иррациональные числа, и двух знаков
-   общего fmt мало, чтобы сверить свой ответ: «1,73» и «1,74» оба верны в
-   пределах сотой. Так записаны и контрольные числа «Математики» (−1,732). */
+/* Э3: корни и вершины используют общую запись чисел, как экономика. */
 function ansFmt(v) {
-  if (!isFinite(v)) return String(v);
-  let r = Math.round(v * 1000) / 1000;
-  if (r === 0) r = 0;                       // −0 не печатаем
-  const a = Math.abs(r), whole = Math.floor(a);
-  let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
-  const frac = String(Math.round((a - whole) * 1000)).padStart(3, '0').replace(/0+$/, '');
-  if (frac) s += ',' + frac;
-  return (r < 0 ? '−' : '') + s;
+  return CalcNumber.format(v);
 }
 function ansPt(x, y) { return '(' + ansFmt(x) + '; ' + ansFmt(y) + ')'; }
 // Несколько значений — через «; », нет ни одного — «нет» (решение владельца 09.10).
@@ -442,11 +432,10 @@ function refreshAnswerSeg() {
 }
 
 // Запись числа в поле отрезка: запятая и настоящий минус, как в «Ответе».
-function ansSegText(v) { return String(+(+v).toFixed(6)).replace('.', ',').replace(/^-/, '−'); }
+function ansSegText(v) { return CalcNumber.format(v); }
 function ansSegParse(t) {
-  const s = String(t == null ? '' : t).replace(/[\s  ]+/g, '').replace(/[−–]/g, '-').replace(',', '.');
-  if (!/^-?(\d+(\.\d+)?|\.\d+)$/.test(s)) return null;
-  return parseFloat(s);
+  const result = CalcNumber.parse(t);
+  return result ? result.value : null;
 }
 
 /* Строка «Ответ ищем на отрезке x от [ ] до [ ]» живёт под полями функций
@@ -467,7 +456,10 @@ function syncAnsSegUI(seg) {
   if (!show) return;
   [['ans-a', seg.a], ['ans-b', seg.b]].forEach(([id, v]) => {
     const e = document.getElementById(id);
-    if (e && document.activeElement !== e) { const t = ansSegText(v); if (e.value !== t) e.value = t; }
+    if (e && document.activeElement !== e) {
+      const t = ansSegText(v); if (e.value !== t) e.value = t;
+      e.dataset.shownValue=t; e.dataset.exactValue=String(v);
+    }
   });
   const back = document.getElementById('ans-seg-auto');
   if (back) back.hidden = !seg.hand;
@@ -486,8 +478,11 @@ function syncAnsSegUI(seg) {
 /* Человек вписал границы. Пусто или «от ≥ до» — отрезок возвращается к
    подобранному по формуле, и об этом говорит короткая подсказка. */
 function applyAnsSegInputs() {
-  const a = ansSegParse((document.getElementById('ans-a') || {}).value);
-  const b = ansSegParse((document.getElementById('ans-b') || {}).value);
+  const read = id => {
+    const e=document.getElementById(id);
+    return e && e.value===e.dataset.shownValue ? Number(e.dataset.exactValue) : ansSegParse(e?.value);
+  };
+  const a = read('ans-a'), b = read('ans-b');
   if (a == null || b == null || !(b > a)) {
     STATE.ansHand = false; STATE.ansA = null; STATE.ansB = null;
     if (typeof toast === 'function') toast(a == null || b == null
@@ -1433,7 +1428,7 @@ function updateMathPanel() {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
-      html += `<div class="stat"><span>Касательная</span><b>$y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}\\,(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})$</b></div>`;
+      html += `<div class="stat"><span>Касательная</span><b>$y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${CalcNumber.factor(Math.abs(r.k))}\\,(x ${r.x0 >= 0 ? '-' : '+'} ${CalcNumber.factor(Math.abs(r.x0))})$</b></div>`;
       // Экстремумы f — ПОСЛЕ прежних строк: их номера держит паритет со старым экраном.
       { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b), '', 'Экстремумы функции'); }
       // Разбор: откуда взялось это число и что показывает треугольник.
@@ -1654,7 +1649,7 @@ function setMathX0(x) {
   // Поле точного значения не трогаем, пока в нём печатают: иначе округление
   // отгрызает у «-11.78» последний знак прямо под руками.
   const n = document.getElementById('mathx0-input');
-  if (n && document.activeElement !== n) n.value = Math.round(x * 1000) / 1000;
+  if (n && document.activeElement !== n) n.value = fmtInput(x);
   redrawAll();
 }
 
