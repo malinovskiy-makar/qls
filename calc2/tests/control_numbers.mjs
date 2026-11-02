@@ -1574,6 +1574,17 @@ cmp('Э7 13.14 Джини союза',r.g,17/40,1e-8);r.gs.forEach((v,i)=>cmp('�
 r=await run(`STATE.ineqInput='formula';STATE.ineqFormula='p^2';STATE.ineqPopulation=3;STATE.ineqCountryB={input:'formula',formula:'p',population:1,totalIncome:1};redrawAll();return{g:STATE.ineqStats.gini,a:STATE.ineqDistribution.at(.5),b:STATE.ineqDistribution.at(.9)};`);
 cmp('Э7 13.18 Джини',r.g,3/8,1e-8);cmp('Э7 13.18 первая ветвь',r.a,2/9,1e-8);cmp('Э7 13.18 вторая ветвь',r.b,.8,1e-8);
 
+head('Ночь 29.10 · Э8 — параметры IS–LM');
+r=await run(`resetSceneMemory();pickScene('islm');STATE.macro.islm.input='params';STATE.macro.islm.params={a:10,b:.75,I0:40,d:0,G:10,T:10,Xn:10,md:'20+.6*Y/i',Ms:260,P:1};redrawAll();return STATE.islmResult;`);
+cmp('Э8 14.55 Y',r.eq.Q,250,1e-7);cmp('Э8 14.55 r',r.eq.P,.625,1e-7);
+r=await run(`STATE.macro.islm.params=islmDefaults();STATE.macro.islm.shock={G:16,T:0,Ms:0};redrawAll();return STATE.islmResult;`);
+for(const[k,v]of Object.entries({Y:40,r:40,I:-8}))cmp('Э8 14.56 изменение '+k,r.changes[k],v,1e-7);
+for(const[k,v]of Object.entries({kG:2.5,kT:-2,kHold:5,kTHold:-4,crowdingY:40,crowdingI:8,requiredDeltaMs:64}))cmp('Э8 14.56 '+k,r[k],v,1e-7);
+r=await run(`STATE.macro.islm.holdRate=true;redrawAll();return STATE.islmResult;`);
+cmp('Э8 ЦБ Y',r.eq.Q,593,1e-7);cmp('Э8 ЦБ r',r.eq.P,13,1e-7);
+r=await run(`STATE.macro.islm.shock.G=2;redrawAll();return STATE.islmResult;`);
+cmp('Э8 14.56а ΔMs',r.requiredDeltaMs,8,1e-7);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

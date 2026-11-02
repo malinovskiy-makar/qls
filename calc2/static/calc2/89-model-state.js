@@ -186,6 +186,7 @@ function applyStatePlain(s) {
 /* Списки, которые сцены строят кодом из STATE: после возврата входов их надо
    пересобрать, иначе строки покажут прежнее. */
 function rerenderModelLists() {
+  if (typeof renderIslmControls === 'function') renderIslmControls(true);
   if (typeof renderPlantRows === 'function') renderPlantRows(true);
   if (typeof renderGraphRows === 'function' && document.getElementById('graph-rows') && STATE.mode === 'graph') renderGraphRows();
   if (typeof renderMmRows === 'function' && document.getElementById('mm-rows')) renderMmRows();

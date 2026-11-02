@@ -1,0 +1,16 @@
+import * as pw from'playwright';import{keepAnswerOpen}from'./answer_open.mjs';let total=0,bad=0;const check=(n,ok,d)=>{total++;if(!ok)bad++;console.log((ok?'OK ':'FAIL ')+n+(!ok?' '+JSON.stringify(d):''));};const near=(a,b)=>Number.isFinite(a)&&Math.abs(a-b)<1e-6;
+for(const engine of(process.env.ENGINES||'chromium,webkit').split(',')){
+ const b=await pw[engine].launch();keepAnswerOpen(b);const p=await b.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),errs=[];p.on('pageerror',e=>errs.push(e.message));await p.goto(process.env.CALC2_BASE_URL+'/calc2/');await p.waitForFunction(()=>typeof pickScene==='function');const exists=await p.evaluate(()=>typeof islmSolve==='function');check(engine+' параметрический расчёт существует',exists);if(!exists){await b.close();continue;}
+ const solve=async c=>p.evaluate(c=>{const r=islmSolve(c);return{error:r.error,eq:r.eq,is:r.isRecord,lm:r.lmRecord,vertical:r.isCurve?.kind,kg:r.kG,kt:r.kT,hold:r.kHold};},c);
+ const base={a:70,b:.8,I0:40,d:.2,G:0,T:6,Xn:0,md:'.4*Y-.4*r',Ms:400,P:2};
+ let r=await solve({a:10,b:.75,I0:40,d:0,G:10,T:10,Xn:10,md:'20+.6*Y/i',Ms:260,P:1});check(engine+' 14.55 Y250 r.625',near(r.eq?.Q,250)&&near(r.eq?.P,.625),r);check(engine+' 14.55 вертикальная IS',r.vertical==='vertical',r);check(engine+' 14.55 LM=400r',await p.evaluate(expr=>Math.abs(math.evaluate(expr,{r:.625})-250)<1e-7,r.lm?.expr),r);
+ r=await solve(base);check(engine+' 14.56 база Y513 r13',near(r.eq?.Q,513)&&near(r.eq?.P,13),r);check(engine+' мультипликаторы G2.5 T−2 фикс5',near(r.kg,2.5)&&near(r.kt,-2)&&near(r.hold,5),r);
+ let s=await p.evaluate(base=>{resetSceneMemory();openModelByUser('islm');STATE.macro.islm={...STATE.macro.islm,input:'params',params:base,shock:{G:16,T:0,Ms:0}};redrawAll();return STATE.islmResult;},base);
+ check(engine+' 14.56 ΔG16: ΔY40 и ΔI−8',near(s?.changes?.Y,40)&&near(s?.changes?.I,-8),s?.changes);check(engine+' фиксированная ставка:ΔY80,вытеснение40',near(s?.holdEq?.Q-s?.base?.Q,80)&&near(s?.crowdingY,40)&&near(s?.crowdingI,8),s);
+ s=await p.evaluate(()=>{STATE.macro.islm.holdRate=true;redrawAll();return STATE.islmResult;});check(engine+' ЦБ держит ставку: r13 Y593',near(s?.eq?.P,13)&&near(s?.eq?.Q,593),s);check(engine+' LM горизонтальная',await p.evaluate(()=>{const c=STATE.macroRes.curves.find(x=>x[0].startsWith('LM'))?.[1];return Math.abs(evalCurve(c,0)-13)<1e-7&&Math.abs(evalCurve(c,800)-13)<1e-7;}));
+ s=await p.evaluate(()=>{STATE.macro.islm.shock.G=2;redrawAll();return STATE.islmResult;});check(engine+' 14.56а ΔMs8 держит ставку',near(s?.requiredDeltaMs,8),s);
+ s=await p.evaluate(()=>{STATE.macro.islm.holdRate=false;STATE.macro.islm.shock={G:0,T:4,Ms:0};redrawAll();return STATE.islmResult;});check(engine+' налоговый шок учитывает b:ΔY−8',near(s?.changes?.Y,-8),s?.changes);
+ const legacy=await p.evaluate(()=>{resetSceneMemory();pickScene('islm');return{q:STATE.macroRes.eq.Q,p:STATE.macroRes.eq.P,input:STATE.macro.islm.input};});check(engine+' прежний ввод кривых:500/3,10/3',near(legacy.q,500/3)&&near(legacy.p,10/3)&&legacy.input!=='params',legacy);
+ check(engine+' нет ошибок JS',!errs.length,errs);await b.close();
+}
+console.log(`Э8: ${total-bad}/${total}, ошибок ${bad}`);process.exitCode=bad?1:0;

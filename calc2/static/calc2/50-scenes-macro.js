@@ -221,6 +221,7 @@ function recomputeMacro() {
     return;
   }
   if (m === 'islm') {
+    renderIslmControls();if(P.input==='params'){recomputeIslmParameters();return;}
     const is = macroCurveY(P.is, V), lm = macroCurveY(P.lm, V);
     if (is.error || lm.error) return fail(is.error || lm.error);
     const eq = findEquilibrium(is, lm, MACRO_SEARCH);
@@ -236,8 +237,9 @@ function drawMacroCurve(c, color, dash, label) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   if (isVertical(c)) {
-    g.append('line').attr('x1', sx(c.atQ)).attr('y1', sy(0)).attr('x2', sx(c.atQ)).attr('y2', sy(CONFIG.Pmax))
+    const vline=g.append('line').attr('x1', sx(c.atQ)).attr('y1', sy(0)).attr('x2', sx(c.atQ)).attr('y2', sy(CONFIG.Pmax))
       .attr('stroke', color).attr('stroke-width', 2.8);
+    if(dash)vline.attr('stroke-dasharray','6 4');
     if (label) renderLabelText(
       g.append('text').attr('x', sx(c.atQ) + 6).attr('y', sy(CONFIG.Pmax * 0.94))
         .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
@@ -252,9 +254,13 @@ function drawMacroCurve(c, color, dash, label) {
   if (c.rec) markExpr(p, c.rec.expr, c.rec.v, null, { axis: c.rec.axis, name: label || '' });
   else markNumeric(p, 'у кривой нет записи формулой', label || '');
   if (label) {
-    for (const t of [0.86, 0.7, 0.5, 0.3, 0.14]) {
-      const q = CONFIG.Qmax * t, v = evalCurve(c, q);
-      if (!isNaN(v) && v > CONFIG.Pmax * 0.04 && v < CONFIG.Pmax * 0.95) {
+    const preferred=[0.86,0.7,0.5,0.3,0.14].map(t=>[CONFIG.Qmax*t,evalCurve(c,CONFIG.Qmax*t)]);
+    // Крутая IS может целиком лежать между пятью пробными абсциссами.
+    // Тогда выбираем видимый участок из уже построенной сетки.
+    const visible=pts.filter(p=>p&&Number.isFinite(p[1])&&p[1]>=0&&p[1]<CONFIG.Pmax*.95)
+      .sort((a,b)=>Math.abs(a[1]-CONFIG.Pmax*.7)-Math.abs(b[1]-CONFIG.Pmax*.7));
+    for (const [q,v] of [...preferred,...visible]) {
+      if (Number.isFinite(v) && v >= 0 && v < CONFIG.Pmax * 0.95) {
         renderLabelText(
           g.append('text').attr('x', sx(q)).attr('y', sy(v) - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
             .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5), label);
@@ -270,7 +276,7 @@ function redrawMacro() {
   svg.selectAll('*').remove();
   addDefs(); drawGrid();
   const M = MACRO[STATE.macroModel];
-  drawAxes(M.xl, M.yl);
+  drawAxes(M.xl, STATE.macroModel==='islm'&&macroP().input==='params'?'r':M.yl);
   const errBox = document.getElementById('macro-error');
   if (errBox) { errBox.style.display = STATE.macroErr ? 'block' : 'none'; errBox.textContent = STATE.macroErr || ''; }
   const r = STATE.macroRes;
@@ -332,13 +338,14 @@ function redrawMacro() {
   (r.curves || []).forEach(([lab, c, col]) => drawMacroCurve(c, col, false, lab));
   (r.vertical || []).forEach(([lab, c, col]) => drawMacroCurve(c, col, false, lab));
   // Точка равновесия + бледный исходный ориентир (заёмные средства «до дефицита»).
-  if (r.base && STATE.showGhost && Math.abs(r.base.Q - r.eq.Q) > 1e-6) {
+  if (r.base && !r.parameterized && STATE.showGhost && Math.abs(r.base.Q - r.eq.Q) > 1e-6) {
     const g = svg.append('g'), [bx, by] = toPx(r.base.Q, r.base.P);
     g.append('circle').attr('cx', bx).attr('cy', by).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
     g.append('text').attr('x', bx + 7).attr('y', by + 14).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('Было');
   }
-  if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : 'E');
+  if(r.parameterized&&STATE.islmResult.shock)drawEquilibriumAt(r.base.Q,r.base.P,'E₀');
+  if (r.eq) drawEquilibriumAt(r.eq.Q, r.eq.P, (r.kind === 'phillips') ? 'u*' : r.parameterized&&STATE.islmResult.shock?'E₁':'E');
   updateMacroPanel();
 }
 
@@ -357,6 +364,8 @@ function drawEquilibriumAt(Q, P, label) {
 function updateMacroPanel() {
   const box = document.getElementById('info-macro'); if (!box) return;
   const r = STATE.macroRes;
+  if(!r&&STATE.macroModel==='islm'&&macroP().input==='params')setFinalFunctions([]);
+  if(r?.parameterized){box.innerHTML=islmPanelHtml(STATE.islmResult);return;}
   if (!r) { box.innerHTML = '<div class="warn">' + (STATE.macroErr || 'Задайте параметры модели.') + '</div>'; return; }
   const P = macroP();
   let html = '';
@@ -432,6 +441,7 @@ function updateMacroPanel() {
 // Переключатель макромодели: показ нужной панели полей + перерисовка.
 function setMacroModel(m) {
   STATE.macroModel = m;
+  if(m==='islm')renderIslmControls(true);
   cancelRangeAnim();
   Object.keys(MACRO).forEach(k => {
     const b = document.getElementById('mm-' + k); if (b) b.classList.toggle('active', k === m);

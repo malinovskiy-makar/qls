@@ -9,6 +9,7 @@
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
   syncTaxPairUI();
+  const labelsBeforeFit=new Map([..._labelPos].map(([k,v])=>[k,{...v}]));
   _coordMarginLeft=0;
   syncParams();          // формулы могли завести или потерять буквы-параметры
   refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
@@ -31,6 +32,11 @@ function redrawAll() {
   // смена шрифта после разведения снова сталкивала ATC и AVC (Э1).
   typesetChartLabels();
   if (fitCoordinateMargin()) {
+    // Первый проход только измерил точные координаты. Его более узкое поле
+    // не должно становиться промежуточным кадром анимации: иначе каждый
+    // следующий кадр снова тянет подпись к узкому полю и обратно, без конца.
+    if(_labelFrame!=null){cancelAnimationFrame(_labelFrame);_labelFrame=null;}
+    _labelPos.clear();labelsBeforeFit.forEach((v,k)=>_labelPos.set(k,v));
     redrawScene(); drawOverlays(); applyLabelSize(); typesetChartLabels();
   }
   unclipLabels();        // подпись, которую режет её же обрезка, переезжает наружу
@@ -3188,6 +3194,7 @@ function sceneReserved() {
   if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
   if (STATE.mode === 'labor') s.add('w');
   if (STATE.mode === 'inequality') {s.add('alpha');s.add('α');}
+  if (STATE.mode === 'macro' && STATE.macroModel === 'islm') {s.add('Y');s.add('r');s.add('i');}
   return s;
 }
 

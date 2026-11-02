@@ -1372,8 +1372,12 @@
         <div class="field"><label>Максимальная ставка на оси</label><input type="number" id="ma-lafmax" step="5" value="100"></div>
       </div>
       <div id="macro-pane-islm" style="display:none;margin-top:10px;">
-        <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
-        <div class="field"><label>LM: r = f(Y)</label><input type="text" id="ma-lm" value="0.05*Y - 5"></div>
+        <div class="seg" id="islm-input-mode"><button type="button" class="seg-btn active" data-input="curves" onclick="setIslmInput('curves')">Две кривые</button><button type="button" class="seg-btn" data-input="params" onclick="setIslmInput('params')">Из параметров</button></div>
+        <div id="islm-curves">
+          <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
+          <div class="field"><label>LM: r = f(Y)</label><input type="text" id="ma-lm" value="0.05*Y - 5"></div>
+        </div>
+        <div id="islm-parameters" style="display:none;"></div>
       </div>
       <div class="error" id="macro-error" style="display:none;"></div>
       <div id="info-macro" style="margin-top:8px;"></div>
@@ -2252,6 +2256,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
 <script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>
 <script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>
+<script src="{% calc2_static 'calc2/51-islm.js' %}"></script>
 <script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
 <script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
 <script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
