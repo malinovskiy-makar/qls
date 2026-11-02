@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-02. HEAD: `e1c2ecf6`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-02. HEAD: `cfaff6e0`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,9 +343,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2290 | 184.7 | шаблон |
-| `calc2/static/calc2/calc2.css` | 4326 | 327.5 | CSS |
-| `calc2/static/calc2/previews.json` | 44 | 30.9 | json |
+| `calc2/templates/calc2/calc2.html` | 2294 | 184.9 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4339 | 328.7 | CSS |
+| `calc2/static/calc2/previews.json` | 44 | 31.0 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1166 | 76.6 | JS |
 | `calc2/static/calc2/12-numbers.js` | 239 | 12.1 | JS |
@@ -355,14 +355,15 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/41-market-policies.js` | 260 | 17.4 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 2067 | 152.3 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1233 | 81.3 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1035 | 66.5 | JS |
+| `calc2/static/calc2/45-plants.js` | 300 | 23.2 | JS |
 | `calc2/static/calc2/46-scenes-labor.js` | 900 | 68.8 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 279 | 18.2 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 445 | 30.3 | JS |
 | `calc2/static/calc2/52-modes.js` | 1007 | 68.8 | JS |
 | `calc2/static/calc2/54-scenes-ppf.js` | 3282 | 212.3 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 555 | 36.3 | JS |
-| `calc2/static/calc2/60-overlays.js` | 4977 | 318.0 | JS |
+| `calc2/static/calc2/60-overlays.js` | 4976 | 317.9 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2091 | 136.0 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1665 | 128.2 | JS |
 | `calc2/static/calc2/80-ui.js` | 856 | 54.3 | JS |
@@ -370,8 +371,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/84-picker.js` | 582 | 44.4 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2157 | 141.0 | JS |
 | `calc2/static/calc2/88-params.js` | 2023 | 139.3 | JS |
-| `calc2/static/calc2/89-model-state.js` | 362 | 23.8 | JS |
-| `calc2/static/calc2/90-explain.js` | 394 | 64.8 | JS |
+| `calc2/static/calc2/89-model-state.js` | 363 | 23.8 | JS |
+| `calc2/static/calc2/90-explain.js` | 397 | 64.8 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 1330 | 91.8 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
@@ -380,7 +381,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 346 | 22.8 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 38 файлов, 47102 строк, 3308.0 КБ.**
+**Итого: 39 файлов, 47224 строк, 3318.1 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -871,18 +872,39 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 919 — `recomputeIsoquant`
 - строка 930 — `redrawIsoquant`
 - строка 946 — `updateIsoPanel`
-- строка 983 — `plantMC`
-- строка 989 — `plantTC`
-- строка 995 — `plantQatMC`
-- строка 1011 — `recomputePlants`
-- строка 1045 — `plantsAt`
-- строка 1062 — `redrawPlants`
-- строка 1143 — `updatePlantsPanel`
-- строка 1173 — `setPlantsView`
-- строка 1180 — `setPlantsQ`
-- строка 1191 — `setCostsInputMode`
-- строка 1199 — `syncCostsInputMode`
-- строка 1213 — `setCostsSub`
+- строка 975 — `setPlantsView`
+- строка 982 — `setPlantsQ`
+- строка 993 — `setCostsInputMode`
+- строка 1001 — `syncCostsInputMode`
+- строка 1015 — `setCostsSub`
+
+#### `calc2/static/calc2/45-plants.js`
+
+- строка 4 — `plantsPolynomial`
+- строка 24 — `plantsValue`
+- строка 25 — `plantsQuadraticRoots`
+- строка 30 — `plantsCandidate`
+- строка 42 — `plantsEnvelope`
+- строка 67 — `plantsConvolve`
+- строка 78 — `plantsExactPieces`
+- строка 88 — `plantsExactAt`
+- строка 107 — `plantInputRows`
+- строка 112 — `setPlantInputRows`
+- строка 116 — `addPlant`
+- строка 117 — `removePlant`
+- строка 118 — `plantCost`
+- строка 119 — `plantMarginal`
+- строка 120 — `plantsCompile`
+- строка 134 — `plantsGrid`
+- строка 164 — `plantsIntegral`
+- строка 167 — `plantsAt`
+- строка 176 — `recomputePlants`
+- строка 197 — `plantsShownAt`
+- строка 198 — `plantsExpr`
+- строка 205 — `redrawPlants`
+- строка 239 — `plantsFinalRecord`
+- строка 253 — `updatePlantsPanel`
+- строка 276 — `renderPlantRows`
 
 #### `calc2/static/calc2/46-scenes-labor.js`
 
@@ -1290,51 +1312,51 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 3759 — `drawMarks`
 - строка 3863 — `snapTargets`
 - строка 3871 — `snapTargetsAll`
-- строка 4002 — `macroSnapTargets`
-- строка 4021 — `consumerSnapTargets`
-- строка 4050 — `ineqSnapTargets`
-- строка 4064 — `mathSnapTargets`
-- строка 4129 — `tradeSnapTargets`
-- строка 4150 — `axisSnapAt`
-- строка 4170 — `snapDistPx`
-- строка 4191 — `snapPointAt`
-- строка 4234 — `showSnapHint`
-- строка 4253 — `armMark`
-- строка 4266 — `cancelMarkDraft`
-- строка 4306 — `resetDecor`
-- строка 4398 — `_undoCopyChild`
-- строка 4412 — `_undoCopy`
-- строка 4432 — `pushUndo`
-- строка 4443 — `undoLast`
-- строка 4460 — `clearUndo`
-- строка 4467 — `forgetSceneSnapshot`
-- строка 4469 — `resetSceneMemory`
-- строка 4480 — `saveSceneSnapshot`
-- строка 4493 — `restoreSceneSnapshot`
-- строка 4521 — `keyOnText`
-- строка 4528 — `markOnText`
-- строка 4538 — `notationTex`
-- строка 4545 — `markOnInto`
-- строка 4554 — `markNameTex`
-- строка 4561 — `addMarkAt`
-- строка 4601 — `colorDist`
-- строка 4610 — `drawnStrokeColors`
-- строка 4626 — `nextMarkColor`
-- строка 4649 — `canvasNameLetters`
-- строка 4661 — `nextMarkName`
-- строка 4673 — `newMark`
-- строка 4689 — `pendingMark`
-- строка 4692 — `startMarkDraft`
-- строка 4701 — `markSnapFn`
-- строка 4712 — `renderMarkList`
-- строка 4724 — `ensureAddMarkButton`
-- строка 4735 — `buildMarkRow`
-- строка 4891 — `markById`
-- строка 4892 — `openMarkMenu`
-- строка 4905 — `fillMarkMenu`
-- строка 4947 — `renameMark`
-- строка 4962 — `editMarkCoords`
-- строка 4971 — `removeMark`
+- строка 4001 — `macroSnapTargets`
+- строка 4020 — `consumerSnapTargets`
+- строка 4049 — `ineqSnapTargets`
+- строка 4063 — `mathSnapTargets`
+- строка 4128 — `tradeSnapTargets`
+- строка 4149 — `axisSnapAt`
+- строка 4169 — `snapDistPx`
+- строка 4190 — `snapPointAt`
+- строка 4233 — `showSnapHint`
+- строка 4252 — `armMark`
+- строка 4265 — `cancelMarkDraft`
+- строка 4305 — `resetDecor`
+- строка 4397 — `_undoCopyChild`
+- строка 4411 — `_undoCopy`
+- строка 4431 — `pushUndo`
+- строка 4442 — `undoLast`
+- строка 4459 — `clearUndo`
+- строка 4466 — `forgetSceneSnapshot`
+- строка 4468 — `resetSceneMemory`
+- строка 4479 — `saveSceneSnapshot`
+- строка 4492 — `restoreSceneSnapshot`
+- строка 4520 — `keyOnText`
+- строка 4527 — `markOnText`
+- строка 4537 — `notationTex`
+- строка 4544 — `markOnInto`
+- строка 4553 — `markNameTex`
+- строка 4560 — `addMarkAt`
+- строка 4600 — `colorDist`
+- строка 4609 — `drawnStrokeColors`
+- строка 4625 — `nextMarkColor`
+- строка 4648 — `canvasNameLetters`
+- строка 4660 — `nextMarkName`
+- строка 4672 — `newMark`
+- строка 4688 — `pendingMark`
+- строка 4691 — `startMarkDraft`
+- строка 4700 — `markSnapFn`
+- строка 4711 — `renderMarkList`
+- строка 4723 — `ensureAddMarkButton`
+- строка 4734 — `buildMarkRow`
+- строка 4890 — `markById`
+- строка 4891 — `openMarkMenu`
+- строка 4904 — `fillMarkMenu`
+- строка 4946 — `renameMark`
+- строка 4961 — `editMarkCoords`
+- строка 4970 — `removeMark`
 
 #### `calc2/static/calc2/70-scenes-math.js`
 
@@ -1713,21 +1735,21 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 172 — `captureStatePlain`
 - строка 181 — `applyStatePlain`
 - строка 188 — `rerenderModelLists`
-- строка 206 — `forceRebuildAfterApply`
-- строка 212 — `syncUiFromState`
-- строка 219 — `capturePristine`
-- строка 230 — `restorePristine`
-- строка 250 — `captureMemory`
-- строка 255 — `applyMemory`
-- строка 278 — `serializeCurves`
-- строка 291 — `rebuildCurves`
-- строка 311 — `modelKeyOf`
-- строка 316 — `collectModelState`
-- строка 336 — `applyModelState`
+- строка 207 — `forceRebuildAfterApply`
+- строка 213 — `syncUiFromState`
+- строка 220 — `capturePristine`
+- строка 231 — `restorePristine`
+- строка 251 — `captureMemory`
+- строка 256 — `applyMemory`
+- строка 279 — `serializeCurves`
+- строка 292 — `rebuildCurves`
+- строка 312 — `modelKeyOf`
+- строка 317 — `collectModelState`
+- строка 337 — `applyModelState`
 
 #### `calc2/static/calc2/90-explain.js`
 
-- строка 388 — `sceneExplainHtml`
+- строка 391 — `sceneExplainHtml`
 
 #### `calc2/static/calc2/91-session.js`
 
@@ -1926,6 +1948,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1443.**
+**Итого функций в индексе: 1461.**
 
 <!-- AUTO:END -->

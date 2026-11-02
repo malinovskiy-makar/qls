@@ -523,7 +523,7 @@ const CASES = [
     run: `setMode('costs'); setCostsSub('plants');
           STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; setPlantsQ(30);
           var a = plantsAt(30), b = plantsAt(15);
-          var naive30 = plantTC(STATE.plants.c1, 30) + plantTC(STATE.plants.c2, 30);
+          var naive30 = plantCost(STATE.plants.specs[0], 30) + plantCost(STATE.plants.specs[1], 30);
           return { q1: a.q1, q2: a.q2, mc30: a.m, tc30: a.tcDirect, vc30: a.vc,
                    q1b: b.q1, q2b: b.q2, mc15: b.m, tc15: b.tcDirect, vc15: b.vc,
                    naive: naive30 };`,
@@ -2541,7 +2541,7 @@ const CASES = [
              ['L максимума TP', 'tpL', 20, 0.1], ['max TP', 'tpV', 4000, 8]],
   },
   {
-    // Б3. TC₁ = Q², TC₂ = 2Q², предел мощности одного завода 100 (PLANT_SCAN_Q).
+    // Б3. TC₁ = Q², TC₂ = 2Q², предел мощности одного завода 100 (явные K в Э6).
     //   MC₁ = 2Q₁, MC₂ = 4Q₂. Равенство предельных ⇒ Q₂ = Q₁/2, то есть Q₁ = 2Q/3.
     //   Пока оба завода внутри мощности (Q ≤ 150):
     //     TC(Q) = (2Q/3)² + 2(Q/3)² = 4Q²/9 + 2Q²/9 = 2Q²/3.
@@ -2551,7 +2551,7 @@ const CASES = [
     //   Q = 180 → 10000 + 2·6400 = 22800; Q = 30 → 600.
     name: 'Б3 · Сложение заводов: 2Q²/3 до излома, дальше 10000 + 2(Q−100)²',
     run: `pickScene('plants');
-          STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; redrawAll();
+          STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; STATE.plCaps = [100, 100]; redrawAll();
           var at = function (q) { STATE.plQ = q; redrawAll(); var c = plantsAt(q) || {}; return c; };
           var a = at(30), b = at(60), c = at(150), d = at(180);
           return { tc30: a.tcDirect, tc60: b.tcDirect, tc150: c.tcDirect, tc180: d.tcDirect,
@@ -2763,7 +2763,7 @@ const CASES = [
           var sd = yl('sd');
           var costsAfterProd = yl('costs'), prodAfterCosts = yl('prod');
           return { costsOk: costs === 'P' ? 1 : 0,
-                   plantsOk: plants === 'P' ? 1 : 0,
+                   plantsOk: plants === 'TC' ? 1 : 0, // Э6: согласованная ось общих затрат
                    prodOk: /TP/.test(prodY) ? 1 : 0, prodX: prodX === 'L' ? 1 : 0,
                    noLeak: (costsAfterProd === costs && prodAfterCosts === prodY) ? 1 : 0,
                    sdOk: sd === 'P' ? 1 : 0 };`,
@@ -2786,7 +2786,7 @@ const CASES = [
           var re = /\\(axis cs:(-?[\\d.]+),(-?[\\d.]+)\\)/g, m;
           while ((m = re.exec(tex))) { if (+m[1] < -1e-6 || +m[2] < -1e-6) outside++; }
           // Точка «излом MC» на графике затрат: в сцене заводов её быть не должно.
-          resetSceneMemory(); pickScene('plants'); setPlantsView('tc'); redrawAll();
+          resetSceneMemory(); pickScene('plants'); STATE.plCaps = [100, 100]; STATE.plQ = 180; setPlantsView('tc'); redrawAll();
           var names = keyTargets().map(function (k) { return k.name; }).join('|');
           var mcOnTc = /MC/.test(names) ? 1 : 0;
           setPlantsView('mc'); redrawAll();
@@ -3245,9 +3245,9 @@ const CASES = [
              ['и ни одной таблицей', 'cT', 0, 0],
              ['производство: TP, MP, AP формулой', 'pF', 3, 0],
              ['и ни одной таблицей', 'pT', 0, 0],
-             ['заводы: TC₁ и TC₂ формулой', 'plF', 2, 0],
-             ['со своими отрезками', 'plDom', 2, 0],
-             ['а совокупная — с пояснением', 'plNotes', 1, 0],
+             ['заводы: TC₁, TC₂ и точная сумма формулой', 'plF', 3, 0],
+             ['со своими отрезками', 'plDom', 3, 0],
+             ['точная сумма не помечена численной', 'plNotes', 0, 0],
              ['символьная производная верна', 'deriv', 15, 0.001]],
   },
   {

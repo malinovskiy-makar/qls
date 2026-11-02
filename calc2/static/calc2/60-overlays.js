@@ -3930,8 +3930,7 @@ function snapTargetsAll() {
   if (STATE.mode === 'costs' && STATE.costsSub === 'plants' && STATE.plants) {
     const p = STATE.plants;
     const mc = (STATE.plView === 'mc');
-    const pts = p.table.map(r => [r.Q, mc ? r.m : r.tcDirect]);
-    out.push({ name: mc ? 'MC' : 'TC', f: (q) => interpY(pts, q) });
+    out.push({ name: mc ? 'MC' : 'TC', f: q => {const r=plantsShownAt(q);return r?(mc?r.m:r.tcDirect):NaN;} });
     return out;
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {

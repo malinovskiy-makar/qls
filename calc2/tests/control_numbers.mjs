@@ -1555,6 +1555,16 @@ r = await run(`resetSceneMemory();pickScene('mono-d1');updateCurveExpr(curveByRo
   var cost=mcSourceCurveAny();updateCurveExpr(cost,'Q^2+30*Q+200');setRole(cost,'tc');redrawAll();return STATE.discr1;`);
 cmp('Э5 6.27 выпуск',r.Qcomp,30,1e-6);cmp('Э5 6.27 прибыль с FC',r.profit,1150,1e-6);
 
+head('Ночь 29.10 · Э6 — глобальный раздел выпуска');
+r = await run(`resetSceneMemory();pickScene('plants');STATE.pl1='10*Q';STATE.pl2='Q^2';setPlantsQ(12);return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:7,q2:5,m:10,tcDirect:95,vc:95}))cmp('Э6 4.18г '+k,r[k],v,1e-7);
+r = await run(`STATE.pl2='6*Q';redrawAll();return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:0,q2:12,m:6,tcDirect:72,vc:72}))cmp('Э6 угол '+k,r[k],v,1e-7);
+r = await run(`STATE.pl1='Q^2';STATE.pl2='Q^2';redrawAll();return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:6,q2:6,tcDirect:72}))cmp('Э6 4.19а '+k,r[k],v,1e-7);
+r = await run(`setPlantInputRows([{expr:'Q^2+5',K:4,kind:'sunk'},{expr:'.5*Q^2+12',K:null,kind:'quasi'},{expr:'3*Q',K:6,kind:'sunk'}]);redrawAll();return plantsAt(12);`);
+[2,4,6].forEach((v,i)=>cmp('Э6 три завода: Q'+(i+1),r.qs[i],v,1e-7));cmp('Э6 три завода: TC',r.tcDirect,47,1e-7);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

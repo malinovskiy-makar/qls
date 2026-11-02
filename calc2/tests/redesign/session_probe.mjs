@@ -296,6 +296,14 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
       return same(actual,rec.start.state.discr3)&&c?.fc===0&&d?.profit===2050&&d?.dwl===1025
         &&Math.abs(u?.P-170/3)<1e-6&&Math.abs(u?.profit-6050/3)<1e-6&&Math.abs(c?.delta-100/3)<1e-6;
     })();
+    // Э6 заменяет интерполированную таблицу точным минимумом. Входы старого
+    // снимка сохраняются, производная таблица проверяется аналитически.
+    const plantsExact = k === 'plants' && (() => {
+      const p=st.plants,r=p?.table?.find(r=>r.Q===30),s=p?.pieces?.[0];
+      return p?.specs?.length===2&&p?.pieces?.length===1&&s?.lo===0&&s?.hi==='Infinity'
+        &&Math.abs(s.a-2/3)<1e-9&&s.b===0&&s.c===0&&r?.q1===20&&r?.q2===10
+        &&r?.m===40&&r?.tcDirect===600&&r?.vc===600;
+    })();
     /* Производное от размера холста (место легенды, касательные «Касательной»,
        пересечения) сверка не сравнивает — тот же список, что VIEW_KEYS в
        compare.mjs: холст нового экрана другого размера, а старт тот же. */
@@ -303,7 +311,10 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
       /* areaHidden — ключ этапа Г (14.10): в записях старта его нет, на старте он пуст. */
       && !(x === 'areaHidden' && !(x in rec.start.state) && Array.isArray(st.areaHidden) && !st.areaHidden.length)
       && !(x === 'prod' && productionExact)
-      && !(x === 'discr3' && discriminationExact));
+      && !(x === 'discr3' && discriminationExact)
+      && !(x === 'plants' && plantsExact)
+      && !(k === 'plants' && plantsExact && x === 'axisYDefault' && st.axisYDefault === 'TC')); // принятая ось Э6
+    if (k === 'plants' && !plantsExact && !real.includes('plants')) real.push('plants: не сошлось аналитическое решение');
     if (k === 'mono-d3' && !discriminationExact && !real.includes('discr3')) real.push('discr3: не сошлось аналитическое решение');
     if (k === 'prod' && !productionExact && !real.includes('prod')) real.push('prod: не сошлось аналитическое решение');
     if (real.length) { bad++; fails.push('заполненное хранилище: ' + k + ' старт разошёлся: ' + real.slice(0, 5).join(', ')); }

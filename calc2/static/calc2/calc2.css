@@ -4324,3 +4324,16 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 #tools-panel .tax-second [data-tax2-side] > .seg { margin:0; }
 #tax-remove-second { width:auto; flex:none; }
 #tax-pair-controls [hidden], #tax-pair-controls[hidden] { display:none !important; }
+
+/* Э6: мощности и постоянные затраты используют те же карточки функций. */
+.plant-options { margin-top: 10px; display: grid; gap: 8px; }
+.plant-options > label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+#plant-rows .plant-options input { box-sizing: border-box; min-width: 0; width: 100%; background: transparent; color: var(--text); border: 0; border-bottom: 1px dashed var(--border-strong); border-radius: 0; padding: 3px 2px; font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 17px; text-align: right; }
+#plant-rows .plant-options input::placeholder { font-family: var(--font-ui, sans-serif); font-size: 14px; }
+.plant-options .seg { display: flex; flex-wrap: wrap; }
+.plant-options .seg-btn { min-width: 0; flex: 1; font-size: 14px; white-space: normal; }
+.plant-options .plant-remove { justify-self: end; font-size: 14px; }
+
+#plant-rows .plant-options .seg { width: 100%; min-width: 0; }
+#plant-rows .plant-options .seg-btn { flex: 1 1 0; white-space: normal; overflow-wrap: anywhere; padding: 6px; min-width: 0; }
+#plant-rows .plant-options > label { display: grid; grid-template-columns: auto minmax(0,1fr); }

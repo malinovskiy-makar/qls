@@ -222,7 +222,7 @@ function answerCellWas(beforeText, afterText) {
 const ANSWER_GROUP = {
   'info-areas': 'Излишки', 'info-tax': 'Вмешательство', 'info-sum': 'По группам',
   'info-mono': 'Монополия', 'info-nat': 'Естественная монополия', 'info-costs': 'Издержки',
-  'info-prod': 'Производство', 'info-iso': 'Изокванта', 'info-plants': 'Два завода',
+  'info-prod': 'Производство', 'info-iso': 'Изокванта', 'info-plants': 'Заводы',
   'info-labor': 'Рынок труда', 'info-inequality': 'Неравенство', 'info-consumer': 'Выбор потребителя',
   'info-macro': 'Равновесие', 'info-math': 'Математика', 'info-elast': 'Эластичность',
   'info-ext': 'Внешние эффекты', 'info-open': 'Открытая экономика', 'info-d3': 'Дискриминация',
