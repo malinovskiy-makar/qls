@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-02. HEAD: `cfaff6e0`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-02. HEAD: `18cc20d4`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,8 +343,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2294 | 184.9 | шаблон |
-| `calc2/static/calc2/calc2.css` | 4339 | 328.7 | CSS |
+| `calc2/templates/calc2/calc2.html` | 2298 | 185.3 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4356 | 330.2 | CSS |
 | `calc2/static/calc2/previews.json` | 44 | 31.0 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1166 | 76.6 | JS |
@@ -362,26 +362,27 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/50-scenes-macro.js` | 445 | 30.3 | JS |
 | `calc2/static/calc2/52-modes.js` | 1007 | 68.8 | JS |
 | `calc2/static/calc2/54-scenes-ppf.js` | 3282 | 212.3 | JS |
-| `calc2/static/calc2/56-scenes-inequality.js` | 555 | 36.3 | JS |
-| `calc2/static/calc2/60-overlays.js` | 4976 | 317.9 | JS |
+| `calc2/static/calc2/56-scenes-inequality.js` | 488 | 34.4 | JS |
+| `calc2/static/calc2/57-distributions.js` | 161 | 18.6 | JS |
+| `calc2/static/calc2/60-overlays.js` | 4977 | 318.0 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2091 | 136.0 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1665 | 128.2 | JS |
 | `calc2/static/calc2/80-ui.js` | 856 | 54.3 | JS |
 | `calc2/static/calc2/82-input.js` | 2363 | 140.7 | JS |
 | `calc2/static/calc2/84-picker.js` | 582 | 44.4 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2157 | 141.0 | JS |
-| `calc2/static/calc2/88-params.js` | 2023 | 139.3 | JS |
+| `calc2/static/calc2/88-params.js` | 2026 | 139.6 | JS |
 | `calc2/static/calc2/89-model-state.js` | 363 | 23.8 | JS |
-| `calc2/static/calc2/90-explain.js` | 397 | 64.8 | JS |
+| `calc2/static/calc2/90-explain.js` | 398 | 65.4 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
-| `calc2/static/calc2/92-ui-kit.js` | 1330 | 91.8 | JS |
+| `calc2/static/calc2/92-ui-kit.js` | 1330 | 91.9 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
 | `calc2/static/calc2/94-answer.js` | 1088 | 71.7 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 470 | 26.7 | JS |
 | `calc2/static/calc2/96-self.js` | 346 | 22.8 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 39 файлов, 47224 строк, 3318.1 КБ.**
+**Итого: 40 файлов, 47344 строк, 3337.7 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1125,37 +1126,65 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 - строка 11 — `parseNumberList`
 - строка 18 — `inequalitySharesFromInput`
-- строка 47 — `lorenzFromShares`
-- строка 56 — `lorenzFromFormula`
-- строка 78 — `lorenzAreaUnder`
-- строка 89 — `lorenzAt`
-- строка 103 — `inequalityStats`
-- строка 124 — `inequalityP90P10`
-- строка 139 — `ineqRedistShares`
-- строка 152 — `applyRedistribution`
-- строка 168 — `recomputeInequality`
-- строка 209 — `drawInequalityDiagonal`
-- строка 218 — `drawInequalityCaptions`
-- строка 236 — `lorenzPlotExpr`
-- строка 243 — `lorenzMark`
-- строка 250 — `lorenzMarkArea`
-- строка 260 — `drawInequalityAreas`
-- строка 271 — `drawLorenzCurve`
-- строка 280 — `drawRobinHood`
-- строка 296 — `drawLorenzNodes`
-- строка 314 — `ineqDragNode`
-- строка 330 — `ineqDragIncome`
-- строка 347 — `attachLorenzNodeDrag`
-- строка 366 — `drawRedistArrow`
-- строка 381 — `updateIneqSortNote`
-- строка 389 — `updateInequalityPanel`
-- строка 426 — `redrawInequality`
-- строка 475 — `defaultGroupShares`
-- строка 482 — `setIneqInput`
-- строка 499 — `setIneqAlpha`
-- строка 515 — `setIneqGroupN`
-- строка 526 — `setIneqRedistTool`
-- строка 537 — `renderIneqGroupsTable`
+- строка 25 — `lorenzFromShares`
+- строка 34 — `lorenzFromFormula`
+- строка 37 — `lorenzAreaUnder`
+- строка 48 — `lorenzAt`
+- строка 62 — `inequalityStats`
+- строка 83 — `inequalityP90P10`
+- строка 98 — `ineqRedistShares`
+- строка 111 — `applyRedistribution`
+- строка 127 — `recomputeInequality`
+- строка 153 — `drawInequalityDiagonal`
+- строка 162 — `drawInequalityCaptions`
+- строка 180 — `ineqDrawData`
+- строка 183 — `ineqPercentExpr`
+- строка 186 — `lorenzPlotExpr`
+- строка 189 — `lorenzMark`
+- строка 196 — `lorenzMarkArea`
+- строка 206 — `drawInequalityAreas`
+- строка 217 — `drawLorenzCurve`
+- строка 231 — `drawRobinHood`
+- строка 247 — `drawLorenzNodes`
+- строка 265 — `ineqDragNode`
+- строка 283 — `ineqDragIncome`
+- строка 300 — `attachLorenzNodeDrag`
+- строка 319 — `drawRedistArrow`
+- строка 334 — `updateIneqSortNote`
+- строка 342 — `updateInequalityPanel`
+- строка 383 — `redrawInequality`
+- строка 434 — `defaultGroupShares`
+- строка 441 — `setIneqInput`
+- строка 458 — `setIneqAlpha`
+- строка 465 — `setIneqGroupN`
+- строка 477 — `setIneqRedistTool`
+- строка 488 — `renderIneqGroupsTable`
+
+#### `calc2/static/calc2/57-distributions.js`
+
+- строка 2 — `ineqNumber`
+- строка 5 — `ineqShares`
+- строка 13 — `ineqWeightedPoints`
+- строка 16 — `ineqSimplify`
+- строка 17 — `ineqPieceExpr`
+- строка 21 — `ineqLinePieces`
+- строка 24 — `ineqIntegrate`
+- строка 27 — `ineqStatsFor`
+- строка 36 — `ineqHasAlpha`
+- строка 37 — `ineqAlphaActive`
+- строка 38 — `ineqFormulaExpr`
+- строка 42 — `ineqDistribution`
+- строка 71 — `ineqUnion`
+- строка 101 — `ineqFirstConfig`
+- строка 103 — `ineqCalculate`
+- строка 111 — `ineqGroupConfig`
+- строка 112 — `ineqWriteGroups`
+- строка 113 — `ineqSetGroupMode`
+- строка 119 — `ineqAddGroup`
+- строка 125 — `ineqRemoveGroup`
+- строка 126 — `ineqRenderRows`
+- строка 138 — `ineqAddCountry`
+- строка 142 — `renderIneqCountryControls`
 
 #### `calc2/static/calc2/60-overlays.js`
 
@@ -1286,77 +1315,77 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 3129 — `freeSymbols`
 - строка 3147 — `freeSymbolsUncached`
 - строка 3175 — `sceneReserved`
-- строка 3198 — `sceneExtraParams`
-- строка 3204 — `paramValue`
-- строка 3210 — `paramScope`
-- строка 3220 — `scopeFor`
-- строка 3227 — `evalWithParams`
-- строка 3238 — `syncParams`
-- строка 3294 — `buildParamChip`
-- строка 3419 — `initSceneColorPickers`
-- строка 3431 — `syncSceneColorPickers`
-- строка 3439 — `syncAxisPlaceholders`
-- строка 3454 — `titleAnchorPx`
-- строка 3464 — `drawGraphTitle`
-- строка 3503 — `editGraphTitleOnCanvas`
-- строка 3548 — `normHex`
-- строка 3570 — `paletteSix`
-- строка 3578 — `closeColorMenu`
-- строка 3592 — `onDocClosePick`
-- строка 3598 — `onEscClosePick`
-- строка 3618 — `paletteTwelve`
-- строка 3619 — `makeColorPicker`
-- строка 3731 — `autoCurveName`
-- строка 3740 — `curveShortName`
-- строка 3750 — `markCaption`
-- строка 3759 — `drawMarks`
-- строка 3863 — `snapTargets`
-- строка 3871 — `snapTargetsAll`
-- строка 4001 — `macroSnapTargets`
-- строка 4020 — `consumerSnapTargets`
-- строка 4049 — `ineqSnapTargets`
-- строка 4063 — `mathSnapTargets`
-- строка 4128 — `tradeSnapTargets`
-- строка 4149 — `axisSnapAt`
-- строка 4169 — `snapDistPx`
-- строка 4190 — `snapPointAt`
-- строка 4233 — `showSnapHint`
-- строка 4252 — `armMark`
-- строка 4265 — `cancelMarkDraft`
-- строка 4305 — `resetDecor`
-- строка 4397 — `_undoCopyChild`
-- строка 4411 — `_undoCopy`
-- строка 4431 — `pushUndo`
-- строка 4442 — `undoLast`
-- строка 4459 — `clearUndo`
-- строка 4466 — `forgetSceneSnapshot`
-- строка 4468 — `resetSceneMemory`
-- строка 4479 — `saveSceneSnapshot`
-- строка 4492 — `restoreSceneSnapshot`
-- строка 4520 — `keyOnText`
-- строка 4527 — `markOnText`
-- строка 4537 — `notationTex`
-- строка 4544 — `markOnInto`
-- строка 4553 — `markNameTex`
-- строка 4560 — `addMarkAt`
-- строка 4600 — `colorDist`
-- строка 4609 — `drawnStrokeColors`
-- строка 4625 — `nextMarkColor`
-- строка 4648 — `canvasNameLetters`
-- строка 4660 — `nextMarkName`
-- строка 4672 — `newMark`
-- строка 4688 — `pendingMark`
-- строка 4691 — `startMarkDraft`
-- строка 4700 — `markSnapFn`
-- строка 4711 — `renderMarkList`
-- строка 4723 — `ensureAddMarkButton`
-- строка 4734 — `buildMarkRow`
-- строка 4890 — `markById`
-- строка 4891 — `openMarkMenu`
-- строка 4904 — `fillMarkMenu`
-- строка 4946 — `renameMark`
-- строка 4961 — `editMarkCoords`
-- строка 4970 — `removeMark`
+- строка 3199 — `sceneExtraParams`
+- строка 3205 — `paramValue`
+- строка 3211 — `paramScope`
+- строка 3221 — `scopeFor`
+- строка 3228 — `evalWithParams`
+- строка 3239 — `syncParams`
+- строка 3295 — `buildParamChip`
+- строка 3420 — `initSceneColorPickers`
+- строка 3432 — `syncSceneColorPickers`
+- строка 3440 — `syncAxisPlaceholders`
+- строка 3455 — `titleAnchorPx`
+- строка 3465 — `drawGraphTitle`
+- строка 3504 — `editGraphTitleOnCanvas`
+- строка 3549 — `normHex`
+- строка 3571 — `paletteSix`
+- строка 3579 — `closeColorMenu`
+- строка 3593 — `onDocClosePick`
+- строка 3599 — `onEscClosePick`
+- строка 3619 — `paletteTwelve`
+- строка 3620 — `makeColorPicker`
+- строка 3732 — `autoCurveName`
+- строка 3741 — `curveShortName`
+- строка 3751 — `markCaption`
+- строка 3760 — `drawMarks`
+- строка 3864 — `snapTargets`
+- строка 3872 — `snapTargetsAll`
+- строка 4002 — `macroSnapTargets`
+- строка 4021 — `consumerSnapTargets`
+- строка 4050 — `ineqSnapTargets`
+- строка 4064 — `mathSnapTargets`
+- строка 4129 — `tradeSnapTargets`
+- строка 4150 — `axisSnapAt`
+- строка 4170 — `snapDistPx`
+- строка 4191 — `snapPointAt`
+- строка 4234 — `showSnapHint`
+- строка 4253 — `armMark`
+- строка 4266 — `cancelMarkDraft`
+- строка 4306 — `resetDecor`
+- строка 4398 — `_undoCopyChild`
+- строка 4412 — `_undoCopy`
+- строка 4432 — `pushUndo`
+- строка 4443 — `undoLast`
+- строка 4460 — `clearUndo`
+- строка 4467 — `forgetSceneSnapshot`
+- строка 4469 — `resetSceneMemory`
+- строка 4480 — `saveSceneSnapshot`
+- строка 4493 — `restoreSceneSnapshot`
+- строка 4521 — `keyOnText`
+- строка 4528 — `markOnText`
+- строка 4538 — `notationTex`
+- строка 4545 — `markOnInto`
+- строка 4554 — `markNameTex`
+- строка 4561 — `addMarkAt`
+- строка 4601 — `colorDist`
+- строка 4610 — `drawnStrokeColors`
+- строка 4626 — `nextMarkColor`
+- строка 4649 — `canvasNameLetters`
+- строка 4661 — `nextMarkName`
+- строка 4673 — `newMark`
+- строка 4689 — `pendingMark`
+- строка 4692 — `startMarkDraft`
+- строка 4701 — `markSnapFn`
+- строка 4712 — `renderMarkList`
+- строка 4724 — `ensureAddMarkButton`
+- строка 4735 — `buildMarkRow`
+- строка 4891 — `markById`
+- строка 4892 — `openMarkMenu`
+- строка 4905 — `fillMarkMenu`
+- строка 4947 — `renameMark`
+- строка 4962 — `editMarkCoords`
+- строка 4971 — `removeMark`
 
 #### `calc2/static/calc2/70-scenes-math.js`
 
@@ -1716,13 +1745,13 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 977 — `ineqParseIncomes`
 - строка 980 — `ineqMasterRebase`
 - строка 985 — `ineqMasterScale`
-- строка 1003 — `ineqMasterApply`
-- строка 1015 — `ineqMasterDetach`
-- строка 1020 — `buildIneqMasterChip`
-- строка 1033 — `showPult`
-- строка 1060 — `updatePult`
-- строка 1095 — `liveFormula`
-- строка 1115 — `wireControls`
+- строка 1006 — `ineqMasterApply`
+- строка 1018 — `ineqMasterDetach`
+- строка 1023 — `buildIneqMasterChip`
+- строка 1036 — `showPult`
+- строка 1063 — `updatePult`
+- строка 1098 — `liveFormula`
+- строка 1118 — `wireControls`
 
 #### `calc2/static/calc2/89-model-state.js`
 
@@ -1749,7 +1778,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 #### `calc2/static/calc2/90-explain.js`
 
-- строка 391 — `sceneExplainHtml`
+- строка 392 — `sceneExplainHtml`
 
 #### `calc2/static/calc2/91-session.js`
 
@@ -1948,6 +1977,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1461.**
+**Итого функций в индексе: 1486.**
 
 <!-- AUTO:END -->

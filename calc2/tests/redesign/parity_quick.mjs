@@ -176,6 +176,11 @@ for (const key of keys) {
       if ((REDEFINED[key] || []).includes(String(r.label).trim())) return;   // ADR 0143, см. выше
       const q = c && c.rows.find(x => String(x.i) === String(r.i));
       if (!q) { bad++; issues.push(key + ': ' + b.id + ' строка «' + r.label + '» не показана'); return; }
+      // Э7 (решение29.10): пяти групп недостаточно для децилей. Строка
+      // остаётся на месте с честным объяснением, а не прежним выдуманным5.
+      if(key==='ineq'&&b.id==='info-inequality'&&r.label==='Коэф. фондов (децильный)'){
+        if(q.value!=='Недостаточно данных'){bad++;issues.push('ineq: недоступные децили показаны как '+q.value);}return;
+      }
       // Старое Q / P — пара, а не дробь. Новые дроби внутри координат
       // разделяются пробелами вокруг внешней косой черты.
       if (/Q\s*\/\s*P/.test(r.label)) {

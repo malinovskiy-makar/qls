@@ -1565,6 +1565,15 @@ for(const[k,v]of Object.entries({q1:6,q2:6,tcDirect:72}))cmp('Э6 4.19а '+k,r[k
 r = await run(`setPlantInputRows([{expr:'Q^2+5',K:4,kind:'sunk'},{expr:'.5*Q^2+12',K:null,kind:'quasi'},{expr:'3*Q',K:6,kind:'sunk'}]);redrawAll();return plantsAt(12);`);
 [2,4,6].forEach((v,i)=>cmp('Э6 три завода: Q'+(i+1),r.qs[i],v,1e-7));cmp('Э6 три завода: TC',r.tcDirect,47,1e-7);
 
+head('Ночь 29.10 · Э7 — группы и союз стран');
+r=await run(`resetSceneMemory();pickScene('ineq');STATE.ineqGroups=[30,70];STATE.ineqPops=[60,40];redrawAll();return STATE.ineqStats;`);
+cmp('Э7 13.15 Джини',r.gini,.3,1e-8);cmp('Э7 невычислимые децили',r.decileAvailable,false,0);
+r=await run(`STATE.ineqGroups=[25,75];STATE.ineqPops=[50,50];STATE.ineqPopulation=4;STATE.ineqTotalIncome=1;STATE.ineqCountryB={input:'groups',groups:[25,75],pops:[50,50],population:1,totalIncome:1};redrawAll();return{g:STATE.ineqStats.gini,pts:STATE.ineqLorenz,gs:STATE.ineqCountries.map(c=>c.stats.gini)};`);
+cmp('Э7 13.14 Джини союза',r.g,17/40,1e-8);r.gs.forEach((v,i)=>cmp('Э7 13.14 Джини страны '+i,v,.25,1e-8));
+[[.4,.125],[.8,.5],[.9,.625]].forEach((q,i)=>q.forEach((v,j)=>cmp('Э7 13.14 точка '+i+' координата '+j,r.pts[i+1][j],v,1e-8)));
+r=await run(`STATE.ineqInput='formula';STATE.ineqFormula='p^2';STATE.ineqPopulation=3;STATE.ineqCountryB={input:'formula',formula:'p',population:1,totalIncome:1};redrawAll();return{g:STATE.ineqStats.gini,a:STATE.ineqDistribution.at(.5),b:STATE.ineqDistribution.at(.9)};`);
+cmp('Э7 13.18 Джини',r.g,3/8,1e-8);cmp('Э7 13.18 первая ветвь',r.a,2/9,1e-8);cmp('Э7 13.18 вторая ветвь',r.b,.8,1e-8);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

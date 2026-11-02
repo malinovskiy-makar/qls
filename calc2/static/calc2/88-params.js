@@ -137,8 +137,8 @@ function pultRegulatorIds() {
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
   }
-  if (STATE.mode === 'inequality' && STATE.ineqInput === 'formula') {
-    return ['ineq-alpha-field'];
+  if (STATE.mode === 'inequality') {
+    return ineqAlphaActive() ? ['ineq-alpha-field'] : [];
   }
   // Потребитель (Фаза 8): живой регулятор — новая цена Px₁ при разложении Слуцкого.
   if (STATE.mode === 'consumer') {
@@ -980,7 +980,7 @@ function ineqParseIncomes(str) {
 function ineqMasterRebase() {        // запомнить текущий профиль как базу (отсчёт 100%)
   STATE.ineqMasterBase = (STATE.ineqInput === 'incomes')
     ? ineqParseIncomes(STATE.ineqIncomes)
-    : STATE.ineqGroups.map(Number);
+    : STATE.ineqGroups.map(ineqNumber);
 }
 function ineqMasterScale(s) {         // применить масштаб s → задать доли/доходы как ручной ввод
   const base = STATE.ineqMasterBase; if (!base || !base.length) return;
@@ -991,8 +991,11 @@ function ineqMasterScale(s) {         // применить масштаб s →
     STATE.ineqIncomes = eff.map(String).join(', ');
     const inc = document.getElementById('ineq-incomes'); if (inc) inc.value = STATE.ineqIncomes;
   } else {
-    const mean = 100 / n;                            // равное распределение долей
-    let eff = base.map(v => Math.max(0, mean + s * (v - mean)));
+    const pops=ineqDistribution(ineqFirstConfig()).pops;if(!pops)return;
+    let eff;
+    if(STATE.ineqGroupMode==='counts'){const mean=base.reduce((a,v,i)=>a+v*pops[i],0);STATE.ineqGroups=base.map(v=>Math.max(0,mean+s*(v-mean)));renderIneqGroupsTable();redrawAll();return;}
+    const norm=base.reduce((a,b)=>a+b,0);
+    eff=base.map((v,i)=>Math.max(0,100*pops[i]+s*(100*v/norm-100*pops[i])));
     const sum = eff.reduce((a, b) => a + b, 0) || 1;
     eff = eff.map(v => v / sum * 100);               // ренормировка к 100 %
     STATE.ineqGroups = eff;
@@ -1920,7 +1923,7 @@ function wireControls() {
   if (ineqInc) ineqInc.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqInc(); });
   liveFormula([ineqInc], applyIneqInc);
   const ineqFm = document.getElementById('ineq-formula');
-  const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; redrawAll(); };
+  const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; updatePult();redrawAll(); };
   const ineqFmBtn = document.getElementById('ineq-formula-apply');
   if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
   if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });

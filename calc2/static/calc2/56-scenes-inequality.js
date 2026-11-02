@@ -16,30 +16,8 @@ function parseNumberList(str) {
 // Доли дохода по группам равного населения (фракции, сумма = 1) из текущего ввода
 // 'groups'/'incomes'. Возвращает { shares, N, warn } или null. (Формула — отдельно.)
 function inequalitySharesFromInput() {
-  if (STATE.ineqInput === 'groups') {
-    const g0 = STATE.ineqGroups.map(Number).filter(v => !isNaN(v));
-    const N = g0.length;
-    if (N < 2) return null;
-    // Кривая Лоренца строится от беднейших к богатейшим → доли групп ОБЯЗАНЫ идти
-    // по неубыванию (иначе кривая теряет вогнутость). Сортируем по возрастанию.
-    const g = g0.slice().sort((a, b) => a - b);
-    const reordered = g.some((v, i) => v !== g0[i]);   // порядок реально изменился?
-    const sum = g.reduce((a, b) => a + b, 0);
-    if (!(sum > 0)) return null;
-    let warn = null;
-    if (Math.abs(sum - 100) > 0.5) warn = 'Сумма долей = ' + CalcNumber.format(sum,{percent:true}) + ' (нормировано до 100%).';
-    return { shares: g.map(v => Math.max(0, v) / sum), N, warn, reordered, sortedGroups: g };
-  }
-  if (STATE.ineqInput === 'incomes') {
-    const xs0 = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0);
-    if (xs0.length < 2) return null;
-    const xs = xs0.slice().sort((a, b) => a - b);
-    const reordered = xs.some((v, i) => v !== xs0[i]);   // ввод был не по возрастанию?
-    const total = xs.reduce((a, b) => a + b, 0);
-    if (!(total > 0)) return null;
-    return { shares: xs.map(v => v / total), N: xs.length, warn: null, reordered };
-  }
-  return null;
+  const r=ineqDistribution(ineqFirstConfig());
+  return r.error?null:{shares:r.shares,pops:r.pops,N:r.shares?.length,warn:null,reordered:r.reordered,sortedGroups:r.sorted?.map(i=>STATE.ineqGroups[i])};
 }
 
 // Кривая Лоренца [[p, L], ...] из долей дохода по группам равного населения.
@@ -53,26 +31,7 @@ function lorenzFromShares(shares) {
 }
 
 // Кривая Лоренца из функции L(p) (переменная p, x — синоним). Возвращает { pts, warn, error }.
-function lorenzFromFormula(expr) {
-  let compiled;
-  try { compiled = math.parse(prepExpr(expr)).compile(); compiled.evaluate(scopeFor(expr, { p: 0.5, x: 0.5 })); }
-  catch (e) { return { pts: null, error: e.message }; }
-  const N = 100, pts = [];
-  for (let i = 0; i <= N; i++) {
-    const p = i / N;
-    let L;
-    try { const v = compiled.evaluate(paramScope({ p: p, x: p })); L = (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-    catch (e) { L = NaN; }
-    pts.push([p, L]);
-  }
-  // Мягкая проверка корректности функции Лоренца (рисуем в любом случае).
-  let warn = null;
-  const L0 = pts[0][1], L1 = pts[pts.length - 1][1];
-  if (isNaN(L0) || isNaN(L1)) warn = 'Функция не вычисляется на всём [0,1].';
-  else if (Math.abs(L0) > 0.02 || Math.abs(L1 - 1) > 0.02) warn = 'Ожидается L(0)=0 и L(1)=1.';
-  else { for (let i = 1; i < pts.length; i++) { if (!isNaN(pts[i][1]) && !isNaN(pts[i - 1][1]) && pts[i][1] < pts[i - 1][1] - 1e-6) { warn = 'L(p) должна быть неубывающей.'; break; } } }
-  return { pts, warn };
-}
+function lorenzFromFormula(expr) { return ineqDistribution({input:'formula',formula:expr}); }
 
 // Площадь под кривой Лоренца (метод трапеций по вершинам). points = [[p, L], ...].
 function lorenzAreaUnder(pts) {
@@ -125,7 +84,7 @@ function inequalityP90P10() {
   if (STATE.ineqInput !== 'incomes') return null;
   const xs = parseNumberList(STATE.ineqIncomes).filter(v => v >= 0).sort((a, b) => a - b);
   const n = xs.length;
-  if (n < 2) return null;
+  if (n < 10) return null;
   const q = (p) => {                       // порядковая статистика с линейной интерполяцией
     const idx = (n - 1) * p, lo = Math.floor(idx), hi = Math.min(n - 1, lo + 1);
     return xs[lo] + (idx - lo) * (xs[hi] - xs[lo]);
@@ -149,56 +108,41 @@ function ineqRedistShares() {
 // Применить перераспределение к долям (сумма сохраняется = 1).
 //  Налог: новая доля = (1−τ)·старая + τ·(1/N) — линейное подтягивание к равенству.
 //  Трансферт: T% общего дохода забираем у богатейшей группы, делим поровну между всеми.
-function applyRedistribution(shares) {
+function applyRedistribution(shares, pops=shares.map(()=>1/shares.length)) {
   const N = shares.length;
   if (STATE.ineqRedistTool === 'tax') {
     const tau = Math.max(0, Math.min(1, STATE.ineqTau));
-    return shares.map(s => (1 - tau) * s + tau * (1 / N));
+    return shares.map((s,i) => (1 - tau) * s + tau * pops[i]);
   }
   const T = Math.max(0, STATE.ineqTransfer) / 100;       // доля общего дохода
   const out = shares.slice();
-  let ri = 0; for (let i = 1; i < N; i++) if (out[i] > out[ri]) ri = i;   // богатейшая группа
+  let ri = 0; for (let i = 1; i < N; i++) if (out[i]/pops[i] > out[ri]/pops[ri]) ri = i;   // богатейшая группа
   const take = Math.min(T, out[ri]);                     // нельзя забрать больше, чем у неё есть
   out[ri] -= take;
-  for (let i = 0; i < N; i++) out[i] += take / N;
+  for (let i = 0; i < N; i++) out[i] += take * pops[i];
   return out;
 }
 
 // Пересчёт неравенства БЕЗ рисования — складываем кривую и коэффициенты в STATE.
 function recomputeInequality() {
-  STATE.ineqLorenz = null; STATE.ineqStats = null; STATE.ineqWarn = null;
-  STATE.ineqShares = null; STATE.ineqShareN = 0; STATE.ineqRedist = null;
-  STATE.ineqSortNote = false;
-  if (STATE.ineqInput === 'formula') {
-    const r = lorenzFromFormula(STATE.ineqFormula);
-    if (!r.pts) { STATE.ineqWarn = 'Не понял формулу: ' + (r.error || ''); return; }
-    STATE.ineqLorenz = r.pts; STATE.ineqWarn = r.warn;
-    STATE.ineqStats = inequalityStats(r.pts);
-  } else {
-    const s = inequalitySharesFromInput();
-    if (!s) { STATE.ineqWarn = 'Введите хотя бы две группы / два дохода.'; return; }
-    // Если сортировка реально переставила группы — фиксируем порядок в таблице и
-    // показываем мягкую подсказку (только при настоящей пересортировке).
-    if (STATE.ineqInput === 'groups' && s.reordered && s.sortedGroups) {
-      STATE.ineqGroups = s.sortedGroups.slice();
-      renderIneqGroupsTable();
-    }
-    STATE.ineqSortNote = !!s.reordered;
-    STATE.ineqShares = s.shares; STATE.ineqShareN = s.N; STATE.ineqWarn = s.warn;
-    STATE.ineqLorenz = lorenzFromShares(s.shares);
-    STATE.ineqStats = inequalityStats(STATE.ineqLorenz);
+  STATE.ineqLorenz=null;STATE.ineqStats=null;STATE.ineqWarn=null;STATE.ineqShares=null;STATE.ineqShareN=0;STATE.ineqRedist=null;STATE.ineqSortNote=false;
+  const calc=ineqCalculate(),r=calc.result;STATE.ineqDistribution=r;STATE.ineqCountries=calc.countries;
+  renderIneqCountryControls();
+  if(r.error){STATE.ineqWarn=r.error;return;}
+  STATE.ineqLorenz=r.pts;STATE.ineqStats=r.stats;STATE.ineqShares=r.shares||null;STATE.ineqShareN=r.shares?.length||0;
+  const first=calc.first;
+  if(STATE.ineqInput==='groups'&&first.reordered){
+    STATE.ineqGroups=first.sorted.map(i=>STATE.ineqGroups[i]);if(STATE.ineqPops)STATE.ineqPops=first.sorted.map(i=>STATE.ineqPops[i]);renderIneqGroupsTable();
   }
-  // Перераспределение (ЧК3): строим «после» из текущих долей.
-  if (STATE.ineqRedistOn && STATE.ineqLorenz) {
-    const sh = ineqRedistShares();
-    if (sh) {
-      const ns = applyRedistribution(sh);
-      // Вогнутость: кривая Лоренца строится от беднейших к богатейшим. Трансферт может
-      // сделать бывшую богатейшую группу не самой богатой — сортируем доли по возрастанию,
-      // как при ручном вводе. Налог порядок не переворачивает, для него это идемпотентно.
-      ns.sort((a, b) => a - b);
-      const rl = lorenzFromShares(ns);
-      STATE.ineqRedist = { lorenz: rl, stats: inequalityStats(rl) };
+  STATE.ineqSortNote=!!first.reordered;
+  if(STATE.ineqRedistOn){
+    if(STATE.ineqRedistTool==='tax'&&r.expr&&r.continuous){
+      const tau=Math.max(0,Math.min(1,STATE.ineqTau));const rd=ineqDistribution({input:'formula',formula:'('+CalcNumber.expression(1-tau)+')*('+r.expr+')+('+CalcNumber.expression(tau)+')*p'});
+      if(!rd.error)STATE.ineqRedist={lorenz:rd.pts,stats:rd.stats,distribution:rd};
+    }else{
+      const pts=r.pts,pops=r.pops||pts.slice(1).map((p,i)=>p[0]-pts[i][0]),shares=r.shares||pts.slice(1).map((p,i)=>p[1]-pts[i][1]);
+      const ns=applyRedistribution(shares,pops),rd=ineqDistribution({input:'groups',groups:ns,pops});
+      if(!rd.error)STATE.ineqRedist={lorenz:rd.pts,stats:rd.stats,distribution:rd};
     }
   }
 }
@@ -233,18 +177,20 @@ function drawInequalityCaptions() {
    точкам (доля населения; доля дохода): это её точный вид, а не приближение.
    По формуле L(p) — та же формула на осях в процентах: 100·L(x/100); буква p
    (и синоним x) подставляется деревом Math.js. */
-function lorenzPlotExpr(pts) {
-  if (STATE.ineqInput !== 'formula' || pts !== STATE.ineqLorenz) return null;
-  try {
-    return '100 * (' + math.parse(prepExpr(String(STATE.ineqFormula))).transform(n => (n.isSymbolNode && (n.name === 'p' || n.name === 'x'))
-      ? math.parse('(x / 100)') : n).toString() + ')';
-  } catch (e) { return null; }
+function ineqDrawData(pts) {
+  return [STATE.ineqDistribution,...(STATE.ineqCountries||[]),STATE.ineqRedist?.distribution].find(r=>r?.pts===pts);
 }
-function lorenzMark(sel, pts) {
-  const e = lorenzPlotExpr(pts);
-  if (e) return markExpr(sel, e, 'x', null, { name: 'кривая Лоренца' });
-  if (STATE.ineqInput === 'formula' && pts === STATE.ineqLorenz) return markNumeric(sel, 'формула L(p) не переводится в запись: кривая по точкам расчёта', 'кривая Лоренца');
-  return markPoly(sel, 'кривая Лоренца по группам: ломаная по точкам (доля населения; доля дохода)', 'кривая Лоренца');
+function ineqPercentExpr(expr) {
+  return '100*('+math.parse(expr).transform(n=>n.isSymbolNode&&n.name==='p'?math.parse('(x/100)'):n).toString()+')';
+}
+function lorenzPlotExpr(pts) {
+  const r=ineqDrawData(pts);return r?.expr&&r.continuous?ineqPercentExpr(r.expr):null;
+}
+function lorenzMark(sel, pts, name='кривая Лоренца') {
+  const r=ineqDrawData(pts),e=lorenzPlotExpr(pts);
+  if(e)return markExpr(sel,e,'x',null,{name});
+  if(r?.approx)return markNumeric(sel,'объединение пересекающихся распределений: численная кривая с проверкой сходимости',name);
+  return markPoly(sel,'кривая Лоренца по группам: точная ломаная по долям населения и дохода',name);
 }
 // Площадь A (between: между диагональю и кривой) или B (под кривой).
 function lorenzMarkArea(sel, pts, between) {
@@ -268,12 +214,17 @@ function drawInequalityAreas(pts) {
 }
 
 // Кривая Лоренца (доли 0..1 → проценты). dashed — для «было»/исходной.
-function drawLorenzCurve(pts, color, dashed) {
-  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y(d => sy(d[1] * 100));
-  const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
-  if (dashed) path.attr('stroke-dasharray', '6 4').attr('opacity', 0.75);
-  lorenzMark(path, pts);
+function drawLorenzCurve(pts, color, dashed, thin=false, name='кривая Лоренца') {
+  const g=svg.append('g').attr('clip-path','url(#plot-clip)'),r=ineqDrawData(pts);
+  const line=d3.line().defined(d=>Number.isFinite(d[1])).x(d=>sx(d[0]*100)).y(d=>sy(d[1]*100));
+  const parts=r?.continuous&&r.pieces?r.pieces:[null];
+  for(const part of parts){
+    let data=part?pts.filter(q=>q[0]>=part.lo-1e-12&&q[0]<=part.hi+1e-12):pts;
+    if(data.length>1200){const step=Math.ceil(data.length/1000),last=data.at(-1);data=data.filter((_,i)=>i%step===0);if(data.at(-1)!==last)data.push(last);}
+    const path=g.append('path').datum(data).attr('fill','none').attr('stroke',color).attr('stroke-width',thin?1.5:STATE.ineqCountries?3.4:2.6).attr('d',line);
+    if(dashed)path.attr('stroke-dasharray','6 4').attr('opacity',.75);
+    if(part)markExpr(path,ineqPercentExpr(part.expr),'x',null,{name});else lorenzMark(path,pts,name);
+  }
 }
 
 // Вертикальный отрезок Робин Гуда в p* (макс. разрыв диагональ−кривая) + подпись.
@@ -294,7 +245,7 @@ function drawRobinHood() {
 // Узлы кривой Лоренца. В способах 'groups' и 'incomes' — перетаскиваемые
 // (ЧК2 / Задача 2); в 'formula' — узлов нет.
 function drawLorenzNodes() {
-  if (STATE.ineqInput === 'formula') return;
+  if (STATE.ineqInput === 'formula' || STATE.ineqCountryB) return;
   const pts = STATE.ineqLorenz;
   const g = svg.append('g');
   for (let i = 1; i < pts.length - 1; i++) {           // концы (0,0) и (1,1) зафиксированы
@@ -312,7 +263,9 @@ function drawLorenzNodes() {
 // монотонность: зажимаем в [cumL[i−1], cumL[i+1]] (доли соседних групп ≥ 0).
 // Меняются доли групп i−1 и i; остальные не трогаются; сумма остаётся 100%.
 function ineqDragNode(i, vFraction) {
-  const g = STATE.ineqGroups.map(Number);
+  const d=ineqDistribution(ineqFirstConfig());if(d.error)return;
+  if(STATE.ineqGroupMode==='counts'){STATE.ineqPops=d.pops.map(x=>x*100);STATE.ineqGroups=d.shares.map(x=>x*100);STATE.ineqGroupMode='shares';}
+  const g = d.shares.map(x=>x*100);
   const sum = g.reduce((a, b) => a + b, 0) || 1;
   const frac = g.map(x => Math.max(0, x) / sum);       // доли (сумма = 1)
   const cum = [0]; for (let k = 0; k < frac.length; k++) cum.push(cum[k] + frac[k]);
@@ -388,16 +341,20 @@ function updateIneqSortNote() {
 // Табло неравенства.
 function updateInequalityPanel() {
   const box = document.getElementById('info-inequality'); if (!box) return;
-  if (!STATE.ineqStats) { box.innerHTML = '<div class="warn">' + (STATE.ineqWarn || 'Введите данные.') + '</div>'; return; }
-  const s = STATE.ineqStats;
+  if (!STATE.ineqStats) { setFinalFunctions([]);box.innerHTML = '<div class="warn">' + ffEsc(STATE.ineqWarn || 'Введите данные.') + '</div>'; return; }
+  const s = STATE.ineqStats,r=STATE.ineqDistribution;
+  setFinalFunctions([{name:STATE.ineqCountries?'Кривая Лоренца союза':'Кривая Лоренца',color:COL.D,...(r.expr?{expr:r.expr,lhs:'L(p)'}:{note:'Построена численно: диапазоны доходов стран пересекаются. Явная кусочная формула не найдена.'})}]);
+  const coefficient=(v,available)=>available===false?'Недостаточно данных':v==null?'Не определён':fmt(v);
   let html = '';
   if (STATE.ineqWarn) html += '<div class="warn" style="margin-bottom:6px;">' + STATE.ineqWarn + '</div>';
-  html += `<div class="stat"><span>Коэффициент Джини</span><b>${fmt(s.gini)}</b></div>`;
+  html += `<div class="stat"><span>Коэффициент Джини</span><b>${r.approx?'≈ '+Number(s.gini.toFixed(3)).toLocaleString('ru-RU',{maximumFractionDigits:3}):fmt(s.gini)}</b></div>`;
   html += `<div class="stat"><span>Робин Гуда (Гувера)</span><b>${fmt(s.hoover)}</b></div>`;
   // Фаза 13: явные подписи — что именно показано.
-  html += `<div class="stat"><span>Коэф. фондов (децильный)</span><b>${s.decile == null ? '∞' : fmt(s.decile)}</b></div>`;
-  html += `<div class="stat"><span>Квинтильный коэф. фондов</span><b>${s.quintile == null ? '∞' : fmt(s.quintile)}</b></div>`;
-  const pp = inequalityP90P10();
+  html += `<div class="stat"><span>Коэф. фондов (децильный)</span><b>${coefficient(s.decile,s.decileAvailable)}</b></div>`;
+  html += `<div class="stat"><span>Квинтильный коэф. фондов</span><b>${coefficient(s.quintile,s.quintileAvailable)}</b></div>`;
+  if(STATE.ineqCountries){STATE.ineqCountries.forEach((c,i)=>{html+=`<div class="stat"><span>Джини страны ${i?'B':'A'}</span><b>${fmt(c.stats.gini)}</b></div>`;});}
+  if(s.decileAvailable===false||s.quintileAvailable===false)html+='<div class="hint">Для коэффициента нужны границы соответствующих групп. Доходы внутри укрупнённой группы не известны; людей на части не делим.</div>';
+  const pp = STATE.ineqCountries?null:inequalityP90P10();
   if (pp) {
     html += `<div class="stat"><span>$\\frac{P_{90}}{P_{10}}$ (пороги)</span><b>${fmt(pp.ratio)}</b></div>`;
     html += `<div class="hint">Это ДВЕ разные величины. <b>Коэффициент фондов</b> это отношение
@@ -462,8 +419,10 @@ function redrawInequality() {
     } else {
       drawInequalityAreas(STATE.ineqLorenz);
       drawInequalityDiagonal();
-      drawLorenzCurve(STATE.ineqLorenz, COL.D, false);
+      if(STATE.ineqCountries){STATE.ineqCountries.forEach((c,i)=>drawLorenzCurve(c.pts,i?COL.S:COL.dwl,false,true,'страна '+(i?'B':'A')));}
+      drawLorenzCurve(STATE.ineqLorenz, COL.D, false,false,STATE.ineqCountries?'союз':'кривая Лоренца');
       drawRobinHood();
+      if(STATE.ineqCountries){const legend=svg.append('g');[['Страна A',COL.dwl,1.5],['Страна B',COL.S,1.5],['Союз',COL.D,3.4]].forEach(([label,color,width],i)=>{const x=sx(5),y=sy(96)+i*20;legend.append('line').attr('x1',x).attr('x2',x+22).attr('y1',y).attr('y2',y).attr('stroke',color).attr('stroke-width',width);legend.append('text').attr('x',x+29).attr('y',y+4).attr('font-size',FS.small).attr('fill',COL.inkSoft).text(label);});}
       drawLorenzNodes();
     }
   }
@@ -497,18 +456,9 @@ function setIneqInput(which) {
 // Синхронизирует ползунок, число и поле формулы. Джини считается общим интегральным
 // методом (для p^α совпадает с (α−1)/(α+1)), отдельной формулы не нужно.
 function setIneqAlpha(a) {
-  a = parseFloat(a);
-  if (isNaN(a) || a < 1) a = 1;
-  STATE.ineqAlpha = Math.round(a * 100) / 100;
-  STATE.ineqFormula = 'p^' + STATE.ineqAlpha;
-  // Отдельного числового поля α больше нет (01.09): точное значение вводится
-  // щелчком по самому ползунку, общим компонентом регулятора.
-  const sl = document.getElementById('ineq-alpha'),
-        val = document.getElementById('ineq-alpha-val'), fm = document.getElementById('ineq-formula');
-  if (sl) sl.value = STATE.ineqAlpha;
-  if (val) val.textContent = fmt(STATE.ineqAlpha);
-  if (fm) fm.value = STATE.ineqFormula;
-  ineqRedraw();   // живой ползунок α — пересчёт троттлом (без мигания)
+  a=Number(a);if(!Number.isFinite(a)||a<1)a=1;STATE.ineqAlpha=a;
+  const sl=document.getElementById('ineq-alpha'),val=document.getElementById('ineq-alpha-val');if(sl)sl.value=a;if(val)val.textContent=fmt(a);
+  ineqRedraw();
 }
 
 // Сменить число групп (5 квинтилей / 10 децилей): сбрасывает доли на пресет.
@@ -516,6 +466,7 @@ function setIneqGroupN(n) {
   n = parseInt(n) || 5;
   STATE.ineqGroupN = n;
   STATE.ineqGroups = defaultGroupShares(n);
+  delete STATE.ineqPops;delete STATE.ineqGroupMode;
   renderIneqGroupsTable();
   if (typeof ineqMasterDetach === 'function') ineqMasterDetach();   // новый профиль → мастер перебазируется
   if (typeof updatePult === 'function') updatePult();
@@ -534,22 +485,4 @@ function setIneqRedistTool(tool) {
 }
 
 // Таблица долей по группам (поля ввода %). Перерисовывается при смене N и при входе в режим.
-function renderIneqGroupsTable() {
-  const box = document.getElementById('ineq-groups-table'); if (!box) return;
-  box.innerHTML = '';
-  STATE.ineqGroups.forEach((v, i) => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
-    const lab = document.createElement('span');
-    lab.style.cssText = 'font-size:' + FS.base + 'px;color:var(--text2);width:78px;';
-    lab.textContent = 'Группа ' + (i + 1);
-    const inp = document.createElement('input');
-    inp.type = 'number'; inp.step = '0.1'; inp.value = v;
-    // Вид берём из общего правила панели (Н75): рамки нет, снизу пунктир.
-    // Своя рамка в inline-стиле била бы любое правило по специфичности.
-    inp.style.flex = '1';
-    inp.addEventListener('change', () => { const nv = parseFloat(inp.value); if (!isNaN(nv)) { STATE.ineqGroups[i] = nv; if (typeof ineqMasterDetach === 'function') ineqMasterDetach(); redrawAll(); } });
-    row.appendChild(lab); row.appendChild(inp); box.appendChild(row);
-  });
-}
-
+function renderIneqGroupsTable() { ineqRenderRows(document.getElementById('ineq-groups-table'),false);renderIneqCountryControls(true); }

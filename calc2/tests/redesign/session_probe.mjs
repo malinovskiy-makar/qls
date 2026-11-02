@@ -304,6 +304,17 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
         &&Math.abs(s.a-2/3)<1e-9&&s.b===0&&s.c===0&&r?.q1===20&&r?.q2===10
         &&r?.m===40&&r?.tcDirect===600&&r?.vc===600;
     })();
+    // Э7: у пяти укрупнённых групп нет децилей. Все входы сверяем со
+    // старым JSON, а новую вычисляемую часть — с точной ломаной и G=0.304.
+    const inequalityExact = k === 'ineq' && (() => {
+      const r=st.ineqDistribution,s=st.ineqStats;
+      const pts=[[0,0],[.2,.08],[.4,.2],[.6,.36],[.8,.6],[1,1]];
+      return st.ineqCountries===null&&r?.continuous===false&&r?.pts?.length===6
+        &&pts.every((p,i)=>p.every((v,j)=>Math.abs(r.pts[i][j]-v)<1e-9))
+        &&Math.abs(s?.gini-.304)<1e-9&&Math.abs(s?.hoover-.24)<1e-9
+        &&s.hooverP===.6&&s.decile===null&&s.funds===null&&s.decileAvailable===false
+        &&s.quintileAvailable===true&&s.quintile===5;
+    })();
     /* Производное от размера холста (место легенды, касательные «Касательной»,
        пересечения) сверка не сравнивает — тот же список, что VIEW_KEYS в
        compare.mjs: холст нового экрана другого размера, а старт тот же. */
@@ -313,7 +324,9 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
       && !(x === 'prod' && productionExact)
       && !(x === 'discr3' && discriminationExact)
       && !(x === 'plants' && plantsExact)
+      && !(inequalityExact && ['ineqStats','ineqCountries','ineqDistribution'].includes(x))
       && !(k === 'plants' && plantsExact && x === 'axisYDefault' && st.axisYDefault === 'TC')); // принятая ось Э6
+    if (k === 'ineq' && !inequalityExact && !real.includes('ineqStats')) real.push('ineqStats: не сошлось аналитическое решение');
     if (k === 'plants' && !plantsExact && !real.includes('plants')) real.push('plants: не сошлось аналитическое решение');
     if (k === 'mono-d3' && !discriminationExact && !real.includes('discr3')) real.push('discr3: не сошлось аналитическое решение');
     if (k === 'prod' && !productionExact && !real.includes('prod')) real.push('prod: не сошлось аналитическое решение');

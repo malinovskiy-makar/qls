@@ -4337,3 +4337,20 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 #plant-rows .plant-options .seg { width: 100%; min-width: 0; }
 #plant-rows .plant-options .seg-btn { flex: 1 1 0; white-space: normal; overflow-wrap: anywhere; padding: 6px; min-width: 0; }
 #plant-rows .plant-options > label { display: grid; grid-template-columns: auto minmax(0,1fr); }
+
+/* Неравные группы и веса стран: те же числовые поля, две колонки в карточке. */
+.ineq-grow { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:9px 10px;margin:6px 0;border:1px solid var(--border);border-radius:8px; }
+.ineq-grow .ineq-group-title { font-size:12px;color:var(--text2); }
+.ineq-grow .ineq-remove { justify-self:end;padding:0 4px;line-height:16px; }
+.ineq-grow label,.ineq-weights label { display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;color:var(--text2); }
+.ineq-grow input,.ineq-weights input { width:100%;min-width:0;box-sizing:border-box;border:0;border-bottom:1px dashed var(--border);border-radius:0;background:transparent;color:var(--text);padding:4px 1px;font:inherit;font-size:14px; }
+.ineq-group-mode { margin:8px 0; }
+.ineq-group-mode .seg-btn { white-space:normal; }
+.ineq-weights { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:8px 0; }
+.ineq-country { border-top:1px solid var(--border);padding-top:10px;margin-top:12px; }
+.ineq-country-head { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+#ineq-add-country,#ineq-add-group,#ineq-b-add-group { margin:8px 0; }
+#ineq-incomes { border:1px solid var(--border);border-radius:6px;padding:7px;box-sizing:border-box;width:100%; }
+
+.ineq-country-head > b { white-space:nowrap;flex:0 0 auto; }
+.ineq-country-head .btn { width:auto;min-width:0;padding:5px 8px;font-size:12px; }

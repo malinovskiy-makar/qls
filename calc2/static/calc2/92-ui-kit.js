@@ -690,7 +690,7 @@ const SC_CARDS = [
   { m: 'm-constraint', input: 'inp-mathfc', sym: 'f', name: 'Целевая функция', prefix: 'f(x,\\,y) =', col: 'D' },
   { m: 'm-constraint', input: 'inp-mathgc', sym: 'g', name: 'Ограничение', col: 'S' },
   // Неравенство (сессия 6, Г1): способ «Формула» — карточка L.
-  { m: 'ineq', input: 'ineq-formula', sym: 'L', name: 'Функция Лоренца', prefix: 'L(p) =', col: 'S' },
+  { m: 'ineq', input: 'ineq-formula', sym: 'L', name: 'Функция Лоренца', prefix: 'L(p) =', col: () => STATE.ineqCountryB ? 'dwl' : 'D' },
 ];
 /* Строки ползунков (README 4): подпись словами слева, «обозначение = значение» справа. Обозначение регулятора
    берёт shortRegulatorName (88-params.js) отсюда. */
@@ -1010,7 +1010,7 @@ function scIneqSync() {
     b.classList.toggle('active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
   });
   document.querySelectorAll('#ineq-groups-table > div').forEach(r => {
-    if (r._scRow) return;
+    if (r._scRow || r.classList.contains('ineq-grow')) return;
     r._scRow = true;
     r.classList.add('sc-grow');
     const i = r.querySelector('input'); if (i) { i.classList.add('sc-num'); i.style.flex = ''; }

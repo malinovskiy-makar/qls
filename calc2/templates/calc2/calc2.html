@@ -1031,13 +1031,15 @@
       <!-- Способ «доли по группам»: N групп равного населения, доля дохода каждой (%) -->
       <div id="ineq-pane-groups" style="margin-top:8px;">
         <div class="field">
-          <label>Число групп</label>
+          <label>Равные группы</label>
           <select id="ineq-ngroups">
             <option value="5" selected>5 (квинтили)</option>
             <option value="10">10 (децили)</option>
           </select>
         </div>
+        <div id="ineq-group-mode" class="seg ineq-group-mode"></div>
         <div id="ineq-groups-table"></div>
+        <button type="button" id="ineq-add-group" class="btn-sm" onclick="ineqAddGroup(false)">+ группа</button>
         <div id="ineq-note-groups" class="hint" style="display:none;color:#b45309;">
           Группы переставлены по возрастанию дохода: кривая Лоренца всегда идёт от бедных к богатым.</div>
       </div>
@@ -1045,7 +1047,7 @@
       <div id="ineq-pane-incomes" style="display:none;margin-top:8px;">
         <div class="field">
           <label>Доходы (через запятую)</label>
-          <input type="text" id="ineq-incomes" value="10, 20, 30, 40, 100" autocomplete="off">
+          <input type="text" id="ineq-incomes" data-plain="1" value="10, 20, 30, 40, 100" autocomplete="off">
         </div>
         <div id="ineq-note-incomes" class="hint" style="display:none;color:#b45309;">
           Доходы переставлены по возрастанию: кривая Лоренца всегда идёт от бедных к богатым.</div>
@@ -1056,16 +1058,18 @@
           <label>Функция Лоренца L(p), p∈[0,1]</label>
           <input type="text" id="ineq-formula" value="p^2" autocomplete="off">
         </div>
-        <!-- Задача 3: ползунок параметра α для семейства L(p)=p^α. -->
-        <div class="field" id="ineq-alpha-field" style="margin-top:8px;">
-          <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
-          <input type="range" id="ineq-alpha" min="1" max="6" step="0.1" value="2">
-        </div>
         <!-- Отдельного поля «α (точное значение)» здесь больше нет (решение
              владельца 01.09): значение уже показано у самого ползунка, а
              точное вводится щелчком по нему, как у всех регуляторов сцены. -->
         <div class="hint">Функция Лоренца: L(0)&nbsp;=&nbsp;0, L(1)&nbsp;=&nbsp;1, неубывающая и выпуклая.</div>
       </div>
+        <!-- Задача 3: ползунок параметра α для семейства L(p)=p^α. -->
+        <div class="field" id="ineq-alpha-field" style="margin-top:8px;">
+          <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
+          <input type="range" id="ineq-alpha" min="1" max="6" step="0.1" value="2">
+        </div>
+      <div id="ineq-countries"></div>
+      <button type="button" id="ineq-add-country" class="btn-sm" onclick="ineqAddCountry()">+ страна</button>
       <!-- Галочки «Исходное состояние (было → стало)» здесь больше нет (решение
            владельца 01.09): в этой модели сравнивать не с чем. Сравнение «до и
            после» даёт «Перераспределение» ниже, и оно про настоящее действие. -->
@@ -1087,9 +1091,8 @@
             <label>Трансферт T = <b id="ineq-transfer-val">0</b>% дохода</label>
             <input type="range" id="ineq-transfer" min="0" max="50" step="1" value="0">
           </div>
-          <div class="hint">Налог: доля каждой группы подтягивается к равной (1/N):
-            новая&nbsp;=&nbsp;(1−τ)·старая&nbsp;+&nbsp;τ·(1/N), при τ=1 получается полное равенство.
-            Трансферт: T% общего дохода забирается у богатейшей группы и делится поровну между всеми.</div>
+          <div class="hint">Налог: доход каждой группы подтягивается к её доле населения. При τ=1 получается полное равенство.
+            Трансферт: T% общего дохода забирается у группы с наибольшим доходом на человека и распределяется пропорционально численности.</div>
         </div>
       </div>
       <div id="info-inequality" style="margin-top:8px;"></div>
@@ -2252,6 +2255,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
 <script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
 <script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
+<script src="{% calc2_static 'calc2/57-distributions.js' %}"></script>
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
 <script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
 <script src="{% calc2_static 'calc2/72-export-tex.js' %}"></script>

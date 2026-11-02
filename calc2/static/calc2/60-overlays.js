@@ -2952,7 +2952,7 @@ function expandImplicitMul(expr) {
        (prepExpr), но и здесь имя за слэшем неприкосновенно: непереведённая
        команда обязана дойти до Math.js целой и получить честный отказ. */
     if (at > 0 && s[at - 1] === '\\') return name;
-    if (ECON_WORDS.has(name) || MATH_CONSTS.has(name)) return name;
+    if (ECON_WORDS.has(name) || MATH_CONSTS.has(name) || sceneReserved().has(name)) return name;
     try { if (typeof math[name] !== 'undefined') return name; } catch (e) {}
     // Имя перед скобкой — вызов функции, разбирать его на буквы нельзя.
     const after = s.slice(at + name.length).match(/^\s*\(/);
@@ -3187,6 +3187,7 @@ function sceneReserved() {
   const taxField = document.getElementById('tax-field');
   if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
   if (STATE.mode === 'labor') s.add('w');
+  if (STATE.mode === 'inequality') {s.add('alpha');s.add('α');}
   return s;
 }
 

@@ -1009,7 +1009,8 @@ const CASES = [
           var before = STATE.ineqFormula;
           openPiecewise(inp, 'p');
           PW.n = 2;
-          PW.rows = [{f:'0.5*p', a:'0', b:'0.5'}, {f:'p - 0.25', a:'0.5', b:''}];
+          // Э7: прежнее p−0.25 давало L(1)=0.75 и не являлось кривой Лоренца.
+          PW.rows = [{f:'0.5*p', a:'0', b:'0.5'}, {f:'1.5*p - 0.5', a:'0.5', b:''}];
           document.getElementById('pw-apply').click();
           var changed = (STATE.ineqFormula !== before) ? 1 : 0;
           return { before: before, after: STATE.ineqFormula, changed: changed,
