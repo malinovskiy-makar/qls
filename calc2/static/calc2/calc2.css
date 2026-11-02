@@ -4375,3 +4375,9 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 #firm-supply-controls .sc-nrow input { width: 92px; min-width: 0; }
 
 .firm-fixed-label { margin-top: 10px; font-size: 12px; color: var(--text2); }
+
+/* Цена фирмы — результат рынка, а не ещё один регулятор. */
+.firm-market-price { margin: 8px 0 12px; font-size: 14px; color: var(--text2); }
+.firm-market-price-mask { display: none; }
+body.self-on:not(.self-all) #firm-market-price-value { display: none; }
+body.self-on:not(.self-all) .firm-market-price-mask { display: inline; }

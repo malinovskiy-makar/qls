@@ -98,6 +98,7 @@ const HERO = {
      · доп.wasText — готовая строка под значением («50 + 50» у потерь из двух треугольников).
    Значение строки табло вида «55 (было 45)» в «Ответе» — «55», под ним «45 + 10» (answerCellWas). */
 const HERO_STATE = {
+  firmmarket: () => [['info-costs', '*']],
   costs: () => STATE.firmSupply ? [['info-costs', '*']] : null,
   taxes: () => {
     if (!STATE.taxPair || !STATE.taxActive) return null;

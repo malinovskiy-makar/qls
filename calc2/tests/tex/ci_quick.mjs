@@ -34,7 +34,7 @@ try { ({ chromium } = await import('playwright')); } catch (e) { console.log('Pl
 
 const OUT = process.env.OUT || '';
 const KEYS = loadStates().filter(s => s.src === 'start').map(s => s.key);
-const TWO = ['taxes', 'mono-d3', 'labor-bilat', 'ppfsum', 'm-tangent'];   // пять семей; две модели о двух панелях
+const TWO = ['taxes', 'mono-d3', 'labor-bilat', 'ppfsum', 'm-tangent', 'firmmarket'];   // новая модель тоже проверяется при двух окнах
 const DEF = ['curvesNoRecPoly', 'curvesNoRecSampled', 'curvesMismatch', 'areasNoRecPoly', 'areasNoRecSampled', 'areasMismatch'];
 const t0 = Date.now();
 const browser = await chromium.launch();

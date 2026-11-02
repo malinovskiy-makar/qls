@@ -33,7 +33,7 @@
 /* areaCalcMode — открытое построение площади («Под кривой» / «По точкам») — тоже вид (сессия 7, В3): вход в набор
    «+ По точкам» был шагом истории. */
 const MODEL_STATE_SKIP = new Set(['panels', 'pointerPx', 'pointerPy', 'roller', 'hoverCross', 'armedCurve',
-  'sceneKey', 'resizeRedraws', 'markArm', 'vertArm', 'areaCalcMode', 'firmSupplyResult']);
+  'sceneKey', 'resizeRedraws', 'markArm', 'vertArm', 'areaCalcMode', 'firmSupplyResult', 'firmMarketResult']);
 
 /* Глубокая копия ПРОСТЫХ данных. Скомпилированные формулы, функции сцен и
    объекты с прототипом не копируются: это кэши расчёта, их пересобирает
@@ -236,6 +236,7 @@ function restorePristine() {
   // Расчёт фирмы исключён из ссылок/истории, но не должен переживать вход
   // в другую модель. В отличие от следов мыши это кэш предыдущей задачи.
   delete STATE.firmSupplyResult;
+  delete STATE.firmMarketResult;
   applyForm(_pristine.form);
   // Поля, которых на свежей странице нет (consFit, ppfCompare… сцены заводят их
   // при первом расчёте): их присутствие уже отличало бы модель от свежей.

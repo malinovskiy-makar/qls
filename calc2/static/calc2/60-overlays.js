@@ -71,6 +71,7 @@ function redrawAll() {
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
+  renderFirmMarketControls();
   // И только теперь — вопросики: знак без живой подсказки прячется. Раньше
   // applyCardScope нельзя, иначе проход не увидит спрятанного соседа.
   if (typeof syncHintDots === 'function') syncHintDots();
@@ -3879,6 +3880,17 @@ function snapTargets(panelId) {
 
 function snapTargetsAll() {
   const out = [];
+  if (STATE.sceneKey === 'firmmarket') {
+    const r=STATE.firmMarketResult;
+    if (r?.firm&&!r.firm.error) {
+      if (STATE.showMC) out.push({name:'MC',f:costMC,panel:'firm-market-firm'});
+      if (STATE.showATC) out.push({name:'ATC',f:costATC,panel:'firm-market-firm'});
+      if (STATE.showAVC) out.push({name:'AVC',f:costAVC,panel:'firm-market-firm'});
+      if (r.found) out.push({name:'P',f:()=>r.P,panel:'firm-market-firm'});
+    }
+    if (r?.D&&!r.D.error) out.push({name:'D',f:Q=>evalCurve(r.D.curve,Q),panel:'firm-market-market'});
+    return out;
+  }
   if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
     if (STATE.showMC)  out.push({ name: 'MC',  f: costMC });
     if (STATE.showATC) out.push({ name: 'ATC', f: costATC });

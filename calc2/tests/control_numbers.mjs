@@ -1617,6 +1617,19 @@ for(const[tag,c,P,Q,profit,shutdown]of[
 r=await run(`var m=firmSupplyBuild({expr:'16*Q'});return{zero:m.at(15).Q,interval:m.at(16).intervals.some(x=>x[0]===0&&x[1]===Infinity),unbounded:m.at(17).unbounded};`);
 cmp('Э10 7.2а ниже MC',r.zero,0,0);cmp('Э10 7.2а интервал',r.interval,true,0);cmp('Э10 7.2а без предела',r.unbounded,true,0);
 
+head('Ночь 29.10 · Э11 — рынок и фирма в СК');
+for(const[tag,tc,D,n,period,want]of[
+ ['Старт','Q^3-6*Q^2+15*Q+18','Q=100-4*P',10,'sr',{P:15,q:4,Q:40,n:10,profit:14}],
+ ['7.5','2*Q^2','Q=140-P',10,'sr',{P:40,q:10,Q:100,profit:200}],
+ ['7.18а','Q^2+10*Q+25','Q=150-P',10,'lr',{P:20,q:5,Q:130,n:26,profit:0}],
+ ['7.18б','Q^2+10*Q+25','Q=290-P',26,'sr',{P:30,q:10,Q:260,n:26,profit:75}],
+ ['7.18в','Q^2+10*Q+25','Q=290-P',26,'lr',{P:20,q:5,Q:270,n:54,profit:0}],
+ ['Дробное n','Q^2+10*Q+25','Q=151-P',26,'lr',{P:20,q:5,Q:131,n:26.2,profit:0}],
+]){
+ r=await run(`resetSceneMemory();pickScene('firmmarket');STATE.costsTC=${JSON.stringify(tc)};STATE.costsSupply={period:${JSON.stringify(period)}};STATE.firmMarket={n:${n},demand:${JSON.stringify(D)}};redrawAll();const x=STATE.firmMarketResult;return{P:x.P,q:x.q,Q:x.Q,n:x.n,profit:x.profit};`);
+ for(const[k,v]of Object.entries(want))cmp('Э11 '+tag+' '+k,r[k],v,1e-6);
+}
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

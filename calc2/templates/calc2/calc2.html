@@ -184,8 +184,8 @@
           <span class="scard-name">Внешние эффекты</span>
           <span class="scard-desc">MSC или MSB против частных, потери DWL, налог или субсидия Пигу.</span>
         </button>
-        <button class="scard soon" data-scene="firmmarket" disabled>
-          <span class="scard-head"><span class="scard-name">Рынок и фирма в СК</span><span class="scard-soon">Скоро</span></span>
+        <button class="scard" data-scene="firmmarket">
+          <span class="scard-name">Рынок и фирма в СК</span>
           <span class="scard-desc">Два графика рядом: цена рынка и она же горизонтальный спрос для фирмы.</span>
         </button>
       </div>
@@ -810,6 +810,11 @@
         <button class="seg-btn" id="cs-plants">Сложение заводов</button>
       </div>
       <div id="costs-pane-costs">
+      <div id="firm-market-inputs" style="display:none;">
+        <div class="field"><label>Спрос рынка</label><input id="firm-market-demand" type="text" value="Q = 100 - 4*P" autocomplete="off"></div>
+        <div class="field sc-nrow" id="firm-market-n-row"><label>Число фирм n</label><input id="firm-market-n" type="text" data-plain="1" value="10"></div>
+        <div class="firm-market-price">Цена задана рынком: <span id="firm-market-price-value">15</span><span class="firm-market-price-mask">?</span></div>
+      </div>
       <!-- Б24. Способ ввода спрашиваем сразу, при входе в сцену. Отдельного
            поля «постоянные издержки FC» больше нет: в режиме «задаю TC» они
            равны TC(0) по определению, а второй хозяин у того же числа молча
@@ -2260,6 +2265,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
 <script src="{% calc2_static 'calc2/45-plants.js' %}"></script>
 <script src="{% calc2_static 'calc2/46-firm-supply.js' %}"></script>
+<script src="{% calc2_static 'calc2/47-firm-market.js' %}"></script>
 <script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
 <script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>
 <script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>

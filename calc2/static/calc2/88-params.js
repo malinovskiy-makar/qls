@@ -153,7 +153,7 @@ function pultRegulatorIds() {
   }
   if (STATE.mode === 'costs') {
     if (STATE.costsSub === 'plants') return ['pl-q-field'];
-    return (STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
+    return (STATE.sceneKey !== 'firmmarket' && STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
   }
   return [];
 }

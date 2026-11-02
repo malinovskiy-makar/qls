@@ -432,6 +432,7 @@ function updateCostsPanel() {
 
 // Полная перерисовка режима «Фирма»: три сюжета (Фаза 9).
 function redrawCosts() {
+  if (STATE.sceneKey === 'firmmarket') { redrawFirmMarket(); return; }
   if (STATE.costsSub === 'production') { redrawProduction(); return; }   // 9а
   if (STATE.costsSub === 'isoquant')   { redrawIsoquant();   return; }   // 9б
   if (STATE.costsSub === 'plants')     { redrawPlants();     return; }   // Фаза 10

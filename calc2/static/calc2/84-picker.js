@@ -286,6 +286,11 @@ const SCENE_ROUTE = {
 
   /* --- Блок 4 · Теория фирмы ---------------------------------------- */
   costs:    { run: () => { loadScene('costs'); setCostsSub('costs'); },      lock: ['costs-seg'] },
+  firmmarket: { base: 'costs', run: () => {
+    loadScene('costs'); setCostsSub('costs'); STATE.costsMCOnly=true;
+    STATE.firmMarket={n:10,demand:'Q = 100 - 4*P'};
+    document.getElementById('firm-market-demand').value=STATE.firmMarket.demand;
+  }, lock: ['costs-seg','lr-price-field','chk-lr'] },
   prod:     { base: 'costs', run: () => { loadScene('costs'); setCostsSub('production'); }, lock: ['costs-seg'] },
   plants:   { base: 'costs', run: () => { loadScene('costs'); setCostsSub('plants'); },     lock: ['costs-seg'] },
   isoquant: { base: 'costs', run: () => { loadScene('costs'); setCostsSub('isoquant'); },   lock: ['costs-seg'] },
