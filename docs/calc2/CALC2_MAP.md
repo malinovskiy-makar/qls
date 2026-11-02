@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `23bcd2e9`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `528d00bb`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,9 +343,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2309 | 186.1 | шаблон |
-| `calc2/static/calc2/calc2.css` | 4369 | 331.0 | CSS |
-| `calc2/static/calc2/previews.json` | 44 | 31.0 | json |
+| `calc2/templates/calc2/calc2.html` | 2311 | 186.3 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4377 | 331.4 | CSS |
+| `calc2/static/calc2/previews.json` | 44 | 31.2 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1166 | 76.6 | JS |
 | `calc2/static/calc2/12-numbers.js` | 239 | 12.1 | JS |
@@ -355,8 +355,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/41-market-policies.js` | 260 | 17.4 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 2067 | 152.3 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1035 | 66.5 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1067 | 69.1 | JS |
 | `calc2/static/calc2/45-plants.js` | 300 | 23.2 | JS |
+| `calc2/static/calc2/46-firm-supply.js` | 312 | 32.1 | JS |
 | `calc2/static/calc2/46-scenes-labor.js` | 900 | 68.8 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 279 | 18.2 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 464 | 32.1 | JS |
@@ -374,17 +375,17 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/84-picker.js` | 582 | 44.4 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2157 | 141.0 | JS |
 | `calc2/static/calc2/88-params.js` | 2026 | 139.6 | JS |
-| `calc2/static/calc2/89-model-state.js` | 365 | 24.0 | JS |
-| `calc2/static/calc2/90-explain.js` | 398 | 65.4 | JS |
+| `calc2/static/calc2/89-model-state.js` | 366 | 24.1 | JS |
+| `calc2/static/calc2/90-explain.js` | 398 | 66.0 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 1330 | 91.9 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
-| `calc2/static/calc2/94-answer.js` | 1088 | 71.7 | JS |
+| `calc2/static/calc2/94-answer.js` | 1089 | 71.8 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 470 | 26.7 | JS |
 | `calc2/static/calc2/96-self.js` | 346 | 22.8 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 42 файлов, 47639 строк, 3372.8 КБ.**
+**Итого: 43 файлов, 47995 строк, 3409.1 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -830,56 +831,56 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 36 — `hasPart`
 - строка 41 — `costsFC`
 - строка 46 — `costTC`
-- строка 55 — `costVC`
-- строка 60 — `costATC`
-- строка 64 — `costAVC`
-- строка 68 — `costAFC`
-- строка 76 — `costMC`
-- строка 83 — `costHas`
-- строка 107 — `minOf`
-- строка 129 — `realMin`
-- строка 137 — `shutdownPrice`
-- строка 146 — `computeFCfromTC`
-- строка 166 — `costsSignature`
-- строка 171 — `paramsSignature`
-- строка 177 — `recomputeCosts`
-- строка 221 — `checkCostsConsistency`
-- строка 248 — `costPoints`
-- строка 266 — `costExprs`
-- строка 296 — `drawCostCurves`
-- строка 355 — `noMinNote`
-- строка 365 — `updateCostsPanel`
-- строка 404 — `redrawCosts`
-- строка 439 — `recomputeLongRun`
-- строка 508 — `drawLongRunArea`
-- строка 516 — `fillLongRunArea`
-- строка 540 — `drawLongRunMarks`
-- строка 545 — `fillLongRunMarks`
-- строка 577 — `drawLongRunHandle`
-- строка 588 — `setLrPrice`
-- строка 596 — `syncLrPriceFields`
-- строка 614 — `beginLrDrag`
-- строка 616 — `dragLrPrice`
-- строка 631 — `endLrDrag`
-- строка 638 — `updateLongRunPanel`
-- строка 681 — `prodEval`
-- строка 691 — `prodDerivative`
-- строка 705 — `prodMP`
-- строка 712 — `prodAP`
-- строка 720 — `maxOf`
-- строка 747 — `realMax`
-- строка 749 — `recomputeProduction`
-- строка 768 — `redrawProduction`
-- строка 886 — `noMaxNote`
-- строка 895 — `updateProdPanel`
-- строка 919 — `recomputeIsoquant`
-- строка 930 — `redrawIsoquant`
-- строка 946 — `updateIsoPanel`
-- строка 975 — `setPlantsView`
-- строка 982 — `setPlantsQ`
-- строка 993 — `setCostsInputMode`
-- строка 1001 — `syncCostsInputMode`
-- строка 1015 — `setCostsSub`
+- строка 56 — `costVC`
+- строка 62 — `costATC`
+- строка 67 — `costAVC`
+- строка 72 — `costAFC`
+- строка 81 — `costMC`
+- строка 89 — `costHas`
+- строка 114 — `minOf`
+- строка 136 — `realMin`
+- строка 144 — `shutdownPrice`
+- строка 153 — `computeFCfromTC`
+- строка 173 — `costsSignature`
+- строка 178 — `paramsSignature`
+- строка 184 — `recomputeCosts`
+- строка 230 — `checkCostsConsistency`
+- строка 257 — `costPoints`
+- строка 293 — `costExprs`
+- строка 324 — `drawCostCurves`
+- строка 384 — `noMinNote`
+- строка 394 — `updateCostsPanel`
+- строка 434 — `redrawCosts`
+- строка 470 — `recomputeLongRun`
+- строка 540 — `drawLongRunArea`
+- строка 548 — `fillLongRunArea`
+- строка 572 — `drawLongRunMarks`
+- строка 577 — `fillLongRunMarks`
+- строка 609 — `drawLongRunHandle`
+- строка 620 — `setLrPrice`
+- строка 628 — `syncLrPriceFields`
+- строка 646 — `beginLrDrag`
+- строка 648 — `dragLrPrice`
+- строка 663 — `endLrDrag`
+- строка 670 — `updateLongRunPanel`
+- строка 713 — `prodEval`
+- строка 723 — `prodDerivative`
+- строка 737 — `prodMP`
+- строка 744 — `prodAP`
+- строка 752 — `maxOf`
+- строка 779 — `realMax`
+- строка 781 — `recomputeProduction`
+- строка 800 — `redrawProduction`
+- строка 918 — `noMaxNote`
+- строка 927 — `updateProdPanel`
+- строка 951 — `recomputeIsoquant`
+- строка 962 — `redrawIsoquant`
+- строка 978 — `updateIsoPanel`
+- строка 1007 — `setPlantsView`
+- строка 1014 — `setPlantsQ`
+- строка 1025 — `setCostsInputMode`
+- строка 1033 — `syncCostsInputMode`
+- строка 1047 — `setCostsSub`
 
 #### `calc2/static/calc2/45-plants.js`
 
@@ -908,6 +909,31 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 239 — `plantsFinalRecord`
 - строка 253 — `updatePlantsPanel`
 - строка 276 — `renderPlantRows`
+
+#### `calc2/static/calc2/46-firm-supply.js`
+
+- строка 3 — `firmPolynomial`
+- строка 21 — `firmPolyAt`
+- строка 23 — `firmPolyExpr`
+- строка 27 — `firmPolyRoots`
+- строка 36 — `firmPolynomialPieces`
+- строка 56 — `firmTax`
+- строка 63 — `firmSupplyBuild`
+- строка 112 — `firmZeroRevenue`
+- строка 119 — `firmCandidateAt`
+- строка 127 — `firmSupplyAt`
+- строка 137 — `firmSupplySchedule`
+- строка 163 — `firmShutdown`
+- строка 179 — `firmSupplyNumeric`
+- строка 211 — `firmSupplyConfig`
+- строка 213 — `recomputeFirmSupply`
+- строка 221 — `recomputeFirmSupplyPrice`
+- строка 231 — `firmOutputText`
+- строка 237 — `firmFinalRecord`
+- строка 256 — `updateFirmSupplyPanel`
+- строка 270 — `drawFirmSupply`
+- строка 289 — `firmCostExpressions`
+- строка 293 — `renderFirmSupplyControls`
 
 #### `calc2/static/calc2/46-scenes-labor.js`
 
@@ -1800,17 +1826,17 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 172 — `captureStatePlain`
 - строка 181 — `applyStatePlain`
 - строка 188 — `rerenderModelLists`
-- строка 209 — `forceRebuildAfterApply`
-- строка 215 — `syncUiFromState`
-- строка 222 — `capturePristine`
-- строка 233 — `restorePristine`
-- строка 253 — `captureMemory`
-- строка 258 — `applyMemory`
-- строка 281 — `serializeCurves`
-- строка 294 — `rebuildCurves`
-- строка 314 — `modelKeyOf`
-- строка 319 — `collectModelState`
-- строка 339 — `applyModelState`
+- строка 210 — `forceRebuildAfterApply`
+- строка 216 — `syncUiFromState`
+- строка 223 — `capturePristine`
+- строка 234 — `restorePristine`
+- строка 254 — `captureMemory`
+- строка 259 — `applyMemory`
+- строка 282 — `serializeCurves`
+- строка 295 — `rebuildCurves`
+- строка 315 — `modelKeyOf`
+- строка 320 — `collectModelState`
+- строка 340 — `applyModelState`
 
 #### `calc2/static/calc2/90-explain.js`
 
@@ -1930,41 +1956,41 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 #### `calc2/static/calc2/94-answer.js`
 
-- строка 199 — `areasHead`
-- строка 205 — `ansNum`
-- строка 210 — `answerCellWas`
-- строка 243 — `heroLabel`
-- строка 259 — `notationTex`
-- строка 273 — `plainText`
-- строка 276 — `statRows`
-- строка 280 — `txRow`
-- строка 303 — `answerSignature`
-- строка 320 — `scheduleAnswer`
-- строка 331 — `answerIsMath`
-- строка 335 — `labelCopy`
-- строка 346 — `answerNumberItem`
-- строка 352 — `answerValueInto`
-- строка 398 — `answerGroupHead`
-- строка 421 — `segNoteOn`
-- строка 425 — `buildSegNote`
-- строка 439 — `hideDrainedBlocks`
-- строка 484 — `retypesetSeenRows`
-- строка 508 — `remeasureStatsAfterFonts`
-- строка 523 — `answerReflow`
-- строка 534 — `answerCells`
-- строка 590 — `buildAnswer`
-- строка 729 — `hideEchoes`
-- строка 763 — `markFirstSection`
-- строка 796 — `decorateTables`
-- строка 830 — `liftTableHead`
-- строка 858 — `answerRow`
-- строка 910 — `burdenOn`
-- строка 917 — `burdenNoteText`
-- строка 924 — `buildBurden`
-- строка 957 — `buildStatus`
-- строка 984 — `buildExplainAccordion`
-- строка 1049 — `questionsWord`
-- строка 1055 — `syncExplainBar`
+- строка 200 — `areasHead`
+- строка 206 — `ansNum`
+- строка 211 — `answerCellWas`
+- строка 244 — `heroLabel`
+- строка 260 — `notationTex`
+- строка 274 — `plainText`
+- строка 277 — `statRows`
+- строка 281 — `txRow`
+- строка 304 — `answerSignature`
+- строка 321 — `scheduleAnswer`
+- строка 332 — `answerIsMath`
+- строка 336 — `labelCopy`
+- строка 347 — `answerNumberItem`
+- строка 353 — `answerValueInto`
+- строка 399 — `answerGroupHead`
+- строка 422 — `segNoteOn`
+- строка 426 — `buildSegNote`
+- строка 440 — `hideDrainedBlocks`
+- строка 485 — `retypesetSeenRows`
+- строка 509 — `remeasureStatsAfterFonts`
+- строка 524 — `answerReflow`
+- строка 535 — `answerCells`
+- строка 591 — `buildAnswer`
+- строка 730 — `hideEchoes`
+- строка 764 — `markFirstSection`
+- строка 797 — `decorateTables`
+- строка 831 — `liftTableHead`
+- строка 859 — `answerRow`
+- строка 911 — `burdenOn`
+- строка 918 — `burdenNoteText`
+- строка 925 — `buildBurden`
+- строка 958 — `buildStatus`
+- строка 985 — `buildExplainAccordion`
+- строка 1050 — `questionsWord`
+- строка 1056 — `syncExplainBar`
 
 #### `calc2/static/calc2/95-picker-screen.js`
 
@@ -2013,6 +2039,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1514.**
+**Итого функций в индексе: 1536.**
 
 <!-- AUTO:END -->

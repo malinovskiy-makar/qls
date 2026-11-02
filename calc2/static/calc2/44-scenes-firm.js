@@ -44,6 +44,7 @@ function costsFC() {
 }
 
 function costTC(q)  {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q);
   if (STATE.costsMode === 'curves') {
     const atc = evalPart('ATC', q);
     if (!isNaN(atc)) return atc * q;
@@ -53,19 +54,23 @@ function costTC(q)  {
   return evalTC(q);
 }
 function costVC(q)  {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q) - STATE.firmSupply.fc;
   if (STATE.costsMode === 'curves') { const a = evalPart('AVC', q); return isNaN(a) ? NaN : a * q; }
   const tc = evalTC(q), fc = costsFC();
   return (isNaN(tc) || isNaN(fc)) ? NaN : tc - fc;               // переменные = TC − FC
 }
 function costATC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q) / q;
   if (STATE.costsMode === 'curves') return evalPart('ATC', q);
   const tc = evalTC(q); return isNaN(tc) ? NaN : tc / q;          // средние общие
 }
 function costAVC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return (STATE.firmSupply.tc(q) - STATE.firmSupply.fc) / q;
   if (STATE.costsMode === 'curves') return evalPart('AVC', q);
   const vc = costVC(q); return isNaN(vc) ? NaN : vc / q;          // средние переменные
 }
 function costAFC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.fc / q;
   if (STATE.costsMode === 'curves') {
     const atc = evalPart('ATC', q), avc = evalPart('AVC', q);
     return (isNaN(atc) || isNaN(avc)) ? NaN : atc - avc;
@@ -74,6 +79,7 @@ function costAFC(q) {
 }
 // MC = d(TC)/dQ численно (центральная разность) — как mcAt для TC.
 function costMC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error) return STATE.firmSupply.mc(q);
   if (STATE.costsMode === 'curves') return evalPart('MC', q);
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = evalTC(q + h), b = evalTC(q - h);
@@ -81,6 +87,7 @@ function costMC(q) {
 }
 // Есть ли у сцены эта кривая вообще (в режиме «по отдельности» — только заданные).
 function costHas(name) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return true;
   if (STATE.costsMode !== 'curves') {
     // Без постоянных затрат нет ни VC, ни AVC, ни AFC.
     if (name === 'VC' || name === 'AVC' || name === 'AFC' || name === 'FC') return !isNaN(costsFC());
@@ -165,7 +172,7 @@ function computeFCfromTC() {
    каждый плюс повторная компиляция (Б32). */
 function costsSignature() {
   return [STATE.costsMode, STATE.costsTC, STATE.costsMCx, STATE.costsATCx, STATE.costsAVCx,
-          costScanTop(), paramsSignature()].join(' ');
+          costScanTop(), paramsSignature(), JSON.stringify(STATE.costsSupply), STATE.costsMCOnly].join(' ');
 }
 // Значения буквенных параметров: от них разбор тоже зависит.
 function paramsSignature() {
@@ -175,6 +182,7 @@ function paramsSignature() {
 
 // Пересчёт издержек: компиляция формул, постоянные затраты, ключевые точки.
 function recomputeCosts() {
+  recomputeFirmSupply();
   const sig = costsSignature();
   if (STATE.costsSig === sig && STATE.costsReady) return;   // входные данные те же
   STATE.costsSig = sig;
@@ -209,7 +217,8 @@ function recomputeCosts() {
     STATE.costsFCInfo = computeFCfromTC();
   }
 
-  const hi = costScanTop();
+  if (STATE.firmSupply && !STATE.firmSupply.error) STATE.costsFCInfo = { val: STATE.firmSupply.fc, kind: STATE.firmSupply.fcKind || 'exact' };
+  const hi = Math.min(costScanTop(), STATE.firmSupply?.K ?? Infinity);
   if (costHas('AVC')) STATE.minAVC = minOf(costAVC, COST_SCAN_LO, hi);   // точка закрытия
   if (costHas('ATC')) STATE.minATC = minOf(costATC, COST_SCAN_LO, hi);   // точка безубыточности
   checkCostsConsistency();
@@ -246,9 +255,27 @@ function checkCostsConsistency() {
    там, где кривая не определена: у средних это выходит само (деление на ноль
    даёт бесконечность и точка отбрасывается), у остальных ничего не теряется. */
 function costPoints(f) {
+  const supply = STATE.firmSupply;
+  if (supply?.exact && supply.pieces.length > 1) {
+    const out = [], lo = Math.max(0, CONFIG.Qmin), hi = Math.min(CONFIG.Qmax, supply.K);
+    for (const piece of supply.pieces) {
+      const a = Math.max(lo, piece.lo), b = Math.min(hi, piece.hi);
+      if (!(b > a)) continue;
+      if (out.length) out.push(null);
+      const n = Math.max(2, Math.ceil(400 * (b-a) / Math.max(1, hi-lo)));
+      for (let i=0; i<=n; i++) {
+        const q=a+(b-a)*i/n, eps=Math.min((b-a)*1e-7,1e-9*Math.max(1,Math.abs(q)));
+        // Односторонний предел: соседний кусок не соединяется через скачок.
+        const at=i===0?q+eps:i===n?q-eps:q, v=f(at);
+        out.push(Number.isFinite(v)&&v>=0&&v<=CONFIG.Pmax*4?[q,v]:null);
+      }
+    }
+    return out;
+  }
   const N = 400, out = [];
   const q0 = Math.max(0, CONFIG.Qmin);
-  const step = (CONFIG.Qmax - q0) / N;
+  const qHi = STATE.firmSupply && !STATE.firmSupply.error ? Math.min(CONFIG.Qmax, STATE.firmSupply.K) : CONFIG.Qmax;
+  const step = (qHi - q0) / N;
   for (let i = 0; i <= N; i++) {
     // Ровно ноль пропускаем: там у средних кривых деление на ноль.
     const q = (i === 0 && q0 === 0) ? step * 1e-3 : q0 + step * i;
@@ -266,6 +293,7 @@ function costPoints(f) {
 function costExprs() {
   const out = { TC: '', VC: '', ATC: '', AVC: '', AFC: '', MC: '', FC: '' };
   if (!STATE.costsReady) return out;
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return firmCostExpressions(STATE.firmSupply);
   if (STATE.costsMode === 'curves') {
     out.MC = (STATE.costsMCx || '').trim();
     out.ATC = (STATE.costsATCx || '').trim();
@@ -307,9 +335,10 @@ function drawCostCurves() {
     const p = g.append('path').datum(costPoints(f)).attr('fill', 'none')
       .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
     if (dash) p.attr('stroke-dasharray', dash);
-    if (expr) markExpr(p, expr, 'Q');
+    if (expr) markExpr(p, expr, 'Q', [0, Math.min(CONFIG.Qmax, STATE.firmSupply?.K ?? Infinity)]);
   };
   const E = costExprs();
+  const limited = f => q => q <= (STATE.firmSupply?.K ?? Infinity) ? f(q) : NaN;
   // Кривой, которой у сцены нет (нет постоянных затрат либо поле пустое),
   // не существует: галочка её не воскрешает.
   // Полные затраты (Б21): TC, VC и FC — тройка, живут вместе.
@@ -323,19 +352,19 @@ function drawCostCurves() {
 
   // Подписи кривых (Фаза 3): у правого края, а если кривая там вне окна —
   // у ближайшего места, где она видна. Раньше подпись просто пропадала.
-  if (STATE.showMC  && costHas('MC'))  labelCurve(g, costMC,  'MC',  COL.costMC);
-  if (STATE.showATC && costHas('ATC')) labelCurve(g, costATC, 'ATC', COL.costATC);
-  if (STATE.showAVC && costHas('AVC')) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
-  if (STATE.showAFC && costHas('AFC')) labelCurve(g, costAFC, 'AFC', COL.costAFC);
-  if (STATE.showVC  && costHas('VC'))  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
-  if (STATE.showTC  && costHas('TC'))  labelCurve(g, costTC,  'TC',  COL.costTC);
+  if (STATE.showMC  && costHas('MC'))  labelCurve(g, limited(costMC),  'MC',  COL.costMC);
+  if (STATE.showATC && costHas('ATC')) labelCurve(g, limited(costATC), 'ATC', COL.costATC);
+  if (STATE.showAVC && costHas('AVC')) labelCurve(g, limited(costAVC), 'AVC', COL.costAVC, { below: true });
+  if (STATE.showAFC && costHas('AFC')) labelCurve(g, limited(costAFC), 'AFC', COL.costAFC);
+  if (STATE.showVC  && costHas('VC'))  labelCurve(g, limited(costVC),  'VC',  COL.costVC, { below: true });
+  if (STATE.showTC  && costHas('TC'))  labelCurve(g, limited(costTC),  'TC',  COL.costTC);
   if (STATE.showFC  && costHas('FC'))  labelCurve(g, () => costsFC(), 'FC', COL.costFC, { below: true });
 
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит
   // через них. Показываем только НАСТОЯЩИЙ внутренний минимум: край отрезка
   // сканирования экономической точкой не является (Б26).
   const mark = (pt, color, label, below = false) => {
-    if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
+    if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax || pt.Q > (STATE.firmSupply?.K ?? Infinity)) return;
     const [px, py] = toPx(pt.Q, pt.val);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
@@ -365,6 +394,7 @@ function noMinNote(m, what, avgName) {
 function updateCostsPanel() {
   const box = document.getElementById('info-costs');
   if (!box) return;
+  if (STATE.firmSupply) { updateFirmSupplyPanel(box); return; }
   if (!STATE.costsReady) {
     box.innerHTML = '<div class="warn">' + (STATE.costsMode === 'curves'
       ? 'Задайте хотя бы одну кривую: MC, ATC или AVC.'
@@ -418,6 +448,7 @@ function redrawCosts() {
   drawAxes('Q', 'P');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
+  drawFirmSupply();
   if (STATE.lrOn) drawLongRunMarks();
   updateCostsPanel();
 }
@@ -438,6 +469,7 @@ function redrawCosts() {
 // Поэтому ищем корень справа налево, как findRootLast.
 function recomputeLongRun() {
   STATE.lr = null;
+  if (STATE.firmSupply) { recomputeFirmSupplyPrice(); return; }
   if (!STATE.costsReady || !STATE.lrOn || !costHas('MC')) return;
   const P = STATE.lrPrice;
   if (!(P > 0)) return;

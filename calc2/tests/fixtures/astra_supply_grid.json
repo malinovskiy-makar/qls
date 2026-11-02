@@ -1,0 +1,1082 @@
+[
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-1)*Q^2+25*Q+20",
+      "K": 2,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 21,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 2
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(4)*Q^2+16*Q+11",
+      "K": 6,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 40,
+    "profit": 21.0,
+    "Q": 2.0,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(2)*Q^2+22*Q+6",
+      "K": 11,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 64,
+    "profit": 75.202077896,
+    "Q": 3.134,
+    "step": 0.001,
+    "effectiveK": 11
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(1)*Q^2+23*Q+9",
+      "K": 13,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 45,
+    "profit": 34.7784775695,
+    "Q": 3.221,
+    "step": 0.001,
+    "effectiveK": 13
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-3)*Q^2+18*Q+8",
+      "K": 12,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 73,
+    "profit": 592.0,
+    "Q": 12,
+    "step": 0.001,
+    "effectiveK": 12
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(0)*Q^2+15*Q+18",
+      "K": 5,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 50,
+    "profit": 61.69850470399999,
+    "Q": 3.416,
+    "step": 0.001,
+    "effectiveK": 5
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(2)*Q^2+18*Q+4",
+      "K": 4,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 39,
+    "profit": 13.329617522,
+    "Q": 1.479,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(1)*Q^2+15*Q+16",
+      "K": 5,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 45,
+    "profit": 14.076034047999997,
+    "Q": 2.076,
+    "step": 0.001,
+    "effectiveK": 5
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(0)*Q^2+27*Q+17",
+      "K": 11,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 47,
+    "profit": 29.069685896750002,
+    "Q": 4.517,
+    "step": 0.001,
+    "effectiveK": 11
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-3)*Q^2+19*Q+14",
+      "K": 14,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 45,
+    "profit": 307.3239882419999,
+    "Q": 11.118,
+    "step": 0.001,
+    "effectiveK": 14
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(1)*Q^2+14*Q+3",
+      "K": 10,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 0,
+    "profit": -3.0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 10
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(-3)*Q^2+21*Q+8",
+      "K": 2,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 22,
+    "profit": 48.0,
+    "Q": 2,
+    "step": 0.001,
+    "effectiveK": 2
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(1)*Q^2+19*Q+3",
+      "K": 7,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 50,
+    "profit": 29.077857103999996,
+    "Q": 1.922,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(2)*Q^2+21*Q+9",
+      "K": 7,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 85,
+    "profit": 376.0,
+    "Q": 7,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(3)*Q^2+21*Q+9",
+      "K": 14,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 44,
+    "profit": 35.08333300000001,
+    "Q": 3.833,
+    "step": 0.001,
+    "effectiveK": 14
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(-1)*Q^2+13*Q+16",
+      "K": 12,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 82,
+    "profit": 224.282862779,
+    "Q": 5.141,
+    "step": 0.001,
+    "effectiveK": 12
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(-1)*Q^2+14*Q+14",
+      "K": 2,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 39,
+    "profit": 7.0,
+    "Q": 2,
+    "step": 0.001,
+    "effectiveK": 2
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-1.0)*Q^2+14.0*Q+28",
+      "K": 7,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 25,
+    "profit": 46.19440128274999,
+    "Q": 5.389,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(4)*Q^2+24*Q+13",
+      "K": 7,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 69,
+    "profit": 45.38331238399999,
+    "Q": 2.152,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(2)*Q^2+26*Q+17",
+      "K": 5,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 51,
+    "profit": 31.5096431595,
+    "Q": 2.961,
+    "step": 0.001,
+    "effectiveK": 5
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(-1)*Q^2+21*Q+5",
+      "K": 7,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 18,
+    "profit": 1.4068479999999948,
+    "Q": 1.26,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(-1)*Q^2+25*Q+4",
+      "K": 7,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 1,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(1)*Q^2+16*Q+18",
+      "K": 7,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 32,
+    "profit": 45.0,
+    "Q": 7,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(1)*Q^2+30*Q+2",
+      "K": 6,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 20,
+    "profit": -2.0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(2)*Q^2+11*Q+10",
+      "K": 3,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 23,
+    "profit": 18.123112151999997,
+    "Q": 2.122,
+    "step": 0.001,
+    "effectiveK": 3
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(2)*Q^2+19*Q+0",
+      "K": 3,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 26,
+    "profit": 33.0,
+    "Q": 3,
+    "step": 0.001,
+    "effectiveK": 3
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(1)*Q^2+30*Q+15",
+      "K": 10,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 68,
+    "profit": 85.06175868075002,
+    "Q": 5.253,
+    "step": 0.001,
+    "effectiveK": 10
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(-1)*Q^2+20*Q+3",
+      "K": 6,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 79,
+    "profit": 130.716898114,
+    "Q": 3.307,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(2)*Q^2+20*Q+15",
+      "K": 8,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 34,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 8
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(1)*Q^2+14*Q+19",
+      "K": 4,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 43,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(-3)*Q^2+13*Q+8",
+      "K": 4,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 70,
+    "profit": 130.26384409599999,
+    "Q": 3.528,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(2)*Q^2+26*Q+1",
+      "K": 9,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 80,
+    "profit": 548.0,
+    "Q": 9,
+    "step": 0.001,
+    "effectiveK": 9
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(2)*Q^2+17*Q+1",
+      "K": 4,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 64,
+    "profit": 64.95397826199999,
+    "Q": 2.3890000000000002,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(0)*Q^2+11*Q+17",
+      "K": 2,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 9,
+    "profit": 27.0,
+    "Q": 2,
+    "step": 0.001,
+    "effectiveK": 2
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(0)*Q^2+30*Q+17",
+      "K": 12,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 83,
+    "profit": 136.51212657300005,
+    "Q": 4.203,
+    "step": 0.001,
+    "effectiveK": 12
+  },
+  {
+    "config": {
+      "expr": "0.0*Q^3+(3.0)*Q^2+12.0*Q+28",
+      "K": 7,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 79,
+    "profit": 319.0,
+    "Q": 7,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(1)*Q^2+16*Q+13",
+      "K": 6,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 50,
+    "profit": 132.0295141895,
+    "Q": 4.941,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(1)*Q^2+15*Q+7",
+      "K": 14,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 2,
+    "profit": -7.0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 14
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(-1)*Q^2+20*Q+5",
+      "K": 6,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 89,
+    "profit": 163.077643344,
+    "Q": 3.5620000000000003,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(1)*Q^2+15*Q+14",
+      "K": 6,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 8,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-3)*Q^2+20*Q+3",
+      "K": 4,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 28,
+    "profit": 61.0,
+    "Q": 4,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(4)*Q^2+17*Q+12",
+      "K": 6,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 55,
+    "profit": 32.062996094,
+    "Q": 1.937,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(1)*Q^2+30*Q+4",
+      "K": 12,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 26,
+    "profit": -4.0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 12
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(0)*Q^2+10*Q+20",
+      "K": 2,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 71,
+    "profit": 105.1,
+    "Q": 2,
+    "step": 0.001,
+    "effectiveK": 2
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(2)*Q^2+14*Q+5",
+      "K": 7,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 46,
+    "profit": 99.124038688,
+    "Q": 4.124,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(-1)*Q^2+29*Q+18",
+      "K": 14,
+      "kind": "sunk",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 25
+      }
+    },
+    "P": 72,
+    "profit": 222.15950498399997,
+    "Q": 5.106,
+    "step": 0.001,
+    "effectiveK": 14
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(0)*Q^2+17*Q+0",
+      "K": 7,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 39,
+    "profit": 39.717521088,
+    "Q": 2.708,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(-3)*Q^2+19*Q+13",
+      "K": 5,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 85,
+    "profit": 335.75,
+    "Q": 5,
+    "step": 0.001,
+    "effectiveK": 5
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(0)*Q^2+13*Q+4",
+      "K": 9,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 6,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 9
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(0)*Q^2+12*Q+9",
+      "K": 4,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 85,
+    "profit": 234.0,
+    "Q": 4,
+    "step": 0.001,
+    "effectiveK": 4
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(1)*Q^2+16*Q+13",
+      "K": 8,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 84,
+    "profit": 134.5073636945,
+    "Q": 4.971,
+    "step": 0.001,
+    "effectiveK": 8
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(-3)*Q^2+10*Q+5",
+      "K": 6,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 51,
+    "profit": 150.33811300000002,
+    "Q": 4.83,
+    "step": 0.001,
+    "effectiveK": 6
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(0)*Q^2+18*Q+4",
+      "K": 13,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "tax",
+        "rate": 25
+      }
+    },
+    "P": 38,
+    "profit": 30.426518631999997,
+    "Q": 2.582,
+    "step": 0.001,
+    "effectiveK": 13
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(4)*Q^2+23*Q+16",
+      "K": 10,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "lump",
+        "kind": "tax",
+        "rate": 10
+      }
+    },
+    "P": 37,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 10
+  },
+  {
+    "config": {
+      "expr": "0.5*Q^3+(2)*Q^2+26*Q+16",
+      "K": 10,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 72,
+    "profit": 121.18020350000006,
+    "Q": 4.57,
+    "step": 0.001,
+    "effectiveK": 10
+  },
+  {
+    "config": {
+      "expr": "1*Q^3+(0)*Q^2+18*Q+6",
+      "K": 9,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 32,
+    "profit": 17.71564800000001,
+    "Q": 2.2800000000000002,
+    "step": 0.001,
+    "effectiveK": 9
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(4)*Q^2+19*Q+10",
+      "K": 11,
+      "kind": "quasi",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "subsidy",
+        "rate": 10
+      }
+    },
+    "P": 8,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 11
+  },
+  {
+    "config": {
+      "expr": "0.25*Q^3+(0)*Q^2+17*Q+14",
+      "K": 7,
+      "kind": "quasi",
+      "period": "sr",
+      "tax": {
+        "type": "unit",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 78,
+    "profit": 362.25,
+    "Q": 7,
+    "step": 0.001,
+    "effectiveK": 7
+  },
+  {
+    "config": {
+      "expr": "0*Q^3+(1)*Q^2+17*Q+14",
+      "K": 10,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "revenue",
+        "kind": "tax",
+        "rate": 5
+      }
+    },
+    "P": 19,
+    "profit": 0,
+    "Q": 0,
+    "step": 0.001,
+    "effectiveK": 10
+  },
+  {
+    "config": {
+      "expr": "2*Q^3+(1)*Q^2+19*Q+1",
+      "K": 3,
+      "kind": "sunk",
+      "period": "lr",
+      "tax": {
+        "type": "none",
+        "kind": "subsidy",
+        "rate": 5
+      }
+    },
+    "P": 27,
+    "profit": 4.0,
+    "Q": 1.0,
+    "step": 0.001,
+    "effectiveK": 3
+  }
+]

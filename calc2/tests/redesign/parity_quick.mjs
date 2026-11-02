@@ -171,6 +171,28 @@ for (const key of keys) {
   const b1 = new Map((ans.blocks || []).map(b => [b.id, b]));
   (rec.start.answer.blocks || []).forEach(b => {
     const c = b1.get(b.id);
+    /* Э10, согласованная спецификация §1: табло фирмы теперь показывает
+       глобальный максимум и цену закрытия ТЕКУЩЕГО периода. Прежние строки
+       min ATC и «Вход/выход» одновременно с SR больше не предусмотрены.
+       Эталон не переснимаем с реализации: TC(4)=46, 15·4−46=14,
+       min AVC=6, FC=18. Проверяем весь новый состав по именам, не индексам.
+       Кусочную Qs(P), точку безразличия и LR проверяет astra_supply_probe. */
+    if (key === 'costs' && b.id === 'info-costs') {
+      const expected = [['Выпуск Q', '4'], ['Прибыль Π', '14'], ['Цена P', '15'],
+        ['Цена закрытия (min AVC)', '6'], ['Постоянные затраты FC', '18']];
+      checks++;
+      if (!c || c.rows.length !== expected.length) {
+        bad++; issues.push('costs: состав табло текущего периода: ' + (c?.rows.length ?? 0) + ' строк вместо 5');
+      }
+      for (const [label, value] of expected) {
+        checks++;
+        const row = c?.rows.find(r => norm(r.label) === norm(label));
+        if (!row || !shownEquivalent(row.value, value)) {
+          bad++; issues.push('costs: «' + label + '»: ожидалось ' + value + ', получено ' + (row?.value ?? 'нет строки'));
+        }
+      }
+      return;
+    }
     b.rows.forEach(r => {
       checks++;
       if ((REDEFINED[key] || []).includes(String(r.label).trim())) return;   // ADR 0143, см. выше

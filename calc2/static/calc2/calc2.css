@@ -4367,3 +4367,11 @@ body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: aut
 .adas-seg { margin:10px 0 7px; }
 .adas-seg .seg-btn { min-width:0;white-space:normal; }
 .adas-auto { font-size:13px;color:var(--muted);line-height:1.45;margin:10px 0; }
+
+/* Э10: те же сегменты и числовые поля, с переносом внутри узкой панели. */
+.firm-seg { flex-wrap: wrap; margin: 8px 0; }
+.firm-seg .seg-btn { flex: 1 1 auto; white-space: normal; }
+.firm-tax-card { margin: 12px 0; padding-top: 8px; border-top: 1px solid var(--border); }
+#firm-supply-controls .sc-nrow input { width: 92px; min-width: 0; }
+
+.firm-fixed-label { margin-top: 10px; font-size: 12px; color: var(--text2); }

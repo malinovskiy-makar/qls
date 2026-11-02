@@ -1594,6 +1594,29 @@ r=await run(`STATE.macro.adas={adMode:'mv',M:256,V:1,srasMode:'labor',production
 for(const[tag,e,w]of[['base',r.base,{Q:64,P:4}],['sr',r.sr,{Q:96,P:6}],['lr',r.lr,{Q:64,P:9}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 '+tag+' '+k,e[k],v,1e-6);
 for(const[tag,l,w]of[['base',r.labor.base,{L:16,realW:2,nominalW:8}],['sr',r.labor.sr,{L:36,realW:4/3,nominalW:8}],['lr',r.labor.lr,{L:16,realW:2,nominalW:18}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 труд '+tag+' '+k,l[k],v,1e-6);
 
+head('Ночь 29.10 · Э10 — глобальное предложение фирмы');
+for(const[tag,c,P,Q,profit,shutdown]of[
+ ['7.1б',{expr:'Q^2+10*Q+100'},30,10,0,10],
+ ['7.2б',{expr:'16*Q-Q^2'},9,8,8,8],
+ ['7.2в',{expr:'Q^2+20*Q',K:10},50,10,200,20],
+ ['7.2г',{expr:'Q^2+400',kind:'quasi'},60,30,500,40],
+ ['7.3а',{expr:'Q^2',tax:{type:'unit',rate:10}},20,5,25,10],
+ ['7.3б',{expr:'Q^2',tax:{type:'unit',kind:'subsidy',rate:10}},20,15,225,-10],
+ ['7.3в',{expr:'Q^2',tax:{type:'revenue',rate:25}},20,7.5,56.25,0],
+ ['7.3г',{expr:'Q^2',tax:{type:'revenue',kind:'subsidy',rate:25}},20,12.5,156.25,0],
+ ['7.7в',{expr:'3*Q',mode:'mc',K:20},90,20,1200,0],
+ ['7.7г',{expr:'12-Q',mode:'mc'},7,12,12,6],
+ ['7.16 SR',{expr:'Q^2+30*Q+100'},40,5,-75,30],
+ ['7.16 LR',{expr:'Q^2+30*Q+100',period:'lr'},40,0,0,50],
+ ['Аккордный sunk',{expr:'Q^2+100',tax:{type:'lump',rate:125}},20,10,-125,0],
+ ['Аккордный quasi',{expr:'Q^2+100',kind:'quasi',tax:{type:'lump',rate:125}},20,0,0,30],
+]){
+ r=await run(`resetSceneMemory();pickScene('costs');var c=${JSON.stringify(c)};STATE.costsMode=c.mode==='mc'?'curves':'tc';STATE.costsMCOnly=c.mode==='mc';if(c.mode==='mc')STATE.costsMCx=c.expr;else STATE.costsTC=c.expr;STATE.costsSupply={K:c.K??null,period:c.period||'sr',kind:c.kind||'sunk',tax:c.tax||{type:'none'}};STATE.lrPrice=${P};redrawAll();return{Q:STATE.lr.Q,profit:STATE.lr.profit,shutdown:STATE.firmSupply.shutdown};`);
+ for(const[k,v]of Object.entries({Q,profit,shutdown}))cmp('Э10 '+tag+' '+k,r[k],v,1e-6);
+}
+r=await run(`var m=firmSupplyBuild({expr:'16*Q'});return{zero:m.at(15).Q,interval:m.at(16).intervals.some(x=>x[0]===0&&x[1]===Infinity),unbounded:m.at(17).unbounded};`);
+cmp('Э10 7.2а ниже MC',r.zero,0,0);cmp('Э10 7.2а интервал',r.interval,true,0);cmp('Э10 7.2а без предела',r.unbounded,true,0);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
