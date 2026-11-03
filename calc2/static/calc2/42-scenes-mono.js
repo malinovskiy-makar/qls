@@ -885,7 +885,14 @@ function drawNaturalPoints() {
     pointName(g, px, py, label, color,
               { dx: side < 0 ? -9 : 9, dy: -9, size: FS.base, weight: 700 })
       .attr('text-anchor', side < 0 ? 'end' : 'start');
-    axisValueX(g, px, oy, fmt(Q), idx || '');
+    const coordinate = axisValueX(g, px, oy, fmt(Q), idx || '');
+    // У двух ориентиров регулирования отдельные строки: точный радикал
+    // ATC шире десятичного числа, особенно в TeX. Якорь Q не сдвигаем.
+    // Не меряем DOM до applyLabelSize: reduced-motion иначе запускает
+    // переход кегля до финального замера левого поля.
+    if (coordinate && idx === 'MC' && n.acReg) {
+      coordinate.attr('y', oy + 8 + Math.max(18, FS.small * labelScale() * 1.8));
+    }
     /* Пунктир шёл и к оси цены, а числа там не было: линия упиралась в пустоту.
        Различитель обязателен — на оси цены встают ТРИ разные цены: монопольная
        и два ориентира регулирования. */
@@ -894,6 +901,10 @@ function drawNaturalPoints() {
   mark(n.Qm, n.Pm, 'M', COL.ink, -1, 'm');
   if (n.acReg) mark(n.acReg.Q, n.acReg.P, 'E_{ATC}', COL.reg, 1, 'ATC');
   if (n.mcReg) mark(n.mcReg.Q, n.mcReg.P, 'E_{MC}', COL.MC, -1, 'MC');
+  // На узком экране раскладка могла начаться до общего размера подписей.
+  // Убираем переход также у tspan: его наследуемый кегль иначе отстаёт
+  // даже при transition:none у самого text и искажает замер левого поля.
+  g.selectAll('text, tspan').style('transition', 'none', 'important');
 }
 
 // Полная отрисовка под-режима «Естественная монополия».

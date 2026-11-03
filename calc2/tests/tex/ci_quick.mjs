@@ -1,10 +1,10 @@
 /* Быстрая проверка выгрузки .tex для CI (её зовёт calc2/tests/test_calc2_tex.py).
 
-   44 старта моделей: файл строится, проверка текста без TeX проходит
+   46 стартов моделей: файл строится, проверка текста без TeX проходит
    (lint.mjs: запрещённые команды выражением сервера, знаки, скобки,
    окружения), дефектов записи нет (кривая или область без записи, запись не
    сошлась с нарисованным), окружений axis столько же, сколько панелей на
-   холсте. Пять моделей разных семей дают побайтно один файл при двух окнах
+   холсте. Семь моделей разных семей дают побайтно один файл при двух окнах
    (1440×760 светлая и 390×844 тёмная).
 
    Свои точки и площади (тихие панели, сессия 7, Г1): состояние taxes@pts-areas (шаг 3 цепочки В — точки A (30; 70),
@@ -21,7 +21,7 @@
    превью нет: «превью устарело: <модель>, пересоберите командой …».
 
    node calc2/tests/tex/ci_quick.mjs          (CALC2_BASE_URL — сервер)
-   OUT=папка — записать 46 файлов: 44 старта, taxes@pts-areas и labor-bilat@mrot45 (тест соберёт их pdflatex, где он есть).
+   OUT=папка — записать 48 файлов: 46 стартов, taxes@pts-areas и labor-bilat@mrot45 (тест соберёт их pdflatex, где он есть).
    Коды: 0 — всё сошлось; 1 — провал; 3 — calc2 не загрузился; 4 — нет Playwright. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,6 +78,13 @@ for (const k of KEYS) {
   DEF.forEach(d => { if (r.stats[d]) why.push(d + ' ' + r.stats[d]); });
   const axes = (r.tex.match(/\\begin\{axis\}/g) || []).length;
   if (axes !== Math.max(1, r.panels)) why.push('окружений axis ' + axes + ', панелей ' + r.panels);
+  if (['m-transform', 'm-optimum', 'm-minmax'].includes(k)) {
+    const axis = r.tex.split('\n').find(line => line.startsWith('\\begin{axis}'));
+    const box = ['xmin', 'ymin', 'xmax', 'ymax'].map(key => Number(new RegExp(key + '=([^,\\]]+)').exec(axis)?.[1]));
+    const boxes = [...r.tex.matchAll(/\\clip \(axis cs:([^,]+),([^)]+)\) rectangle \(axis cs:([^,]+),([^)]+)\);/g)]
+      .map(m => m.slice(1).map(Number));
+    if (!boxes.some(b => b.every((v, i) => Math.abs(v - box[i]) < 1e-3))) why.push('нет обрезки кривых по полю');
+  }
   if (why.length) fails.push(k + ': ' + why.join(' | '));
   if (OUT) { fs.mkdirSync(OUT, { recursive: true }); fs.writeFileSync(path.join(OUT, k + '.tex'), r.tex); }
   if (PV[k]) {

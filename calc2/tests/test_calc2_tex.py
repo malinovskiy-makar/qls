@@ -1,11 +1,11 @@
 """Выгрузка графика в .tex (файл из записи при рисовании, ADR 0139).
 
 Поднимает живой сервер и запускает node-раннер calc2/tests/tex/ci_quick.mjs:
-44 старта моделей — файл строится, проверка текста без TeX проходит,
+46 стартов моделей — файл строится, проверка текста без TeX проходит,
 дефектов записи нет (кривая или область без записи, запись не сошлась с
-нарисованным), окружений axis столько же, сколько панелей; пять моделей
-разных семей дают один файл при двух окнах. Там, где есть pdflatex, те же 44
-файла собираются тем же путём, что у сервера (compile_pdf_pdflatex); где его
+нарисованным), окружений axis столько же, сколько панелей; семь моделей
+разных семей дают один файл при двух окнах. Там, где есть pdflatex, все 48
+файлов собираются тем же путём, что у сервера (compile_pdf_pdflatex); где его
 нет — громкая строка «ПРОПУЩЕНА проверка сборки PDF», как в test_export_pdf.
 
 Пропуск раннера только там, где нет node или Playwright (код 4 или не найден
@@ -61,7 +61,7 @@ class TexLintMatchesServerTests(SimpleTestCase):
 # раннер за предел времени по причине, не имеющей отношения к выгрузке.
 @tag("calc2", "browser", "serial")
 class Calc2TexExportTest(StaticLiveServerTestCase):
-    """44 старта: файл строится, текст чист, дефектов записи нет, сборка pdflatex."""
+    """46 стартов: файл строится, текст чист, дефектов записи нет, сборка pdflatex."""
 
     def _loud_skip(self, what, reason):
         line = "=" * 72
@@ -91,9 +91,9 @@ class Calc2TexExportTest(StaticLiveServerTestCase):
         self.assertEqual(result.returncode, 0, msg="Выгрузка .tex нарушена (см. вывод выше).")
 
         files = sorted(f for f in os.listdir(out_dir) if f.endswith(".tex"))
-        # 44 старта, состояние своих точек и площадей taxes@pts-areas (тихие панели, сессия 7, Г1) и «Двусторонняя
+        # 46 стартов (добавлены firmmarket и bigopen), свои точки и площади taxes@pts-areas и «Двусторонняя
         # монополия» с МРОТ 45 labor-bilat@mrot45 (рынок труда, 15.10, ADR 0156): их pdflatex тоже собирает.
-        self.assertEqual(len(files), 46, msg="раннер записал не 46 файлов (44 старта, taxes@pts-areas и labor-bilat@mrot45)")
+        self.assertEqual(len(files), 48, msg="раннер записал не 48 файлов (46 стартов, taxes@pts-areas и labor-bilat@mrot45)")
         if not pdflatex_available():
             self._loud_skip("А проверка сборки PDF", "pdflatex не установлен на этой машине")
 

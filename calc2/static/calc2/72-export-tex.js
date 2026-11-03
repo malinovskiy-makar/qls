@@ -968,9 +968,13 @@ const TexExport = (function () {
         const cs = getComputedStyle(el);
         const op = chainOpacity(el, chart);
         if (op < 0.02) continue;
-        const clipR = ctx.clip ? clips[ctx.clip] : null;
+        // mathLine задаёт обрезку самому пути, а не родительской группе.
+        // Без неё PDF выпускал кривую за поле, хотя SVG её уже обрезал.
+        const ownClip = /url\(["']?#([^)"']+)/.exec(el.getAttribute('clip-path') || '');
+        const clipId = ownClip && clips[ownClip[1]] ? ownClip[1] : ctx.clip;
+        const clipR = clipId ? clips[clipId] : null;
         const panelOf = (px, py) => clipR ? nearest(clipR.x + clipR.w / 2, clipR.y + clipR.h / 2) : nearest(px, py);
-        const base = { z: order.n++, clip: ctx.clip || null };
+        const base = { z: order.n++, clip: clipId || null };
 
         if (tag === 'line') {
           const x1 = +el.getAttribute('x1'), y1 = +el.getAttribute('y1'), x2 = +el.getAttribute('x2'), y2 = +el.getAttribute('y2');

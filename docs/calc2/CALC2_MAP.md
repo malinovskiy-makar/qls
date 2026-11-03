@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `f4cb71d6`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `e1c46e44`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -353,7 +353,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/30-curves.js` | 1517 | 110.5 | JS |
 | `calc2/static/calc2/40-scenes-market.js` | 3895 | 281.6 | JS |
 | `calc2/static/calc2/41-market-policies.js` | 260 | 17.4 | JS |
-| `calc2/static/calc2/42-scenes-mono.js` | 2070 | 152.5 | JS |
+| `calc2/static/calc2/42-scenes-mono.js` | 2081 | 153.5 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
 | `calc2/static/calc2/44-scenes-firm.js` | 1068 | 69.2 | JS |
 | `calc2/static/calc2/45-plants.js` | 300 | 23.2 | JS |
@@ -372,7 +372,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/57-distributions.js` | 161 | 18.6 | JS |
 | `calc2/static/calc2/60-overlays.js` | 5008 | 320.1 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2091 | 136.0 | JS |
-| `calc2/static/calc2/72-export-tex.js` | 1665 | 128.2 | JS |
+| `calc2/static/calc2/72-export-tex.js` | 1669 | 128.6 | JS |
 | `calc2/static/calc2/80-ui.js` | 856 | 54.3 | JS |
 | `calc2/static/calc2/82-input.js` | 2366 | 140.9 | JS |
 | `calc2/static/calc2/84-picker.js` | 591 | 45.1 | JS |
@@ -388,7 +388,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 353 | 23.3 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 46 файлов, 48752 строк, 3484.5 КБ.**
+**Итого: 46 файлов, 48767 строк, 3485.9 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -779,40 +779,40 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 833 — `drawNaturalAreas`
 - строка 848 — `drawNaturalCurves`
 - строка 871 — `drawNaturalPoints`
-- строка 900 — `drawNaturalFull`
-- строка 908 — `updateNaturalPanel`
-- строка 946 — `drawMonoTaxAreas`
-- строка 982 — `drawMonoTaxShiftedMC`
-- строка 1000 — `drawMonoTaxPoints`
-- строка 1021 — `drawMonoFloorAreas`
-- строка 1036 — `drawMonoFloorPoints`
-- строка 1056 — `drawMonoFloorLine`
-- строка 1071 — `updateMonoInterventionPanel`
-- строка 1208 — `makeCurve`
-- строка 1224 — `segExpr`
-- строка 1231 — `kinkedDemandExpr`
-- строка 1242 — `drawDiscr1`
-- строка 1275 — `updateDiscr1Panel`
-- строка 1301 — `allocateMR`
-- строка 1327 — `recomputeDiscr3`
-- строка 1386 — `drawMiniMarket`
-- строка 1493 — `redrawDiscr3`
-- строка 1536 — `drawMonoExport`
-- строка 1661 — `updateDiscr3Panel`
-- строка 1739 — `applyD3WorldLabels`
-- строка 1761 — `buildKinkedDemand`
-- строка 1781 — `sumDemandCurves`
-- строка 1818 — `recomputeKinked`
-- строка 1865 — `drawKinkedFull`
-- строка 1954 — `updateKinkPanel`
-- строка 1995 — `applyMonoVisibility`
-- строка 2016 — `ensureMonopolyCurves`
-- строка 2027 — `fillIfEmpty`
-- строка 2030 — `ensureD3Fields`
-- строка 2035 — `ensureKinkFields`
-- строка 2041 — `ensureMonopolyPreset`
-- строка 2048 — `setMonoMode`
-- строка 2059 — `setKinkInput`
+- строка 911 — `drawNaturalFull`
+- строка 919 — `updateNaturalPanel`
+- строка 957 — `drawMonoTaxAreas`
+- строка 993 — `drawMonoTaxShiftedMC`
+- строка 1011 — `drawMonoTaxPoints`
+- строка 1032 — `drawMonoFloorAreas`
+- строка 1047 — `drawMonoFloorPoints`
+- строка 1067 — `drawMonoFloorLine`
+- строка 1082 — `updateMonoInterventionPanel`
+- строка 1219 — `makeCurve`
+- строка 1235 — `segExpr`
+- строка 1242 — `kinkedDemandExpr`
+- строка 1253 — `drawDiscr1`
+- строка 1286 — `updateDiscr1Panel`
+- строка 1312 — `allocateMR`
+- строка 1338 — `recomputeDiscr3`
+- строка 1397 — `drawMiniMarket`
+- строка 1504 — `redrawDiscr3`
+- строка 1547 — `drawMonoExport`
+- строка 1672 — `updateDiscr3Panel`
+- строка 1750 — `applyD3WorldLabels`
+- строка 1772 — `buildKinkedDemand`
+- строка 1792 — `sumDemandCurves`
+- строка 1829 — `recomputeKinked`
+- строка 1876 — `drawKinkedFull`
+- строка 1965 — `updateKinkPanel`
+- строка 2006 — `applyMonoVisibility`
+- строка 2027 — `ensureMonopolyCurves`
+- строка 2038 — `fillIfEmpty`
+- строка 2041 — `ensureD3Fields`
+- строка 2046 — `ensureKinkFields`
+- строка 2052 — `ensureMonopolyPreset`
+- строка 2059 — `setMonoMode`
+- строка 2070 — `setKinkInput`
 
 #### `calc2/static/calc2/43-discrimination.js`
 
@@ -1623,10 +1623,10 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 - строка 30 — `texPaperActive`
 - строка 35 — `texPaperComputeSize`
-- строка 1662 — `texEnterPaper`
-- строка 1663 — `texCapture`
-- строка 1664 — `texEmit`
-- строка 1665 — `texInventory`
+- строка 1666 — `texEnterPaper`
+- строка 1667 — `texCapture`
+- строка 1668 — `texEmit`
+- строка 1669 — `texInventory`
 
 #### `calc2/static/calc2/80-ui.js`
 
