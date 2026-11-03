@@ -21,9 +21,7 @@
         Тренажёр ВП
       </a>
       <h1 class="vp-sel-h1">Выберите класс и вариант</h1>
-      {% if user.is_authenticated %}
-      <p class="vp-sel-sub">Первая попытка по варианту с таймером идёт в таблицу лучших попыток. Повторные – тренировка.</p>
-      {% else %}
+      {% if not user.is_authenticated %}
       <p class="vp-sel-sub">Открыть можно любой. Чтобы начать прохождение, понадобится короткая бесплатная регистрация.</p>
       {% endif %}
     </div>
@@ -59,7 +57,7 @@
         {% elif card.status.kind == 'ranked' %}
         <span class="vp-st is-ok">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
-          {{ card.status.ranked.score|num }} · {{ card.status.seconds|mmss }} · в таблице
+          {{ card.status.ranked.score|num }} · {{ card.status.seconds|mmss }} · в лидерборде
         </span>
         {% elif card.status.kind == 'done' %}
         <span class="vp-st">Пройден · лучший {{ card.status.best|num }}</span>

@@ -45,6 +45,7 @@ class WallAsksOnlyTheUnknownTests(TestCase):
         self.assertIn('Вы прошли во 2 тур?', html)
         self.assertNotIn('name="grade"', html)
         self.assertNotIn('name="source"', html)
+        self.assertNotIn('* Instagram принадлежит', html)
         response = self.client.post(self.survey, {'tour2_status': 'waiting',
                                                   'grade': '11', 'source': 'tiktok'})
         self.assertEqual(response.status_code, 302)

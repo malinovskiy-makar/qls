@@ -24,7 +24,7 @@
     {% endcomment %}
     <div class="vp-item-text vp-gaptext"><span class="vp-sr">Задание {{ row.number }}. </span>
       {% for p in row.paras %}
-      <p class="vp-gap-para">{% if forloop.first %}<button type="button" class="vp-flag" aria-pressed="false" data-flag="{{ row.number }}">⚑ Вернуться позже</button>{% endif %}{% for g in p.chunks %}{{ g.text|nbsp_num }}{% if g.key %}<a class="vp-gapmark{% if g.word %} is-filled{% endif %}" href="#vp-gap-{{ row.number }}-{{ g.key }}" data-key="{{ g.key }}"><span class="vp-sr">пропуск </span><b>{{ g.key }}</b><span class="vp-gapmark-w" data-word>{{ g.word|nbsp_num }}</span></a>{% endif %}{% endfor %}</p>
+      <p class="vp-gap-para">{% if forloop.first %}<button type="button" class="vp-flag" aria-pressed="false" data-flag="{{ row.number }}">⚑ Вернуться позже</button>{% endif %}{% for g in p.chunks %}{{ g.text|nbsp_num|vp_inline }}{% if g.key %}<a class="vp-gapmark{% if g.word %} is-filled{% endif %}" href="#vp-gap-{{ row.number }}-{{ g.key }}" data-key="{{ g.key }}"><span class="vp-sr">пропуск </span><b>{{ g.key }}</b><span class="vp-gapmark-w" data-word>{{ g.word|nbsp_num }}</span></a>{% endif %}{% endfor %}</p>
       {% if p.gaps %}
       <div class="vp-gaplist">{% for g in p.gaps %}
         <div class="vp-gaprow"><label class="vp-gapnum" for="vp-gap-{{ row.number }}-{{ g.key }}"><span class="vp-sr">Пропуск </span>{{ g.key }}</label><span class="vp-select-wrap"><select class="vp-select" id="vp-gap-{{ row.number }}-{{ g.key }}" data-key="{{ g.key }}" name="item-{{ row.number }}.{{ g.key }}"><option value="">выберите слово</option>{% for o in row.options %}<option value="{{ o.n }}"{% if o.n == g.value %} selected{% endif %}>{{ o.text|nbsp_num }}</option>{% endfor %}</select></span></div>{% endfor %}
@@ -33,7 +33,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="vp-item-text"><button type="button" class="vp-flag" aria-pressed="false" data-flag="{{ row.number }}">⚑ Вернуться позже</button><span class="vp-sr">Задание {{ row.number }}. </span>{% for chunk in row.statement|gap_parts %}{{ chunk|nbsp_num|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+    <div class="vp-item-text"><button type="button" class="vp-flag" aria-pressed="false" data-flag="{{ row.number }}">⚑ Вернуться позже</button><span class="vp-sr">Задание {{ row.number }}. </span>{% for chunk in row.statement|gap_parts %}{{ chunk|nbsp_num|vp_inline|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
     {% endif %}
     {% if row.figure_url %}
     <figure class="vp-figure">
@@ -79,11 +79,11 @@
     Повторное нажатие на выбранную букву снимает выбор (`take.js`).
     {% endcomment %}
     <div class="vp-match">
-      <div class="vp-match-legend">{% for o in row.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num }}</span>{% endfor %}</div>
+      <div class="vp-match-legend">{% for o in row.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num|vp_inline }}</span>{% endfor %}</div>
       {% for r in row.rows %}
       <div class="vp-match-row">
         <span class="vp-match-n" aria-hidden="true">{{ r.key }}</span>
-        <span class="vp-match-text" id="vp-m-{{ row.number }}-{{ r.key }}">{{ r.text|nbsp_num }}</span>
+        <span class="vp-match-text" id="vp-m-{{ row.number }}-{{ r.key }}">{{ r.text|nbsp_num|vp_inline }}</span>
         <span class="vp-abseg" role="radiogroup" aria-labelledby="vp-m-{{ row.number }}-{{ r.key }}">{% for o in row.letters %}<label class="vp-abseg-opt"><input type="radio" name="item-{{ row.number }}.{{ r.key }}" value="{{ o.n }}" data-key="{{ r.key }}" aria-label="{{ o.letter }} – {{ o.label }}"{% if o.n == r.value %} checked{% endif %}><span aria-hidden="true">{{ o.letter }}</span></label>{% endfor %}</span>
       </div>
       {% endfor %}
@@ -103,7 +103,7 @@
     <fieldset class="vp-options{% if row.pills %} is-pills{% endif %}">
       <legend class="vp-sr">Варианты ответа на задание {{ row.number }}{% if row.kind == 'multi' %}, можно выбрать несколько{% endif %}</legend>
       {% for o in row.options %}
-      <label class="vp-opt{% if row.pills %} vp-opt--pill{% endif %}"><input type="{% if row.kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="item-{{ row.number }}" value="{{ o.n }}"{% if o.n in row.chosen %} checked{% endif %}><span>{{ o.text|nbsp_num }}</span></label>
+      <label class="vp-opt{% if row.pills %} vp-opt--pill{% endif %}"><input type="{% if row.kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="item-{{ row.number }}" value="{{ o.n }}"{% if o.n in row.chosen %} checked{% endif %}><span>{{ o.text|nbsp_num|vp_inline }}</span></label>
       {% endfor %}
     </fieldset>
     {% endif %}

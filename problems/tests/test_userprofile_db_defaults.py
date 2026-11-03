@@ -39,7 +39,8 @@ class UserProfileDbDefaultTests(TestCase):
             else:
                 values.append(f.get_db_prep_save(f.get_default(), connection))
         quote = connection.ops.quote_name
-        sql = 'INSERT INTO %s (%s) VALUES (%s)' % (
+        # Имена — только метаданные модели с quote_name, значения — параметры.
+        sql = 'INSERT INTO %s (%s) VALUES (%s)' % (  # nosec B608
             quote(UserProfile._meta.db_table), ', '.join(quote(c) for c in columns),
             ', '.join(['%s'] * len(columns)))
         with connection.cursor() as cursor:

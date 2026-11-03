@@ -297,6 +297,7 @@ def index(request):
         'countdown': landing.countdown(),
         # Примеры пробника — образцы ЗАПИСИ (что ученик мог бы ввести), а не данные варианта.
         'probe_examples': ('37.5', '1 200', '15%', '3,125', '-4,5', '37,50'),
+        'mail_on': email_codes.mail_enabled(),
         'composition': landing.composition(groups, band),
         'boards': boards,
         'board_attempts': current_board['attempts'] if current_board else 0,
@@ -309,20 +310,15 @@ def index(request):
     })
 
 
-def _variant_eyebrow(variant, published):
-    """Надпись над названием карточки: «Демоверсия ВШЭ» или «Пробный · вариант k».
+def _variant_eyebrow(variant):
+    """Происхождение варианта; его номер и серия задаются заголовком.
 
-    Номер k – порядковый номер АВТОРСКОГО варианта внутри своего класса, по
-    `order`. Он не хранится: список вариантов меняется, а номер должен идти
-    подряд от единицы в том порядке, в каком карточки стоят на экране.
+    Сквозной номер карточки конфликтует с номерами отдельных серий
+    (например, архивная 1–5 и тренировочная 1–5) и меняется при добавлении.
     """
     if variant.source_kind == VPVariant.SourceKind.DEMO:
         return 'Демоверсия ВШЭ'
-    same = [v for v in published
-            if v.grade_band == variant.grade_band
-            and v.source_kind != VPVariant.SourceKind.DEMO]
-    same.sort(key=lambda v: (v.order, v.pk))
-    return f'Пробный · вариант {same.index(variant) + 1}' if variant in same else 'Пробный'
+    return 'Учебная сборка'
 
 
 def variants(request):
@@ -335,8 +331,6 @@ def variants(request):
     everything = (VPVariant.objects.filter(tour__in=config.VISIBLE_TOURS) if _is_staff(request)
                   else visibility.visible_variants())
     everything = list(everything.prefetch_related('items'))
-    published = [v for v in everything if v.is_published]
-
     bands = []
     for code, label in config.bands():
         chosen = sorted((v for v in everything if v.grade_band == code),
@@ -351,7 +345,7 @@ def variants(request):
     for variant in (current['variants'] if current else []):
         cards.append({
             'variant': variant,
-            'eyebrow': _variant_eyebrow(variant, published),
+            'eyebrow': _variant_eyebrow(variant),
             'status': landing.variant_status(request.user, variant),
             'meta': landing.variant_meta(variant, origin=False),
             'count': variant.items.count(),
@@ -432,7 +426,7 @@ def format_check(request):
 
 ATTEMPT_FILTERS = (
     ('all', 'Все'),
-    ('ranked', 'В таблице'),
+    ('ranked', 'В лидерборде'),
     ('training', 'Тренировка'),
     ('open', 'Не сдана'),
 )
@@ -569,6 +563,7 @@ def intro(request, slug):
         'variant': variant,
         'own_attempts': own,
         'has_ranked': has_ranked,
+        'default_untimed': request.GET.get('with_timer') == '0',
         'sections': sections,
         'items_count': len(items),
         'whole_ranges': blocks.merged_ranges(whole),

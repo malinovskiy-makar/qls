@@ -4,7 +4,10 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 
+from vp.formatting import inline_text
+
 register = template.Library()
+register.filter('vp_inline', inline_text)
 
 _MINUS = '−'  # настоящий минус, а не дефис: рядом с цифрами не «прыгает»
 

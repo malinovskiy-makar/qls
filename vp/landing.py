@@ -396,7 +396,7 @@ def wall_eyebrow(variant):
     Часть названия до « – », подпись класса из `config` и длительность словами.
     Рядом с `variant_meta`: строка меты одна на раздел, и её родня — тоже здесь.
     """
-    bits = [variant.title.split(' – ')[0]]
+    bits = [variant.title.replace(' — ', ' – ').split(' – ', 1)[0]]
     band = dict(config.bands(variant.tour)).get(variant.grade_band)
     if band:
         bits.append(band)

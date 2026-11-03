@@ -222,6 +222,13 @@ _ALLOWED_TAGS = {
 _CLEAN_CONTENT_TAGS = {'script', 'style', 'iframe'}
 
 
+def _list_number_attribute(tag, attribute, value):
+    """Сохранить только номер начала списка, без CSS, ссылок и обработчиков."""
+    if tag == 'ol' and attribute == 'start' and re.fullmatch(r'-?[0-9]{1,9}', value):
+        return value
+    return None
+
+
 def _sanitize_html(html_text):
     """Прогнать HTML-фрагмент через nh3 с allow-list. Чистая функция.
 
@@ -233,7 +240,8 @@ def _sanitize_html(html_text):
     return nh3.clean(
         html_text,
         tags=_ALLOWED_TAGS,
-        attributes={},  # ноль атрибутов на любом теге, не только on*
+        attributes={'ol': {'start'}},
+        attribute_filter=_list_number_attribute,
         clean_content_tags=_CLEAN_CONTENT_TAGS,
     )
 
@@ -258,6 +266,10 @@ def render_markdown(text):
     if not text:
         return ''
     protected_text, protected = _protect_math_and_currency(text)
+    # Самостоятельный ответ «980.» — число с точкой, а не пустой пункт
+    # списка. Непустые списки, в том числе «2) ответ», разбираются обычно.
+    if re.fullmatch(r'\s*[0-9]{1,9}\.\s*', protected_text):
+        protected_text = protected_text.replace('.', r'\.')
     raw_html = _md.render(protected_text)
     restored = _restore_math_and_currency(raw_html, protected)
     return _sanitize_html(restored)

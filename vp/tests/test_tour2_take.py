@@ -61,7 +61,7 @@ class Tour2PageTests(Tour2Base):
         # Соотнесение: 4 строки с текстами из `rows`, у каждой две радиокнопки-буквы (сессия R).
         self.assertEqual(re.findall(r'type="radio" name="item-4\.(\d+)"', html),
                          ['1', '1', '2', '2', '3', '3', '4', '4'])
-        self.assertIn('Прожиточный минимум может использоваться', html)
+        self.assertIn('Граница бедности определяется стоимостью фиксированного набора', html)
         # Число: текстовое поле с десятичной клавиатурой и подписью.
         self.assertRegex(html, r'name="item-5" type="text"[^>]*inputmode="decimal"')
         self.assertEqual(html.count('Только число: запятая, до сотых'), 14)

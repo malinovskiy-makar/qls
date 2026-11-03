@@ -19,7 +19,7 @@
     <li class="{% if wall.step == 'contact' %}is-now{% else %}is-done{% endif %}">
       {% if wall.step == 'contact' %}<span class="vp-wall-n">1</span>{% else %}<span class="vp-wall-n is-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>{% endif %}Контакт
     </li>
-    <li class="{% if wall.step == 'survey' %}is-now{% endif %}"><span class="vp-wall-n">2</span>Три вопроса</li>
+    <li class="{% if wall.step == 'survey' %}is-now{% endif %}"><span class="vp-wall-n">2</span>Анкета</li>
     <li><span class="vp-wall-n">3</span>Вариант</li>
   </ol>
 
@@ -58,7 +58,7 @@
         {% endfor %}
       </div>
     </fieldset>{% endif %}
-    <p class="vp-gate-fine">* Instagram принадлежит компании Meta, которая признана экстремистской организацией и запрещена в России.</p>
+    {% if wall.survey.ask_source %}<p class="vp-gate-fine">* Instagram принадлежит компании Meta, которая признана экстремистской организацией и запрещена в России.</p>{% endif %}
     <button type="submit" class="vp-btn vp-btn--lg vp-wall-main">Начать вариант</button>
     <p class="vp-wall-meta">{% if wall.with_timer %}Таймер на {{ wall.minutes_word }} запустится сразу. {% endif %}Анкету спрашиваем один раз.</p>
   </form>

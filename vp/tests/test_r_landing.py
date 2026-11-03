@@ -23,17 +23,17 @@ ANSWERS = {5: '25000', 9: '98.0', 11: '-0.12', 13: '11 800', 14: '160 ед', 17:
 
 class CountdownTests(TestCase):
     def test_days_before_during_and_after(self):
-        self.assertEqual(landing.countdown(date(2026, 10, 25)), 'до тура 19 дней')
-        self.assertEqual(landing.countdown(date(2026, 11, 12)), 'до тура 1 день')
-        self.assertEqual(landing.countdown(date(2026, 11, 13)), 'тур идёт')
-        self.assertEqual(landing.countdown(date(2026, 11, 22)), 'тур идёт')
+        self.assertEqual(landing.countdown(date(2026, 10, 25)), 'до тура 22 дня')
+        self.assertEqual(landing.countdown(date(2026, 11, 15)), 'до тура 1 день')
+        self.assertEqual(landing.countdown(date(2026, 11, 16)), 'тур идёт')
+        self.assertEqual(landing.countdown(date(2026, 11, 21)), 'тур идёт')
         self.assertIsNone(landing.countdown(date(2026, 11, 23)))
 
     def test_page_uses_the_local_date(self):
         load_demo('10')
         with mock.patch('django.utils.timezone.localdate', return_value=date(2026, 10, 25)):
             html = Client().get(reverse('vp:index')).content.decode()
-        self.assertIn('до тура 19 дней', html)
+        self.assertIn('до тура 22 дня', html)
         with mock.patch('django.utils.timezone.localdate', return_value=date(2026, 11, 23)):
             html = Client().get(reverse('vp:index')).content.decode()
         self.assertNotIn('до тура', html)
@@ -90,7 +90,7 @@ class LandingTests(TestCase):
 # ⚠️ «Таблица своя у каждого класса» стоит и в блоке правил (`_rules.html`, он включён в страницу,
 # там после слова «класса» двоеточие – владелец просил его не трогать), поэтому ищем хвост
 # подзаголовка таблицы целиком: с пробелом перед фразой и точкой после неё.
-GONE_ON_LANDING = ('Что дальше', 'Моя лучшая попытка', 'попадёт в таблицу',
+GONE_ON_LANDING = ('Что дальше', 'Моя лучшая попытка', 'попадёт в лидерборд',
                    ' Таблица своя у каждого класса.')
 
 

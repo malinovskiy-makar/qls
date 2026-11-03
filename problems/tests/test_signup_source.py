@@ -503,7 +503,7 @@ class WebvisorTests(TestCase):
         html = self.client.get(reverse('vp:my')).content.decode()
         recorded = recorded_text(html)
         # Список с баллами и местами скрыт…
-        self.assertIn('в таблице · 1-е', html)
+        self.assertIn('в лидерборде · 1-е', html)
         self.assertNotIn('в таблице', recorded)
         self.assertIn(variant.title, html)
         self.assertNotIn(variant.title, recorded)

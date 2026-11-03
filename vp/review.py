@@ -16,7 +16,9 @@ from statistics import median
 
 from django.core.cache import cache
 
+from problems.rendering import _math_span_end
 from vp import blocks, scoring
+from vp.formatting import plain_inline
 from vp.loader import GAP_MARK, chain_letters
 from vp.models import VPAttempt, VPItem
 
@@ -190,11 +192,24 @@ LEAD_MAX = 90
 
 
 def _lead(statement):
-    """Начало условия для строки таблицы: без меток `[[k]]`, в одну строку."""
-    text = ' '.join(GAP_MARK.sub('…', statement or '').split())
+    """Начало условия в одну строку; сокращение не разрывает формулу."""
+    text = ' '.join(GAP_MARK.sub('…', plain_inline(statement)).split())
     if len(text) <= LEAD_MAX:
         return text
-    return text[:LEAD_MAX].rsplit(' ', 1)[0] + '…'
+    cut = len(text[:LEAD_MAX].rsplit(' ', 1)[0])
+    pos = 0
+    while pos < cut:
+        if text[pos:pos + 2] == r'\$':
+            pos += 2
+            continue
+        end = _math_span_end(text, pos)
+        if end > cut:
+            # Формула целиком остаётся в раскрытом условии. Если она стоит
+            # в самом начале, сохраняем её целиком и в краткой подписи.
+            cut = pos if text[:pos].strip() else end
+            break
+        pos = end if end > pos else pos + 1
+    return text[:cut].rstrip() + ('…' if cut < len(text) else '')
 
 
 def _status(item, answer, blank, explain):

@@ -10,7 +10,7 @@ import sys
 
 from playwright.sync_api import Error, sync_playwright
 
-WINDOWS = ((1440, 778), (1536, 730))
+WINDOWS = ((1440, 778), (1536, 730), (768, 1024), (900, 1024), (1024, 768))
 
 
 def main(base):
@@ -29,9 +29,20 @@ def main(base):
                 page.goto(base + path, wait_until='load')
                 page.wait_for_timeout(500)          # анимация появления карточки
                 seen['%s %dx%d' % (path, width, height)] = page.evaluate(
-                    '() => [document.documentElement.scrollHeight, innerHeight,'
+                    '() => { const pitch = document.querySelector(".au-pitch");'
+                    ' const card = document.querySelector(".au-card").getBoundingClientRect();'
+                    ' const visible = pitch && getComputedStyle(pitch).display !== "none";'
+                    ' const overlap = visible && [...pitch.querySelectorAll("h1, li")].some(el => {'
+                    ' const range = document.createRange(); range.selectNodeContents(el);'
+                    ' return range.getBoundingClientRect().right > card.left; });'
+                    ' const fab = document.querySelector(".tg-fab").getBoundingClientRect();'
+                    ' const footerOverlap = [...document.querySelectorAll(".legal-foot > *")].some(el => {'
+                    ' const r = el.getBoundingClientRect(); return r.width && r.height &&'
+                    ' r.right > fab.left && r.left < fab.right && r.bottom > fab.top && r.top < fab.bottom; });'
+                    ' return [document.documentElement.scrollHeight, innerHeight,'
                     ' document.querySelectorAll(".social-btn").length,'
-                    ' document.querySelectorAll(".consent").length]')
+                    ' document.querySelectorAll(".consent").length,'
+                    ' document.documentElement.scrollWidth, innerWidth, overlap, footerOverlap]; }')
             context.close()
         browser.close()
     print('###FIT-JSON###')

@@ -23,20 +23,25 @@ class VisibleTextTests(SimpleTestCase):
 
 
 class LostContentTests(SimpleTestCase):
-    """#41924: `3.` съедается markdown как номер пустого пункта списка."""
+    """Историческая потеря #41924 исправлена; настоящая пустота блокируется."""
 
-    def test_41924_part_g_is_detected_as_lost(self):
-        self.assertEqual(render_markdown('3.'), '<ol>\n<li></li>\n</ol>\n')
-        self.assertEqual(classify_block('3.', '3.'), CODE_LOST)
+    def test_41924_part_g_survives_literal_number_fix(self):
+        self.assertEqual(visible_text(render_markdown('3.')), '3.')
+        self.assertIsNone(classify_block('3.', '3.'))
+
+    def test_empty_rendered_list_still_blocks(self):
+        self.assertEqual(classify_block('3.', '3)'), CODE_LOST)
+        self.assertEqual(classify_block('3.', ''), CODE_LOST)
 
     def test_41924_siblings_are_not_lost(self):
         # У соседних подпунктов `0;`, `1;`, `2;` точки нет — они целы.
         for src in ('0;', '1;', '2;'):
             self.assertIsNone(classify_block(src, src), f'ложная потеря на {src!r}')
 
-    def test_any_numeric_marker_alone_is_lost(self):
+    def test_numeric_answers_with_final_dot_are_visible(self):
         for src in ('1.', '5.', '42.'):
-            self.assertEqual(classify_block(src, src), CODE_LOST)
+            self.assertIsNone(classify_block(src, src))
+            self.assertEqual(visible_text(render_markdown(src)), src)
 
     def test_normal_text_survives(self):
         self.assertIsNone(classify_block('обычное условие', 'обычное условие'))
@@ -99,7 +104,7 @@ class ProblemLevelTests(SimpleTestCase):
     def test_41924_shape_reports_exactly_the_lost_part(self):
         blocks = [('Условие', 'Государство вводит налог', 'Государство вводит налог'),
                   ('Часть а', '0;', '0;'), ('Часть б', '1;', '1;'),
-                  ('Часть в', '2;', '2;'), ('Часть г', '3.', '3.')]
+                  ('Часть в', '2;', '2;'), ('Часть г', '3.', '')]
         lost, needs_content = check_problem(blocks)
         self.assertEqual(lost, ['Часть г'])
         self.assertFalse(needs_content)

@@ -45,15 +45,6 @@
     </table>
   </div>
 
-  {% if number_ranges %}
-  <div class="vp-res-loss vp-intro-rule">
-    <span class="vp-res-loss-ico" aria-hidden="true">Ф</span>
-    <div class="vp-res-loss-main">
-      <h2>Ответ-число в неверной записи – 0 баллов, как на туре</h2>
-      <p>Правило ВШЭ: «{{ number_rule }}» <a class="vp-link" href="{{ drill_url }}">Потренировать запись – 2 минуты</a></p>
-    </div>
-  </div>
-  {% endif %}
 
   {% if sections.0.block == 'snake' %}
   <div class="vp-card vp-mt">
@@ -84,12 +75,12 @@
     <fieldset class="vp-modes">
       <legend class="vp-sr">Режим прохождения</legend>
       <label class="vp-mode">
-        <input type="radio" name="with_timer" value="1" checked>
-        <span><b>С таймером – {{ variant.duration_seconds|minutes }}</b><span>Как на олимпиаде. Время вышло – работа сдаётся сама. {% if has_ranked %}Первая попытка по варианту уже в таблице; эта будет тренировкой.{% elif variant.tour == 1 %}Первая попытка идёт в таблицу лучших попыток.{% else %}Первая попытка идёт в таблицу {{ band_genitive }}.{% endif %}</span></span>
+        <input type="radio" name="with_timer" value="1"{% if not default_untimed %} checked{% endif %}>
+        <span><b>С таймером – {{ variant.duration_seconds|minutes }}</b><span>Как на олимпиаде. Время вышло – работа сдаётся сама. {% if has_ranked %}Первая попытка по варианту уже в лидерборде; эта будет тренировкой.{% elif variant.tour == 1 %}Первая попытка идёт в лидерборд.{% else %}Первая попытка идёт в лидерборд {{ band_genitive }}.{% endif %}</span></span>
       </label>
       <label class="vp-mode">
-        <input type="radio" name="with_timer" value="0">
-        <span><b>Без таймера</b><span>Без ограничения по времени. В таблицу не идёт.</span></span>
+        <input type="radio" name="with_timer" value="0"{% if default_untimed %} checked{% endif %}>
+        <span><b>Без таймера</b><span>Без ограничения по времени. В лидерборд не идёт.</span></span>
       </label>
     </fieldset>
     <div class="vp-start">
@@ -97,7 +88,6 @@
       {% if register_url %}
       <div class="vp-mute">Пройти вариант можно только после короткой бесплатной регистрации.</div>
       {% else %}
-      <div class="vp-mute">Ответы сохраняются сами. Закрыли вкладку – продолжите с того же места, таймер при этом идёт.</div>
       {% endif %}
     </div>
   </form>
@@ -110,7 +100,7 @@
       <a class="vp-land-more" href="{% url 'vp:my' %}">Все попытки</a>
     </h2>
     <div class="vp-arow is-head">
-      <span>Дата</span><span>Режим</span><span class="is-num">Балл</span>
+      <span>Дата</span><span class="is-mode">Режим</span><span class="is-num">Балл</span>
       <span class="is-num">Время</span><span>Статус</span><span></span>
     </div>
     {% for r in own_attempts %}
@@ -122,7 +112,7 @@
       <span class="vp-arow-k{% if r.kind == 'ranked' %} is-ok{% endif %}">
         {% if r.kind == 'ranked' %}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
-        в таблице
+        в лидерборде
         {% else %}тренировка{% endif %}
       </span>
       <span class="vp-arow-a"><a class="vp-land-btn" href="{% url 'vp:result' r.attempt.public_code %}">Разбор</a></span>
@@ -145,12 +135,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
     </div>
     <h2 id="vp-gate-h">Сначала короткая регистрация</h2>
-    <p>Пройти вариант можно только после регистрации. Она бесплатная и занимает минуту: {% if mail_on %}логин, почта и пароль – почту подтвердим кодом из письма{% else %}логин и пароль, без почты{% endif %}. После неё вернём вас на этот вариант.</p>
+    <p>Пройти вариант можно только после регистрации. Она бесплатная и занимает минуту: {% if mail_on %}почта и пароль – почту подтвердим кодом из письма{% else %}логин и пароль, без почты{% endif %}. После неё вернём вас на этот вариант.</p>
     <div class="vp-gate-a">
       <a class="vp-btn" href="{{ register_url }}">Зарегистрироваться</a>
       <a class="vp-btn vp-btn--plain" href="{{ login_url }}">Уже есть аккаунт – войти</a>
     </div>
-    <p class="vp-gate-fine">Первая попытка по варианту с таймером попадёт в таблицу лучших попыток.</p>
+    <p class="vp-gate-fine">Первая попытка по варианту с таймером попадёт в лидерборд.</p>
   </dialog>
   {% endif %}
 </div>

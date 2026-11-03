@@ -132,8 +132,10 @@
 <form hidden aria-hidden="true">{% csrf_token %}</form>
 
 {% include '_corner_stack.html' %}
-{% comment %}Пульс не спрашивают на входе и регистрации: человек ещё не пользовался сайтом.{% endcomment %}
-{% if request.resolver_match.url_name != 'login' and request.resolver_match.url_name != 'register' %}{% include '_pulse.html' %}{% endif %}
+{% comment %}Пульс не спрашивают на входе и регистрации: человек ещё не пользовался сайтом.
+И на страницах тура олимпиады (вход, решение, результат, страница телефона —
+добивка 31.10, У9): карточка в углу мешает решать и закрывает кнопки.{% endcomment %}
+{% with rm=request.resolver_match %}{% if rm.url_name == 'login' or rm.url_name == 'register' %}{% elif rm.namespace == 'olympiads' and rm.url_name == 'training_intro' or rm.namespace == 'olympiads' and rm.url_name == 'training_take' or rm.namespace == 'olympiads' and rm.url_name == 'training_result' or rm.namespace == 'olympiads' and rm.url_name == 'phone_upload' %}{% else %}{% include '_pulse.html' %}{% endif %}{% endwith %}
 
 {{ feedback_data|json_script:"fb-options" }}
 <script>

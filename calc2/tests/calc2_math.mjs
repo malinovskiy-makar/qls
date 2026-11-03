@@ -3229,12 +3229,38 @@ const CASES = [
           var borderTop = parseFloat(cs.borderTopWidth);
           var bg = cs.backgroundColor;
           var bgFlag = (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') ? 1 : 0;
-          var widFlag = (wid > 0 && wid <= 40) ? 1 : 0;
+          // Проверяем правило «поле по содержимому», а не прежний размер шрифта.
+          // 114 в текущем Montserrat даёт 40.375px: это не растяжение до панели.
+          // Независимая линейка — отрисованный текст с тем же шрифтом, включая
+          // табличные цифры; формулу length + 1 из fitWidth здесь не повторяем.
+          var measure = document.createElement('span');
+          Object.assign(measure.style, {position:'absolute', visibility:'hidden',
+            whiteSpace:'pre', fontFamily:cs.fontFamily, fontSize:cs.fontSize,
+            fontWeight:cs.fontWeight, fontStyle:cs.fontStyle,
+            fontVariantNumeric:cs.fontVariantNumeric, letterSpacing:cs.letterSpacing});
+          document.body.appendChild(measure);
+          var padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+          var fontSize = parseFloat(cs.fontSize);
+          var fits = function () {
+            measure.textContent = inp.value;
+            var textWidth = measure.getBoundingClientRect().width;
+            var width = inp.getBoundingClientRect().width;
+            return width >= textWidth + padding - 1 &&
+                   width <= textWidth + padding + 1.5 * fontSize && width < panelWidth * 0.6;
+          };
+          var fitShort = fits() ? 1 : 0;
+          inp.value = '12345678'; inp.dispatchEvent(new Event('input', {bubbles:true}));
+          var fitLong = fits() ? 1 : 0;
+          var grows = inp.getBoundingClientRect().width > wid + fontSize ? 1 : 0;
+          inp.value = '114'; inp.dispatchEvent(new Event('input', {bubbles:true}));
+          measure.remove();
           var eqNarrowFlag = (eqWidth < panelWidth * 0.6) ? 1 : 0;
           inp.blur();
-          return { wid: wid, widFlag: widFlag, borderTop: borderTop, bgFlag: bgFlag,
+          return { fitShort, fitLong, grows, borderTop: borderTop, bgFlag: bgFlag,
                    eqWidth: eqWidth, panelWidth: panelWidth, eqNarrowFlag: eqNarrowFlag };`,
-    checks: [['ширина поля ≤ 40px (флаг)', 'widFlag', 1, 0.1], ['ширина поля, px (сырое)', 'wid', 20, 20],
+    checks: [['короткое число помещается без лишней ширины', 'fitShort', 1, 0],
+             ['длинное число помещается без лишней ширины', 'fitLong', 1, 0],
+             ['поле растёт вместе с числом', 'grows', 1, 0],
              ['border-top = 0', 'borderTop', 0, 0.1], ['фон прозрачный (флаг)', 'bgFlag', 1, 0.1],
              ['строка .reg-eq заметно уже панели (флаг)', 'eqNarrowFlag', 1, 0.1],
              ['ширина .reg-eq, px (сырое)', 'eqWidth', 70, 70], ['ширина #params-body, px (сырое)', 'panelWidth', 260, 260]],

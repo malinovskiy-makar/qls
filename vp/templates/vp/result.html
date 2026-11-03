@@ -28,7 +28,7 @@
       <div class="vp-res-tags">
         <span class="vp-res-tag">{{ variant.tour }} тур</span>
         <span class="vp-res-tag">{% if attempt.with_timer %}с таймером{% else %}без таймера{% endif %}</span>
-        {% if archived %}<span class="vp-res-tag">архив {{ variant.tour }} тура</span>{% elif attempt.is_ranked %}<span class="vp-res-tag is-ok">первая попытка – в таблице</span>{% else %}<span class="vp-res-tag">тренировка</span>{% endif %}
+        {% if archived %}<span class="vp-res-tag">архив {{ variant.tour }} тура</span>{% elif attempt.is_ranked %}<span class="vp-res-tag is-ok">первая попытка – в лидерборде</span>{% else %}<span class="vp-res-tag">тренировка</span>{% endif %}
       </div>
     </div>
     <div class="vp-res-when">{% if not is_owner %}{{ author }} · {% endif %}сдано {{ attempt.submitted_at|date:"j E в H:i" }}{% if auto %}<br>по истечении времени{% endif %}</div>
@@ -60,9 +60,9 @@
     </div>
     {% if is_owner and place %}
     <div class="vp-res-cell">
-      <div class="vp-res-cap">Таблица{% if variant.tour != 1 %} · {{ band_label }}{% endif %}</div>
+      <div class="vp-res-cap">Лидерборд{% if variant.tour != 1 %} · {{ band_label }}{% endif %}</div>
       <div class="vp-res-big"><b>{{ place }}-е</b> место</div>
-      <a class="vp-link vp-res-small" href="{{ board_url }}">Открыть таблицу</a>
+      <a class="vp-link vp-res-small" href="{{ board_url }}">Открыть лидерборд</a>
     </div>
     {% endif %}
     <div class="vp-res-cell vp-res-act">
@@ -72,7 +72,7 @@
       <p class="vp-mute vp-res-small" id="vp-share-note" role="status" aria-live="polite">по ссылке видно только балл, без ответов</p>
       {% else %}
       {% if again_url %}<a class="vp-btn" href="{{ again_url }}">Пройти этот же вариант</a>{% endif %}
-      <a class="vp-btn vp-btn--plain" href="{% url 'vp:index' %}">Все варианты</a>
+      <a class="vp-btn vp-btn--plain" href="{{ other_url }}">Все варианты</a>
       {% endif %}
     </div>
   </section>
@@ -119,7 +119,7 @@
         <div class="vp-crow vp-cpanel {% if c.blank %}is-blank{% elif c.is_correct %}is-ok{% else %}is-bad{% endif %}" id="vp-r-{{ c.number }}" data-panel="{{ c.number }}">
           <div class="vp-cpanel-q">
             <div class="vp-zmeta">Задание {{ c.number }} · змейка · {{ c.item.points|points_word }}</div>
-            <p class="vp-crow-text">{{ c.statement|nbsp_num|linebreaksbr }}</p>
+            <p class="vp-crow-text">{{ c.statement|nbsp_num|vp_inline|linebreaksbr }}</p>
           </div>
           <div class="vp-cpanel-a">
             {% if c.blank %}
@@ -176,16 +176,16 @@
           <div class="vp-zbody">
             {% if t.shared %}
             <details class="vp-zshared"><summary>Общее условие (задача {{ t.shared.number }})</summary>
-              <div class="vp-tcard-text">{{ t.shared.statement|nbsp_num|linebreaksbr }}</div>
+              <div class="vp-tcard-text">{{ t.shared.statement|nbsp_num|vp_inline|linebreaksbr }}</div>
               {% if t.shared.figure_url %}<figure class="vp-figure"><img src="{{ t.shared.figure_url }}" alt="{{ t.shared.figure_caption|default:'Рисунок к заданию' }}" loading="lazy"></figure>{% endif %}
               {% if t.shared.table_html %}<div class="vp-scroll">{{ t.shared.table_html|safe }}</div>{% endif %}
             </details>
             {% endif %}
             <div class="vp-zmeta">Задание {{ t.number }} · {{ t.block_title }} · {{ t.max|points_word }}</div>
             {% if t.block == 'gaptext' %}
-            <div class="vp-tcard-text">{% for g in t.gap_chunks %}{{ g.text|nbsp_num|linebreaksbr }}{% if g.key %}<span class="vp-gapmark" aria-label="пропуск {{ g.key }}">{{ g.key }}</span>{% endif %}{% endfor %}</div>
+            <div class="vp-tcard-text">{% for g in t.gap_chunks %}{{ g.text|nbsp_num|vp_inline|linebreaksbr }}{% if g.key %}<span class="vp-gapmark" aria-label="пропуск {{ g.key }}">{{ g.key }}</span>{% endif %}{% endfor %}</div>
             {% else %}
-            <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|nbsp_num|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+            <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|nbsp_num|vp_inline|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
             {% endif %}
             {% if t.figure_url %}
             <figure class="vp-figure">
@@ -197,8 +197,8 @@
 
             {% if t.blank %}
             {% if t.match_text_rows %}
-            {% if t.letters %}<div class="vp-match-legend">{% for o in t.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num }}</span>{% endfor %}</div>{% endif %}
-            <ol class="vp-mrows">{% for r in t.match_text_rows %}<li>{{ r|nbsp_num }}</li>{% endfor %}</ol>
+            {% if t.letters %}<div class="vp-match-legend">{% for o in t.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num|vp_inline }}</span>{% endfor %}</div>{% endif %}
+            <ol class="vp-mrows">{% for r in t.match_text_rows %}<li>{{ r|nbsp_num|vp_inline }}</li>{% endfor %}</ol>
             {% endif %}
             <div class="vp-zno"><b>Ответа нет – 0 из {{ t.max|num }}.</b> Ответ и решение откроются, когда вы дорешаете задачу вне зачёта или нажмёте «Показать ответ». На балл это не влияет.</div>
             {% include 'vp/_practice.html' with number=t.number kind=t.kind options=t.options prefix='' suffix='' keys=t.practice_keys open=True %}
@@ -217,11 +217,11 @@
             {% endwith %}
             {% elif t.kind == 'match' %}
             {% with e=t.explain %}
-            {% if t.letters %}<div class="vp-match-legend">{% for o in t.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num }}</span>{% endfor %}</div>{% endif %}
+            {% if t.letters %}<div class="vp-match-legend">{% for o in t.letters %}<span><b>{{ o.letter }}</b> – {{ o.label|nbsp_num|vp_inline }}</span>{% endfor %}</div>{% endif %}
             <ul class="vp-mres">
               {% for m in t.match_rows %}
               <li class="vp-mres-row{% if not m.ok %} is-wrong{% endif %}">
-                <span class="vp-mres-label">{% if t.block == 'gaptext' %}<span class="vp-gapmark">{{ m.key }}</span>{% else %}<span class="vp-topt-n">{{ m.key }}</span> {{ m.label|nbsp_num }}{% endif %}</span>
+                <span class="vp-mres-label">{% if t.block == 'gaptext' %}<span class="vp-gapmark">{{ m.key }}</span>{% else %}<span class="vp-topt-n">{{ m.key }}</span> {{ m.label|nbsp_num|vp_inline }}{% endif %}</span>
                 {% if t.block == 'matching' %}
                 <span class="vp-mres-pick">{% if m.chosen_letter %}<span class="vp-tag vp-tag--mine">ваш: {{ m.chosen_letter }}</span>{% else %}<span class="vp-mute">не выбрано</span>{% endif %}{% if m.ok %} <span class="vp-tag vp-tag--right">верно</span>{% else %} <span class="vp-tag vp-tag--wrong">верно: {{ m.right_letter }}</span>{% endif %}</span>
                 {% else %}
@@ -238,7 +238,7 @@
               {% for o in t.options %}
               <li class="vp-topt{% if o.chosen and not o.right %} is-wrong{% endif %}">
                 <span class="vp-topt-n">{{ o.n }}</span>
-                <span>{{ o.text|nbsp_num }}</span>
+                <span>{{ o.text|nbsp_num|vp_inline }}</span>
                 <span class="vp-topt-tags">
                   {% if o.chosen %}<span class="vp-tag vp-tag--mine">ваш выбор</span>{% endif %}
                   {% if o.right %}<span class="vp-tag vp-tag--right">верный</span>{% elif o.chosen %}<span class="vp-tag vp-tag--wrong">неверный</span>{% endif %}
@@ -248,13 +248,13 @@
             </ul>
             {% with e=t.explain %}
             {% if e.kind == 'share' %}
-            <p class="vp-tcard-line">Найдено верных {{ e.correct_hit }} из {{ e.correct_total }}{% if e.penalty %}, лишних отмечено {{ e.wrong_hit }} из {{ e.wrong_total }}{% endif %}.</p>
+            <p class="vp-tcard-line">Правильных выборов {{ e.correct_hit }} из {{ e.correct_total }}{% if e.penalty %}, лишних отмечено {{ e.wrong_hit }} из {{ e.wrong_total }}{% endif %}.</p>
             <div class="vp-math">{{ e.points|num }} × {{ e.correct_hit }}/{{ e.correct_total }}{% if e.loss %} − {{ e.points|num }} × {{ e.wrong_hit }}/{{ e.wrong_total }}{% endif %} = {{ e.gain|dec2 }}{% if e.loss %} − {{ e.loss|dec2 }} = {% if e.clamped %}{{ e.before_clamp|dec2 }} → {% endif %}{{ e.score|dec2 }}{% endif %}</div>
             {% endif %}
             {% endwith %}
             {% endif %}
             <div class="vp-zfoot">
-              {% if t.solution %}<details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|nbsp_num|linebreaksbr }}</div></details>{% endif %}
+              {% if t.solution %}<details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|nbsp_num|vp_inline|linebreaksbr }}</div></details>{% endif %}
               <a class="vp-link vp-zlink" href="#z{{ t.number }}">Ссылка на задание {{ t.number }}</a>
             </div>
           </div>
@@ -299,8 +299,8 @@
         {% if not archived %}{# интро скрытого варианта ученику — 404 #}
         <div class="vp-next">
           <b>Этот же вариант без таймера</b>
-          <p>Без ограничения по времени. В таблицу не идёт.</p>
-          <a class="vp-link" href="{% url 'vp:intro' variant.slug %}">Открыть</a>
+          <p>Без ограничения по времени. В лидерборд не идёт.</p>
+          <a class="vp-link" href="{% url 'vp:intro' variant.slug %}?with_timer=0">Открыть</a>
         </div>
         {% endif %}
       </section>

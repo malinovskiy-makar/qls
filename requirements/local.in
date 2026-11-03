@@ -29,3 +29,6 @@ anthropic
 
 # PyYAML — уже в base.in (импорт вариантов ВП), сюда приходит строкой `-r base.in`.
 cryptography
+
+# Прежний Windows-зависимый пакет CLI сохраняется в общем локе на macOS.
+colorama==0.4.6

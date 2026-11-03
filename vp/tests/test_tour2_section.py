@@ -54,9 +54,9 @@ class SectionBase(TestCase):
 class ConfigTests(TestCase):
     def test_settings_of_the_season(self):
         self.assertEqual((config.CURRENT_TOUR, config.VISIBLE_TOURS), (2, (2,)))
-        self.assertEqual(config.TOUR_DATES[2], ('range', (date(2026, 11, 13), date(2026, 11, 22))))
+        self.assertEqual(config.TOUR_DATES[2], ('days', (date(2026, 11, 16), date(2026, 11, 21))))
         self.assertEqual(config.bands(2), (('9', '9 класс'), ('10', '10 класс'), ('11', '11 класс')))
-        self.assertEqual(config.NEW_BADGE_UNTIL, date(2026, 11, 13))
+        self.assertEqual(config.NEW_BADGE_UNTIL, date(2026, 11, 16))
 
 
 class LandingTour2Tests(SectionBase):
@@ -65,7 +65,7 @@ class LandingTour2Tests(SectionBase):
         self.assertIn('<title>Высшая проба, 2 тур', html)
         self.assertIn('Отборочный этап · 2 тур', html)
         self.assertIn('тренажёр второго тура', html)
-        self.assertIn('с 13 по 22 ноября 2026', html)
+        self.assertIn('16 и 21 ноября 2026', html)
         hero = html.split('aria-label="Формат варианта"', 1)[1].split('class="vp-land-cta"', 1)[0]
         # Сессия R: плитки заменены строкой состава и полосой долей (числа из данных).
         self.assertIn('10–11 класс: 18 заданий · 70 минут · 100 баллов', hero)
@@ -182,8 +182,8 @@ class IntroTour2Tests(SectionBase):
     def test_intro_explains_number_format_and_shares(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-2tur-2026-demo-10'])).content.decode()
         self.assertIn('Отборочный этап · 2 тур', html)
-        self.assertIn('Ответ-число в неверной записи – 0 баллов, как на туре', html)   # плашка сессии R
-        self.assertIn(NUMBER_RULE, html)
+        self.assertNotIn('Ответ-число в неверной записи – 0 баллов, как на туре', html)   # плашка сессии R
+        self.assertNotIn(NUMBER_RULE, html)
         self.assertIn('штрафа нет', html)
         self.assertNotIn('Что такое змейка', html)
         self.assertEqual(VPVariant.objects.get(slug='vp-2tur-2026-demo-10').duration_seconds, 4200)

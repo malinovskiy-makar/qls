@@ -2,7 +2,7 @@
 
 Правило владельца 22.09.2026: считается ПЕРВАЯ попытка человека по варианту,
 начатая с таймером; из таких у каждого берётся лучшая; при равных баллах выше тот,
-кто сдал быстрее; гостя в таблице нет.
+кто сдал быстрее; гостя в лидерборде нет.
 
 ⚠️ Числа здесь — из фикстуры, а не из головы: сколько людей завели, столько строк
 и ждём. Зачётность ставит `views.start`, и отдельный класс ниже проверяет именно его.
@@ -52,7 +52,7 @@ def _attempt(variant, user, *, score, seconds, ranked=True, timer=True,
 
 @tour1_screens
 class BoardRowsTests(TestCase):
-    """Инварианты 1–3: кто попадает в таблицу, в каком порядке и что видно в топе."""
+    """Инварианты 1–3: кто попадает в лидерборд, в каком порядке и что видно в топе."""
 
     @classmethod
     def setUpTestData(cls):
@@ -60,7 +60,7 @@ class BoardRowsTests(TestCase):
         cls.other = make_published('board-b')
 
     def test_01_training_and_guests_stay_out_and_only_the_ranked_one_counts(self):
-        """Инвариант 1: в таблице по строке на человека, и это его ЗАЧЁТНАЯ попытка."""
+        """Инвариант 1: в лидерборде по строке на человека, и это его ЗАЧЁТНАЯ попытка."""
         one, two, three = _user('one'), _user('two'), _user('three')
         _attempt(self.variant, one, score=80, seconds=1200)
 
@@ -70,7 +70,7 @@ class BoardRowsTests(TestCase):
         _attempt(self.variant, two, score=100, seconds=900, ranked=False)
         _attempt(self.variant, two, score=100, seconds=900, ranked=False, timer=False)
 
-        # У третьего только попытка без таймера — в таблице его нет вовсе.
+        # У третьего только попытка без таймера — в лидерборде его нет вовсе.
         _attempt(self.variant, three, score=95, seconds=800, ranked=False, timer=False)
 
         rows = board.rows()
@@ -129,7 +129,7 @@ class BoardRowsTests(TestCase):
         self.assertIsNone(board.place_of(worse))
 
     def test_06_unsubmitted_ranked_attempt_is_not_in_the_board_yet(self):
-        """Начатая зачётная попытка в таблицу не идёт, пока не сдана."""
+        """Начатая зачётная попытка в лидерборд не идёт, пока не сдана."""
         person = _user('running')
         # Идёт прямо сейчас: с 24.09 просроченную зачётную таблица сдаёт сама.
         _attempt(self.variant, person, score=0, seconds=0, submitted=False,

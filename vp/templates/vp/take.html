@@ -31,6 +31,7 @@
         <span class="vp-timer-cap"><span id="vp-timer-cap">осталось</span> из {{ limit_seconds|mmss }}</span>
       </div>
       {% if limit_seconds %}<div class="vp-timebar" aria-hidden="true"><i id="vp-timebar" style="width: {{ time_percent }}%"></i></div>{% endif %}
+      {% else %}<span class="vp-timer-cap">Без таймера</span>
       {% endif %}
     </div>
     <div class="vp-bar-side">
@@ -75,7 +76,7 @@
         <h2 class="vp-h2" id="vp-sec-{{ s.first }}">{% if s.first == s.last %}Задание{% else %}Задания{% endif %} {{ s.range }} · {{ s.titles.heading }}</h2>
         <span class="vp-mute">{% if s.first == s.last %}{{ s.total|points_word }}{% elif s.uniform %}{{ s.uniform|points_each }}{% else %}от {{ s.points_min|num }} до {{ s.points_max|points_word }}{% endif %}{% if s.block == 'number' %}: полный балл или ноль{% elif s.how %} · {{ s.how }}{% endif %}{% if s.penalty %} · за лишние варианты балл уменьшается{% endif %}</span>
       </div>
-      {% if s.block == 'number' %}<div class="vp-note vp-note--rule"><b>Правило ввода ВШЭ.</b> {{ number_rule }}</div>{% endif %}
+      {% if s.block == 'number' %}<div class="vp-note vp-note--rule"><b>Правило ввода ВШЭ.</b> {{ number_rule }} Если ответ отрицательный, поставьте перед числом обычный минус с клавиатуры, например «-318».</div>{% endif %}
       {% if s.intro %}<div class="vp-note">{{ s.intro|linebreaksbr }}</div>{% endif %}
       <div class="vp-list">
         {% for row in s.rows %}{% if row.group_first %}<div class="vp-group" role="group" aria-label="{{ row.group_label }}"><div class="vp-group-cap">{{ row.group_label }}</div>{% endif %}{% include 'vp/_take_item.html' %}{% if row.group_last %}</div>{% endif %}{% endfor %}

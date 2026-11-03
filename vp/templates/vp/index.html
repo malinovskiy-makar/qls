@@ -41,7 +41,7 @@
     <div class="vp-land-comp" aria-label="Формат варианта">
       <div class="vp-land-comp-h"><b>Из чего состоит вариант</b><span>{{ composition.label }}: {{ composition.count|plural:"задание,задания,заданий" }}{% if composition.minutes %} · {{ composition.minutes|plural:"минута,минуты,минут" }}{% endif %} · {{ composition.total|points_word }}</span></div>
       <div class="vp-land-bar" role="img" aria-label="{% for r in composition.rows %}{{ r.range }} – {{ r.title|lower }}, {{ r.total|points_word }}{% if not forloop.last %}; {% endif %}{% endfor %}">
-        {% for r in composition.rows %}<span class="vp-land-seg is-{{ r.block }}" style="width: {{ r.percent|stringformat:'.2f' }}%" data-points="{{ r.total|num }}">{{ r.range }}{% if r.percent >= 40 %} · {{ r.title|lower }} · {{ r.total|points_word }}{% endif %}</span>{% endfor %}
+        {% for r in composition.rows %}<span class="vp-land-seg is-{{ r.block }}" style="width: {{ r.percent|stringformat:'.2f' }}%" data-points="{{ r.total|num }}">{{ r.range }}{% if r.percent >= 40 %}<span class="vp-land-seg-detail"> · {{ r.title|lower }} · {{ r.total|points_word }}</span>{% endif %}</span>{% endfor %}
       </div>
       <div class="vp-land-legend">{% for r in composition.rows %}<span>{{ r.range }} {{ r.title|lower }} · {{ r.total|num }}</span>{% endfor %}{% for o in composition.others %}<span>{{ o }}</span>{% endfor %}</div>
     </div>
@@ -140,13 +140,13 @@
 
     <p class="vp-land-bfoot">
       {% if not user.is_authenticated %}
-        В таблицу попадают только зарегистрированные. Попыток в таблице: {{ b.attempts }}.
+        В лидерборд попадают только зарегистрированные. Попыток в лидерборде: {{ b.attempts }}.
       {% elif b.my_place == 1 %}
-        Попыток в таблице: {{ b.attempts }}. Вы на первом месте.
+        Попыток в лидерборде: {{ b.attempts }}. Вы на первом месте.
       {% elif b.my_place %}
-        Попыток в таблице: {{ b.attempts }}. Ваше место – {{ b.my_place }}-е; выше можно подняться первой попыткой по другому варианту.
+        Попыток в лидерборде: {{ b.attempts }}. Ваше место – {{ b.my_place }}-е; выше можно подняться первой попыткой по другому варианту.
       {% else %}
-        Попыток в таблице: {{ b.attempts }}.
+        Попыток в лидерборде: {{ b.attempts }}.
       {% endif %}
     </p>
     </div>
@@ -159,7 +159,7 @@
     <div class="vp-land-card vp-land-cell is-guest">
       <div class="vp-land-gtxt">
         <b>Чтобы пройти вариант, нужна короткая бесплатная регистрация</b>
-        <span>Логин и пароль, без почты. Правила, таблица и описания вариантов открыты всем.</span>
+        <span>{% if mail_on %}Почта и пароль; почту подтвердим кодом из письма.{% else %}Логин и пароль, без почты.{% endif %} Правила, лидерборд и описания вариантов открыты всем.</span>
       </div>
       <div class="vp-land-ca">
         <a class="vp-land-btn is-amber" href="{{ register_url }}">Зарегистрироваться</a>

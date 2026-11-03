@@ -3,6 +3,7 @@
 Таблица экранов — в `vp.views_wall.wall_window`; здесь по одной проверке на строку.
 """
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -174,7 +175,7 @@ class ScreenTableTests(ScreenCase):
         self.assertIn('Вход в варианты временно закрыт. Попробуйте через час.', self.page('closed'))
 
     def test_eyebrow(self):
-        self.assertIn('<div class="vp-wall-eyebrow">Демоверсия 2 тура · 10 класс · 70 минут</div>',
+        self.assertIn('<div class="vp-wall-eyebrow">Официальная демоверсия – 10 класс · 70 минут</div>',
                       self.page())
 
     def test_window_is_rendered_open_only_with_parameter(self):
@@ -307,6 +308,12 @@ class GuestWayTests(TestCase):
     def setUpTestData(cls):
         cls.variant = load_demo('10')
 
+    def setUp(self):
+        # Other registration tests can leave this worker's IP rate limit filled.
+        # A database rollback does not reset that cache; this journey starts fresh.
+        cache.clear()
+        self.addCleanup(cache.clear)
+
     def test_guest_without_timer_all_the_way(self):
         client = Client()
         slug = self.variant.slug
@@ -315,6 +322,7 @@ class GuestWayTests(TestCase):
         done = client.post(reverse('register'), {
             'username': 'guest_way', 'password1': self.PASSWORD, 'password2': self.PASSWORD,
             'role': 'student', 'consent': 'on', 'next': wall_url})
+        self.assertEqual(done.status_code, 302)
         self.assertEqual(done['Location'], wall_url)
         user = User.objects.get(username='guest_way')
         wall.pass_contact(user, 'tg')
@@ -334,7 +342,8 @@ class GuestDialogTextTests(TestCase):
     @override_settings(MAIL_ENABLED=True)
     def test_mail_on_mentions_email_code(self):
         html = Client().get(reverse('vp:intro', args=[self.variant.slug])).content.decode()
-        self.assertIn('логин, почта и пароль – почту подтвердим кодом из письма', html)
+        self.assertIn('почта и пароль – почту подтвердим кодом из письма', html)
+        self.assertNotIn('логин, почта', html)
         self.assertNotIn('без почты', html)
 
     @override_settings(MAIL_ENABLED=False)
