@@ -138,8 +138,25 @@ if ($RemoteRelease -notmatch '^/srv/weconomics/releases/vp_[0-9]{8}_[0-9]{6}$') 
 scp -i "$env:USERPROFILE\.ssh\id_ed25519_weconomics" -r .\deploy-payload "makar@135.106.181.151:$RemoteRelease/"
 ```
 
-На сервере проверить манифест payload по выданным SHA-256. Не передавать ни
-Mac-дампы, ни весь каталог backups, ни локальные .env.
+На сервере проверить манифест payload по выданным SHA-256:
+
+```bash
+python3 - "$RELEASE_DIR/deploy-payload" <<'PYVERIFY'
+from pathlib import Path
+import hashlib, json, sys
+root = Path(sys.argv[1]).resolve()
+rows = json.loads((root / 'MANIFEST.json').read_text(encoding='utf-8-sig'))
+for row in rows:
+    path = (root / row['path']).resolve()
+    if not path.is_relative_to(root):
+        raise SystemExit('Unexpected payload path')
+    if hashlib.sha256(path.read_bytes()).hexdigest() != row['sha256']:
+        raise SystemExit('Payload hash mismatch: ' + row['path'])
+print('Payload hashes verified:', len(rows))
+PYVERIFY
+```
+
+Не передавать ни Mac-дампы, ни весь каталог backups, ни локальные .env.
 
 ## 6. Техническое окно и согласованный снимок
 

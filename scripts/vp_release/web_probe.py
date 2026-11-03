@@ -9,6 +9,7 @@ import re
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument('--host', default='weconomics.ai', help='Host header; connection stays on loopback')
     parser.add_argument('--variants', type=Path, required=True)
     args = parser.parse_args()
     manifest = json.loads((args.variants/'variants-manifest.json').read_text())
@@ -18,7 +19,7 @@ def main():
     assets = set()
     def get(path, secure=True):
         con = http.client.HTTPConnection('127.0.0.1', args.port, timeout=30)
-        headers = {'Host': 'localhost'}
+        headers = {'Host': args.host}
         if secure:
             headers['X-Forwarded-Proto'] = 'https'
         con.request('GET', path, headers=headers)
