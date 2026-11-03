@@ -4147,8 +4147,25 @@ function mathSnapTargets(out) {
      по СПРЯТАННОЙ формуле из чужого поля, то есть по кривой, которой на экране
      нет. Катаем по самому ограничению: его точки сцена уже посчитала. */
   if (sub === 'constraint') {
-    const pts = (STATE.mathRes && STATE.mathRes.conPts) || [];
-    if (pts.length >= 2) out.push({ name: 'ограничение', f: (x) => interpY(pts, x) });
+    // Замкнутое ограничение не является одной функцией y(x). Каждая
+    // монотонная по x часть — отдельная цель; верх и низ не склеиваются.
+    const branches = (STATE.mathRes && STATE.mathRes.conBranches) || [];
+    for (const branch of branches) {
+      let part = [], direction = 0;
+      const add = () => {
+        if (part.length < 2) return;
+        const pts = part.slice().sort((a, b) => a[0] - b[0]);
+        if (pts.at(-1)[0] - pts[0][0] < 1e-10) return;
+        out.push({ name: 'ограничение', f: x => x < pts[0][0] || x > pts.at(-1)[0] ? NaN : interpY(pts, x) });
+      };
+      for (const point of branch) {
+        const next = part.length ? Math.sign(point[0] - part.at(-1)[0]) : 0;
+        if (next && direction && next !== direction) { add(); part = [part.at(-1)]; }
+        if (next) direction = next;
+        part.push(point);
+      }
+      add();
+    }
     return;
   }
   if (f) out.push({ name: 'f', f });

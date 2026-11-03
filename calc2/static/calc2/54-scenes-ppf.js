@@ -2906,7 +2906,7 @@ function syncPpftPriceUI(d) {
 
 // Полная перерисовка под-режима «КТВ» (расчёт лёгкий — можно каждый раз).
 function redrawPpfTrade() {
-  if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: эндогенная мировая цена
+  if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: две страны-партнёра
   recomputePpfTrade();
   makeScales();
   svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
@@ -2917,15 +2917,9 @@ function redrawPpfTrade() {
   _wantRangeAnim = false;   // страховка: гасим запрос, даже если recompute вышел по ошибке
 }
 
-/* --- ЧК5: сценарий Б — эндогенная мировая цена двух стран -----------
-   Две страны с КПВ. Автарктическая цена X каждой = наклон её КПВ. Равновесная
-   мировая цена Pw устанавливается МЕЖДУ автарктическими ценами (среднее
-   геометрическое — строго внутри интервала). Специализация по сравнительному
-   преимуществу: страна с меньшими альт. издержками X специализируется на X и
-   экспортирует его, другая — на Y. Линии торговых возможностей при Pw лежат вне
-   КПВ обеих стран (выигрыш от торговли). Полноценный баланс спроса-предложения
-   требует функций спроса (их нет) — берём разумную минимально достаточную
-   версию: Pw эндогенна и в правильном интервале, а не задана извне. */
+/* Две страны с ЛИНЕЙНЫМИ КПВ. Их наклоны задают границы взаимовыгодной
+   цены, но не равновесную цену: для неё нужны предпочтения и спрос.
+   Среднее геометрическое — только начальный пример внутри интервала. */
 function recomputeTradeB() {
   STATE.tradeBData = null;
   const r1 = compilePpf(STATE.tbF1), r2 = compilePpf(STATE.tbF2);
@@ -2936,16 +2930,20 @@ function recomputeTradeB() {
     STATE.tradeBData = { ok: false, error: 'Не удалось определить границы КПВ (нужны убывающие кривые, пересекающие оси).' };
     return;
   }
-  // Автарктическая цена X = альт. издержки X. Для линейной — наклон c.b; иначе среднее Ymax/Xmax.
-  const b1 = (c1.type === 'linear') ? c1.b : (c1.Ymax / c1.Xmax);
-  const b2 = (c2.type === 'linear') ? c2.b : (c2.Ymax / c2.Xmax);
-  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали, торговать незачем.' }; return; }
+  // У нелинейной КПВ предельные издержки меняются: отношение перехватов
+  // нельзя выдавать за её наклон, а производство — за полную специализацию.
+  if (c1.type !== 'linear' || c2.type !== 'linear' || !(c1.b > 0) || !(c2.b > 0)) {
+    STATE.tradeBData = { ok: false, error: 'Эта модель двух стран рассчитана на линейные убывающие КПВ вида Y = a − bX. Нелинейная КПВ требует отдельного расчёта производства и торговли; линейный ответ к ней неприменим.' };
+    return;
+  }
+  const b1 = c1.b, b2 = c2.b;
+  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали. Строгого сравнительного преимущества нет; обмен по этой цене не расширяет производственные возможности.' }; return; }
   const co1 = { idx: 1, c: c1, b: b1, color: COL.D, ppts: singlePpfPoints(f1, c1.Xmax) };
   const co2 = { idx: 2, c: c2, b: b2, color: COL.S, ppts: singlePpfPoints(f2, c2.Xmax) };
   const lowIs1 = b1 < b2;                              // у кого меньше альт. цена X — тот экспортирует X
   const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
   const bL = lowCo.b, bH = highCo.b;
-  const Pweq = Math.sqrt(bL * bH);                     // равновесная (эндогенная) мировая цена в (bL, bH)
+  const Pweq = Math.sqrt(bL * bH);                     // пример цены; имя поля сохранено для совместимости
   /* Границы регулятора — сам экономически допустимый промежуток (Фаза 8).
      Раньше ползунок ходил по [0.1, 2×макс. автарктической], а введённое вручную
      число молча обрезалось до этого предела: набрал 9 при автарктических 1 и 2,
@@ -2955,14 +2953,14 @@ function recomputeTradeB() {
   const priceMin = bL, priceMax = bH;
   let manual = (STATE.tbManualPrice != null && STATE.tbManualPrice > 0);
   const Pw = manual ? STATE.tbManualPrice : Pweq;
-  const inInterval = (Pw > bL + 1e-9 && Pw < bH - 1e-9);
+  const inInterval = (Pw >= bL - 1e-9 && Pw <= bH + 1e-9);
+  const atBoundary = inInterval && (Math.abs(Pw - bL) <= 1e-9 || Math.abs(Pw - bH) <= 1e-9);
   // Цена вне интервала: одной из стран выгоднее автаркия, обмена не будет.
   let noTradeMsg = null;
   if (!inInterval) {
     const who = (Pw <= bL + 1e-9) ? lowCo.idx : highCo.idx;
-    noTradeMsg = 'Цена ' + fmt(Pw) + ' лежит вне промежутка: она обязана быть между ' +
-      fmt(bL) + ' и ' + fmt(bH) + '. При такой цене стране ' + who +
-      ' выгоднее автаркия, торговать она не станет, поэтому обмена нет.';
+    noTradeMsg = 'Цена ' + fmt(Pw) + ' вне допустимого интервала: цена должна быть между ' + fmt(bL) + ' и ' + fmt(bH) +
+      ', включая границы. Стране ' + who + ' невыгодно участвовать в показанном направлении обмена. Такая торговля между этими двумя странами не состоится.';
   }
   // Специализация (углы линейной КПВ): низкая страна → весь X, высокая → весь Y.
   lowCo.prod = [lowCo.c.Xmax, 0]; lowCo.exports = 'X';
@@ -3002,7 +3000,7 @@ function recomputeTradeB() {
     shift: [S_H / Pw, -S_H],
   };
 
-  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTrade: !inInterval, noTradeMsg, priceMin, priceMax,
+  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, atBoundary, noTrade: !inInterval, noTradeMsg, priceMin, priceMax,
     bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx,
     lowCo, highCo, Ymax_H, Xmax_L, E_L, S_H };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
@@ -3165,9 +3163,10 @@ function updateTradeBPanel() {
   if (d.noTradeMsg) html += `<div class="warn" style="margin-bottom:6px;">${d.noTradeMsg}</div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.1</span><b>${fmt(d.b1)}</b></div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.2</span><b>${fmt(d.b2)}</b></div>`;
-  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
-  if (d.manual) html += `<div class="stat"><span>Равновесная Pw</span><b>${fmt(d.Pweq)}</b></div>`;
-  html += `<div class="stat"><span>Экспортируют</span><b>${tbName(d.lowIdx)} → X, ${tbName(d.highIdx)} → Y</b></div>`;
+  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(пример цены)</span>'}</div>`;
+  if (d.manual) html += `<div class="stat"><span>Пример Pw</span><b>${fmt(d.Pweq)}</b></div>`;
+  if (d.noTrade) { box.innerHTML = html; return; }
+  html += `<div class="stat"><span>Направление обмена</span><b>${tbName(d.lowIdx)} → X, ${tbName(d.highIdx)} → Y</b></div>`;
   // Предел торговли (Фаза 15.6): сколько товара реально удаётся обменять.
   html += `<div class="stat"><span>Обмен X (макс.)</span><b>${fmt(d.E_L)}</b></div>`;
   html += `<div class="stat"><span>Обмен Y (макс.)</span><b>${fmt(d.S_H)}</b></div>`;
@@ -3199,28 +3198,16 @@ function updateTradeBPanel() {
   html += '<p>Рисовать КТВ бесконечной прямой от края до края неверно: это означало бы, что '
         + 'обменять можно сколько угодно, хотя партнёр физически столько не производит.</p>';
   html += '</div>';
-  // Фаза 4б: не просто число, а КАК оно получается — логика избыточного спроса
-  // и предложения, границы интервала и честная оговорка о том, чего модель не знает.
-  html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
-    '<b>Откуда берётся Pw</b><br>' +
-    `Автарктическая цена X это альтернативные издержки X внутри страны: ` +
-    `у страны&nbsp;${d.lowIdx} она ${fmt(d.bL)}, у страны&nbsp;${d.highIdx} она ${fmt(d.bH)}.<br><br>` +
-    'Мировая цена уравновешивает мировой рынок: <b>сколько X страна-экспортёр хочет продать при цене Pw, ' +
-    'столько же X страна-импортёр хочет купить</b>: избыточное предложение = избыточному спросу.<br><br>' +
-    `Отсюда сразу следуют границы. При $P_w \\le ${fmt(d.bL)}$ стране&nbsp;${d.lowIdx} невыгодно продавать X ` +
-    '(дома за него дают не меньше), и избыточное предложение обнуляется. ' +
-    `При $P_w \\ge ${fmt(d.bH)}$ стране&nbsp;${d.highIdx} невыгодно покупать X (дешевле произвести самой), и ` +
-    'обнуляется избыточный спрос. Значит равновесие обязано лежать <b>строго внутри</b> ' +
-    `интервала (${fmt(d.bL)};&nbsp;${fmt(d.bH)}), и это следует из одних КПВ, без всяких допущений.<br><br>` +
-    '<b>Чего модель не знает.</b> Конкретная точка внутри интервала зависит от того, сколько каждая страна ' +
-    'хочет потребить при данной цене, то есть от предпочтений (функций спроса). В модели из одних КПВ их нет, ' +
-    'поэтому одним числом точка не определяется, определяется интервал. ' +
-    `Нейтральная точка строго внутри: среднее геометрическое ` +
-    `√(${fmt(d.bL)}·${fmt(d.bH)})&nbsp;=&nbsp;${fmt(d.Pweq)}. ` +
-    'Чем ближе цена к автарктической цене страны, тем меньше её выигрыш от торговли.</div>';
-  if (d.manual) {
-    html += `<div class="hint" style="margin-top:6px;">Сейчас цена задана вручную; равновесная мировая цена ${fmt(d.Pweq)}.</div>`;
-  }
+  html += '<div class="hint"><b>Откуда берётся Pw</b><br>' +
+    `Линейные КПВ задают альтернативные издержки X: ${fmt(d.bL)} и ${fmt(d.bH)} единиц Y. ` +
+    `Взаимовыгодная цена лежит в интервале [${fmt(d.bL)}; ${fmt(d.bH)}]. ` +
+    'Строго внутри обе страны выигрывают от обмена и имеют стимул к полной специализации. ' +
+    'На границе одна страна безразлична между производством и обменом; возможна неполная специализация. ' +
+    'Показанная полная специализация на границе представляет один допустимый вариант, а не единственное решение.<br><br>' +
+    '<b>Чего модель не определяет.</b> Равновесная цена и фактический объём торговли зависят от предпочтений и спроса. ' +
+    'По одним КПВ они не известны. Здесь показаны возможности и максимальный обмен при выбранной цене. ' +
+    `Начальный пример задан средним геометрическим: √(${fmt(d.bL)}·${fmt(d.bH)}) = ${fmt(d.Pweq)}.</div>`;
+  if (d.atBoundary) html += '<div class="hint">Цена на границе интервала: одна страна безразлична между специализациями. Показан один из возможных планов.</div>';
   box.innerHTML = html;
 }
 

@@ -1660,7 +1660,7 @@ function wireControls() {
     redrawKeepingWindow();
   });
 
-  // ЧК5: две страны (эндогенная мировая цена). Сценарий А/Б задаёт карточка
+  // ЧК5: две страны (пример мировой цены). Сценарий А/Б задаёт карточка
   // сюжета через setTradeScenario, кнопок в разметке нет (Свх-4б).
   const tb1 = document.getElementById('inp-tb1'), tb2 = document.getElementById('inp-tb2');
   function applyTradeB() {
@@ -1672,7 +1672,7 @@ function wireControls() {
   if (tbApply) tbApply.addEventListener('click', applyTradeB);
   [tb1, tb2].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyTradeB(); }); });
   liveFormula([tb1, tb2], applyTradeB);
-  // Задача 2: своя мировая цена — ползунок + поле + сброс к равновесной (всё синхронно).
+  // Своя мировая цена — ползунок + поле + сброс к примеру цены (всё синхронно).
   const tbPrice = document.getElementById('inp-tb-price');
   if (tbPrice) tbPrice.addEventListener('change', () => {
     const v = parseFloat(tbPrice.value);
@@ -1689,8 +1689,8 @@ function wireControls() {
   });
   const tbReset = document.getElementById('btn-tb-reset');
   if (tbReset) tbReset.addEventListener('click', () => {
-    STATE.tbManualPrice = null;   // вернуться к равновесной; ползунок/поле обновит syncTbPriceUI
-    _wantRangeAnim = true;        // равновесная Pw тоже меняет масштаб — плавно
+    STATE.tbManualPrice = null;   // вернуться к примеру цены; поле обновит syncTbPriceUI
+    _wantRangeAnim = true;        // начальная Pw тоже меняет масштаб — плавно
     redrawKeepingWindow();
   });
 

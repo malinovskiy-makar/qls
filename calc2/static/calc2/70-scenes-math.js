@@ -1240,60 +1240,146 @@ function parseConstraint(src) {
   };
 }
 
-/* Точки ограничения в прямоугольнике окна: для каждого x — первый y, где
-   G(x, y) меняет знак. Границы приходят снаружи, поэтому кривую видно и в
-   отрицательной части плоскости, если пользователь снял первую четверть. */
-function constraintPointsIn(G, x0, x1, y0, y1, N) {
-  N = N || 260;
-  const out = [];
-  for (let i = 0; i <= N; i++) {
-    const a = x0 + (x1 - x0) * i / N;
-    const g = (b) => G(a, b);
-    let prevB = y0, prevV = g(y0);
-    for (let j = 1; j <= 160; j++) {
-      const b = y0 + (y1 - y0) * j / 160, v = g(b);
-      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
-        const root = (prevV === 0) ? prevB : (v === 0 ? b : bisect(g, prevB, b));
-        if (isFinite(root)) { out.push([a, root]); break; }
-      }
-      prevB = b; prevV = v;
+/* Трассировка G=0 по ячейкам, а не «первый корень на вертикали».
+   Узлы общих рёбер общие для соседних ячеек; компоненты не соединяются
+   поперёк пустоты. Так сохраняются обе половины окружности и вертикали. */
+function constraintContoursIn(G, x0, x1, y0, y1, N) {
+  N = N || 160;
+  const dx = (x1 - x0) / N, dy = (y1 - y0) / N;
+  const values = Array.from({ length: N + 1 }, (_, i) =>
+    Array.from({ length: N + 1 }, (_, j) => G(x0 + i * dx, y0 + j * dy)));
+  const nodes = new Map(), edges = new Map();
+  const crossing = (i, j, k, l) => {
+    const va = values[i][j], vb = values[k][l];
+    if (!isFinite(va) || !isFinite(vb) || (va >= 0) === (vb >= 0)) return null;
+    const key = va === 0 ? `p${i},${j}` : vb === 0 ? `p${k},${l}` : `${i},${j}:${k},${l}`;
+    if (nodes.has(key)) return key;
+    const ax = x0 + i * dx, ay = y0 + j * dy, bx = x0 + k * dx, by = y0 + l * dy;
+    const h = t => G(ax + t * (bx - ax), ay + t * (by - ay));
+    const t = va === 0 ? 0 : vb === 0 ? 1 : bisect(h, 0, 1);
+    if (!isFinite(t)) return null;
+    const p = [ax + t * (bx - ax), ay + t * (by - ay)];
+    // Разрыв (например 1/x) не является нулём ограничения.
+    if (Math.abs(G(...p)) > 1e-6 * Math.max(1, Math.abs(va), Math.abs(vb))) return null;
+    nodes.set(key, p); edges.set(key, new Set());
+    return key;
+  };
+  const join = (a, b) => {
+    if (a != null && b != null && a !== b) { edges.get(a).add(b); edges.get(b).add(a); }
+  };
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const e = [crossing(i, j, i + 1, j), crossing(i + 1, j, i + 1, j + 1),
+      crossing(i, j + 1, i + 1, j + 1), crossing(i, j, i, j + 1)];
+    const hits = e.filter(v => v != null);
+    if (hits.length === 2) join(hits[0], hits[1]);
+    else if (hits.length === 4) {
+      // В седловой ячейке знак центра определяет, какие стороны связаны.
+      const center = G(x0 + (i + .5) * dx, y0 + (j + .5) * dy);
+      if ((center >= 0) === (values[i][j] >= 0)) { join(e[0], e[1]); join(e[2], e[3]); }
+      else { join(e[0], e[3]); join(e[1], e[2]); }
     }
   }
+  const out = [];
+  const walk = start => {
+    const pts = [nodes.get(start)];
+    let at = start;
+    while (edges.get(at).size) {
+      const next = edges.get(at).values().next().value;
+      edges.get(at).delete(next); edges.get(next).delete(at);
+      pts.push(nodes.get(next)); at = next;
+      if (at === start) break;
+    }
+    if (pts.length > 1) out.push(pts);
+  };
+  for (const [key, links] of edges) if (links.size === 1) walk(key);
+  for (const [key, links] of edges) if (links.size) walk(key);
   return out;
 }
-// Прежняя форма вызова (от нуля до предела) — через общий вариант.
+function constraintPointsIn(G, x0, x1, y0, y1, N) {
+  return constraintContoursIn(G, x0, x1, y0, y1, N).flat();
+}
 function constraintPoints(G, aMax, bMax, N) {
   return constraintPointsIn(G, 0, aMax, 0, bMax, N);
 }
 
-// Максимум (или минимум) F вдоль произвольного ограничения.
-function optimizeAlongCurve(f, pts, wantMax) {
-  let best = null;
-  pts.forEach(([a, b]) => {
-    const v = f(a, b);
-    if (!isFinite(v)) return;
-    if (!best || (wantMax ? v > best.value : v < best.value)) best = { a, b, value: v };
-  });
+/* Сетка находит кандидатов на ВСЕХ ветвях. Затем уточняем их на G=0:
+   пробный шаг, проекция по нормали и уменьшение шага. Значение в узле
+   сетки не выдаётся за точный оптимум. Окно изображения не участвует. */
+function optimizeAlongCurve(f, pts, wantMax, G, bounds) {
+  const candidates = pts.map(([a, b]) => ({ a, b, value: f(a, b) })).filter(p => isFinite(p.value));
+  candidates.sort((a, b) => wantMax ? b.value - a.value : a.value - b.value);
+  if (!candidates.length) return null;
+  if (!G || !bounds) return candidates[0];
+  const { xMin, xMax, yMin, yMax } = bounds;
+  const span = Math.max(xMax - xMin, yMax - yMin), h = span * 1e-6;
+  const project = (a, b) => {
+    for (let n = 0; n < 16; n++) {
+      const v = G(a, b), gx = (G(a + h, b) - G(a - h, b)) / (2 * h),
+        gy = (G(a, b + h) - G(a, b - h)) / (2 * h), norm = gx * gx + gy * gy;
+      if (!isFinite(v) || !isFinite(norm) || norm < 1e-24) return null;
+      const step = v / norm;
+      a -= step * gx; b -= step * gy;
+      if (Math.abs(step) * Math.sqrt(norm) < span * 1e-11) break;
+    }
+    if (a < xMin || a > xMax || b < yMin || b > yMax || !isFinite(f(a, b))) return null;
+    const gx = (G(a + h, b) - G(a - h, b)) / (2 * h), gy = (G(a, b + h) - G(a, b - h)) / (2 * h);
+    if (Math.abs(G(a, b)) > span * 1e-8 * Math.hypot(gx, gy)) return null;
+    return { a, b, value: f(a, b) };
+  };
+  const better = (a, b) => {
+    const delta = (wantMax ? 1 : -1) * (a.value - b.value);
+    const tol = 1e-12 * Math.max(1, Math.abs(a.value), Math.abs(b.value));
+    if (Math.abs(delta) > tol) return delta > 0;
+    // При равных экстремумах оставляем привычный неотрицательный вариант
+    // (например ±(5/√2,5/√2)). Это выбор представителя, не сужение поиска.
+    return a.a >= 0 && a.b >= 0 && (b.a < 0 || b.b < 0);
+  };
+  let best = candidates[0];
+  const seeds = [];
+  for (const p of candidates) {
+    if (seeds.every(q => Math.hypot(p.a - q.a, p.b - q.b) > span / 40)) seeds.push(p);
+    if (seeds.length === 12) break;
+  }
+  for (const seed of seeds) {
+    let p = seed, step = span / 80;
+    for (let n = 0; n < 180 && step > span * 1e-10; n++) {
+      let next = p;
+      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const q = project(p.a + step * da, p.b + step * db);
+        if (q && better(q, next)) next = q;
+      }
+      if (next === p) step /= 2; else p = next;
+    }
+    if (better(p, best)) best = p;
+  }
   return best;
 }
 
-/* Подогнать окно под ограничение. Делается ОДИН раз при входе в сюжет и при
-   смене формулы, а не на каждой перерисовке: иначе своё окно, выбранное
-   колесом, сцена возвращала бы себе обратно, и зум не работал бы вовсе. */
+/* Область задачи запоминается при смене ограничения. Начальная мелкая
+   сетка видит небольшие замкнутые кривые, которые пропускала сетка 0..1000.
+   Отрицательные координаты учитываются независимо от режима первой четверти.
+   Это конечная численная область, а не доказательство глобального оптимума
+   произвольной функции на всей плоскости. */
 function constraintFit() {
-  let xMax = 12, yMax = 12;
   const G = parseConstraint(STATE.mathGC);
+  let pts = [], extent = 12;
   if (G) {
-    const probe = constraintPoints(G, 1e3, 1e3, 120);
-    if (probe.length) {
-      xMax = padMax(Math.max.apply(null, probe.map(q => q[0])));
-      yMax = padMax(Math.max.apply(null, probe.map(q => q[1])));
+    for (let n = 0; n < 8; n++) {
+      pts = constraintPointsIn(G, -extent, extent, -extent, extent, 160);
+      if (pts.length) break;
+      extent *= 2;
     }
   }
-  // Запоминаем размах задачи: по нему ищется оптимум независимо от того,
-  // насколько человек приблизил картинку.
-  STATE.consFit = { xMax: xMax || 12, yMax: yMax || 12 };
-  setMathWindow(0, xMax || 12, 0, yMax || 12);
+  let xMin = -extent, xMax = extent, yMin = -extent, yMax = extent;
+  if (pts.length) {
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const loX = Math.min(...xs), hiX = Math.max(...xs), loY = Math.min(...ys), hiY = Math.max(...ys);
+    const px = Math.max(1, hiX - loX) * .15, py = Math.max(1, hiY - loY) * .15;
+    xMin = Math.min(0, loX - px); xMax = Math.max(0, hiX + px);
+    yMin = Math.min(0, loY - py); yMax = Math.max(0, hiY + py);
+  }
+  STATE.consFit = { xMin, xMax, yMin, yMax };
+  setMathWindow(xMin, xMax, yMin, yMax);
   STATE.viewDirty = false;
   updateResetViewBtn();
 }
@@ -1324,9 +1410,10 @@ function drawMathConstraint() {
   }
   const [x0, x1] = mx.domain(), [y0, y1] = my.domain();
   // Рисуем ту часть ограничения, что попала в окно.
-  const pts = constraintPointsIn(G, x0, x1, y0, y1);
-  if (pts.length > 1) {
-    const cp = g.append('path').datum(pts).attr('fill', 'none')
+  const branches = constraintContoursIn(G, x0, x1, y0, y1);
+  const pts = branches.flat();
+  for (const branch of branches) {
+    const cp = g.append('path').datum(branch).attr('fill', 'none')
       .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
     /* запись для .tex — по форме ввода ограничения (тот же разбор, что у
        строки КПВ): y = f(x) — формула, x = g(y) — «по вертикали», общее
@@ -1340,14 +1427,14 @@ function drawMathConstraint() {
      картинку — ответ не меняется (ADR 0143). Область поиска — размах самого
      ограничения (consFit, считается при входе и смене формулы), БЕЗ окна:
      объединение с окном меняло шаг сетки при отдалении и сдвиге. */
-  const fit = STATE.consFit || { xMax: x1, yMax: y1 };
-  const searchPts = (x0 === 0 && x1 === fit.xMax && y0 === 0 && y1 === fit.yMax)
-    ? pts : constraintPointsIn(G, 0, fit.xMax, 0, fit.yMax);
-  const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false);
-  /* Точки ограничения кладём в состояние: по ним катается точка и по ним же
-     ищутся ключевые точки сюжета (Н66). Пересчитывать их второй раз в
-     mathSnapTargets значило бы делать ту же тяжёлую работу дважды за кадр. */
-  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts };
+  if (!STATE.consFit) constraintFit();
+  const fit = { xMin: 0, yMin: 0, ...STATE.consFit };
+  const searchBranches = constraintContoursIn(G, fit.xMin, fit.xMax, fit.yMin, fit.yMax);
+  const searchPts = searchBranches.flat();
+  const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false, G, fit);
+  const tol = Math.max(fit.xMax - fit.xMin, fit.yMax - fit.yMin) * 1e-6;
+  const touchesEdge = searchPts.some(([a, b]) => isFinite(f(a, b)) && Math.min(a - fit.xMin, fit.xMax - a, b - fit.yMin, fit.yMax - b) < tol);
+  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts, conBranches: branches, fit, touchesEdge };
   if (opt) {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
     // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
@@ -1361,8 +1448,10 @@ function drawMathConstraint() {
 }
 // Линия уровня F = const на своих шкалах (движок трассировки — общий).
 function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity, dash) {
-  const pts = traceLevelCurve(f, level, mx.domain()[1], my.domain()[1], 220);
-  if (!pts || pts.length < 2) return;
+  const [x0, x1] = mx.domain(), [y0, y1] = my.domain();
+  const branches = constraintContoursIn((a, b) => f(a, b) - level, x0, x1, y0, y1, 100);
+  const pts = branches.flatMap(branch => [...branch, null]);
+  if (!pts.length) return;
   const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
@@ -1530,8 +1619,9 @@ function updateMathPanel() {
     }
   } else if (STATE.mathSub === 'constraint') {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
-    else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
+    else if (!r.opt) html = '<div class="muted">Точка не нашлась в численной области поиска: проверьте формулы ограничения и цели.</div>';
     else {
+      if (r.touchesEdge) html += '<div class="warn">Ограничение выходит за область поиска. Показано лучшее найденное значение в этой области; глобальный оптимум на всей кривой не установлен.</div>';
       const cg = ' data-ans-group="Условный оптимум"';
       html += `<div class="stat ans-main"${cg}><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
       html += `<div class="stat ans-main"${cg}><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
@@ -1542,11 +1632,10 @@ function updateMathPanel() {
          ниже — там оно объясняет способ, а не повторяет орган управления. */
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + '<p><b>Что такое ограничение на графике?</b> Это кривая: точки, где g(x, y) обращается в ноль. '
-        + 'Она ищется численно, для каждого x подбирается свой y, поэтому подходит '
-        + 'любая форма, а не только прямая.</p>'
+        + 'Все обнаруженные ветви трассируются численно по сетке, включая замкнутые кривые. Очень мелкие детали и изолированные точки могут не обнаружиться.</p>'
         + `<p><b>Как ищется оптимум?</b> Вдоль этой кривой перебирается значение цели, и берётся ${r.wantMax ? 'наибольшее' : 'наименьшее'}. `
-        + 'Тонкими линиями нарисован веер линий уровня цели, жирной та, что проходит через найденную точку.</p>'
-        + '<p><b>Почему именно касание?</b> Линия уровня касается ограничения, а не пересекает его. Это и есть признак оптимума: '
+        + 'Лучшие кандидаты уточняются на самом ограничении. Тонкими линиями нарисован веер линий уровня цели, жирной та, что проходит через найденную точку.</p>'
+        + '<p><b>Когда возникает касание?</b> В гладкой внутренней точке оптимума линия уровня обычно касается ограничения. Одного касания недостаточно: значения цели нужно сравнить, чтобы убедиться, что '
         + 'сдвинуться вдоль ограничения в любую сторону значит перейти на линию уровня хуже.</p>'
         + '<p><b>Почему это одна и та же задача во всей микроэкономике?</b> Потребитель максимизирует полезность '
         + 'при бюджете, фирма максимизирует выпуск при затратах или минимизирует затраты при выпуске, страна '
@@ -1555,8 +1644,7 @@ function updateMathPanel() {
         + '<p><b>Когда касания не будет?</b> Когда оптимум упирается в угол: у совершенных заменителей берут '
         + 'только один товар, и решение сидит на оси. Тогда равенства наклонов нет, а ответ всё равно верный. '
         + 'Поэтому касание это признак оптимума внутри области, а не закон на все случаи.</p>'
-        + '<p><b>Вывод.</b> Сначала проверяют, есть ли внутреннее решение по касанию, и только потом смотрят '
-        + 'углы. Обратный порядок в олимпиадных задачах чаще всего и приводит к потере ответа.</p>'
+        + '<p><b>Вывод.</b> Сравнивают внутренние решения, углы и границы. Численная сетка даёт приближение и не доказывает существование глобального оптимума для произвольной функции.</p>'
         + '</div>';
     }
   }

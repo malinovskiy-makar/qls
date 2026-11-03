@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `e1c46e44`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-03. HEAD: `15bd4a4b`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,7 +343,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
-| `calc2/templates/calc2/calc2.html` | 2337 | 188.3 | шаблон |
+| `calc2/templates/calc2/calc2.html` | 2338 | 188.8 | шаблон |
 | `calc2/static/calc2/calc2.css` | 4397 | 332.5 | CSS |
 | `calc2/static/calc2/previews.json` | 46 | 33.7 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
@@ -351,9 +351,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/12-numbers.js` | 239 | 12.1 | JS |
 | `calc2/static/calc2/20-plane.js` | 999 | 68.2 | JS |
 | `calc2/static/calc2/30-curves.js` | 1517 | 110.5 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 3895 | 281.6 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 3895 | 281.7 | JS |
 | `calc2/static/calc2/41-market-policies.js` | 260 | 17.4 | JS |
-| `calc2/static/calc2/42-scenes-mono.js` | 2081 | 153.5 | JS |
+| `calc2/static/calc2/42-scenes-mono.js` | 2090 | 154.6 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
 | `calc2/static/calc2/44-scenes-firm.js` | 1068 | 69.2 | JS |
 | `calc2/static/calc2/45-plants.js` | 300 | 23.2 | JS |
@@ -362,16 +362,16 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/46-scenes-labor.js` | 900 | 68.8 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 279 | 18.2 | JS |
 | `calc2/static/calc2/49-trade-policy.js` | 262 | 27.3 | JS |
-| `calc2/static/calc2/50-scenes-macro.js` | 464 | 32.1 | JS |
+| `calc2/static/calc2/50-scenes-macro.js` | 514 | 35.1 | JS |
 | `calc2/static/calc2/51-islm.js` | 112 | 14.8 | JS |
 | `calc2/static/calc2/52-modes.js` | 1007 | 68.8 | JS |
 | `calc2/static/calc2/53-adas.js` | 130 | 15.9 | JS |
-| `calc2/static/calc2/54-scenes-ppf.js` | 3282 | 212.3 | JS |
+| `calc2/static/calc2/54-scenes-ppf.js` | 3269 | 211.1 | JS |
 | `calc2/static/calc2/55-big-trade.js` | 170 | 14.8 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 491 | 34.7 | JS |
 | `calc2/static/calc2/57-distributions.js` | 161 | 18.6 | JS |
-| `calc2/static/calc2/60-overlays.js` | 5008 | 320.1 | JS |
-| `calc2/static/calc2/70-scenes-math.js` | 2091 | 136.0 | JS |
+| `calc2/static/calc2/60-overlays.js` | 5025 | 320.9 | JS |
+| `calc2/static/calc2/70-scenes-math.js` | 2179 | 141.2 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1669 | 128.6 | JS |
 | `calc2/static/calc2/80-ui.js` | 856 | 54.3 | JS |
 | `calc2/static/calc2/82-input.js` | 2366 | 140.9 | JS |
@@ -379,7 +379,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/86-workspace.js` | 2159 | 141.1 | JS |
 | `calc2/static/calc2/88-params.js` | 2026 | 139.6 | JS |
 | `calc2/static/calc2/89-model-state.js` | 374 | 24.8 | JS |
-| `calc2/static/calc2/90-explain.js` | 404 | 68.7 | JS |
+| `calc2/static/calc2/90-explain.js` | 389 | 69.3 | JS |
 | `calc2/static/calc2/91-session.js` | 502 | 26.6 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 1332 | 92.3 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
@@ -388,7 +388,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 353 | 23.3 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 46 файлов, 48767 строк, 3485.9 КБ.**
+**Итого: 46 файлов, 48904 строк, 3496.2 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -799,20 +799,20 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 1504 — `redrawDiscr3`
 - строка 1547 — `drawMonoExport`
 - строка 1672 — `updateDiscr3Panel`
-- строка 1750 — `applyD3WorldLabels`
-- строка 1772 — `buildKinkedDemand`
-- строка 1792 — `sumDemandCurves`
-- строка 1829 — `recomputeKinked`
-- строка 1876 — `drawKinkedFull`
-- строка 1965 — `updateKinkPanel`
-- строка 2006 — `applyMonoVisibility`
-- строка 2027 — `ensureMonopolyCurves`
-- строка 2038 — `fillIfEmpty`
-- строка 2041 — `ensureD3Fields`
-- строка 2046 — `ensureKinkFields`
-- строка 2052 — `ensureMonopolyPreset`
-- строка 2059 — `setMonoMode`
-- строка 2070 — `setKinkInput`
+- строка 1758 — `applyD3WorldLabels`
+- строка 1781 — `buildKinkedDemand`
+- строка 1801 — `sumDemandCurves`
+- строка 1838 — `recomputeKinked`
+- строка 1885 — `drawKinkedFull`
+- строка 1974 — `updateKinkPanel`
+- строка 2015 — `applyMonoVisibility`
+- строка 2036 — `ensureMonopolyCurves`
+- строка 2047 — `fillIfEmpty`
+- строка 2050 — `ensureD3Fields`
+- строка 2055 — `ensureKinkFields`
+- строка 2061 — `ensureMonopolyPreset`
+- строка 2068 — `setMonoMode`
+- строка 2079 — `setKinkInput`
 
 #### `calc2/static/calc2/43-discrimination.js`
 
@@ -1036,13 +1036,14 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 40 — `macroCurveY`
 - строка 49 — `macroCurveInv`
 - строка 78 — `macroCurveAny`
-- строка 107 — `macroP`
-- строка 113 — `recomputeMacro`
-- строка 237 — `drawMacroCurve`
-- строка 274 — `redrawMacro`
-- строка 359 — `drawEquilibriumAt`
-- строка 370 — `updateMacroPanel`
-- строка 450 — `setMacroModel`
+- строка 111 — `lafferSolution`
+- строка 154 — `macroP`
+- строка 160 — `recomputeMacro`
+- строка 285 — `drawMacroCurve`
+- строка 322 — `redrawMacro`
+- строка 408 — `drawEquilibriumAt`
+- строка 419 — `updateMacroPanel`
+- строка 500 — `setMacroModel`
 
 #### `calc2/static/calc2/51-islm.js`
 
@@ -1213,18 +1214,18 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 2745 — `updatePpfTradePanel`
 - строка 2897 — `syncPpftPriceUI`
 - строка 2908 — `redrawPpfTrade`
-- строка 2929 — `recomputeTradeB`
-- строка 3018 — `tradeCpfPoints`
-- строка 3036 — `tradeCpfMark`
-- строка 3055 — `tradeBPanels`
-- строка 3076 — `drawTradeB`
-- строка 3149 — `drawTradeBMarks`
-- строка 3152 — `tbName`
-- строка 3158 — `updateTradeBPanel`
-- строка 3228 — `syncTbPriceUI`
-- строка 3241 — `redrawTradeB`
-- строка 3256 — `setTradeScenario`
-- строка 3268 — `setPpfSub`
+- строка 2923 — `recomputeTradeB`
+- строка 3016 — `tradeCpfPoints`
+- строка 3034 — `tradeCpfMark`
+- строка 3053 — `tradeBPanels`
+- строка 3074 — `drawTradeB`
+- строка 3147 — `drawTradeBMarks`
+- строка 3150 — `tbName`
+- строка 3156 — `updateTradeBPanel`
+- строка 3215 — `syncTbPriceUI`
+- строка 3228 — `redrawTradeB`
+- строка 3243 — `setTradeScenario`
+- строка 3255 — `setPpfSub`
 
 #### `calc2/static/calc2/55-big-trade.js`
 
@@ -1467,47 +1468,47 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 4052 — `consumerSnapTargets`
 - строка 4081 — `ineqSnapTargets`
 - строка 4095 — `mathSnapTargets`
-- строка 4160 — `tradeSnapTargets`
-- строка 4181 — `axisSnapAt`
-- строка 4201 — `snapDistPx`
-- строка 4222 — `snapPointAt`
-- строка 4265 — `showSnapHint`
-- строка 4284 — `armMark`
-- строка 4297 — `cancelMarkDraft`
-- строка 4337 — `resetDecor`
-- строка 4429 — `_undoCopyChild`
-- строка 4443 — `_undoCopy`
-- строка 4463 — `pushUndo`
-- строка 4474 — `undoLast`
-- строка 4491 — `clearUndo`
-- строка 4498 — `forgetSceneSnapshot`
-- строка 4500 — `resetSceneMemory`
-- строка 4511 — `saveSceneSnapshot`
-- строка 4524 — `restoreSceneSnapshot`
-- строка 4552 — `keyOnText`
-- строка 4559 — `markOnText`
-- строка 4569 — `notationTex`
-- строка 4576 — `markOnInto`
-- строка 4585 — `markNameTex`
-- строка 4592 — `addMarkAt`
-- строка 4632 — `colorDist`
-- строка 4641 — `drawnStrokeColors`
-- строка 4657 — `nextMarkColor`
-- строка 4680 — `canvasNameLetters`
-- строка 4692 — `nextMarkName`
-- строка 4704 — `newMark`
-- строка 4720 — `pendingMark`
-- строка 4723 — `startMarkDraft`
-- строка 4732 — `markSnapFn`
-- строка 4743 — `renderMarkList`
-- строка 4755 — `ensureAddMarkButton`
-- строка 4766 — `buildMarkRow`
-- строка 4922 — `markById`
-- строка 4923 — `openMarkMenu`
-- строка 4936 — `fillMarkMenu`
-- строка 4978 — `renameMark`
-- строка 4993 — `editMarkCoords`
-- строка 5002 — `removeMark`
+- строка 4177 — `tradeSnapTargets`
+- строка 4198 — `axisSnapAt`
+- строка 4218 — `snapDistPx`
+- строка 4239 — `snapPointAt`
+- строка 4282 — `showSnapHint`
+- строка 4301 — `armMark`
+- строка 4314 — `cancelMarkDraft`
+- строка 4354 — `resetDecor`
+- строка 4446 — `_undoCopyChild`
+- строка 4460 — `_undoCopy`
+- строка 4480 — `pushUndo`
+- строка 4491 — `undoLast`
+- строка 4508 — `clearUndo`
+- строка 4515 — `forgetSceneSnapshot`
+- строка 4517 — `resetSceneMemory`
+- строка 4528 — `saveSceneSnapshot`
+- строка 4541 — `restoreSceneSnapshot`
+- строка 4569 — `keyOnText`
+- строка 4576 — `markOnText`
+- строка 4586 — `notationTex`
+- строка 4593 — `markOnInto`
+- строка 4602 — `markNameTex`
+- строка 4609 — `addMarkAt`
+- строка 4649 — `colorDist`
+- строка 4658 — `drawnStrokeColors`
+- строка 4674 — `nextMarkColor`
+- строка 4697 — `canvasNameLetters`
+- строка 4709 — `nextMarkName`
+- строка 4721 — `newMark`
+- строка 4737 — `pendingMark`
+- строка 4740 — `startMarkDraft`
+- строка 4749 — `markSnapFn`
+- строка 4760 — `renderMarkList`
+- строка 4772 — `ensureAddMarkButton`
+- строка 4783 — `buildMarkRow`
+- строка 4939 — `markById`
+- строка 4940 — `openMarkMenu`
+- строка 4953 — `fillMarkMenu`
+- строка 4995 — `renameMark`
+- строка 5010 — `editMarkCoords`
+- строка 5019 — `removeMark`
 
 #### `calc2/static/calc2/70-scenes-math.js`
 
@@ -1584,40 +1585,41 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 1168 — `drawMathMinMax`
 - строка 1215 — `compileAB`
 - строка 1228 — `parseConstraint`
-- строка 1246 — `constraintPointsIn`
-- строка 1265 — `constraintPoints`
-- строка 1270 — `optimizeAlongCurve`
-- строка 1283 — `constraintFit`
-- строка 1301 — `drawMathConstraint`
-- строка 1363 — `drawLevelCurveOn`
-- строка 1377 — `mathOptimumReasoning`
-- строка 1414 — `updateMathPanel`
-- строка 1566 — `redrawMath`
-- строка 1606 — `setMathSub`
-- строка 1629 — `setMathWindow`
-- строка 1644 — `setMathX0`
-- строка 1669 — `downloadBlob`
-- строка 1678 — `exportBaseName`
-- строка 1691 — `paperChartClone`
-- строка 1718 — `exportNumbersLine`
-- строка 1727 — `exportExtras`
-- строка 1735 — `exportPNG`
-- строка 1776 — `buildTex`
-- строка 1785 — `afterFonts`
-- строка 1790 — `exportTex`
-- строка 1800 — `exportPDF`
-- строка 1807 — `exportPDFSend`
-- строка 1831 — `exportTitleDefault`
-- строка 1833 — `buildExportFields`
-- строка 1863 — `refreshExportPreview`
-- строка 1901 — `expValue`
-- строка 1912 — `syncExportFormat`
-- строка 1924 — `refreshExportSheet`
-- строка 1932 — `wireExport`
-- строка 1961 — `openExport`
-- строка 1982 — `closeExport`
-- строка 2002 — `updateGraphPanel`
-- строка 2063 — `graphExplainNote`
+- строка 1246 — `constraintContoursIn`
+- строка 1298 — `constraintPointsIn`
+- строка 1301 — `constraintPoints`
+- строка 1308 — `optimizeAlongCurve`
+- строка 1363 — `constraintFit`
+- строка 1387 — `drawMathConstraint`
+- строка 1450 — `drawLevelCurveOn`
+- строка 1466 — `mathOptimumReasoning`
+- строка 1503 — `updateMathPanel`
+- строка 1654 — `redrawMath`
+- строка 1694 — `setMathSub`
+- строка 1717 — `setMathWindow`
+- строка 1732 — `setMathX0`
+- строка 1757 — `downloadBlob`
+- строка 1766 — `exportBaseName`
+- строка 1779 — `paperChartClone`
+- строка 1806 — `exportNumbersLine`
+- строка 1815 — `exportExtras`
+- строка 1823 — `exportPNG`
+- строка 1864 — `buildTex`
+- строка 1873 — `afterFonts`
+- строка 1878 — `exportTex`
+- строка 1888 — `exportPDF`
+- строка 1895 — `exportPDFSend`
+- строка 1919 — `exportTitleDefault`
+- строка 1921 — `buildExportFields`
+- строка 1951 — `refreshExportPreview`
+- строка 1989 — `expValue`
+- строка 2000 — `syncExportFormat`
+- строка 2012 — `refreshExportSheet`
+- строка 2020 — `wireExport`
+- строка 2049 — `openExport`
+- строка 2070 — `closeExport`
+- строка 2090 — `updateGraphPanel`
+- строка 2151 — `graphExplainNote`
 
 #### `calc2/static/calc2/72-export-tex.js`
 
@@ -1900,7 +1902,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 #### `calc2/static/calc2/90-explain.js`
 
-- строка 398 — `sceneExplainHtml`
+- строка 383 — `sceneExplainHtml`
 
 #### `calc2/static/calc2/91-session.js`
 
@@ -2099,6 +2101,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1584.**
+**Итого функций в индексе: 1586.**
 
 <!-- AUTO:END -->

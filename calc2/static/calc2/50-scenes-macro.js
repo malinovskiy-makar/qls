@@ -104,6 +104,53 @@ const MACRO = {
   islm:     { title: 'IS–LM', xl: 'Y', yl: 'r, %', vars: ['Y'] },
 };
 
+/* Экономическая область Лаффера: 0 ≤ Q ≤ Q(0), t = D(Q) − S(Q).
+   Верхняя ставка оси сюда НЕ входит. Линейный случай точный; для обычных
+   нелинейных кривых уточняем все найденные локальные максимумы поступлений.
+   Несовместимые с этой постановкой кривые не получают ложный максимум. */
+function lafferSolution(D, S) {
+  const e0 = findEquilibrium(D, S);
+  const wedge = q => evalCurve(D, q) - evalCurve(S, q);
+  const stop = wedge(0);
+  if (!e0 || !(e0.Q > 0) || !(stop > 0) || !isFinite(stop))
+    return { error: 'Для этой постановки нужны положительный рынок без налога и конечная запретительная потоварная ставка D(0) − S(0).' };
+  const Q0 = e0.Q, N = 240;
+  const revenue = q => q * Math.max(0, wedge(q));
+  const vals = [];
+  let previous = stop;
+  for (let i = 0; i <= N; i++) {
+    const q = Q0 * i / N, t = wedge(q);
+    if (!isFinite(t) || (i > 0 && t >= previous - Math.max(1, stop) * 1e-12))
+      return { error: 'Разность D(Q) − S(Q) должна убывать до нуля. Для этих кривых налог может иметь несколько равновесий; единственный максимум не определён этой моделью.' };
+    vals.push(revenue(q)); previous = t;
+  }
+  let best = { t: 0, rev: 0, Q: Q0 };
+  const consider = q => {
+    const t = Math.max(0, wedge(q)), rev = t * q;
+    if (rev > best.rev) best = { t, rev, Q: q };
+  };
+  if (D.linear && S.linear && S.linear.a > D.linear.a) {
+    consider(stop / (2 * (S.linear.a - D.linear.a)));
+  } else {
+    // Сетка выделяет кандидатов, но ответ не округляется до её узлов.
+    for (let i = 1; i < N; i++) {
+      if (vals[i] < vals[i - 1] || vals[i] < vals[i + 1]) continue;
+      let lo = Q0 * (i - 1) / N, hi = Q0 * (i + 1) / N;
+      for (let j = 0; j < 65; j++) {
+        const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+        if (revenue(a) < revenue(b)) lo = a; else hi = b;
+      }
+      consider((lo + hi) / 2);
+    }
+  }
+  const atTax = t => {
+    if (t >= stop) return 0;
+    if (t === 0) return Q0;
+    return bisect(q => wedge(q) - t, 0, Q0);
+  };
+  return { best, stop, atTax };
+}
+
 function macroP() { return STATE.macro[STATE.macroModel] || {}; }
 // Запас поиска равновесия для макромоделей: масштаб осей подбирается ПОСЛЕ расчёта,
 // поэтому искать в пределах текущего кадра нельзя — пересечение может быть за краем.
@@ -199,16 +246,14 @@ function recomputeMacro() {
        «Q = 120 − P» — Q(P). Прежде голый compileFormula отвечал «Undefined symbol P». */
     const D = buildAnyCurve(P.d), S = buildAnyCurve(P.s);
     if (D.error || S.error) return fail(D.error || S.error);
-    const pts = [];
-    let best = { t: 0, rev: 0, Q: null };
+    const solution = lafferSolution(D, S);
+    if (solution.error) return fail(solution.error);
+    const pts = [], best = solution.best;
     const N = 200, tMax = P.tmax;
     for (let i = 0; i <= N; i++) {
       const t = tMax * i / N;
-      const st = { fn: (q) => { const v = evalCurve(S, q); return isNaN(v) ? NaN : v + t; } };
-      const e = findEquilibrium(D, st);
-      const rev = e ? t * e.Q : 0;
+      const rev = t * solution.atTax(t);
       pts.push([t, rev]);
-      if (rev > best.rev) best = { t, rev, Q: e ? e.Q : null };
     }
     /* запись для .tex: у линейных D: P = aD·Q + bD и S: P = aS·Q + bS равновесие
        с налогом t — Q = (bD − bS − t)/(aS − aD), доход t·Q, ноль там, где рынка нет.
@@ -217,7 +262,10 @@ function recomputeMacro() {
     if (D.linear && S.linear && S.linear.a - D.linear.a > 0) {
       rec = 'x * max(0, ((' + D.linear.b + ') - (' + S.linear.b + ') - x) / (' + (S.linear.a - D.linear.a) + '))';
     }
-    STATE.macroRes = texTag({ kind: 'laffer', pts, best, tMax }, 'rec', rec);
+    // Включаем вершину в узлы, если она видна: экспорт и линия проходят
+    // через тот же максимум, что указан в ответе, даже между узлами сетки.
+    if (best.t <= tMax) { pts.push([best.t, best.rev]); pts.sort((a, b) => a[0] - b[0]); }
+    STATE.macroRes = texTag({ kind: 'laffer', pts, best, tMax, stop: solution.stop }, 'rec', rec);
     applyAutoRanges(niceMax(tMax), niceMax(Math.max(best.rev, 1) * 1.25));
     return;
   }
@@ -297,6 +345,7 @@ function redrawMacro() {
       markNumeric(ar, why);
       markNumeric(cv, why, 'Кривая Лаффера');
     }
+    if (r.best.t > CONFIG.Qmax) { updateMacroPanel(); return; }
     const og = svg.append('g'), ox = sx(0), oy = sy(0);
     const [px, py] = toPx(r.best.t, r.best.rev);
     og.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
@@ -430,13 +479,14 @@ function updateMacroPanel() {
       html += `<div class="stat" style="margin-top:4px;"><span>Фиксированный курс</span><b>${fmt(r.fixed.e)}</b></div>`;
       html += `<div class="stat"><span>(Спрос; предложение)</span><b>(${fmt(r.fixed.Qd)}; ${fmt(r.fixed.Qs)})</b></div>`;
       html += `<div class="stat"><span>${r.fixed.deficit ? 'Дефицит валюты' : 'Избыток валюты'}</span><b>${fmt(r.fixed.gap)}</b></div>`;
-      html += `<div class="hint">Это ровно та же геометрия, что потолок и пол цены на обычном рынке: торгуется ` +
-        `короткая сторона, а разрыв ${r.fixed.deficit ? 'ЦБ покрывает продажей резервов' : 'ЦБ скупает, наращивая резервы'}.</div>`;
+      html += `<div class="hint">Q обозначает иностранную валюту, e её цену в национальной валюте. ` +
+        `${r.fixed.deficit ? 'Дефицит ЦБ покрывает продажей иностранной валюты из резервов' : 'Избыток иностранной валюты ЦБ скупает, наращивая валютные резервы'}.</div>`;
     }
   } else if (r.kind === 'laffer') {
     html += `<div class="stat"><span>Ставка максимума t</span><b>${fmt(r.best.t)}</b></div>`;
     html += `<div class="stat"><span>Максимальные поступления</span><b>${fmt(r.best.rev)}</b></div>`;
     if (r.best.Q != null) html += `<div class="stat"><span>Объём рынка при ней</span><b>${fmt(r.best.Q)}</b></div>`;
+    if (r.best.t > r.tMax) html += '<div class="warn">Максимум находится за выбранной границей оси. Ответ рассчитан по модели и не зависит от видимого диапазона.</div>';
     // Как построена кривая и почему у неё вершина — вопросы «Разбора» (сессия 5, А4).
   } else if (r.kind === 'islm') {
     html += `<div class="stat"><span>Равновесный выпуск Y</span><b>${fmt(r.eq.Q)}</b></div>`;
