@@ -33,7 +33,7 @@ class EntryCopyTests(TestCase):
             with self.subTest(dash=dash):
                 self.variant.title = f'Демоверсия 2 тура {dash} 11 класс (с уточнениями)'
                 self.assertEqual(landing.wall_eyebrow(self.variant),
-                                 'Демоверсия 2 тура · 11 класс · 70 минут')
+                                 'Демоверсия 2 тура – 11 класс (с уточнениями) · 70 минут')
 
     def test_untimed_link_selects_the_promised_mode_without_starting_a_clock(self):
         self.client.force_login(get_user_model().objects.create_user('ui_untimed'))

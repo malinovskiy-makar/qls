@@ -391,14 +391,10 @@ def variant_meta(variant, parts=('count', 'minutes'), origin=True):
 
 
 def wall_eyebrow(variant):
-    """Надзаголовок окна стены: «Демоверсия 2 тура · 10 класс · 70 минут».
-
-    Часть названия до « – », подпись класса из `config` и длительность словами.
-    Рядом с `variant_meta`: строка меты одна на раздел, и её родня — тоже здесь.
-    """
-    bits = [variant.title.replace(' — ', ' – ').split(' – ', 1)[0]]
+    """Полное название, класс без повтора и длительность; номер варианта сохраняется."""
+    bits = [variant.title.replace(' — ', ' – ')]
     band = dict(config.bands(variant.tour)).get(variant.grade_band)
-    if band:
+    if band and band.lower() not in bits[0].lower():
         bits.append(band)
     bits.append(duration_words(variant))
     return ' · '.join(bits)
