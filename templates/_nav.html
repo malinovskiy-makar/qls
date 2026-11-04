@@ -30,7 +30,7 @@
    отступов поднят с 1060 до 1119: с отступами 12 ряду персонала нужно 1114,9 px, и
    на 1061–1114 он не помещался. Замер и запас — у порога бургера ниже. */
 nav.site-nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14px; }
-@media (max-width: 1119px) {
+@media (max-width: 1127px) {
   nav.site-nav { --nav-pad: 8px; --nav-edge: 12px; --nav-logo-gap: 12px; --nav-btn-pad: 10px; }
 }
 @media (max-width: 900px) {
@@ -151,7 +151,7 @@ nav.site-nav {
 a.nav-icon-btn { text-decoration: none; }
 .nav-docs-btn .qi { width: 16px; height: 16px; }
 /* Ниже порога бургера «Документы» живёт в панели ☰, значок не нужен. */
-@media (max-width: 1023px) { .nav-docs-btn { display: none; } }
+@media (max-width: 1031px) { .nav-docs-btn { display: none; } }
 
 /* Плашка профиля: круг с инициалами (или аватар) и имя — одна ссылка. */
 .nav-user {
@@ -241,8 +241,11 @@ a.nav-icon-btn { text-decoration: none; }
    1018,9 + 5 → ряд показывается с 1024. Запас мал намеренно: ещё одна буква в
    подписи (~9 px) краснит проверку `d.nav_staff_row_margin` раннера ВП — пороги
    тогда перемеряют, а не «как-нибудь пройдёт». */
+/* Linux Chromium, 04.11.2026: ширина полного ряда 1022,5 / 1118,5 px.
+   Старые пороги оставляли только 1,5 px вместо требуемых 5. Добавляем 8 px
+   к порогам, сохраняя запас и на Windows; полный перебор 700–1920 — в ВП. */
 .nav-burger { display: none; }
-@media (max-width: 1023px) {
+@media (max-width: 1031px) {
   .nav-burger { display: inline-flex; }
   /* Прячем ряд и метку, которые стоят В САМОЙ ШАПКЕ; их копии в панели
      живут по своим правилам ниже. Селекторы точные (`>` и `.nav-right`):
@@ -311,7 +314,7 @@ a.nav-icon-btn { text-decoration: none; }
    именем в плашке ему нужно 1524,5 px (документ 1504 при окне 1501: страница ехала
    вбок на 1501–1504). Запас над замером прежний, 35 px: 1524,5 + 35 → имя видно с
    1560. Замер и способ — у порога бургера выше. */
-@media (max-width: 1559px) {
+@media (max-width: 1567px) {
   .nav-user span:last-child { display: none; }
   .nav-user { padding: 3px; }
 }
