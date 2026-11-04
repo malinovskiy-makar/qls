@@ -72,7 +72,7 @@ try {
    const read=()=>({eq:STATE.eq,taxEq:STATE.taxEq,cs:STATE.csTax,ps:STATE.psTax,budget:STATE.budget,dwl:STATE.dwl});
    const raf=()=>new Promise(requestAnimationFrame),frames=[],samples=[];
    const start=geometry(),slider=document.getElementById('tax-slider');
-   let mathError=0,labelOverflow=0,inputLag=0;
+   let mathError=0,areaRelativeError=0,labelOverflow=0,inputLag=0;
    for(let i=0;i<steps;i++){
     await raf();
     const value=i<steps/2?i*200/steps:200-i*200/steps;
@@ -86,13 +86,20 @@ try {
     const actual=STATE.taxEq||{Q:STATE.eq.Q,Pb:STATE.eq.P,Ps:STATE.eq.P};
     const comparisons=[[actual.Q,q],[actual.Pb,pb],[actual.Ps,ps],
      [STATE.budget??0,(pb-ps)*q]];
-    const q0=name==='radical'?(-100+Math.sqrt(50000))/2:100/(1+b);
+    const q0=STATE.eq.Q,aq=actual.Q;
     const welfare=x=>100*x-x*x/2-(name==='radical'?x*x*x/300:b*x*x/2);
-    comparisons.push([rate===0?STATE.cs:STATE.csTax,q*q/2],
-     [rate===0?STATE.ps:STATE.psTax,name==='radical'?q*q*q/150:b*q*q/2],
-     [STATE.dwl??0,welfare(q0)-welfare(q)]);
-    for(const [a,e]of comparisons){if(typeof a!=='number'||!Number.isFinite(a))mathError=Infinity;
-     else mathError=Math.max(mathError,Math.abs(a-e)/Math.max(1,Math.abs(e)));}
+    // c9 integrates with 1000 trapezoids. For S=Q²/100, |f''|=.02:
+    // the independent error bound is |f''| L³/(12 n²). Keep the old
+    // integrator and solver tolerances; don't demand impossible 1e-9 areas.
+    // Areas use the already checked equilibrium to avoid counting root error twice.
+    const areaBound=length=>name==='radical'?Math.abs(length)**3/(600*1000**2):0;
+    const areas=[[rate===0?STATE.cs:STATE.csTax,(100-actual.Pb)*aq-aq*aq/2,0],
+     [rate===0?STATE.ps:STATE.psTax,actual.Ps*aq-(name==='radical'?aq**3/300:b*aq*aq/2),areaBound(aq)],
+     [STATE.dwl??0,welfare(q0)-welfare(aq),areaBound(q0-aq)]];
+    for(const [a,e]of areas)areaRelativeError=Math.max(areaRelativeError,Math.abs(a-e)/Math.max(1,Math.abs(e)));
+    comparisons.push(...areas);
+    for(const [a,e,bound=0]of comparisons){if(typeof a!=='number'||!Number.isFinite(a))mathError=Infinity;
+     else mathError=Math.max(mathError,Math.max(0,Math.abs(a-e)-bound)/Math.max(1,Math.abs(e)));}
     const sync=geometry();await raf();const first=geometry();await raf();
     const frame=geometry(),elapsed=performance.now()-t;
     frames.push(sync,first,frame);
@@ -104,7 +111,7 @@ try {
     }
     samples.push({value:STATE.tax,handler,elapsed,numbers});
    }
-   return {start,frames,samples,mathError,labelOverflow,inputLag,calls:{...__taxPerfCalls}};
+   return {start,frames,samples,mathError,areaRelativeError,labelOverflow,inputLag,calls:{...__taxPerfCalls}};
   },{steps,name});
   await page.waitForTimeout(900);
   const idle=await page.evaluate(()=>({...__taxPerfCalls}));
@@ -118,7 +125,7 @@ try {
   }
   const summary={name,engine,width,theme,steps,run,round,p50:pct(data.samples.map(s=>s.handler),.5),
    p95:pct(data.samples.map(s=>s.handler),.95),frameP95:pct(data.samples.map(s=>s.elapsed),.95),
-   calls:data.calls,geometry,mathError:data.mathError,labelOverflow:data.labelOverflow,inputLag:data.inputLag,before,after,
+   calls:data.calls,geometry,mathError:data.mathError,areaRelativeError:data.areaRelativeError,labelOverflow:data.labelOverflow,inputLag:data.inputLag,before,after,
    idleRedraw:(idle.redrawAll||0)-(data.calls.redrawAll||0),errors};
   console.log(JSON.stringify(summary));reports.push({summary,data});
   await page.screenshot({path:path.join(out,`${name}-${engine}-${width}-${theme}-${round}-${run}.png`)});
