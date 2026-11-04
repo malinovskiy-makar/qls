@@ -40,6 +40,7 @@ let _fromProblem = null;      // вошли из задачи (?from=, ADR 0145)
    на следующем кадре): такое изменение — не правка, его история впитывает
    молча, иначе «Отменить» вела бы в недосчитанную модель. */
 let _histTouched = false;
+let _histActionFirstAt = 0, _histActionLastAt = 0;
 
 function histOf(key) {
   const k = key || modelKeyOf();
@@ -101,6 +102,7 @@ function applyKeepView(s) {
 function historyBaseline() {
   if (!STATE.sceneKey) return;
   _histTouched = false;
+  _histActionFirstAt = _histActionLastAt = 0;
   const h = histOf();
   const s = collectModelState();
   h.last = s; h.lastSig = histSig(s); h.at = 0; h.label = null;
@@ -120,13 +122,16 @@ function historyCheck() {
   if (!_histTouched) { h.last = s; h.lastSig = sig; return; }
   _histTouched = false;
   const now = Date.now();
-  const glue = _histLabel && _histLabel === h.label && (now - h.at) < HIST_GLUE_MS;
+  // Запись могла задержаться перерисовкой и объединить несколько вводов.
+  // Сравниваем первый ещё не записанный ввод с последним уже записанным,
+  // иначе непрерывная серия нажатий дробилась из-за скорости отрисовки.
+  const glue = _histLabel && _histLabel === h.label && ((_histActionFirstAt || now) - h.at) < HIST_GLUE_MS;
   if (!glue) {
     h.undo.push(h.last);
     if (h.undo.length > HIST_MAX) h.undo.shift();
   }
   h.redo.length = 0;
-  h.last = s; h.lastSig = sig; h.at = now; h.label = _histLabel;
+  h.last = s; h.lastSig = sig; h.at = _histActionLastAt || now; h.label = _histLabel;
   _fromLink = false;
   dropShareHash();
   dropFromParam();
@@ -143,9 +148,17 @@ function historyAfterRedraw() {
 }
 
 /* Единая дверь «сейчас будет правка» (pushUndo в 60-overlays.js). */
+function historyTouch() {
+  const now = Date.now();
+  // Пустое действие могло оставить touched: новая серия после паузы
+  // начинается заново, даже если предыдущий ввод не менял значение.
+  if (!_histTouched || now - _histActionLastAt >= HIST_GLUE_MS) _histActionFirstAt = now;
+  _histActionLastAt = now;
+  _histTouched = true;
+}
 function historyMark(label) {
   if (label) _histLabel = label;
-  _histTouched = true;
+  historyTouch();
 }
 
 function historyUndo() {
@@ -194,7 +207,7 @@ function histLabelOf(el) {
   document.addEventListener(ev, (e) => {
     if (!e.isTrusted) return;   // события, которые шлёт сам код, — не действие человека
     const l = histLabelOf(e.target); if (l) _histLabel = l;
-    _histTouched = true;
+    historyTouch();
   }, true);
 });
 
