@@ -50,29 +50,46 @@ function quadratic(v,co){
   return null;
 }
 function relation(x,accept){
-  const norm=Math.hypot(...x),y=x.map(t=>t/norm),s=y.map((_,i)=>Math.hypot(...y.slice(i)));
-  const H=y.map((_,i)=>[0,1].map(j=>i<j?0:i===j?s[i+1]/s[i]:-y[i]*y[j]/(s[j]*s[j+1])));
-  const B=y.map((_,i)=>y.map((_,j)=>+(i===j)));
+  // Это всегда задача размерности 3. Плоские буферы сохраняют порядок
+  // арифметики PSLQ, но не создают map/slice/коэффициенты на каждом из
+  // сотен тысяч внутренних шагов при движении ставки. Пределы, допуски
+  // и проверка найденного радикала с 30 знаками остались прежними.
+  const norm=Math.hypot(...x),y=new Float64Array([x[0]/norm,x[1]/norm,x[2]/norm]);
+  const s0=Math.hypot(...y),s1=Math.hypot(y[1],y[2]),s2=Math.hypot(y[2]);
+  const H=new Float64Array([s1/s0,0,-y[1]*y[0]/(s0*s1),s2/s1,
+    -y[2]*y[0]/(s0*s1),-y[2]*y[1]/(s1*s2)]);
+  const B=new Float64Array([1,0,0,0,1,0,0,0,1]);
+  const rejected=new Float64Array(9).fill(NaN);
   const reduce=()=>{for(let i=1;i<3;i++)for(let j=i-1;j>=0;j--){
-    if(Math.abs(H[j][j])<1e-25)return false;
-    const t=Math.round(H[i][j]/H[j][j]);
-    y[j]+=t*y[i];for(let k=0;k<=j;k++)H[i][k]-=t*H[j][k];
-    for(let k=0;k<3;k++)B[k][j]+=t*B[k][i];
-  }return B.every(row=>row.every(t=>Number.isSafeInteger(t)&&Math.abs(t)<=1e9));};
+    if(Math.abs(H[3*j])<1e-25)return false;
+    const t=Math.round(H[2*i+j]/H[3*j]);
+    y[j]+=t*y[i];for(let k=0;k<=j;k++)H[2*i+k]-=t*H[2*j+k];
+    for(let k=0;k<3;k++)B[3*k+j]+=t*B[3*k+i];
+  }
+  for(let k=0;k<9;k++)if(!Number.isSafeInteger(B[k])||Math.abs(B[k])>1e9)return false;
+  return true;};
   for(let iter=0;iter<100;iter++){
     if(!reduce())return null;
     for(let j=0;j<3;j++){
-      const co=B.map(row=>row[j]);
-      const residual=Math.abs(co.reduce((sum,k,i)=>sum+k*x[i],0));
-      if(residual>1e-9*Math.max(1,...co.map((k,i)=>Math.abs(k*x[i]))))continue;
-      const r=accept(co);if(r)return r;
+      // Нулевая редукция оставляет тот же столбец. Чистая проверка уже
+      // отвергла его: повторять невязку, gcd и поиск радикала незачем.
+      if(B[j]===rejected[3*j]&&B[3+j]===rejected[3*j+1]&&B[6+j]===rejected[3*j+2])continue;
+      const a=B[j]*x[0],b=B[3+j]*x[1],c=B[6+j]*x[2];
+      const residual=Math.abs(((0+a)+b)+c);
+      if(residual>1e-9*Math.max(1,Math.abs(a),Math.abs(b),Math.abs(c)))continue;
+      rejected[3*j]=B[j];rejected[3*j+1]=B[3+j];rejected[3*j+2]=B[6+j];
+      const r=accept([B[j],B[3+j],B[6+j]]);if(r)return r;
     }
-    const m=1.2*Math.abs(H[1][1])>Math.abs(H[0][0])?1:0;
-    [y[m],y[m+1]]=[y[m+1],y[m]];[H[m],H[m+1]]=[H[m+1],H[m]];
-    for(let i=0;i<3;i++)[B[i][m],B[i][m+1]]=[B[i][m+1],B[i][m]];
+    const m=1.2*Math.abs(H[3])>Math.abs(H[0])?1:0;
+    const ym=y[m];y[m]=y[m+1];y[m+1]=ym;
+    for(let j=0;j<2;j++){const h=H[2*m+j];H[2*m+j]=H[2*(m+1)+j];H[2*(m+1)+j]=h;}
+    for(let i=0;i<3;i++){
+      const b=B[3*i+m];B[3*i+m]=B[3*i+m+1];B[3*i+m+1]=b;
+      const r=rejected[3*m+i];rejected[3*m+i]=rejected[3*(m+1)+i];rejected[3*(m+1)+i]=r;
+    }
     if(m===0){
-      const n=Math.hypot(H[0][0],H[0][1]),a=H[0][0]/n,b=H[0][1]/n;
-      for(let i=0;i<3;i++){const h=H[i][0];H[i][0]=a*h+b*H[i][1];H[i][1]=-b*h+a*H[i][1];}
+      const n=Math.hypot(H[0],H[1]),a=H[0]/n,b=H[1]/n;
+      for(let i=0;i<3;i++){const h=H[2*i];H[2*i]=a*h+b*H[2*i+1];H[2*i+1]=-b*h+a*H[2*i+1];}
     }
   }
   return null;

@@ -85,6 +85,14 @@ const BOTTOM_BAND = 44;
 /* Запас левого поля под подпись координаты (см. разбор в fitMargins). */
 const COORD_LABEL_PAD = 24;
 
+// На экране налоговой сцены поле не зависит от текущей ставки. Иначе
+// 298/3 вместо 99 сдвигало всю плоскость на 3 px, радикал — на 106 px.
+// На бумаге ширина поля подбирается под единственный экспортируемый кадр.
+function fixedTaxCoordinateBand() {
+  return STATE.mode === 'market' && ['taxes', 'tax', 'tax-adv'].includes(STATE.sceneKey)
+    && !(typeof texPaperActive === 'function' && texPaperActive());
+}
+
 function fitMargins() {
   const m = CONFIG.margin;
   makeScales();
@@ -111,6 +119,13 @@ function fitMargins() {
      scripts/calc2_coordlabel_probe.js считает, сколько подписей залезло правее
      оси, и при этом запасе их ноль. */
   m.left = Math.max(_coordMarginLeft, 30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
+  if (fixedTaxCoordinateBand()) {
+    // Постоянный запас под два слагаемых точной записи с дробями и корнем.
+    // На телефоне оставляем не меньше половины холста графику. Формат числа
+    // и его точность не меняются. Крупный шрифт пересчитывает запас сразу.
+    const reserve = Math.ceil(measureText('−9\u202f999/100 + 9\u202f999√998/100', FS.small * labelScale(), 700)) + 24;
+    m.left = Math.max(m.left, Math.min(W / 2, reserve));
+  }
 
   /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
      «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
@@ -158,7 +173,7 @@ function fitCoordinateMargin() {
   const limit=Math.max(0,W-Math.min(240,W*.6));
   const need=Math.min(limit,Math.ceil(width)+18);
   let changed=false;
-  if(need>CONFIG.margin.left+1){_coordMarginLeft=need;changed=true;}
+  if(!fixedTaxCoordinateBand() && need>CONFIG.margin.left+1){_coordMarginLeft=need;changed=true;}
   const xs=[...node.querySelectorAll('text.coord-num')]
     .filter(t=>t.getAttribute('text-anchor')==='middle').map(t=>t.getBoundingClientRect());
   // На узком холсте соседние значения занимают два ряда, без сдвига вдоль оси.

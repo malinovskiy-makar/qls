@@ -1126,6 +1126,15 @@ function smoothLabel(key, px, py, toLeft) {
   // Здесь кривая меняется сразу; отложенная анимация отрывала от неё имя.
   if (!key || STATE.mode === 'graph') return { px, py, toLeft };
   const prev = _labelPos.get(key);
+  // В налоговой сцене якорь уже уточнён curveAnchor до края кривой.
+  // Доводка имени через redrawKeepingWindow пересчитывала всю экономику,
+  // SVG и обе панели ещё 5–6 раз после каждого шага ставки. Имя следует
+  // за новой кривой в том же кадре; память стороны нужна для гистерезиса.
+  if (STATE.mode === 'market' && ['taxes', 'tax', 'tax-adv'].includes(STATE.sceneKey)) {
+    const out = { px, py, toLeft, below: prev?.below };
+    _labelPos.set(key, out);
+    return out;
+  }
   if (!prev) { _labelPos.set(key, { px, py, toLeft }); return { px, py, toLeft }; }
   const far = Math.hypot(px - prev.px, py - prev.py) > LABEL_JUMP;
   const nx = far ? px : prev.px + (px - prev.px) * LABEL_EASE;
