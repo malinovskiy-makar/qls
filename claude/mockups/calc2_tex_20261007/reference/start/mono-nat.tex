@@ -1,0 +1,63 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Естественная монополия.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c00797A}{HTML}{00797A}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c2E9E44}{HTML}{2E9E44}
+\definecolor{cD23B3B}{HTML}{D23B3B}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{c119C8A}{HTML}{119C8A}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{c0E8072}{HTML}{0E8072}
+\definecolor{c8B3FE0}{HTML}{8B3FE0}
+\definecolor{cB5791F}{HTML}{B5791F}
+\definecolor{c9F6A1B}{HTML}{9F6A1B}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель main: x от 0 до 100, y от 0 до 100
+\begin{axis}[name=panelA, at={(46.5pt,33.0pt)}, anchor=south west, width=340.5pt, height=226.5pt, scale only axis, clip=false, xmin=0, xmax=100, ymin=0, ymax=100, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={10,20,30,40,50,60,70,80,90}, xticklabels={{$10$},{$20$},{$30$},{\textcolor{c00797A}{$40_{m}$}},{$50$},{$60$},{},{\textcolor{c00797A}{$80_{\mathrm{MC}}$}},{$90$}}, ytick={20,40,60,80}, yticklabels={{\textcolor{c00797A}{$20_{\mathrm{MC}}$}},{$40$},{\textcolor{c00797A}{$60_{m}$}},{$80$}}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={100}, extra x tick labels={}, extra y ticks={100}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}, xlabel={$Q$}, xlabel style={at={(current axis.right of origin)}, anchor=west, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, ylabel={$P$}, ylabel style={at={(current axis.above origin)}, anchor=south, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}]
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:100,100);
+\fill[c2E9E44, opacity=0.20] (axis cs:0,40) rectangle (axis cs:40,60);
+\fill[cD23B3B, opacity=0.18] (axis cs:0,20) rectangle (axis cs:80,30);
+\addplot[c2F6FED, line width=1.13pt, domain=0:100, samples=2, forget plot] {100 - x};   % D
+\addplot[c119C8A, line width=1.13pt, domain=0:100, samples=2, forget plot] {20};   % MC
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2A6CED] at (axis cs:95.678,5.318) {$D$};
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c0E8072] at (axis cs:95.678,15.364) {$\mathrm{MC}$};
+\draw[c8B3FE0, line width=0.50pt, dash pattern=on 3.6pt off 2.4pt, opacity=0.45] (axis cs:50,0) -- (axis cs:65,-30);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[c8B3FE0, line width=0.90pt, dash pattern=on 3.6pt off 2.4pt] (axis cs:0,100) -- (axis cs:50,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\addplot[cB5791F, line width=1.13pt, forget plot] coordinates {(7.274,130) (7.465,127.167) (7.714,123.711) (7.963,120.471) (8.211,117.427) (8.46,114.563) (8.709,111.862) (8.957,109.311) (9.206,106.897) (9.455,104.611) (9.704,102.442) (9.952,100.382) (10.201,98.422) (10.45,96.555) (10.699,94.775) (10.948,93.076) (11.196,91.453) (11.445,89.9) (11.694,88.413) (11.943,86.988) (12.191,85.621) (12.44,84.309) (12.689,83.048) (12.937,81.836) (13.186,80.669) (13.435,79.546) (13.684,78.464) (13.933,77.42) (14.181,76.413) (14.43,75.44) (14.679,74.501) (14.928,73.592) (15.176,72.714) (15.425,71.864) (15.674,71.041) (15.922,70.243) (16.171,69.471) (16.42,68.721) (16.669,67.994) (16.917,67.288) (17.166,66.603) (17.415,65.937) (17.664,65.29) (17.913,64.662) (18.161,64.05) (18.41,63.455) (18.659,62.875) (18.907,62.311) (19.156,61.762) (19.405,61.226) (19.654,60.705) (19.902,60.196) (20.151,59.7) (20.4,59.216) (20.649,58.743) (20.898,58.282) (21.146,57.832) (21.395,57.392) (21.644,56.962) (21.893,56.542) (22.141,56.132) (22.39,55.73) (22.639,55.338) (22.887,54.954) (23.136,54.578) (23.385,54.21) (23.634,53.85) (23.883,53.497) (24.131,53.152) (24.38,52.814) (24.629,52.482) (24.878,52.158) (25.126,51.839) (25.375,51.527) (25.624,51.221) (25.872,50.921) (26.121,50.626) (26.37,50.337) (26.619,50.054) (26.867,49.776) (27.116,49.503) (27.365,49.234) (27.614,48.971) (27.863,48.713) (28.111,48.458) (28.36,48.209) (28.609,47.964) (28.857,47.723) (29.106,47.485) (29.355,47.253) (29.604,47.024) (29.852,46.798) (30.101,46.577) (30.35,46.359) (30.599,46.145) (30.848,45.934) (31.096,45.726) (31.345,45.523) (31.594,45.322) (31.843,45.124) (32.091,44.929) (32.34,44.737) (32.589,44.548) (32.837,44.362) (33.086,44.179) (33.335,43.999) (33.584,43.821) (33.833,43.646) (34.081,43.473) (34.33,43.303) (34.579,43.136) (34.828,42.97) (35.076,42.808) (35.325,42.647) (35.574,42.488) (35.822,42.332) (36.071,42.178) (36.32,42.026) (36.569,41.876) (36.817,41.729) (37.066,41.583) (37.315,41.439) (37.564,41.297) (37.813,41.157) (38.061,41.019) (38.31,40.882) (38.559,40.748) (38.807,40.615) (39.056,40.483) (39.305,40.354) (39.554,40.225) (39.802,40.099) (40.051,39.975) (40.3,39.851) (40.549,39.729) (40.798,39.609) (41.046,39.49) (41.295,39.373) (41.544,39.257) (41.793,39.142) (42.041,39.029) (42.29,38.917) (42.539,38.806) (42.787,38.697) (43.036,38.589) (43.285,38.482) (43.534,38.376) (43.783,38.272) (44.031,38.169) (44.28,38.067) (44.529,37.966) (44.778,37.866) (45.026,37.768) (45.275,37.67) (45.524,37.573) (46.021,37.383) (46.27,37.29) (46.519,37.197) (47.016,37.015) (47.514,36.837) (48.011,36.663) (48.26,36.577) (48.509,36.492) (48.757,36.408) (49.255,36.242) (49.504,36.16) (49.752,36.079) (50.25,35.921) (50.748,35.764) (51.245,35.611) (51.494,35.536) (51.991,35.387) (52.489,35.241) (52.986,35.098) (53.484,34.958) (53.733,34.888) (54.23,34.752) (54.728,34.618) (55.225,34.486) (55.722,34.357) (56.22,34.23) (56.717,34.105) (57.215,33.982) (57.713,33.862) (58.21,33.743) (58.707,33.627) (59.205,33.512) (59.702,33.4) (60.2,33.289) (60.946,33.126) (61.693,32.968) (62.439,32.813) (62.936,32.711) (63.683,32.562) (64.18,32.465) (64.926,32.322) (65.424,32.228) (66.419,32.045) (67.414,31.867) (68.16,31.737) (68.906,31.61) (69.652,31.485) (70.15,31.404) (71.394,31.205) (72.14,31.089) (73.135,30.939) (74.13,30.792) (75.125,30.649) (75.871,30.544) (76.866,30.408) (77.613,30.308) (78.856,30.145) (80.1,29.987) (81.095,29.865) (82.339,29.716) (83.334,29.6) (85.075,29.403) (86.319,29.268) (87.314,29.162) (88.806,29.008) (90.548,28.835) (92.04,28.692) (93.284,28.576) (95.025,28.419) (96.269,28.31) (97.761,28.183) (99.751,28.02) (100,28)};   % БЕЗ ЗАПИСИ: по отсчётам (228 узлов)
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c9F6A1B] at (axis cs:91.678,30.92) {$\mathrm{ATC}$};
+\end{scope}
+\draw[c2D2D2D, line width=0.54pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.85] (axis cs:40,0) -- (axis cs:40,60);
+\draw[c2D2D2D, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.55] (axis cs:0,60) -- (axis cs:40,60);
+\fill[c2D2D2D] (axis cs:40,60) circle[radius=2.7pt];
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont\boldmath, text=c2D2D2D] at (axis cs:38.018,62.98) {$M$};
+\draw[cB5791F, line width=0.54pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.85] (axis cs:68.284,0) -- (axis cs:68.284,31.716);
+\draw[cB5791F, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.55] (axis cs:0,31.716) -- (axis cs:68.284,31.716);
+\fill[cB5791F] (axis cs:68.284,31.716) circle[radius=2.7pt];
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont\boldmath, text=c9F6A1B] at (axis cs:70.267,34.696) {$E_{\mathrm{ATC}}$};
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, yshift=-6.0pt] at (axis cs:68.284,0) {$68{,}28_{\mathrm{ATC}}$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,31.716) {$31{,}72_{\mathrm{ATC}}$};
+\draw[c119C8A, line width=0.54pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.85] (axis cs:80,0) -- (axis cs:80,20);
+\draw[c119C8A, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt, opacity=0.55] (axis cs:0,20) -- (axis cs:80,20);
+\fill[c119C8A] (axis cs:80,20) circle[radius=2.7pt];
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont\boldmath, text=c0E8072] at (axis cs:78.018,22.98) {$E_{\mathrm{MC}}$};
+\node[anchor=north east, inner sep=0pt, xshift=-4pt, yshift=-4pt, font=\fontsize{8}{9.2}\selectfont, text=c6B6457] at (axis cs:0,0) {$0$};
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

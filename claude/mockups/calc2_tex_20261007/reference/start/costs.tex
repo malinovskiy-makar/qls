@@ -1,0 +1,59 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Издержки фирмы.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{patterns}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c00797A}{HTML}{00797A}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{cC9C3B5}{HTML}{C9C3B5}
+\definecolor{c2E9E44}{HTML}{2E9E44}
+\definecolor{c8B3FE0}{HTML}{8B3FE0}
+\definecolor{cB5791F}{HTML}{B5791F}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{c119C8A}{HTML}{119C8A}
+\definecolor{c0E8072}{HTML}{0E8072}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{c9F6A1B}{HTML}{9F6A1B}
+\definecolor{cB0338C}{HTML}{B0338C}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель main: x от 0 до 10, y от 0 до 50
+\begin{axis}[name=panelA, at={(39.0pt,33.0pt)}, anchor=south west, width=340.5pt, height=226.5pt, scale only axis, clip=false, xmin=0, xmax=10, ymin=0, ymax=50, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={1,2,3,4,5,6,7,8,9}, xticklabels={{$1$},{$2$},{$3$},{\textcolor{c00797A}{$4$}},{$5$},{$6$},{$7$},{$8$},{$9$}}, ytick={10,20,30,40}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={10}, extra x tick labels={}, extra y ticks={50}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}, xlabel={$Q$}, xlabel style={at={(current axis.right of origin)}, anchor=west, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, ylabel={$P$}, ylabel style={at={(current axis.above origin)}, anchor=south, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, legend style={at={(0.680,0.199)}, anchor=north west, draw=cC9C3B5, fill=white, fill opacity=0.9, text opacity=1, font=\fontsize{9}{10.3}\selectfont, cells={anchor=west}, row sep=0.5pt, inner sep=3pt}]
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:10,50);
+\fill[pattern=north east lines, pattern color=c2E9E44] (axis cs:0,11.5) rectangle (axis cs:4,15);   % Прибыль фирмы
+\addplot[c8B3FE0, line width=0.99pt, domain=0.2769231:10, samples=641, restrict y to domain*=-15:65, forget plot] {18 / x};
+\addplot[cB5791F, line width=0.99pt, domain=0.000022:10, samples=41, forget plot] {(x^3 - 6 * x^2 + 15 * x + 18 - 18) / x};
+\addplot[c2F6FED, line width=0.99pt, domain=0.3464299:10, samples=321, restrict y to domain*=-15:65, forget plot] {(x^3 - 6 * x^2 + 15 * x + 18) / x};
+\addplot[c119C8A, line width=0.99pt, domain=0.000022:6.5460606, samples=41, restrict y to domain*=-15:65, forget plot] {3 * x^2 + 15 - 12 * x};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c0E8072] at (axis cs:6.0479,46.682) {$\mathrm{MC}$};
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2A6CED] at (axis cs:9.2778,46.682) {$\mathrm{ATC}$};
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c9F6A1B] at (axis cs:9.4253,48.834) {$\mathrm{AVC}$};
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c8B3FE0] at (axis cs:9.5678,3.015) {$\mathrm{AFC}$};
+\fill[c2F6FED] (axis cs:3.6685,11.354) circle[radius=2.4pt];
+\node[anchor=base, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c2A6CED] at (axis cs:3.6685,12.844) {безубыточность};
+\fill[cB5791F] (axis cs:3,6) circle[radius=2.4pt];
+\node[anchor=base, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c9F6A1B] at (axis cs:3,7.49) {закрытие};
+\end{scope}
+\draw[cB0338C, line width=1.13pt] (axis cs:0,15) -- (axis cs:10,15);
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,15) {$15$};
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:4,15) -- (axis cs:4,0);
+\fill[c2D2D2D] (axis cs:4,15) circle[radius=2.7pt];
+\node[anchor=north east, inner sep=0pt, xshift=-4pt, yshift=-4pt, font=\fontsize{8}{9.2}\selectfont, text=c6B6457] at (axis cs:0,0) {$0$};
+\addlegendimage{legend image code/.code={\fill[pattern=north east lines, pattern color=c2E9E44] (0cm,-0.09cm) rectangle (0.42cm,0.11cm);}} \addlegendentry{Прибыль фирмы}
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

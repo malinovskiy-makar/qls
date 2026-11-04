@@ -15,17 +15,27 @@ function texFallback(expr) {
     .replace(/\*/g, '\\cdot ')
     .replace(/<=/g, '\\le ').replace(/>=/g, '\\ge ');
 }
+/* ⚠️ ОДНОБУКВЕННАЯ ПЕРЕМЕННАЯ — КУРСИВОМ, ДАЖЕ ЕСЛИ MATH.JS ЗНАЕТ ЕЁ КАК ЕДИНИЦУ (сессия 7 «тихих панелей», А3.5;
+   Notion …81fd…). Math.js печатает символ, совпавший с единицей измерения, прямым шрифтом: L (литр), K (кельвин),
+   W (ватт), m, s, g, h, A, N … → \mathrm{L}. В поле «W = 100 − L» и «Q = L^0.5·K^0.5» буквы L и K стояли прямо, а
+   прочие переменные — курсивом. Правим только ЗАПИСЬ: разбор и счёт формулы идут мимо этой функции. Имя функции
+   («\mathrm{f}\left(») не трогаем. */
+function texVarsItalic(tex) {
+  return String(tex).replace(/\\mathrm\{([A-Za-z])\}(?!\\left)/g, ' $1')
+    .replace(/(\d)~\s+(?=[A-Za-z](?![A-Za-z]))/g, '$1');
+}
 function mathToTex(expr) {
   const s = String(expr || '').trim();
   if (!s) return '';
-  try { return math.parse(s).toTex({ parenthesis: 'auto' }); }
+  const options = {parenthesis:'auto',handler:node => node.isConstantNode && typeof node.value === 'number' ? CalcNumber.factor(node.value,{tex:true}) : undefined};
+  try { return texVarsItalic(math.parse(s).toTex(options)); }
   catch (e) {
     /* Предпросмотр показывает то, что считает движок. Запись, которую Math.js
        не берёт как есть («100-ax», вставленный из буфера LaTeX), он берёт
        после общей подготовки — той же, что стоит перед разбором. Сначала
        пробуем исходный текст: подготовка раскрывает неявное умножение, и
        показывать «a*x» там, где человек набрал «ax», незачем. */
-    try { const t = prepExpr(s); if (t !== s) return math.parse(t).toTex({ parenthesis: 'auto' }); }
+    try { const t = prepExpr(s); if (t !== s) return texVarsItalic(math.parse(t).toTex(options)); }
     catch (e2) {}
     return texFallback(s);
   }
@@ -49,8 +59,13 @@ function renderTexRaw(el, tex) {
   if (!katexInto(el, tex)) el.textContent = tex;
 }
 // KaTeX подгружается отложенно — когда доедет, перерисовываем то, что уже на экране.
+/* ⚠️ ОЧЕРЕДЬ ЖИВЁТ ТОЛЬКО ДО ЗАГРУЗКИ, ПОТОМ В НЕЁ НЕ КЛАДУТ (13.10). Раньше
+   каждое собранное поле формулы клало сюда своё замыкание навсегда, а строки
+   списка функций пересобирались на каждом шаге ползунка сдвига: замыкание
+   держало старую строку с полем MathLive и его теневым деревом. 808 шагов
+   «Сдвига MC» — 15 979 → 487 483 узла DOM, и Safari ронял вкладку. */
 const _texPending = [];
-function onKatexReady() { _texPending.forEach(fn => { try { fn(); } catch (e) {} }); }
+function onKatexReady() { _texPending.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); }
 
 /* Подсказка формата формулы (Фаза 4а). Карточка под полем: заголовок, сетка
    примеров (каждый — набранная формула + за что её берут) и строка о синтаксисе.
@@ -259,12 +274,15 @@ function renderPw() {
   const cnt = document.getElementById('pw-count');
   if (cnt && document.activeElement !== cnt) cnt.value = PW.n;
   while (PW.rows.length < PW.n) PW.rows.push({ f: '', a: '', b: '' });
+  PW.rows.length = PW.n;
+  pwSyncHead();
   const box = document.getElementById('pw-rows');
   if (box) {
     box.innerHTML = '';
     for (let i = 0; i < PW.n; i++) {
       const row = document.createElement('div');
       row.className = 'pw-row';
+      row.dataset.i = i;
       // Формула куска набирается тем же движком, что и в панели: пользователь
       // пишет 0.5*x и сразу видит точку умножения, дробь рисуется дробью.
       const slot = document.createElement('div');
@@ -274,61 +292,175 @@ function renderPw() {
       f.setAttribute('aria-label', 'Формула куска ' + (i + 1));
       f.addEventListener('input', () => { PW.rows[i].f = f.value; pwPreview(); });
       slot.appendChild(f);
-      const from = document.createElement('span'); from.className = 'pw-when'; from.textContent = 'От';
-      const a = document.createElement('input');
-      a.type = 'text'; a.className = 'pw-bound'; a.value = PW.rows[i].a;
-      a.placeholder = i === 0 ? '0' : '';
-      a.setAttribute('aria-label', 'Начало участка ' + (i + 1));
-      a.addEventListener('input', () => { PW.rows[i].a = a.value; pwPreview(); });
-      const to = document.createElement('span'); to.className = 'pw-when'; to.textContent = 'До';
-      const b = document.createElement('input');
-      b.type = 'text'; b.className = 'pw-bound'; b.value = PW.rows[i].b;
-      b.placeholder = i === PW.n - 1 ? '∞' : '';
-      b.setAttribute('aria-label', 'Конец участка ' + (i + 1));
-      b.addEventListener('input', () => { PW.rows[i].b = b.value; pwPreview(); });
-      row.append(slot, from, a, to, b);
+      /* Соседние границы связаны (README макета, 6.6): правка «до» куска
+         двигает «от» следующего, пока они совпадали, и наоборот. */
+      const bound = (key, label, ph) => {
+        const e = document.createElement('input');
+        e.type = 'text'; e.className = 'pw-bound'; e.value = PW.rows[i][key];
+        e.placeholder = ph; e.setAttribute('aria-label', label + ' ' + (i + 1));
+        e.inputMode = 'decimal';
+        e.addEventListener('input', () => {
+          const was = PW.rows[i][key];
+          PW.rows[i][key] = e.value;
+          const j = key === 'b' ? i + 1 : i - 1, other = key === 'b' ? 'a' : 'b';
+          if (PW.rows[j] && String(PW.rows[j][other]).trim() === String(was).trim()) {
+            PW.rows[j][other] = e.value;
+            const peer = box.querySelector('.pw-row[data-i="' + j + '"] .pw-bound[data-k="' + other + '"]');
+            if (peer) peer.value = e.value;
+          }
+          pwPreview();
+        });
+        e.dataset.k = key;
+        return e;
+      };
+      const a = bound('a', 'Начало участка', i === 0 ? '0' : '');
+      const b = bound('b', 'Конец участка', i === PW.n - 1 ? '∞' : '');
+      row.append(slot, a, b);
+      if (PW.n > 1) {
+        const del = document.createElement('button');
+        del.type = 'button'; del.className = 'pw-del';
+        del.setAttribute('aria-label', 'Убрать кусок ' + (i + 1));
+        del.setAttribute('data-tip', 'Убрать кусок');
+        del.textContent = '×';
+        del.addEventListener('click', () => pwRemoveRow(i));
+        row.appendChild(del);
+      }
       box.appendChild(row);
       upgradeFormulaField(f);
-      // Клавиатура переезжает в ту строку, где стоит курсор (Фаза 7).
+      // Клавиатура пишет в ту строку, где стоит курсор (Фаза 7).
       const focusRow = () => pwAttachKeyboard(row, f);
       f.addEventListener('focus', focusRow);
       if (f._mf) f._mf.addEventListener('focusin', focusRow);
       if (i === 0) focusRow();
     }
   }
+  const add = document.getElementById('pw-add');
+  if (add) add.hidden = PW.n >= 12;
   pwPreview();
 }
 
+/* Шапка окна: имя и обозначение функции, приставка «P =» у скобки, буква в
+   подписях колонок, кнопки «−» и «+» на краю диапазона бледнее. */
+function pwSyncHead() {
+  const v = pwVar();
+  const pfx = (PW.inp ? pwPrefixOf(PW.inp.value) : '').trim().replace(/=\s*$/, '').trim();
+  const pre = document.getElementById('pw-prefix');
+  if (pre) { const t = (pfx || (PW.prefixDefault || 'P')) + '\\,='; if (typeof katexInto === 'function') katexInto(pre, t); else pre.textContent = t.replace('\\,', ' '); }
+  ['pw-col-from', 'pw-col-to'].forEach((id, k) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = (k ? 'До ' : 'От ') + '<i>' + v + '</i>';
+  });
+  const nm = document.getElementById('pw-name');
+  if (nm) nm.textContent = PW.name ? ' · ' + PW.name : '';
+  const minus = document.getElementById('pw-minus'), plus = document.getElementById('pw-plus');
+  if (minus) minus.classList.toggle('is-edge', PW.n <= 1);
+  if (plus) plus.classList.toggle('is-edge', PW.n >= 12);
+}
+function pwSetCount(n) {
+  n = Math.max(1, Math.min(12, n | 0));
+  if (n === PW.n) return;
+  if (n > PW.n) { while (PW.n < n) pwAddRow(true); renderPw(); return; }
+  PW.n = n; PW.rows.length = n;
+  if (PW.rows[n - 1]) PW.rows[n - 1].b = '';
+  renderPw();
+}
+/* «Добавить кусок» продолжает последний: закрывает его открытую границу на
+   шаг дальше (длина предыдущего участка, иначе значение «от», иначе 10) и
+   добавляет кусок с той же формулой (README макета, 6.6). */
+function pwAddRow(quiet) {
+  if (PW.n >= 12) return;
+  const last = PW.rows[PW.n - 1] || { f: '', a: '', b: '' };
+  const num = (t) => CalcNumber.parse(t)?.value ?? null;
+  let to = num(last.b);
+  if (to == null) {
+    const a = num(last.a), prev = PW.rows[PW.n - 2];
+    const len = prev && num(prev.a) != null && num(prev.b) != null ? num(prev.b) - num(prev.a) : null;
+    to = (a != null ? a : 0) + (len && len > 0 ? len : (a ? a : 10));
+    last.b = String(+to.toPrecision(6));
+  }
+  PW.rows[PW.n - 1] = last;
+  PW.rows.push({ f: last.f, a: last.b, b: '' });
+  PW.n++;
+  if (!quiet) renderPw();
+}
+// Удалённый кусок отдаёт участок соседу сверху (у первого — снизу): дыр нет.
+function pwRemoveRow(i) {
+  if (PW.n <= 1) return;
+  const gone = PW.rows[i];
+  if (i > 0) PW.rows[i - 1].b = gone.b;
+  else if (PW.rows[1]) PW.rows[1].a = gone.a;
+  PW.rows.splice(i, 1);
+  PW.n--;
+  renderPw();
+}
+/* Проверка записи по кускам (README макета, 6.6): ошибка — первая, текстом;
+   замечания (перекрытие, дыра) — не ошибки. */
+function pwCheck() {
+  const rows = pwRows();
+  const v = pwVar();
+  const num = (t) => CalcNumber.parse(t)?.value ?? null;
+  const out = { error: '', bad: [], notes: [] };
+  const err = (i, what, msg) => { if (!out.error) out.error = msg; out.bad.push([i, what]); };
+  rows.forEach((r, i) => {
+    const n = 'Кусок ' + (i + 1) + ': ';
+    if (!r.f) err(i, 'f', n + 'впишите формулу');
+    else { try { math.parse(prepExpr(r.f)); } catch (e) { const m = String(e.message || e).replace(/\s*\(char \d+\)/, ''); err(i, 'f', n + m.charAt(0).toLowerCase() + m.slice(1)); } }
+    if (r.a !== '' && num(r.a) == null) err(i, 'a', n + 'граница «от» должна быть числом');
+    if (r.b !== '' && num(r.b) == null) err(i, 'b', n + 'граница «до» должна быть числом');
+    if (num(r.a) != null && num(r.b) != null && num(r.a) >= num(r.b)) err(i, 'a', n + '«от» должно быть меньше «до»');
+  });
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const b = num(rows[i].b), a = num(rows[i + 1].a);
+    if (b != null && a != null && a < b) out.notes.push('Куски ' + (i + 1) + ' и ' + (i + 2) + ' перекрываются при ' + v + ' от ' + fmt(a) + ' до ' + fmt(b) + ': там считается кусок ' + (i + 1) + '.');
+    if (b != null && a != null && a > b) out.notes.push('При ' + v + ' от ' + fmt(b) + ' до ' + fmt(a) + ' функция не задана.');
+  }
+  return out;
+}
 /* Одна кнопка клавиатуры на весь редактор: она переезжает к строке, в которой
    стоит курсор. Пять иконок на пять кусков читались как пять разных настроек,
    хотя клавиатура нужна ровно одной строке за раз. */
 function pwAttachKeyboard(row, inp) {
   const kbd = document.getElementById('pw-kbd');
   if (!kbd) return;
-  let btn = document.getElementById('pw-kbd-btn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.type = 'button'; btn.id = 'pw-kbd-btn'; btn.className = 'f-help f-kbd';
-    btn.setAttribute('data-tip', 'Клавиатура');
-    btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
-    btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>'
-      + '<path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01"/>'
-      + '<path d="M8.2 15.6h7.6"/></svg>';
+  /* Редизайн 10.2026 (README макета, раздел 10): кнопка «Клавиатура» стоит
+     внизу окна, а клавиатура открывается колонкой справа от строк и пишет в
+     то поле, где стоит курсор. */
+  const btn = document.getElementById('pw-kbd-btn');
+  if (!btn) return;
+  if (!btn._wired) {
+    btn._wired = true;
     btn.addEventListener('click', () => {
       const open = kbd.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const m = document.getElementById('pw-modal');
+      if (m) m.classList.toggle('kbd-open', open);
       if (open && btn._inp) buildKeyboard(kbd, btn._inp);
     });
   }
-  if (btn.parentElement !== row) row.appendChild(btn);
   btn._inp = inp;
   if (kbd.classList.contains('open')) buildKeyboard(kbd, inp);
 }
 
 function pwPreview() {
   const prev = document.getElementById('pw-preview');
+  const chk = pwCheck();
   if (prev) renderTexRaw(prev, pwLatex());
+  const box = document.getElementById('pw-preview-box');
+  if (box) box.hidden = !!chk.error;
+  const e = document.getElementById('pw-error');
+  if (e) { e.textContent = chk.error; e.hidden = !chk.error; }
+  const nt = document.getElementById('pw-notes');
+  if (nt) { nt.innerHTML = ''; chk.notes.forEach(t => { const d = document.createElement('div'); d.textContent = t; nt.appendChild(d); }); nt.hidden = !chk.notes.length; }
+  document.querySelectorAll('#pw-rows .pw-row').forEach(r => r.querySelectorAll('.is-bad').forEach(x => x.classList.remove('is-bad')));
+  chk.bad.forEach(([i, what]) => {
+    const r = document.querySelector('#pw-rows .pw-row[data-i="' + i + '"]');
+    if (!r) return;
+    const el = what === 'f' ? r.querySelector('.f-slot') : r.querySelector('.pw-bound[data-k="' + what + '"]');
+    if (el) el.classList.add('is-bad');
+  });
+  const ap = document.getElementById('pw-apply');
+  if (ap) ap.classList.toggle('is-off', !!chk.error);
+  PW.error = chk.error;
 }
 
 /* Какой буквой сцена ДЕЙСТВИТЕЛЬНО пишет это поле — читаем из его текущей
@@ -472,12 +604,44 @@ function pwParse(text, fallbackVar) {
    перестаёт течь между полями: он ничего не помнит со страницы, а спрашивает
    само поле. Либо разбор того, что в нём стоит, либо значения по умолчанию с
    буквой этого поля — третьего не дано. */
-function openPiecewise(inp, v) {
+/* «Задать кусками» у обычной формулы (редизайн 10.2026, README макета 6.6):
+   конструктор начинает с ТОЙ ЖЕ формулы, разрезанной на два одинаковых куска.
+   Граница — половина первого положительного корня, округлённая до одной
+   значащей цифры; корня нет — 50. График не меняется, пока не нажато
+   «Готово»: два одинаковых куска и есть прежняя функция. */
+function pwSplitRows(text, v) {
+  const pfx = pwPrefixOf(text);
+  const f = String(text || '').slice(pfx.length).trim();
+  if (!f) return null;
+  let border = 50;
+  try {
+    const code = math.compile(prepExpr(f));
+    const scope = (typeof paramScope === 'function') ? paramScope() : {};
+    const at = (x) => { const o = Object.assign({}, scope); o[v] = x; const y = code.evaluate(o); return typeof y === 'number' ? y : NaN; };
+    let prev = at(0), root = null;
+    for (let i = 1; i <= 4000 && root == null; i++) {
+      const x = i * 0.25, y = at(x);
+      if (isFinite(prev) && isFinite(y) && (prev === 0 || prev * y < 0)) root = prev === 0 ? x - 0.25 : x;
+      prev = y;
+    }
+    if (root != null && root > 0) {
+      const half = root / 2, p = Math.pow(10, Math.floor(Math.log10(half)));
+      border = Math.round(half / p) * p;
+    }
+  } catch (e) { /* формулу не разобрали — граница по умолчанию */ }
+  const b = String(+border.toPrecision(6));
+  return [{ f, a: '', b }, { f, a: b, b: '' }];
+}
+
+function openPiecewise(inp, v, opts) {
   PW.inp = inp; PW.v = v || 'Q';
   const parsed = pwParse(inp ? inp.value : '', PW.v);
+  const split = (!parsed && opts && opts.split) ? pwSplitRows(inp ? inp.value : '', PW.v) : null;
   if (parsed) { PW.v = parsed.v || PW.v; PW.rows = parsed.rows; }
+  else if (split) { PW.rows = split; }
   else { PW.rows = pwDefaultRows(PW.v); }
   PW.n = PW.rows.length;
+  PW.name = (opts && opts.name) || '';
   const m = document.getElementById('pw-modal');
   if (!m) return;
   // Окно открываем ДО сборки полей: MathLive, собранный внутри inert-подложки,
@@ -863,6 +1027,8 @@ let _sceneOpen = false;   // окно выбора закрыто хотя бы 
 function upgradeFormulaField(inp) {
   if (!inp || inp._mfDone) return;
   inp._mfDone = true;
+  // Оторванные от страницы поля (строку пересобрали) в очереди не держим.
+  for (let i = _mfWaiting.length - 1; i >= 0; i--) if (!_mfWaiting[i].isConnected) _mfWaiting.splice(i, 1);
   _mfWaiting.push(inp);
   /* Запасной путь: как только к полю прикоснулись, собираем его немедленно и
      не полагаясь на учёт видимости. Ленивая сборка экономит четыре десятка
@@ -906,6 +1072,7 @@ function upgradeFormulaField(inp) {
    чужой библиотеки — вещь непрочная: не нашли узел, значит просто не
    подбираем кегль, а ширину строке всё равно отдаём. */
 const FIELD_MIN_PX = 11;
+const CARD_MIN_PX = 16;   // запись карточки функции не мельче 16 px (сессия 6, А1)
 
 function fitFormulaField(inp) {
   const mf = inp && inp._mf;
@@ -949,6 +1116,29 @@ function fitFormulaField(inp) {
       mf.style.fontSize = '';
       shrink();
     }
+  } else if (inp.closest('.fc-card')) {
+    /* Карточка функции (тихие панели, сессия 6, А1; ADR 0154): база записи 18 px у всех карточек; запись, которая
+       не помещается, ужимается до CARD_MIN_PX, не меньше. Только НЕкусочные записи и только поля в карточке:
+       кусочные идут веткой выше побайтно как было, прочие поля FORMULA_FIELDS не задеты. */
+    const line = inp.closest('.crow-formula');
+    const shrink = () => {
+      let size = parseFloat(getComputedStyle(mf).fontSize) || 18;
+      for (let step = 0; step < 4; step++) {
+        const need = box.scrollWidth, have = box.clientWidth;
+        if (!need || !have || need <= have + 1 || size <= CARD_MIN_PX) break;
+        size = Math.max(CARD_MIN_PX, size * have / need - 0.2);
+        mf.style.fontSize = size + 'px';
+      }
+    };
+    if (line) line.classList.remove('fc-pre-off');
+    shrink();
+    /* Не влезла и в 16 px (TC «Издержек» в колонке 305 px при 1 240–1 399) — приставка «TC =» уходит (обозначение
+       карточки стоит в верхнем ряду), кегль подбирается заново. Класс на строке без id: вид, не модель. */
+    if (line && box.scrollWidth > box.clientWidth + 1 && line.querySelector(':scope > .fc-prefix')) {
+      line.classList.add('fc-pre-off');
+      mf.style.fontSize = '';
+      shrink();
+    }
   }
   inp._fitSaw = box.scrollWidth;
 }
@@ -964,10 +1154,15 @@ function fitFormulaFields() {
 function fitFormulaFieldsSoon() {
   fitFormulaFields();
   requestAnimationFrame(fitFormulaFields);
-  if (_fitSoonT == null) {
-    _fitSoonT = setTimeout(() => { _fitSoonT = null; fitFormulaFields(); }, 200);
-  }
+  /* Отложенный проход — через 200 мс после ПОСЛЕДНЕГО вызова (сессия 6, А1): таймер от первого вызова срабатывал
+     раньше, чем MathLive дорисовывает только что показанное поле, и запись MC, ATC «Задаю кривые» в WebKit
+     оставалась 18 px и резалась. */
+  if (_fitSoonT != null) clearTimeout(_fitSoonT);
+  _fitSoonT = setTimeout(() => { _fitSoonT = null; fitFormulaFields(); }, 200);
 }
+/* Шрифты формул догружаются позже первой подгонки: запись, которая помещалась запасным шрифтом, после загрузки
+   шире — подгоняем заново (сессия 6, А1: без этого TC «Издержек» оставалась 18 px и резалась). */
+if (document.fonts && typeof document.fonts.addEventListener === 'function') document.fonts.addEventListener('loadingdone', () => fitFormulaFieldsSoon());
 
 /* Собираем только те поля, которые ПРЯМО СЕЙЧАС на экране (А56).
 
@@ -1028,8 +1223,12 @@ function flushMathfields() {
    и внутри них ничего не трогаем — там кириллица уже на своём месте. */
 const TEX_TEXT_CMD = /\\(?:text|textrm|textbf|textit|mathrm|operatorname)\s*\{/g;
 
+/* Десятичная запятая между цифрами — {,} (сессия 7 «тихих панелей», А1; Notion …8102…): без скобок KaTeX
+   считает запятую знаком препинания и ставит после неё пробел, и «1,41» читалось «1, 41». Правка — здесь, на
+   общем входе набора (katexInto), а не в fmt и не в шаблонах сцен: так же уже делают statToTex (60-overlays.js)
+   и answerValueInto (94-answer.js). Пара «2, 3» с пробелом и \, не трогаются. */
 function katexSafe(src) {
-  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,');
+  let s = String(src == null ? '' : src).replace(/[  ]/g, '\\,').replace(/(\d),(?=\d)/g, '$1{,}');
   if (!/[А-Яа-яЁё]/.test(s)) return s;
   // Где начинаются текстовые группы: внутрь них не заглядываем.
   const spans = [];
@@ -1066,7 +1265,7 @@ function katexSafe(src) {
    экране остаётся исходный текст, как и было. */
 function katexInto(el, tex, opts) {
   if (!el) return false;
-  const raw = String(tex == null ? '' : tex);
+  const raw = CalcNumber.texText(String(tex == null ? '' : tex));
   if (typeof katex === 'undefined') { el.textContent = raw; return false; }
   try {
     katex.render(katexSafe(raw), el, Object.assign({ throwOnError: false, displayMode: false }, opts || {}));
@@ -1205,12 +1404,19 @@ function buildMathfield(inp) {
           fieldProblem(inp, 'Не понимаю команду ' + bad + ': калькулятор её не считает');
         return;
       }
+      const hadTex = !!inp.dataset.texUnknown;
       delete inp.dataset.texUnknown;
-      if (typeof fieldProblem === 'function') fieldProblem(inp, '');
       const text = latexToMath(mf.value);
+      /* ⚠️ СООБЩЕНИЕ СНИМАЕТСЯ, ТОЛЬКО КОГДА ТЕКСТ СМЕНИЛСЯ (24.10, ADR 0157). Мост зовётся
+         на каждое событие поля, и на Enter тоже; раньше он стирал сообщение всегда, а
+         обработчик поля ставил его заново только на новом тексте — «P = 100 − 2P» после
+         Enter оставалась красной рамкой без слов (обход 24.10: «ошибки нет»). */
       if (inp.value !== text) {
+        if (typeof fieldProblem === 'function') fieldProblem(inp, '');
         inp.value = text;
         inp.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (hadTex && typeof fieldProblem === 'function') {
+        fieldProblem(inp, '');
       }
     } finally { syncing = false; }
   };
@@ -1264,6 +1470,32 @@ function buildMathfield(inp) {
   fromInput();
 }
 
+/* Записать в поле формулы новое значение ТИХО: без события `input`, то есть
+   без шага истории и без повторного разбора формулы. Нужна сдвигу кривой
+   (ползунок, мышь): модель уже поменяла запись сама, полю остаётся её
+   показать — в MathLive, в накладке-запасе (если поле ещё не собрано) и
+   кеглем по ширине. Пересобирать ради этого строку целиком нельзя (13.10:
+   утечка памяти и 70–150 мс на шаг). */
+function setFormulaFieldQuiet(inp, text) {
+  if (!inp) return;
+  text = String(text == null ? '' : text);
+  if (inp.value === text) return;
+  inp.value = text;
+  const mf = inp._mf;
+  if (mf) {
+    const want = mathToLatexField(text);
+    try { mf.setValue(want, { silenceNotifications: true }); } catch (e) { mf.value = want; }
+    if (fieldActive(inp)) fitFormulaField(inp);
+    return;
+  }
+  const slot = inp.closest('.f-slot');
+  const ts = slot && slot.querySelector(':scope > .f-typeset');
+  if (ts) {
+    renderTex(ts, text.trim());
+    ts.classList.toggle('show', document.activeElement !== inp && !!text.trim() && ts.classList.contains('has'));
+  }
+}
+
 // Вставить кусок формулы в активное поле: в поле MathLive — набранным
 // символом, в обычное поле — текстом Math.js.
 function insertIntoField(inp, tex, txt, back) {
@@ -1299,7 +1531,8 @@ function keyboardAdapter(inp, box) {
     },
     piecewise: function () {
       box.classList.remove('open');
-      openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
+      // Тот же вход, что «Задать кусками»: конструктор начинает с формулы поля.
+      openPiecewise(inp, pwVarForField(inp, box._var || 'x'), { split: true });
     },
   };
 }
@@ -1307,6 +1540,48 @@ function keyboardAdapter(inp, box) {
 // Собрать клавиатуру под конкретным полем. Три раздела, открыт один.
 function buildKeyboard(box, inp) {
   window.MathKbd.build(box, keyboardAdapter(inp, box));
+}
+
+/* «Как писать» — четвёртый раздел окна клавиатуры поля формулы (тихие панели 14.10:
+   кнопки «Как писать формулы» в шапке «Условия» больше нет, решение …81eb…, ADR 0151).
+   Таблица записи HOW_TO_ROWS (92-ui-kit.js) и примеры по роли поля (FORMULA_EXAMPLES).
+   Пример — строкой, как его набирают: это справка по записи, поэтому моноширинным
+   (единственное место панелей с моноширинным шрифтом — образец набора). Раздел
+   заводится здесь, а не в общем модуле static/mathkbd (им живут и домашки). */
+function addHowToTab(box, kind) {
+  const tabs = box.querySelector(':scope > .mkbd-tabs');
+  if (!tabs || box.querySelector(':scope > .mkbd-howto') || typeof HOW_TO_ROWS === 'undefined') return;
+  const tab = document.createElement('button');
+  tab.type = 'button'; tab.className = 'mkbd-tab'; tab.textContent = 'Как писать';
+  const pane = document.createElement('div');
+  pane.className = 'mkbd-pane mkbd-howto';
+  const rows = (list, typeset) => {
+    const t = document.createElement('div'); t.className = 'howto-rows';
+    list.forEach(([a, b]) => {
+      const r = document.createElement('div'); r.className = 'howto-row';
+      const m = document.createElement('span'); m.className = 'howto-ex';
+      if (typeset && typeof renderTex === 'function') renderTex(m, a); else m.textContent = a;
+      const n = document.createElement('span'); n.className = 'howto-note'; n.textContent = b;
+      r.append(m, n); t.appendChild(r);
+    });
+    return t;
+  };
+  pane.appendChild(rows(HOW_TO_ROWS, false));
+  const set = (typeof FORMULA_EXAMPLES !== 'undefined') ? FORMULA_EXAMPLES[kind] : null;
+  if (set && set.items && set.items.length) {
+    const sub = document.createElement('div'); sub.className = 'mkbd-lab'; sub.textContent = 'Примеры для этого поля';
+    pane.append(sub, rows(set.items, true));
+  }
+  const ps = box.querySelectorAll(':scope > .mkbd-pane'), last = ps[ps.length - 1];
+  if (last) last.after(pane); else box.appendChild(pane);
+  tab.addEventListener('click', () => {
+    tabs.querySelectorAll('.mkbd-tab').forEach(x => x.classList.remove('active'));
+    box.querySelectorAll(':scope > .mkbd-pane').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active'); pane.classList.add('active');
+  });
+  // Свои разделы модуля гасят только свои панели: «Как писать» гасим сами.
+  tabs.querySelectorAll('.mkbd-tab').forEach(x => x.addEventListener('click', () => { if (x !== tab) pane.classList.remove('active'); }));
+  tabs.appendChild(tab);
 }
 
 // Закрыть все открытые клавиатуры, кроме той, что в переданном слоте.
@@ -1337,16 +1612,130 @@ function closeAllKeyboardsExcept(slot) {
 
    Один помощник на все поля: четырнадцать копий этой подписки разошлись бы. */
 const FORMULA_INPUT_DELAY = 220;
-function onFormulaInput(inp, apply) {
-  if (!inp || typeof apply !== 'function') return;
+/* ⚠️ НЕВЕРНАЯ ЗАПИСЬ В МОДЕЛЬ НЕ УХОДИТ (редизайн 10.2026, фаза 4).
+   Раньше живые поля (математика, сумма КПВ, изокванта, макро) применяли
+   каждый символ, и «x² − 4 +» опустошало сцену до конца набора. Теперь запись
+   сначала проверяется: синтаксис по частям уравнения (знак равенства и
+   неравенства допустимы — у ограничения и неявных кривых он есть), у КПВ —
+   её собственный разбор, у списка доходов — числа через запятую. Неверная
+   остаётся черновиком в поле с пометкой и текстом под ним; модель держит
+   последнюю верную. Пустое поле законно только там, где оно значит «кривой
+   нет» (FORMULA_EMPTY_OK). Смысловые ошибки (неизвестная функция) по-прежнему
+   ловит сам движок. */
+const FORMULA_EMPTY_OK = /^(inp-cmc|inp-catc|inp-cavc|inp-ki-3|inp-msb|inp-msc|graph-f-\d+|mm-f\d+)$/;
+const FORMULA_PPF = /^(inp-ppf|inp-ppf2b|inp-ppft|inp-tb1|inp-tb2|inp-ppfsum-\d+)$/;
+function formulaInputError(inp) {
+  const v = String((inp && inp.value) || '').trim();
+  const id = (inp && inp.id) || '';
+  if (!v) return FORMULA_EMPTY_OK.test(id) ? null : 'Поле пустое';
+  if (id === 'ineq-incomes') {
+    const xs = (typeof parseNumberList === 'function' ? parseNumberList(v) : []).filter(x => x >= 0);
+    return xs.length >= 2 ? null : 'Нужно хотя бы два дохода через запятую';
+  }
+  if (FORMULA_PPF.test(id) && typeof parsePpfEquation === 'function') {
+    if (id === 'inp-ppf2b' && !STATE.ppfCompare) return null;
+    const r = parsePpfEquation(v);
+    return r && r.error ? r.error : null;
+  }
+  /* Поля спроса и предложения сцен (дискриминация, внешний рынок, составной спрос, Лаффер,
+     AD–AS): левая часть записи — та же проверка, что у списка кривых (splitCurveLhs, ADR 0157),
+     ошибка встаёт под полем, график держит последнюю верную запись. */
+  if (LHS_FIELD_IDS.has(id) && typeof splitCurveLhs === 'function') {
+    const sp = splitCurveLhs(v);
+    if (sp.error) return sp.error;
+    try { math.parse(sp.rhs); return null; } catch (e) { return mathErrorRu(e.message || e); }
+  }
+  // Запись целиком (в том числе кусочная «x < 50 ? … : …») — первым делом.
+  try { math.parse(v.replace(/≤/g, '<=').replace(/≥/g, '>=')); return null; } catch (e) { /* дальше по частям */ }
+  const parts = v.split(/(?<![<>=!])=(?!=)/);
+  if (parts.length > 2) return 'В записи больше одного знака равенства';
+  for (const part of parts) {
+    if (!part.trim()) return 'По одну сторону знака равенства пусто';
+    // По-русски (ADR 0157): английский текст Math.js на экран не идёт.
+    try { math.parse(part); } catch (e) { return mathErrorRu(e.message || e); }
+  }
+  return null;
+}
+const LHS_FIELD_IDS = new Set(['inp-d3-1', 'inp-d3-2', 'inp-d3-mc', 'inp-ki-1', 'inp-ki-2', 'inp-ki-3',
+  'big-A-D', 'big-A-S', 'big-B-D', 'big-B-S',
+  'inp-kp-1', 'inp-kp-2', 'inp-kink-mc', 'ma-lafd', 'ma-lafs', 'ma-ad', 'ma-sras', 'adas-shock-ad', 'adas-shock-sras']);
+function markFormulaField(inp, err) {
+  if (!inp) return;
+  inp.classList.toggle('bad', !!err);
+  inp.setAttribute('aria-invalid', err ? 'true' : 'false');
+  if (typeof fieldProblem === 'function' && !inp.dataset.texUnknown) fieldProblem(inp, err ? (err + '. График держит запись до правки.') : '');
+}
+
+const FORMULA_EDIT_FIELDS = new Set();
+function syncFormulaEditBases() {
+  FORMULA_EDIT_FIELDS.forEach(inp => {
+    if (!inp.isConnected) { FORMULA_EDIT_FIELDS.delete(inp); return; }
+    if (inp._formulaApplying) return;
+    // Смена модели, сброс, история и ссылка присваивают полям значение сами.
+    // Их запись начинает новую правку, старый черновик к ней не относится.
+    if (inp._formulaScene !== STATE.sceneKey || inp.value !== inp._formulaDraft) {
+      if (inp._formulaCancel) inp._formulaCancel();
+      delete inp._formulaEditBase;
+      inp._formulaCommitted = inp.value;
+      inp._formulaDraft = inp.value;
+      inp._formulaScene = STATE.sceneKey;
+    }
+  });
+}
+
+function onFormulaInput(inp, rawApply) {
+  if (!inp || typeof rawApply !== 'function') return;
+  FORMULA_EDIT_FIELDS.add(inp);
+  inp._formulaCommitted = inp.value; inp._formulaDraft = inp.value; inp._formulaScene = STATE.sceneKey;
+  const begin = () => {
+    if (!inp._formulaEditBase) inp._formulaEditBase = {value: inp._formulaCommitted};
+    inp._formulaDraft = inp.value;
+  };
+  const apply = (commit = false) => {
+    begin();
+    const draft = inp.value, err = formulaInputError(inp);
+    inp._formulaApplying = true;
+    try {
+      if (err) inp.value = inp._formulaEditBase.value;
+      if (draft !== inp._formulaCommitted) requestFormulaFit();
+      rawApply();
+    } finally {
+      if (err) inp.value = draft;
+      inp._formulaApplying = false;
+      inp._formulaDraft = inp.value;
+      markFormulaField(inp, err);
+    }
+    if (!err && commit) { inp._formulaCommitted = inp.value; delete inp._formulaEditBase; }
+  };
   let timer = null;
-  const now = () => { if (timer) { clearTimeout(timer); timer = null; } apply(); };
+  inp._formulaCancel = () => { clearTimeout(timer); timer = null; };
+  const now = (ev) => {
+    if (ev) ev.stopImmediatePropagation(); // старые Enter/change не обходят проверку поля
+    if (timer) { clearTimeout(timer); timer = null; }
+    apply(true);
+  };
   inp.addEventListener('input', () => {
+    begin();
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; apply(); }, FORMULA_INPUT_DELAY);
   });
-  inp.addEventListener('change', now);
-  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') now(); });
+  inp.addEventListener('change', now, true);
+  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') now(ev); }, true);
+  const wrap = inp.closest('.f-wrap') || inp;
+  wrap.addEventListener('focusin', ev => {
+    if (ev.relatedTarget && wrap.contains(ev.relatedTarget)) return;
+    if (!inp.classList.contains('bad')) {
+      delete inp._formulaEditBase;
+      inp._formulaCommitted = inp.value;
+      inp._formulaDraft = inp.value;
+      inp._formulaScene = STATE.sceneKey;
+    }
+  });
+  wrap.addEventListener('focusout', ev => {
+    if (ev.relatedTarget && wrap.contains(ev.relatedTarget)) return;
+    if (timer) { clearTimeout(timer); timer = null; apply(true); }
+    else if (!inp.classList.contains('bad')) { inp._formulaCommitted = inp.value; delete inp._formulaEditBase; }
+  });
 }
 
 const FORMULA_FIELDS = [];
@@ -1391,13 +1780,21 @@ function fieldActive(el) {
 }
 
 function liveFormulaTexts() {
-  return FORMULA_FIELDS.filter(fieldActive).map(i => i.value);
+  return FORMULA_FIELDS.filter(fieldActive).map(i => {
+    // TC=… и прочие имена формульных полей — не свободные параметры.
+    if(LHS_FIELD_IDS.has(i.id)){
+      const s=splitCurveLhs(i.value);if(!s.error&&s.lhs)return s.rhs;
+    }
+    return i.value;
+  });
 }
 
 /* Какой набор примеров и какая переменная у поля. Ключи — те же, что в
    FORMULA_EXAMPLES; поле, которого здесь нет, общей оснастки не получает
    (имена, заголовки и списки чисел формулами не являются). */
 const FORMULA_FIELD_KINDS = {
+  'big-A-D': 'DEMAND', 'big-A-S': 'SUPPLY', 'big-B-D': 'DEMAND', 'big-B-S': 'SUPPLY',
+  'firm-market-demand': 'DEMAND',
   'inp-msb': 'DEMAND', 'inp-msc': 'SUPPLY',   // общественные кривые внешних эффектов
   'inp-d3-1': 'DEMAND', 'inp-d3-2': 'DEMAND', 'inp-d3-mc': 'MC',
   'inp-ki-1': 'DEMAND', 'inp-ki-2': 'DEMAND', 'inp-ki-3': 'DEMAND',
@@ -1406,6 +1803,7 @@ const FORMULA_FIELD_KINDS = {
   'inp-cmc': 'MC', 'inp-catc': 'ATC', 'inp-cavc': 'ATC',
   'ineq-formula': 'MATHF',
   'inp-ppft': 'PPF',   // строки стран собираются на лету и оснащаются там же
+  'inp-ppf2b': 'PPF',  // вторая КПВ «Сравнить с другой КПВ» — та же оснастка, что у первой (сессия 6, А6; Notion …8138…)
   'inp-tb1': 'PPF', 'inp-tb2': 'PPF',
   'ma-sras': 'MACRO', 'ma-ad': 'MACRO', 'ma-md': 'MACRO', 'ma-ls': 'MACRO',
   'ma-ld': 'MACRO', 'ma-fxd': 'MACRO', 'ma-fxs': 'MACRO',
@@ -1500,11 +1898,11 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     inp.addEventListener('focus', sync);
     inp.addEventListener('blur', sync);
     typeset.addEventListener('mousedown', (e) => { e.preventDefault(); inp.focus(); });
-    _texPending.push(sync);
+    if (typeof katex === 'undefined') _texPending.push(sync);   // только до загрузки (см. _texPending)
     sync();
 
     upgradeFormulaField(inp);
-    _mfPending.push(sync);   // библиотека доехала — накладка больше не нужна
+    if (!MATHLIVE_READY) _mfPending.push(sync);   // библиотека доехала — накладка больше не нужна
 
     // Клавиатура живёт под полем и раскрывается кнопкой в строке ввода.
     kbd = document.createElement('div');
@@ -1612,7 +2010,7 @@ function attachFormulaHelp(btnId, popId, inputId, kind) {
     closeAllKeyboardsExcept(null);
     if (open) {
       kbd._var = FORMULA_VAR[(typeof kind === 'function') ? kind() : kind] || 'x';
-      if (!kbd._built) { buildKeyboard(kbd, inp); kbd._built = true; }
+      if (!kbd._built) { buildKeyboard(kbd, inp); addHowToTab(kbd, (typeof kind === 'function') ? kind() : kind); kbd._built = true; }
       kbd.classList.add('open');
       if (inp && inp._mf) inp._mf.focusField(); else if (inp) inp.focus();
     }
@@ -1677,8 +2075,9 @@ function makeEditableValue(opts) {
 
   const parse = (raw) => {
     if (!isNum) return raw;
-    const v = parseFloat(String(raw).replace(',', '.'));
-    if (!isFinite(v)) return null;
+    const parsed = CalcNumber.parse(raw);
+    if (!parsed) return null;
+    const v = parsed.value;
     if (opts.min != null && v < opts.min) return null;
     if (opts.max != null && v > opts.max) return null;
     return v;
@@ -1688,7 +2087,7 @@ function makeEditableValue(opts) {
     if (el.classList.contains('editing')) return;
     const before = opts.get();
     el.classList.add('editing');
-    el.textContent = isNum ? String(shown()).replace(/ /g, '') : String(before == null ? '' : before);
+    el.textContent = isNum ? fmtInput(before) : String(before == null ? '' : before);
     el.contentEditable = 'plaintext-only';
     if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';   // Firefox
     el.focus();
@@ -1961,6 +2360,7 @@ function upgradeTextFieldsIn(root) {
   box.querySelectorAll('input[type="text"]').forEach(inp => {
     if (inp._equipped || inp._mfDone) return;      // это поле формулы, у него свой вид
     if (inp.classList.contains('curve-expr-inp')) return;
+    if (inp.dataset.plain) return;                 // числовое поле (отрезок ответа): остаётся окошком
     upgradeTextField(inp);
   });
 }

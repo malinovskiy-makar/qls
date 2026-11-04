@@ -86,15 +86,19 @@ check('верхний край: CS = 800', table[9].cs, 800, 1e-6);
 check('верхний край: PS = 1600', table[9].ps, 1600, 1e-6);
 
 // --- 3. Квота ВЫШЕ равновесия не связывает ------------------------------
-const wide = await page.evaluate(`(function(){
+const wide = await page.evaluate(`(async function(){
   resetSceneMemory(); pickScene('quota'); setQuota(70); redrawAll();
+  await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });   // «Ответ» собирается на кадр позже табло
   var q = STATE.qt || {};
   return { binding: q.binding ? 1 : 0, active: STATE.quotaActive ? 1 : 0,
            P: q.P === undefined ? 'нет' : q.P, dwl: q.dwl === undefined ? 'нет' : q.dwl,
            slider: (function(){ var e = document.getElementById('quota-price-field');
                                 return e && e.offsetParent !== null ? 1 : 0; })(),
            eqQ: (STATE.eq||{}).Q,
-           info: ((document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
+           /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 8.1): предупреждение сцены —
+              строка статуса «Ответа» (#ans-status), в блоке табло оно спрятано, чтобы
+              не повторяться. «Панель честно говорит» = видимый текст колонки «Ответ». */
+           info: ((document.getElementById('params-panel')||document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
 })()`);
 flag('квота 70 (выше Q*=50) не связывает', wide.binding === 0 && wide.active === 0, JSON.stringify({ b: wide.binding, a: wide.active }));
 flag('коридора нет', wide.P === 'нет' && wide.dwl === 'нет', JSON.stringify({ P: wide.P, dwl: wide.dwl }));

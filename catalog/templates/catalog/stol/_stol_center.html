@@ -80,6 +80,7 @@
 <section class="stm stm--q" aria-label="Условие">
   <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
 </section>
+{% include "catalog/stol/_calc_link.html" %}
 {% include "catalog/_problem_test.html" %}
 {% else %}
 <section class="stm" aria-label="Условие">
@@ -91,6 +92,7 @@
   </ol>
   {% endif %}
 </section>
+{% include "catalog/stol/_calc_link.html" %}
 
 {% if show_how %}
 {% comment %}«Как прошло?» — один клик, повторный снимает; «Решил сам» недоступно после открытого решения (ADR 0119); после отметки справа «Дальше ›».{% endcomment %}

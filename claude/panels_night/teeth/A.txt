@@ -1,0 +1,52 @@
+### 1 вернуть «по умолчанию открыт» → код 1
+  FAIL [chromium] 1440: пустая память → «Ответ» закрыт: полоска 44, .side-inner не видна  — {"h":false,"rail":false,"inner":true,"w":349}
+  FAIL [chromium] 1440: закрыт — шеврон «‹» (повёрнут), aria-expanded false, подпись «Показать «Ответ»»  — ["Спрятать «Ответ»","true","Показать «Ответ»"] none
+  FAIL [chromium] 1440: щелчок по стрелке → открыт, колонка 349 px  — {"w":44,"inner":false}
+  FAIL [chromium] 1440: закрытый холст был шире открытого  — 734 / 1039
+  FAIL [chromium] 1440: открыт — «›» на левом краю колонки (центр ±2, верх 12 ± 2), aria-expanded true  — {"hide":{"l":1377,"r":1417,"t":116,"b":156,"w":40,"h":40},"col":{"l":1396,"r":1440,"t":104,"b":900,"w":44,"h":796},"rot":"matrix(-1, 0, 0, -1, 0, 0)","aria":["Показать «Ответ»","false","Показать «Ответ»"]}
+  FAIL [chromium] 1440: щелчок по стрелке — не шаг истории, ссылка та же  — [0,0,"{\"undo\":false,\"redo\":false}","{\"undo\":false,\"redo\":false}",false]
+  FAIL [chromium] 1440: перезагрузка → открыт
+  FAIL [chromium] 1440: стрелка → закрыт
+### 2 стрелку внутрь .side-inner (в шапку) → код 1
+
+### 4 убрать запас 24 px у .cv-bar → код 0
+ИТОГ answer_panel_probe: 42 из 42, всё сошлось
+### 5 сворачивать «Разбор» display у узла с id → код 1
+  FAIL [chromium] щелчки по полосе и вопросу — не шаг истории, ссылка та же  — [0,0,"{\"undo\":false,\"redo\":false}","{\"undo\":false,\"redo\":false}"]
+  FAIL [chromium] 390: вкладка «Разбор» раскрыта, полосы нет  — {"bar":false,"barText":"Разбор 4 вопроса","shown":false,"fold":false,"qVis":0,"q":4,"aVis":0,"intro":0,"expanded":"false"}
+ИТОГ answer_panel_probe: 11 из 13, провалов 2
+### 6 раскрыть «Разбор» по умолчанию → код 1
+  FAIL [chromium] taxes: полоса «Разбор · 4 вопроса», свёрнут  — {"bar":true,"barText":"Разбор 4 вопроса","shown":true,"fold":true,"qVis":4,"q":4,"aVis":0,"intro":266,"expanded":"true"}
+  FAIL [chromium] щелчок → видны вступление и 4 вопроса, ответы скрыты  — {"bar":true,"barText":"Разбор 4 вопроса","shown":false,"fold":false,"qVis":0,"q":4,"aVis":0,"intro":0,"expanded":"false"}
+  FAIL [chromium] первый абзац «Налогов» одним абзацем: жирное «null» в строке с текстом перед ним  — null
+### 7 вернуть display: block жирному → код 1
+  FAIL [chromium] первый абзац «Налогов» одним абзацем: жирное «сдвигается» в строке с текстом перед ним  — {"word":"сдвигается","dy":20,"disp":"block"}
+  FAIL [chromium] 42 моделей: в абзацах «Разбора» нет блочных потомков  — taxes: B.ex-inline «сдвигается» | mono: B.ex-inline «предельные издержки MC\mathrm{»
+ИТОГ answer_panel_probe: 11 из 13, провалов 2
+### 8 в answer_probe убрать открытие колонки → код 1
+  FAIL предусловие: «Ответ» закрыт (#params-panel > .side-inner не видна)
+git diff после отката: пусто
+### 4 убрать запас 24 px у .cv-bar → код 1
+  FAIL [chromium] 1440: закрыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)  — [{"id":"btn-focus","l":1343,"r":1377,"t":120.5,"b":152.5,"w":34,"h":32}]
+  FAIL [chromium] 1440: открыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)  — [{"id":"btn-focus","l":1038,"r":1072,"t":120.5,"b":152.5,"w":34,"h":32}]
+  FAIL [chromium] 1280: закрыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)  — [{"id":"btn-focus","l":1183,"r":1217,"t":120.5,"b":152.5,"w":34,"h":32}]
+  FAIL [chromium] 1280: открыт — стрелка не касается кнопок .cv-bar (зазор ≥ 4 px)  — [{"id":"btn-focus","l":910.328125,"r":944,"t":120.5,"b":152.5,"w":33.671875,"h":32}]
+ИТОГ answer_panel_probe: 38 из 42, провалов 4
+git diff после отката: calc2/tests/redesign/answer_panel_probe.mjs | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+### 2 стрелку внутрь .side-inner (в шапку) → код 1
+  FAIL [chromium] 1440: стрелка — прямой ребёнок #params-panel вне .side-inner
+  FAIL [chromium] 1440: закрыт — стрелка видна, центр ±2 от левого края колонки, верх 12 ± 2  — {"hide":null,"col":{"l":1396,"r":1440,"t":104,"b":900,"w":44,"h":796}}
+  FAIL [chromium] 1440: открыт — «›» на левом краю колонки (центр ±2, верх 12 ± 2), aria-expanded true  — {"hide":{"l":1421.8125,"r":1430,"t":131,"b":153,"w":8.1875,"h":22},"col":{"l":1091,"r":1440,"t":104,"b":900,"w":349,"h":796},"rot":"нет шеврона","aria":["Спрятать «Ответ»","true","Показать «Ответ»"]}
+  FAIL [chromium] 1280: стрелка — прямой ребёнок #params-panel вне .side-inner
+  FAIL [chromium] 1280: закрыт — стрелка видна, центр ±2 от левого края колонки, верх 12 ± 2  — {"hide":null,"col":{"l":1236,"r":1280,"t":104,"b":900,"w":44,"h":796}}
+  FAIL [chromium] 1280: открыт — «›» на левом краю колонки (центр ±2, верх 12 ± 2), aria-expanded true  — {"hide":{"l":1261.8125,"r":1270,"t":131,"b":153,"w":8.1875,"h":22},"col":{"l":963,"r":1280,"t":104,"b":900,"w":317,"h":796},"rot":"нет шеврона","aria":["Спрятать «Ответ»","true","Показать «Ответ»"]}
+ИТОГ answer_panel_probe: 36 из 42, провалов 6
+git diff после отката: calc2/tests/redesign/answer_panel_probe.mjs | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+### 3 убрать пересборку при открытии → код 1
+  FAIL [chromium] 1440: 42 моделей — собранный закрытым открывается тем же  — 2 моделей: ppf {"open":[true,true],"cells":[2,2],"stats":[3,3],"tables":[0,0],"stacks":[3,1],"at":"…1 X за ед. Y Разбор 5 вопросов ⟂ …1 X за ед. Y Разбор 5 вопросов"} || sdsum {"open":[true,true],"cells":[2,2],"stats":[16,16],"tables":[0,0],"stacks":[1,0],"at":"…, PS = 1 325 . Разбор 1 вопрос ⟂ …, PS = 1 325 . Разбор 1 в
+  FAIL [chromium] 1280: 42 моделей — собранный закрытым открывается тем же  — 3 моделей: mono-nat {"open":[true,true],"cells":[3,3],"stats":[13,13],"tables":[0,0],"stacks":[1,0],"at":"…ыша теряется. Разбор 4 вопроса ⟂ …ыша теряется. Разбор 4 вопроса"} || mono-d1 {"open":[true,true],"cells":[2,2],"stats":[5,5],"tables":[0,0],"stacks":[1,0],"at":"…ишек у фирмы. Разбор 4 вопроса ⟂ …ишек у фирмы. Разб
+ИТОГ answer_panel_probe: 0 из 2, провалов 2
+git diff после отката: calc2/tests/redesign/answer_panel_probe.mjs | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)

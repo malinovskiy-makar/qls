@@ -1,0 +1,1628 @@
+{
+ "scenes": {
+  "m-graph": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "f",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "f",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "m-tangent": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "f",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "f'",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "f",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "f'",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "m-optimum": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "f",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "f",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "m-transform": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "f",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "после",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "f",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "после",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "m-minmax": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "f₁",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "f₂",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "Z",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "f₁",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "f₂",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "Z",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 3
+   }
+  },
+  "m-constraint": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "ограничение",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "ограничение",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "ppf": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "КПВ",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "КПВ",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "ppfsum": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "Сумма",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "КПВ 1",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "КПВ 2",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "Сумма",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "КПВ 1",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "КПВ 2",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 3
+   }
+  },
+  "trade": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "КПВ",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "КТВ",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "КПВ",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "КТВ",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "tradeprice": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "КПВ",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "КТВ",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "КПВ",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "КТВ",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "sd": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "sdsum": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "спрос первой группы",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "спрос второй группы",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "рыночный спрос",
+     "cursor": "pointer"
+    },
+    {
+     "i": 3,
+     "name": "предложение первой группы",
+     "cursor": "pointer"
+    },
+    {
+     "i": 4,
+     "name": "предложение второй группы",
+     "cursor": "pointer"
+    },
+    {
+     "i": 5,
+     "name": "рыночное предложение",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "спрос первой группы",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "спрос второй группы",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "рыночный спрос",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "предложение первой группы",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "предложение второй группы",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "рыночное предложение",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 6
+   }
+  },
+  "taxes": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "tax": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "tax-adv": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "ceil": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "quota": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "elast": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "circle",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    },
+    {
+     "tag": "circle",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "ext": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "costs": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "MC",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "ATC",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "AVC",
+     "cursor": "pointer"
+    },
+    {
+     "i": 3,
+     "name": "AFC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "MC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "ATC",
+     "skip": "полоса ничем не ловится"
+    },
+    {
+     "name": "AVC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "AFC",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 4
+   }
+  },
+  "prod": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "TP",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "TP",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "plants": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "TC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "TC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "isoquant": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "изокванта",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "изокванта",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "mono": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "MC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "path",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": [
+      "MC"
+     ]
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "mono-nat": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "MC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "path",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": [
+      "MC"
+     ]
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "mono-d1": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "MC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "path",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": [
+      "MC"
+     ]
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "mono-d3": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D₁",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "D₂",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "MC₁",
+     "cursor": "pointer"
+    },
+    {
+     "i": 3,
+     "name": "MC₂",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D₁",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "D₂",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC₁",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC₂",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 4
+   }
+  },
+  "mono-kink": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "MC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "labor": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "labor-mono": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "labor-union": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "labor-bilat": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "smallopen": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "rect",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "D",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "monoexport": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D внутри",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "MC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D внутри",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "MC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "consumer": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "бюджетная линия",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "кривая безразличия",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [
+    {
+     "tag": "circle",
+     "hit": true,
+     "stillDrags": true,
+     "curvesMoved": []
+    },
+    {
+     "tag": "circle",
+     "hit": false,
+     "stillDrags": true,
+     "curvesMoved": []
+    }
+   ],
+   "moved": [
+    {
+     "name": "бюджетная линия",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "кривая безразличия",
+     "skip": "полоса ничем не ловится"
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "cons-slutsky": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "бюджет: старый",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "бюджет: компенсир.",
+     "cursor": "pointer"
+    },
+    {
+     "i": 2,
+     "name": "бюджет: новый",
+     "cursor": "pointer"
+    },
+    {
+     "i": 3,
+     "name": "U исходная",
+     "cursor": "pointer"
+    },
+    {
+     "i": 4,
+     "name": "U новая",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "бюджет: старый",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "бюджет: компенсир.",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "бюджет: новый",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "U исходная",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "U новая",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": "U новая",
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 5
+   }
+  },
+  "adas": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "AD",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "SRAS",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "AD",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "SRAS",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "islm": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "IS",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "LM",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "IS",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "LM",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "phillips": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "SRPC",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "SRPC",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "money": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "Md",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "Md",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "loanable": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "S",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "D частн.",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "S",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "D частн.",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "fx": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "D валюты",
+     "cursor": "pointer"
+    },
+    {
+     "i": 1,
+     "name": "S валюты",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "D валюты",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    },
+    {
+     "name": "S валюты",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 2
+   }
+  },
+  "ineq": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "Лоренц",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "Лоренц",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  },
+  "laffer": {
+   "bands": [
+    {
+     "i": 0,
+     "name": "Поступления",
+     "cursor": "pointer"
+    }
+   ],
+   "grabs": [],
+   "moved": [
+    {
+     "name": "Поступления",
+     "cursor": "pointer",
+     "curveMoved": false,
+     "armedNow": null,
+     "formulaChanged": false
+    }
+   ],
+   "cursors": {
+    "pointer": 1
+   }
+  }
+ },
+ "offenders": [],
+ "pageErrors": []
+}

@@ -1,0 +1,3324 @@
+{
+  "key": "firmmarket",
+  "source": "Новая модель Э11, решение29.10; первый эталон03.11 после проверки15/4/40/14/n10.",
+  "start": {
+    "state": {
+      "D": null,
+      "S": null,
+      "acFrom": null,
+      "acTo": null,
+      "advTau": 0,
+      "ansA": null,
+      "ansB": null,
+      "ansHand": false,
+      "applyPigou": false,
+      "areaCalcList": [],
+      "areaCalcMode": "curve",
+      "areaColor": {},
+      "areaHidden": [],
+      "areaPicked": [],
+      "areaVerts": [],
+      "axisXDefault": "Q",
+      "axisXName": "",
+      "axisYDefault": "P",
+      "axisYName": "",
+      "budget": null,
+      "bundleOn": false,
+      "bundleX": null,
+      "bundleY": null,
+      "colorOverride": {},
+      "cons": null,
+      "consA": 0.5,
+      "consB": 0.5,
+      "consCustom": "x^0.5 * y^0.5",
+      "consErr": null,
+      "consFan": true,
+      "consI": 100,
+      "consK": 2,
+      "consPx": 1,
+      "consPx1": 4,
+      "consPy": 2,
+      "consSlutskyOn": false,
+      "consType": "cobb",
+      "costsATCx": "Q^2 - 6*Q + 15 + 18/Q",
+      "costsAVCx": "Q^2 - 6*Q + 15",
+      "costsCompiled": {},
+      "costsFCInfo": {
+        "kind": "exact",
+        "val": 18
+      },
+      "costsMCOnly": true,
+      "costsMCx": "3*Q^2 - 12*Q + 15",
+      "costsMode": "tc",
+      "costsParts": null,
+      "costsReady": true,
+      "costsSig": "tc Q^3 - 6*Q^2 + 15*Q + 18 3*Q^2 - 12*Q + 15 Q^2 - 6*Q + 15 + 18/Q Q^2 - 6*Q + 15 200   true",
+      "costsSub": "costs",
+      "costsTC": "Q^3 - 6*Q^2 + 15*Q + 18",
+      "costsWarn": null,
+      "crosses": [
+        {
+          "a": "MC",
+          "b": "ATC",
+          "x": 3.66868509,
+          "y": 11.35352979
+        },
+        {
+          "a": "MC",
+          "b": "AVC",
+          "x": 3,
+          "y": 5.999999999
+        },
+        {
+          "a": "MC",
+          "b": "P",
+          "x": 4,
+          "y": 15
+        },
+        {
+          "a": "ATC",
+          "b": "P",
+          "x": 2.167055174,
+          "y": 15
+        },
+        {
+          "a": "ATC",
+          "b": "P",
+          "x": 5.377551642,
+          "y": 15
+        },
+        {
+          "a": "AVC",
+          "b": "P",
+          "x": 6,
+          "y": 15
+        },
+        {
+          "a": "MC",
+          "b": "ось P",
+          "x": 0,
+          "y": 15
+        }
+      ],
+      "crossesPanel": "firm-market-firm",
+      "cs": null,
+      "csTax": null,
+      "curves": [],
+      "d3D1": "100 - Q",
+      "d3D2": "80 - 2*Q",
+      "d3MC": "20",
+      "d3World": false,
+      "discr1": null,
+      "discr3": null,
+      "dwl": null,
+      "elast": null,
+      "elastQ": null,
+      "elastQS": null,
+      "elastS": null,
+      "eq": null,
+      "ext": null,
+      "extSign": "neg",
+      "firmMarket": {
+        "demand": "Q = 100 - 4*P",
+        "n": 10
+      },
+      "firmMarketResult": {
+        "D": {
+          "curve": {
+            "compiled": null,
+            "error": null,
+            "fn": null,
+            "linear": {
+              "a": -0.25,
+              "b": 25
+            }
+          },
+          "exact": true,
+          "source": {
+            "compiled": null,
+            "fn": null,
+            "form": "QP",
+            "linear": {
+              "a": -0.25,
+              "b": 25
+            },
+            "rhs": "100 - 4*P",
+            "srcCompiled": {},
+            "srcLinear": {
+              "c": 100,
+              "d": -4
+            }
+          }
+        },
+        "P": 15,
+        "Q": 40,
+        "equilibria": [
+          {
+            "P": 15,
+            "Q": 40,
+            "profit": 14,
+            "q": 4
+          }
+        ],
+        "exact": true,
+        "firm": {
+          "K": "Infinity",
+          "autoCap": null,
+          "avoidable": false,
+          "candidates": [
+            {
+              "Q": 0,
+              "attained": true,
+              "cost": 0,
+              "expr": "0",
+              "hi": "Infinity",
+              "id": 0,
+              "kind": "fixed",
+              "lo": 0
+            },
+            {
+              "Q": 2,
+              "attained": true,
+              "cost": 14,
+              "expr": "2",
+              "hi": "Infinity",
+              "id": 1,
+              "kind": "fixed",
+              "lo": 0
+            },
+            {
+              "attained": true,
+              "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+              "hi": "Infinity",
+              "hiQ": "Infinity",
+              "id": 2,
+              "kind": "curve",
+              "lo": 3,
+              "loQ": 2,
+              "mc": [
+                15,
+                -12,
+                3
+              ],
+              "net": [
+                0,
+                15,
+                -6,
+                1
+              ]
+            }
+          ],
+          "config": {
+            "expr": "Q^3 - 6*Q^2 + 15*Q + 18",
+            "kind": "sunk",
+            "mode": "tc",
+            "period": "sr"
+          },
+          "exact": true,
+          "fc": 18,
+          "pieces": [
+            {
+              "c": [
+                18,
+                15,
+                -6,
+                1
+              ],
+              "hi": "Infinity",
+              "hiClosed": false,
+              "lo": 0,
+              "loClosed": true
+            }
+          ],
+          "schedule": {
+            "points": [
+              {
+                "P": 0,
+                "Q": 0,
+                "branch": {
+                  "Q": 0,
+                  "attained": true,
+                  "cost": 0,
+                  "expr": "0",
+                  "hi": "Infinity",
+                  "id": 0,
+                  "kind": "fixed",
+                  "lo": 0
+                },
+                "intervalClosed": [],
+                "intervals": [],
+                "outputs": [
+                  0
+                ],
+                "profit": -18,
+                "tie": false,
+                "unattained": false
+              },
+              {
+                "P": 6,
+                "Q": 3,
+                "branch": {
+                  "attained": true,
+                  "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+                  "hi": "Infinity",
+                  "hiQ": "Infinity",
+                  "id": 2,
+                  "kind": "curve",
+                  "lo": 3,
+                  "loQ": 2,
+                  "mc": [
+                    15,
+                    -12,
+                    3
+                  ],
+                  "net": [
+                    0,
+                    15,
+                    -6,
+                    1
+                  ]
+                },
+                "intervalClosed": [],
+                "intervals": [],
+                "outputs": [
+                  0,
+                  3
+                ],
+                "profit": -18,
+                "tie": true,
+                "unattained": false
+              }
+            ],
+            "rows": [
+              {
+                "branch": {
+                  "Q": 0,
+                  "attained": true,
+                  "cost": 0,
+                  "expr": "0",
+                  "hi": "Infinity",
+                  "id": 0,
+                  "kind": "fixed",
+                  "lo": 0
+                },
+                "expr": "0",
+                "hi": 6,
+                "lo": 0,
+                "unattained": false
+              },
+              {
+                "branch": {
+                  "attained": true,
+                  "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+                  "hi": "Infinity",
+                  "hiQ": "Infinity",
+                  "id": 2,
+                  "kind": "curve",
+                  "lo": 3,
+                  "loQ": 2,
+                  "mc": [
+                    15,
+                    -12,
+                    3
+                  ],
+                  "net": [
+                    0,
+                    15,
+                    -6,
+                    1
+                  ]
+                },
+                "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+                "hi": "Infinity",
+                "lo": 6,
+                "unattained": false
+              }
+            ]
+          },
+          "shutdown": 6,
+          "tax": {
+            "alpha": 1,
+            "kind": "tax",
+            "lump": 0,
+            "rate": 0,
+            "type": "none",
+            "unit": 0
+          },
+          "zeroCost": 18
+        },
+        "found": true,
+        "lr": false,
+        "n": 10,
+        "nonunique": null,
+        "profit": 14,
+        "q": 4
+      },
+      "firmSupply": {
+        "K": "Infinity",
+        "autoCap": null,
+        "avoidable": false,
+        "candidates": [
+          {
+            "Q": 0,
+            "attained": true,
+            "cost": 0,
+            "expr": "0",
+            "hi": "Infinity",
+            "id": 0,
+            "kind": "fixed",
+            "lo": 0
+          },
+          {
+            "Q": 2,
+            "attained": true,
+            "cost": 14,
+            "expr": "2",
+            "hi": "Infinity",
+            "id": 1,
+            "kind": "fixed",
+            "lo": 0
+          },
+          {
+            "attained": true,
+            "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+            "hi": "Infinity",
+            "hiQ": "Infinity",
+            "id": 2,
+            "kind": "curve",
+            "lo": 3,
+            "loQ": 2,
+            "mc": [
+              15,
+              -12,
+              3
+            ],
+            "net": [
+              0,
+              15,
+              -6,
+              1
+            ]
+          }
+        ],
+        "config": {
+          "expr": "Q^3 - 6*Q^2 + 15*Q + 18",
+          "kind": "sunk",
+          "mode": "tc",
+          "period": "sr"
+        },
+        "exact": true,
+        "fc": 18,
+        "pieces": [
+          {
+            "c": [
+              18,
+              15,
+              -6,
+              1
+            ],
+            "hi": "Infinity",
+            "hiClosed": false,
+            "lo": 0,
+            "loClosed": true
+          }
+        ],
+        "schedule": {
+          "points": [
+            {
+              "P": 0,
+              "Q": 0,
+              "branch": {
+                "Q": 0,
+                "attained": true,
+                "cost": 0,
+                "expr": "0",
+                "hi": "Infinity",
+                "id": 0,
+                "kind": "fixed",
+                "lo": 0
+              },
+              "intervalClosed": [],
+              "intervals": [],
+              "outputs": [
+                0
+              ],
+              "profit": -18,
+              "tie": false,
+              "unattained": false
+            },
+            {
+              "P": 6,
+              "Q": 3,
+              "branch": {
+                "attained": true,
+                "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+                "hi": "Infinity",
+                "hiQ": "Infinity",
+                "id": 2,
+                "kind": "curve",
+                "lo": 3,
+                "loQ": 2,
+                "mc": [
+                  15,
+                  -12,
+                  3
+                ],
+                "net": [
+                  0,
+                  15,
+                  -6,
+                  1
+                ]
+              },
+              "intervalClosed": [],
+              "intervals": [],
+              "outputs": [
+                0,
+                3
+              ],
+              "profit": -18,
+              "tie": true,
+              "unattained": false
+            }
+          ],
+          "rows": [
+            {
+              "branch": {
+                "Q": 0,
+                "attained": true,
+                "cost": 0,
+                "expr": "0",
+                "hi": "Infinity",
+                "id": 0,
+                "kind": "fixed",
+                "lo": 0
+              },
+              "expr": "0",
+              "hi": 6,
+              "lo": 0,
+              "unattained": false
+            },
+            {
+              "branch": {
+                "attained": true,
+                "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+                "hi": "Infinity",
+                "hiQ": "Infinity",
+                "id": 2,
+                "kind": "curve",
+                "lo": 3,
+                "loQ": 2,
+                "mc": [
+                  15,
+                  -12,
+                  3
+                ],
+                "net": [
+                  0,
+                  15,
+                  -6,
+                  1
+                ]
+              },
+              "expr": "(sqrt(144 - 12 * (15 - P)) + 12) / 6",
+              "hi": "Infinity",
+              "lo": 6,
+              "unattained": false
+            }
+          ]
+        },
+        "shutdown": 6,
+        "tax": {
+          "alpha": 1,
+          "kind": "tax",
+          "lump": 0,
+          "rate": 0,
+          "type": "none",
+          "unit": 0
+        },
+        "zeroCost": 18
+      },
+      "firstQuad": true,
+      "graphTitle": "",
+      "gridDense": false,
+      "incBuyer": null,
+      "incSeller": null,
+      "ineqAlpha": 2,
+      "ineqFormula": "p^2",
+      "ineqGroupN": 5,
+      "ineqGroups": [
+        8,
+        12,
+        16,
+        24,
+        40
+      ],
+      "ineqIncomes": "10, 20, 30, 40, 100",
+      "ineqInput": "groups",
+      "ineqLorenz": null,
+      "ineqMasterBase": null,
+      "ineqMasterDetached": false,
+      "ineqMasterS": 1,
+      "ineqRedist": null,
+      "ineqRedistOn": false,
+      "ineqRedistTool": "tax",
+      "ineqShareN": 0,
+      "ineqShares": null,
+      "ineqSortNote": false,
+      "ineqStats": null,
+      "ineqTau": 0,
+      "ineqTransfer": 0,
+      "ineqVisited": false,
+      "ineqWarn": null,
+      "intervType": "tax",
+      "iso": null,
+      "isoC": 100,
+      "isoErr": null,
+      "isoExpr": "L^0.5 * K^0.5",
+      "isoFan": true,
+      "isoR": 2,
+      "isoW": 1,
+      "kiD1": "100 - Q",
+      "kiD2": "60 - Q",
+      "kiD3": "",
+      "kinkInput": "individual",
+      "kinkMC": "20",
+      "kinked": null,
+      "kpD1": "100 - Q",
+      "kpD2": "120 - 1.5*Q",
+      "labelSize": 14,
+      "laborBilateral": null,
+      "laborD": null,
+      "laborEq": null,
+      "laborMin": null,
+      "laborMinOn": false,
+      "laborMinW": 0,
+      "laborMono": null,
+      "laborS": null,
+      "laborStruct": "competition",
+      "laborUnion": null,
+      "laborVisited": false,
+      "legendSpot": 0,
+      "lr": null,
+      "lrArea": true,
+      "lrOn": true,
+      "lrPrice": 15,
+      "macro": {
+        "adas": {
+          "ad": "120 - 0.6*Y",
+          "lras": 100,
+          "sras": "10 + 0.5*Y"
+        },
+        "fx": {
+          "d": "100 - 2*e",
+          "fixed": 20,
+          "fixedOn": false,
+          "s": "20 + 3*e"
+        },
+        "islm": {
+          "is": "20 - 0.1*Y",
+          "lm": "0.05*Y - 5"
+        },
+        "laffer": {
+          "d": "100 - Q",
+          "s": "Q",
+          "tmax": 100
+        },
+        "loanable": {
+          "d": "150 - 3*r",
+          "dg": 0,
+          "s": "50 + 2*r"
+        },
+        "money": {
+          "md": "200 - 4*i",
+          "ms": 120
+        },
+        "phillips": {
+          "beta": 0.5,
+          "pe": 5,
+          "ustar": 5
+        }
+      },
+      "macroErr": null,
+      "macroModel": "adas",
+      "macroRes": null,
+      "markArm": false,
+      "market": "comp",
+      "marks": [],
+      "mathConsWantMax": true,
+      "mathConvex": true,
+      "mathDx": 1,
+      "mathFC": "x^0.5 * y^0.5",
+      "mathFormula": "x^2",
+      "mathG2": "4 - x",
+      "mathG3": "",
+      "mathG4": "",
+      "mathGC": "x + y = 10",
+      "mathGmore": [],
+      "mathInflect": true,
+      "mathMinMax": "min",
+      "mathRes": null,
+      "mathSecant": false,
+      "mathSub": "tangent",
+      "mathTrans": "up",
+      "mathX0": 1,
+      "mathXmax": 6,
+      "mathXmin": -6,
+      "mathYmax": 20,
+      "mathYmin": -4,
+      "mcFlat": null,
+      "minATC": {
+        "Q": 3.668481662,
+        "kind": "interior",
+        "val": 11.35352985
+      },
+      "minAVC": {
+        "Q": 2.999985005,
+        "kind": "interior",
+        "val": 6
+      },
+      "mmCount": 2,
+      "mmName": "Z",
+      "mode": "costs",
+      "mono": null,
+      "monoCeil": null,
+      "monoFloor": null,
+      "monoMode": "simple",
+      "monoQuota": null,
+      "monoTax": null,
+      "msbCompiled": null,
+      "msbExpr": "",
+      "msbOn": false,
+      "mscCompiled": null,
+      "mscExpr": "",
+      "mscOn": false,
+      "natFC": 800,
+      "natural": null,
+      "offEq": null,
+      "open": null,
+      "openPw": 30,
+      "openPwSet": false,
+      "openQuota": 20,
+      "openTariff": 10,
+      "openTool": "none",
+      "pReg": 0,
+      "pRegSet": false,
+      "panelWin": {},
+      "params": {},
+      "pc": null,
+      "pcActive": false,
+      "pcMode": false,
+      "pl1": "Q^2",
+      "pl2": "2*Q^2",
+      "plErr": null,
+      "plQ": 30,
+      "plView": "tc",
+      "plants": null,
+      "pointNames": {},
+      "ppf1": "100 - X",
+      "ppf2": "60 - 3*X",
+      "ppfCompiled": null,
+      "ppfFormula": "100 - X",
+      "ppfReady": false,
+      "ppfSub": "single",
+      "ppfSumColor": "",
+      "ppfSumColors": [],
+      "ppfSumCount": 2,
+      "ppfSumData": null,
+      "ppfSumKinks": null,
+      "ppfSumMore": [],
+      "ppfSumName": "Сумма",
+      "ppfSumNames": [],
+      "ppfSumView": "scale",
+      "ppfTradeData": null,
+      "ppfX": null,
+      "ppftFormula": "100 - X",
+      "ppftPrice": 2,
+      "prod": null,
+      "prodCompiled": null,
+      "prodExpr": "30*L^2 - L^3",
+      "ps": null,
+      "psTax": null,
+      "qt": null,
+      "quadSaved": null,
+      "quota": 0,
+      "quotaActive": false,
+      "quotaMode": false,
+      "quotaPos": 0.5,
+      "quotaSet": false,
+      "scenario": "none",
+      "sceneKey": "firmmarket",
+      "shift": 0,
+      "showAFC": true,
+      "showAP": true,
+      "showATC": true,
+      "showAVC": true,
+      "showCS": true,
+      "showElastS": true,
+      "showFC": false,
+      "showGhost": false,
+      "showGrid": true,
+      "showLegend": true,
+      "showMC": true,
+      "showMP": true,
+      "showMonoCS": true,
+      "showMonoPS": true,
+      "showMonoVC": false,
+      "showNatLoss": true,
+      "showNatProfit": true,
+      "showOpenDwl": true,
+      "showOpenMoney": true,
+      "showPS": true,
+      "showTC": false,
+      "showTP": true,
+      "showVC": false,
+      "subKind": "unit",
+      "sumN": {
+        "D": 2,
+        "S": 2
+      },
+      "sumOn": false,
+      "sw": null,
+      "tax": 0,
+      "taxActive": false,
+      "taxAfterD": null,
+      "taxAfterS": null,
+      "taxCurveOn": false,
+      "taxEq": null,
+      "taxForm": "unit",
+      "taxKind": "unit",
+      "taxNoBase": false,
+      "taxSide": "seller",
+      "tbF1": "100 - X",
+      "tbF2": "100 - 2*X",
+      "tbManualPrice": null,
+      "tbNames": [],
+      "titleColor": null,
+      "tradeBData": null,
+      "tradeScenario": "A",
+      "tx": null,
+      "unionModel": "monopoly",
+      "unionWage": 0,
+      "unionWageVisited": false,
+      "vertArm": false,
+      "viewDirty": false,
+      "xStep": null,
+      "yStep": null,
+      "zoomLock": false
+    },
+    "windows": {
+      "config": {
+        "Qmin": 0,
+        "Qmax": 10,
+        "Pmin": 0,
+        "Pmax": 50
+      },
+      "panels": {
+        "firm-market-firm": {
+          "x0": 0,
+          "x1": 10,
+          "y0": 0,
+          "y1": 30,
+          "px": [
+            244,
+            337
+          ]
+        },
+        "firm-market-market": {
+          "x0": 0,
+          "x1": 100,
+          "y0": 0,
+          "y1": 30,
+          "px": [
+            244,
+            337
+          ]
+        }
+      }
+    },
+    "geometry": {
+      "paths": [
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 101,
+          "pts": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              1.2
+            ],
+            [
+              0,
+              2.4
+            ],
+            [
+              0,
+              3.6
+            ],
+            [
+              0,
+              4.8
+            ],
+            [
+              0,
+              6
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 101,
+          "pts": [
+            [
+              3,
+              6
+            ],
+            [
+              3.612459016,
+              10.8
+            ],
+            [
+              4.049385246,
+              15.6
+            ],
+            [
+              4.408319672,
+              20.4
+            ],
+            [
+              4.720286885,
+              25.2
+            ],
+            [
+              5,
+              30
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 132,
+          "pts": [
+            [
+              0,
+              15
+            ],
+            [
+              1.25,
+              4.687477745
+            ],
+            [
+              1.3125,
+              4.418011869
+            ],
+            [
+              1.375,
+              4.171869436
+            ],
+            [
+              1.4375,
+              3.949228487
+            ],
+            [
+              1.5,
+              3.75
+            ],
+            [
+              1.5625,
+              3.574183976
+            ],
+            [
+              1.625,
+              3.421869436
+            ],
+            [
+              1.6875,
+              3.292967359
+            ],
+            [
+              1.75,
+              3.187477745
+            ],
+            [
+              1.8125,
+              3.105489614
+            ],
+            [
+              1.875,
+              3.046913947
+            ],
+            [
+              1.9375,
+              3.011750742
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              2.0625,
+              3.011750742
+            ],
+            [
+              2.125,
+              3.046913947
+            ],
+            [
+              2.1875,
+              3.105489614
+            ],
+            [
+              2.25,
+              3.187477745
+            ],
+            [
+              2.3125,
+              3.292967359
+            ],
+            [
+              2.375,
+              3.421869436
+            ],
+            [
+              2.4375,
+              3.574183976
+            ],
+            [
+              2.5,
+              3.75
+            ],
+            [
+              2.5625,
+              3.949228487
+            ],
+            [
+              2.625,
+              4.171869436
+            ],
+            [
+              2.6875,
+              4.418011869
+            ],
+            [
+              2.75,
+              4.687477745
+            ],
+            [
+              3.75,
+              12.18747774
+            ],
+            [
+              5,
+              30
+            ],
+            [
+              6.25,
+              57.18747774
+            ],
+            [
+              7.5,
+              93.75
+            ],
+            [
+              8.1875,
+              117.8554896
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 158,
+          "pts": [
+            [
+              0.1875,
+              109.9101187
+            ],
+            [
+              1.4375,
+              20.9631454
+            ],
+            [
+              2.5625,
+              13.21575668
+            ],
+            [
+              2.625,
+              12.99774481
+            ],
+            [
+              2.6875,
+              12.79531157
+            ],
+            [
+              2.75,
+              12.60792285
+            ],
+            [
+              2.8125,
+              12.43513353
+            ],
+            [
+              2.875,
+              12.27649852
+            ],
+            [
+              2.9375,
+              12.1315727
+            ],
+            [
+              3,
+              12
+            ],
+            [
+              3.0625,
+              11.88142433
+            ],
+            [
+              3.125,
+              11.77566766
+            ],
+            [
+              3.1875,
+              11.68219585
+            ],
+            [
+              3.25,
+              11.60091988
+            ],
+            [
+              3.3125,
+              11.53166172
+            ],
+            [
+              3.375,
+              11.47397626
+            ],
+            [
+              3.4375,
+              11.42777448
+            ],
+            [
+              3.5,
+              11.39287834
+            ],
+            [
+              3.5625,
+              11.36902077
+            ],
+            [
+              3.625,
+              11.35611276
+            ],
+            [
+              3.6875,
+              11.35397626
+            ],
+            [
+              3.75,
+              11.36252226
+            ],
+            [
+              3.8125,
+              11.38148368
+            ],
+            [
+              3.875,
+              11.41077151
+            ],
+            [
+              3.9375,
+              11.45029674
+            ],
+            [
+              4,
+              11.49997033
+            ],
+            [
+              4.0625,
+              11.55970326
+            ],
+            [
+              4.125,
+              11.62922849
+            ],
+            [
+              4.1875,
+              11.70863501
+            ],
+            [
+              4.25,
+              11.79783383
+            ],
+            [
+              4.3125,
+              11.89655786
+            ],
+            [
+              4.375,
+              12.00489614
+            ],
+            [
+              4.4375,
+              12.12275964
+            ],
+            [
+              4.5,
+              12.24997033
+            ],
+            [
+              4.5625,
+              12.38661721
+            ],
+            [
+              4.625,
+              12.53252226
+            ],
+            [
+              4.6875,
+              12.68768546
+            ],
+            [
+              4.75,
+              12.8520178
+            ],
+            [
+              5.1875,
+              14.25507418
+            ],
+            [
+              6.4375,
+              20.61249258
+            ],
+            [
+              7.6875,
+              30.3141543
+            ],
+            [
+              8.9375,
+              43.26792285
+            ],
+            [
+              10,
+              56.79997033
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 158,
+          "pts": [
+            [
+              0.1875,
+              96
+            ],
+            [
+              1.4375,
+              12.52175074
+            ],
+            [
+              2.6875,
+              6.697655786
+            ],
+            [
+              3.9375,
+              4.571394659
+            ],
+            [
+              5.1875,
+              3.469851632
+            ],
+            [
+              6.4375,
+              2.796142433
+            ],
+            [
+              7.6875,
+              2.341424332
+            ],
+            [
+              8.9375,
+              2.014005935
+            ],
+            [
+              10,
+              1.8
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 161,
+          "pts": [
+            [
+              0,
+              15
+            ],
+            [
+              1.25,
+              9.062492582
+            ],
+            [
+              1.8125,
+              7.410178042
+            ],
+            [
+              1.875,
+              7.265608309
+            ],
+            [
+              1.9375,
+              7.128872404
+            ],
+            [
+              2,
+              6.999970326
+            ],
+            [
+              2.0625,
+              6.878902077
+            ],
+            [
+              2.125,
+              6.765667656
+            ],
+            [
+              2.1875,
+              6.660178042
+            ],
+            [
+              2.25,
+              6.562522255
+            ],
+            [
+              2.3125,
+              6.472700297
+            ],
+            [
+              2.375,
+              6.390623145
+            ],
+            [
+              2.4375,
+              6.316379822
+            ],
+            [
+              2.5,
+              6.249970326
+            ],
+            [
+              2.5625,
+              6.191394659
+            ],
+            [
+              2.625,
+              6.140652819
+            ],
+            [
+              2.6875,
+              6.097655786
+            ],
+            [
+              2.75,
+              6.062492582
+            ],
+            [
+              2.8125,
+              6.035163205
+            ],
+            [
+              2.875,
+              6.015667656
+            ],
+            [
+              2.9375,
+              6.003916914
+            ],
+            [
+              3,
+              6
+            ],
+            [
+              3.0625,
+              6.003916914
+            ],
+            [
+              3.125,
+              6.015667656
+            ],
+            [
+              3.1875,
+              6.035163205
+            ],
+            [
+              3.25,
+              6.062492582
+            ],
+            [
+              3.3125,
+              6.097655786
+            ],
+            [
+              3.375,
+              6.140652819
+            ],
+            [
+              3.4375,
+              6.191394659
+            ],
+            [
+              3.5,
+              6.249970326
+            ],
+            [
+              3.5625,
+              6.316379822
+            ],
+            [
+              3.625,
+              6.390623145
+            ],
+            [
+              3.6875,
+              6.472700297
+            ],
+            [
+              3.75,
+              6.562522255
+            ],
+            [
+              3.8125,
+              6.660178042
+            ],
+            [
+              3.875,
+              6.765667656
+            ],
+            [
+              3.9375,
+              6.878902077
+            ],
+            [
+              4,
+              6.999970326
+            ],
+            [
+              4.0625,
+              7.128872404
+            ],
+            [
+              4.125,
+              7.265608309
+            ],
+            [
+              4.1875,
+              7.410178042
+            ],
+            [
+              5,
+              9.999970326
+            ],
+            [
+              6.25,
+              16.56249258
+            ],
+            [
+              7.5,
+              26.25
+            ],
+            [
+              8.75,
+              39.06249258
+            ],
+            [
+              10,
+              54.99997033
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 2,
+          "pts": [
+            [
+              0,
+              15
+            ],
+            [
+              10,
+              15
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 240,
+          "pts": [
+            [
+              0.04168032787,
+              14.75172107
+            ],
+            [
+              0.875,
+              10.51566766
+            ],
+            [
+              1.708319672,
+              7.6684273
+            ],
+            [
+              2.083319672,
+              6.840267062
+            ],
+            [
+              2.125,
+              6.765667656
+            ],
+            [
+              2.166680328,
+              6.694451039
+            ],
+            [
+              2.208319672,
+              6.626706231
+            ],
+            [
+              2.25,
+              6.562522255
+            ],
+            [
+              2.291680328,
+              6.501721068
+            ],
+            [
+              2.333319672,
+              6.444480712
+            ],
+            [
+              2.375,
+              6.390623145
+            ],
+            [
+              2.416680328,
+              6.340237389
+            ],
+            [
+              2.458319672,
+              6.293412463
+            ],
+            [
+              2.5,
+              6.249970326
+            ],
+            [
+              2.541680328,
+              6.210089021
+            ],
+            [
+              2.583319672,
+              6.173590504
+            ],
+            [
+              2.625,
+              6.140652819
+            ],
+            [
+              2.666680328,
+              6.111097923
+            ],
+            [
+              2.708319672,
+              6.085103858
+            ],
+            [
+              2.75,
+              6.062492582
+            ],
+            [
+              2.791680328,
+              6.043442136
+            ],
+            [
+              2.833319672,
+              6.027774481
+            ],
+            [
+              2.875,
+              6.015667656
+            ],
+            [
+              2.916680328,
+              6.00694362
+            ],
+            [
+              2.958319672,
+              6.001780415
+            ],
+            [
+              3,
+              6
+            ],
+            [
+              3.041680328,
+              6.001780415
+            ],
+            [
+              3.083319672,
+              6.00694362
+            ],
+            [
+              3.125,
+              6.015667656
+            ],
+            [
+              3.166680328,
+              6.027774481
+            ],
+            [
+              3.208319672,
+              6.043442136
+            ],
+            [
+              3.25,
+              6.062492582
+            ],
+            [
+              3.291680328,
+              6.085103858
+            ],
+            [
+              3.333319672,
+              6.111097923
+            ],
+            [
+              3.375,
+              6.140652819
+            ],
+            [
+              3.416680328,
+              6.173590504
+            ],
+            [
+              3.458319672,
+              6.210089021
+            ],
+            [
+              3.5,
+              6.249970326
+            ],
+            [
+              3.541680328,
+              6.293412463
+            ],
+            [
+              3.583319672,
+              6.340237389
+            ],
+            [
+              3.625,
+              6.390623145
+            ],
+            [
+              3.666680328,
+              6.444480712
+            ],
+            [
+              3.708319672,
+              6.501721068
+            ],
+            [
+              3.75,
+              6.562522255
+            ],
+            [
+              3.791680328,
+              6.626706231
+            ],
+            [
+              3.833319672,
+              6.694451039
+            ],
+            [
+              3.875,
+              6.765667656
+            ],
+            [
+              3.916680328,
+              6.840267062
+            ],
+            [
+              4.208319672,
+              7.460029674
+            ],
+            [
+              5.041680328,
+              10.16839763
+            ],
+            [
+              5.875,
+              14.26566766
+            ],
+            [
+              6.708319672,
+              19.75175074
+            ],
+            [
+              7.541680328,
+              26.62673591
+            ],
+            [
+              8.375,
+              34.89062315
+            ],
+            [
+              9.208319672,
+              44.54341246
+            ],
+            [
+              10,
+              54.99997033
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 240,
+          "pts": [
+            [
+              0.04168032787,
+              446.7517211
+            ],
+            [
+              0.875,
+              31.08703264
+            ],
+            [
+              1.708319672,
+              18.20501484
+            ],
+            [
+              2.541680328,
+              13.29204748
+            ],
+            [
+              2.791680328,
+              12.4911276
+            ],
+            [
+              2.833319672,
+              12.38074184
+            ],
+            [
+              2.875,
+              12.27649852
+            ],
+            [
+              2.916680328,
+              12.17839763
+            ],
+            [
+              2.958319672,
+              12.08626113
+            ],
+            [
+              3,
+              12
+            ],
+            [
+              3.041680328,
+              11.91952522
+            ],
+            [
+              3.083319672,
+              11.84474777
+            ],
+            [
+              3.125,
+              11.77566766
+            ],
+            [
+              3.166680328,
+              11.7120178
+            ],
+            [
+              3.208319672,
+              11.65379822
+            ],
+            [
+              3.25,
+              11.60091988
+            ],
+            [
+              3.291680328,
+              11.55338279
+            ],
+            [
+              3.333319672,
+              11.51109792
+            ],
+            [
+              3.375,
+              11.47397626
+            ],
+            [
+              3.416680328,
+              11.44192878
+            ],
+            [
+              3.458319672,
+              11.41486647
+            ],
+            [
+              3.5,
+              11.39287834
+            ],
+            [
+              3.541680328,
+              11.37578635
+            ],
+            [
+              3.583319672,
+              11.36350148
+            ],
+            [
+              3.625,
+              11.35611276
+            ],
+            [
+              3.666680328,
+              11.35353116
+            ],
+            [
+              3.708319672,
+              11.35566766
+            ],
+            [
+              3.75,
+              11.36252226
+            ],
+            [
+              3.791680328,
+              11.37400593
+            ],
+            [
+              3.833319672,
+              11.39011869
+            ],
+            [
+              3.875,
+              11.41077151
+            ],
+            [
+              3.916680328,
+              11.43605341
+            ],
+            [
+              3.958319672,
+              11.46578635
+            ],
+            [
+              4,
+              11.49997033
+            ],
+            [
+              4.041680328,
+              11.53869436
+            ],
+            [
+              4.083319672,
+              11.58178042
+            ],
+            [
+              4.125,
+              11.62922849
+            ],
+            [
+              4.166680328,
+              11.6811276
+            ],
+            [
+              4.208319672,
+              11.7372997
+            ],
+            [
+              4.25,
+              11.79783383
+            ],
+            [
+              4.291680328,
+              11.86255193
+            ],
+            [
+              4.333319672,
+              11.93163205
+            ],
+            [
+              4.375,
+              12.00489614
+            ],
+            [
+              4.416680328,
+              12.08243323
+            ],
+            [
+              4.458319672,
+              12.1641543
+            ],
+            [
+              4.5,
+              12.24997033
+            ],
+            [
+              5.041680328,
+              13.73866469
+            ],
+            [
+              5.875,
+              17.32949555
+            ],
+            [
+              6.708319672,
+              22.43492582
+            ],
+            [
+              7.541680328,
+              29.01347181
+            ],
+            [
+              8.375,
+              37.03985163
+            ],
+            [
+              9.208319672,
+              46.49813056
+            ],
+            [
+              10,
+              56.79997033
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 241,
+          "pts": [
+            [
+              0,
+              15
+            ],
+            [
+              0.8333196721,
+              15
+            ],
+            [
+              1.666680328,
+              15
+            ],
+            [
+              2.5,
+              15
+            ],
+            [
+              3.333319672,
+              15
+            ],
+            [
+              4.166680328,
+              15
+            ],
+            [
+              5,
+              15
+            ],
+            [
+              5.833319672,
+              15
+            ],
+            [
+              6.666680328,
+              15
+            ],
+            [
+              7.5,
+              15
+            ],
+            [
+              8.333319672,
+              15
+            ],
+            [
+              9.166680328,
+              15
+            ],
+            [
+              10,
+              15
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "filled": false,
+          "n": 241,
+          "pts": [
+            [
+              0,
+              15
+            ],
+            [
+              0.8333196721,
+              7.083293769
+            ],
+            [
+              1.416680328,
+              4.020801187
+            ],
+            [
+              1.458319672,
+              3.880237389
+            ],
+            [
+              1.5,
+              3.75
+            ],
+            [
+              1.541680328,
+              3.630178042
+            ],
+            [
+              1.583319672,
+              3.520860534
+            ],
+            [
+              1.625,
+              3.421869436
+            ],
+            [
+              1.666680328,
+              3.333293769
+            ],
+            [
+              1.708319672,
+              3.255222552
+            ],
+            [
+              1.75,
+              3.187477745
+            ],
+            [
+              1.791680328,
+              3.130237389
+            ],
+            [
+              1.833319672,
+              3.083323442
+            ],
+            [
+              1.875,
+              3.046913947
+            ],
+            [
+              1.916680328,
+              3.020830861
+            ],
+            [
+              1.958319672,
+              3.005252226
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              2.041680328,
+              3.005252226
+            ],
+            [
+              2.083319672,
+              3.020830861
+            ],
+            [
+              2.125,
+              3.046913947
+            ],
+            [
+              2.166680328,
+              3.083323442
+            ],
+            [
+              2.208319672,
+              3.130237389
+            ],
+            [
+              2.25,
+              3.187477745
+            ],
+            [
+              2.291680328,
+              3.255222552
+            ],
+            [
+              2.333319672,
+              3.333293769
+            ],
+            [
+              2.375,
+              3.421869436
+            ],
+            [
+              2.416680328,
+              3.520860534
+            ],
+            [
+              2.458319672,
+              3.630178042
+            ],
+            [
+              2.5,
+              3.75
+            ],
+            [
+              2.541680328,
+              3.880237389
+            ],
+            [
+              2.583319672,
+              4.020801187
+            ],
+            [
+              3.333319672,
+              8.333323442
+            ],
+            [
+              4.166680328,
+              17.08335312
+            ],
+            [
+              5,
+              30
+            ],
+            [
+              5.833319672,
+              47.08335312
+            ],
+            [
+              6.666680328,
+              68.33332344
+            ],
+            [
+              7.5,
+              93.75
+            ],
+            [
+              8.333319672,
+              123.3332938
+            ],
+            [
+              9.166680328,
+              157.0832938
+            ],
+            [
+              10,
+              195
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "filled": false,
+          "n": 101,
+          "pts": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              1.2
+            ],
+            [
+              0,
+              2.4
+            ],
+            [
+              0,
+              3.6
+            ],
+            [
+              0,
+              4.8
+            ],
+            [
+              0,
+              6
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "filled": false,
+          "n": 101,
+          "pts": [
+            [
+              30,
+              6
+            ],
+            [
+              36.12459016,
+              10.8
+            ],
+            [
+              40.49385246,
+              15.6
+            ],
+            [
+              44.08319672,
+              20.4
+            ],
+            [
+              47.20286885,
+              25.2
+            ],
+            [
+              50,
+              30
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "filled": false,
+          "n": 241,
+          "pts": [
+            [
+              0,
+              24.99997033
+            ],
+            [
+              8.333196721,
+              22.91670623
+            ],
+            [
+              16.66680328,
+              20.83335312
+            ],
+            [
+              25,
+              18.75
+            ],
+            [
+              33.33319672,
+              16.66664688
+            ],
+            [
+              41.66680328,
+              14.58329377
+            ],
+            [
+              50,
+              12.50002967
+            ],
+            [
+              58.33319672,
+              10.41667656
+            ],
+            [
+              66.66680328,
+              8.333323442
+            ],
+            [
+              75,
+              6.249970326
+            ],
+            [
+              83.33319672,
+              4.166706231
+            ],
+            [
+              91.66680328,
+              2.083353116
+            ],
+            [
+              100,
+              0
+            ]
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "filled": false,
+          "n": 301,
+          "pts": [
+            [
+              0,
+              24.99997033
+            ],
+            [
+              6.666803279,
+              23.33332344
+            ],
+            [
+              13.33319672,
+              21.66667656
+            ],
+            [
+              20,
+              20.00002967
+            ],
+            [
+              26.66680328,
+              18.33329377
+            ],
+            [
+              33.33319672,
+              16.66664688
+            ],
+            [
+              40,
+              15
+            ],
+            [
+              46.66680328,
+              13.33335312
+            ],
+            [
+              53.33319672,
+              11.66670623
+            ],
+            [
+              60,
+              9.999970326
+            ],
+            [
+              66.66680328,
+              8.333323442
+            ],
+            [
+              73.33319672,
+              6.666676558
+            ],
+            [
+              80,
+              5.000029674
+            ],
+            [
+              86.66680328,
+              3.333293769
+            ],
+            [
+              93.33319672,
+              1.666646884
+            ],
+            [
+              100,
+              0
+            ]
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            0,
+            30
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            10,
+            0
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            0,
+            15
+          ],
+          "b": [
+            4,
+            15
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            0,
+            6
+          ],
+          "b": [
+            3,
+            6
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            10.73770492,
+            31.06824926
+          ],
+          "b": [
+            10.73770492,
+            -1.068249258
+          ]
+        },
+        {
+          "panel": "firm-market-firm",
+          "a": [
+            4,
+            15
+          ],
+          "b": [
+            4,
+            0
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            0,
+            30
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            100,
+            0
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "a": [
+            0,
+            15
+          ],
+          "b": [
+            40,
+            15
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "a": [
+            0,
+            6
+          ],
+          "b": [
+            30,
+            6
+          ]
+        },
+        {
+          "panel": "firm-market-market",
+          "a": [
+            40,
+            15
+          ],
+          "b": [
+            40,
+            0
+          ]
+        }
+      ],
+      "rects": [
+        {
+          "panel": "firm-market-firm",
+          "filled": true,
+          "a": [
+            0,
+            15
+          ],
+          "b": [
+            4,
+            11.5
+          ]
+        }
+      ],
+      "dots": [
+        {
+          "panel": "firm-market-firm",
+          "c": [
+            0,
+            6
+          ],
+          "r": 4
+        },
+        {
+          "panel": "firm-market-firm",
+          "c": [
+            3,
+            6
+          ],
+          "r": 4
+        },
+        {
+          "panel": "firm-market-firm",
+          "c": [
+            4,
+            15
+          ],
+          "r": 4.5
+        },
+        {
+          "panel": "firm-market-market",
+          "c": [
+            0,
+            6
+          ],
+          "r": 4
+        },
+        {
+          "panel": "firm-market-market",
+          "c": [
+            30,
+            6
+          ],
+          "r": 4
+        },
+        {
+          "panel": "firm-market-market",
+          "c": [
+            40,
+            15
+          ],
+          "r": 4.5
+        }
+      ],
+      "keyPoints": {
+        "firm-market-firm": [
+          [
+            0,
+            0,
+            "cross"
+          ],
+          [
+            0,
+            15,
+            "cross"
+          ],
+          [
+            2,
+            3,
+            "extremum"
+          ],
+          [
+            2.167055174,
+            15,
+            "cross"
+          ],
+          [
+            3,
+            5.999999999,
+            "cross"
+          ],
+          [
+            3.66868509,
+            11.35352979,
+            "cross"
+          ],
+          [
+            4,
+            0,
+            "drawn"
+          ],
+          [
+            4,
+            15,
+            "cross"
+          ],
+          [
+            5.377551642,
+            15,
+            "cross"
+          ],
+          [
+            6,
+            15,
+            "cross"
+          ]
+        ],
+        "firm-market-market": [
+          [
+            0,
+            0,
+            "cross"
+          ],
+          [
+            0,
+            15,
+            "drawn"
+          ],
+          [
+            0,
+            25,
+            "cross"
+          ],
+          [
+            100,
+            0,
+            "cross"
+          ],
+          [
+            40,
+            0,
+            "drawn"
+          ],
+          [
+            40,
+            15,
+            "drawn"
+          ]
+        ]
+      }
+    },
+    "controls": [
+      {
+        "key": "#scene-back",
+        "kind": "button",
+        "label": "Ко всем моделям",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#model-switch",
+        "kind": "button",
+        "label": "Сменить модель, не теряя этой",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-undo",
+        "kind": "button",
+        "label": "Отменить (Ctrl+Z)",
+        "section": "",
+        "props": {
+          "disabled": true
+        }
+      },
+      {
+        "key": "#btn-redo",
+        "kind": "button",
+        "label": "Повторить (Ctrl+Shift+Z)",
+        "section": "",
+        "props": {
+          "disabled": true
+        }
+      },
+      {
+        "key": "#btn-self",
+        "kind": "button",
+        "label": "Спрятать числа ответа и проверить себя",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#btn-model-reset",
+        "kind": "button",
+        "label": "Вернуть стартовые функции и параметры",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#dock-export",
+        "kind": "button",
+        "label": "Скачать график",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-share",
+        "kind": "button",
+        "label": "Ссылка на это состояние модели",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "mf:#firm-market-demand",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-costs",
+        "props": {
+          "value": "Q = 100 - 4*P"
+        }
+      },
+      {
+        "key": "#fh-auto-firm-market-demand",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-market-n",
+        "kind": "input:text",
+        "label": "Число фирм n",
+        "section": "#sec-costs",
+        "props": {
+          "value": "10"
+        }
+      },
+      {
+        "key": "#cm-tc",
+        "kind": "button",
+        "label": "Задам TC",
+        "section": "#sec-costs",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#cm-curves",
+        "kind": "button",
+        "label": "Задам кривые",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#costs-input-tc>button.btn-icon",
+        "kind": "button",
+        "label": "Настройки: Суммарные затраты",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "mf:#inp-tc",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-costs",
+        "props": {
+          "value": "Q^3 - 6*Q^2 + 15*Q + 18"
+        }
+      },
+      {
+        "key": "#fh-tc",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-capacity",
+        "kind": "input:text",
+        "label": "Не больше K единиц",
+        "section": "#sec-costs",
+        "props": {
+          "value": ""
+        }
+      },
+      {
+        "key": "#firm-period>button.seg-btn",
+        "kind": "button",
+        "label": "Краткосрочный (SR)",
+        "section": "#sec-costs",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#firm-period>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Долгосрочный (LR)",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-fixed>button.seg-btn",
+        "kind": "button",
+        "label": "Невозвратные",
+        "section": "#sec-costs",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#firm-fixed>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Квазипостоянные",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-tax-type>button.seg-btn",
+        "kind": "button",
+        "label": "Нет",
+        "section": "#sec-costs",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#firm-tax-type>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Потоварный",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-tax-type>button.seg-btn[2]",
+        "kind": "button",
+        "label": "% выручки",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#firm-tax-type>button.seg-btn[3]",
+        "kind": "button",
+        "label": "Аккордный",
+        "section": "#sec-costs",
+        "props": {}
+      },
+      {
+        "key": "#tool-cursor",
+        "kind": "button",
+        "label": "Тянуть ручки и двигать график",
+        "section": "",
+        "props": {
+          "pressed": "true"
+        }
+      },
+      {
+        "key": "#tool-pts",
+        "kind": "button",
+        "label": "Ставить свои точки и считать площади",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#btn-zoomout",
+        "kind": "button",
+        "label": "Отдалить (клавиша «−»)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-zoomin",
+        "kind": "button",
+        "label": "Приблизить (клавиша «+»)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-resetview",
+        "kind": "button",
+        "label": "Вернуться к изначальному масштабу (или двойной клик)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-view",
+        "kind": "button",
+        "label": "Вид графика: оси, сетка, подписи, заголовок",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-focus",
+        "kind": "button",
+        "label": "Развернуть график",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#ans-hide",
+        "kind": "button",
+        "label": "Спрятать «Ответ»",
+        "section": "#params-panel",
+        "props": {}
+      },
+      {
+        "key": "#info-final>button.ff-expand",
+        "kind": "button",
+        "label": "Показать запись целиком",
+        "section": "#scoreboard",
+        "props": {}
+      },
+      {
+        "key": "#info-final>button.ff-copy",
+        "kind": "button",
+        "label": "Скопировать запись",
+        "section": "#scoreboard",
+        "props": {}
+      },
+      {
+        "key": "#info-final>button.ff-expand[1]",
+        "kind": "button",
+        "label": "Показать запись целиком",
+        "section": "#scoreboard",
+        "props": {}
+      },
+      {
+        "key": "#info-final>button.ff-copy[1]",
+        "kind": "button",
+        "label": "Скопировать запись",
+        "section": "#scoreboard",
+        "props": {}
+      },
+      {
+        "key": "#ex-bar",
+        "kind": "button",
+        "label": "Разбор4 вопроса",
+        "section": "#explain",
+        "props": {}
+      }
+    ],
+    "popups": [],
+    "answer": {
+      "blocks": [
+        {
+          "id": "info-final",
+          "rows": [],
+          "tables": [],
+          "notes": [],
+          "warns": [],
+          "final": [
+            {
+              "name": "Предложение фирмы",
+              "tex": "q_s = \\begin{cases}0, & P < 6\\\\0 \\;\\text{или}\\; 3, & P = 6\\\\\\frac{\\sqrt{144-12\\cdot\\left(15- P\\right)}+12}{6}, & 6 < P\\end{cases}",
+              "copy": "(P == 6 ? 3 : (P < 6 ? 0 : (P >= 0 ? (sqrt(144 - 12 * (15 - P)) + 12) / 6 : NaN)))"
+            },
+            {
+              "name": "Предложение рынка",
+              "tex": "Q_s = \\begin{cases}0, & P < 6\\\\0 \\;\\text{или}\\; 30, & P = 6\\\\\\frac{\\left(\\sqrt{144-12\\cdot\\left(15- P\\right)}+12\\right)\\cdot5}{3}, & 6 < P\\end{cases}",
+              "copy": "(P == 6 ? 30 : (P < 6 ? 0 : (P >= 0 ? (sqrt(144 - 12 * (15 - P)) + 12) * 5 / 3 : NaN)))"
+            }
+          ]
+        },
+        {
+          "id": "info-costs",
+          "rows": [
+            {
+              "i": 0,
+              "label": "Цена P",
+              "value": "15",
+              "raw": null
+            },
+            {
+              "i": 1,
+              "label": "Совокупный выпуск Q",
+              "value": "40",
+              "raw": null
+            },
+            {
+              "i": 2,
+              "label": "Число фирм n",
+              "value": "10",
+              "raw": null
+            },
+            {
+              "i": 3,
+              "label": "Выпуск фирмы q",
+              "value": "4",
+              "raw": null
+            },
+            {
+              "i": 4,
+              "label": "Прибыль фирмы Π",
+              "value": "14",
+              "raw": null
+            },
+            {
+              "i": 5,
+              "label": "Прибыль всех фирм",
+              "value": "140",
+              "raw": null
+            },
+            {
+              "i": 6,
+              "label": "Цена закрытия",
+              "value": "6",
+              "raw": null
+            }
+          ],
+          "tables": [],
+          "notes": [],
+          "warns": [],
+          "final": []
+        }
+      ],
+      "title": "",
+      "explain": [
+        "Постоянные затраты FC = TC(0), переменные VC = TC − FC.",
+        "Прибыль (P − ATC)·Q закрашивается зелёным, убыток красным. Долгосрочная точка входа и выхода стоит там, где P = min ATC: экономическая прибыль ноль.",
+        "Откуда берётся цена фирмы? Рынок складывает предложения одинаковых фирм: Qs​(P)=nqs​(P). Пересечение с рыночным спросом определяет цену, которую отдельная фирма принимает как заданную.",
+        "Как фирма выбирает выпуск? Сравнивает прибыль при всех допустимых выпусках, включая закрытие, предел мощности и границы кусочной функции. Условие P=MC само по себе не гарантирует максимум.",
+        "Что меняется в долгом периоде? При свободном входе положительная экономическая прибыль привлекает фирмы. Равновесная цена равна минимуму средних общих издержек с учётом налога, прибыль действующей фирмы нулевая, а n=Qd​/q. Число фирм здесь не округляется.",
+        "Что означает пунктирный скачок? Его концы — равноценные выпуски. Внутренние точки не обязательно допустимы: если спрос попал между концами, одинаковый выпуск всех фирм может не давать равновесия."
+      ],
+      "tips": [
+        "Вернуть стартовые функции и параметры",
+        "Вернуться к изначальному масштабу (или двойной клик)",
+        "Вид графика: оси, сетка, подписи, заголовок",
+        "Клавиатура и примеры формул",
+        "Ко всем моделям",
+        "Отдалить (клавиша «−»)",
+        "Отменить (Ctrl+Z)",
+        "Повторить (Ctrl+Shift+Z)",
+        "Показать запись целиком",
+        "Приблизить (клавиша «+»)",
+        "Развернуть график",
+        "Скачать график",
+        "Скопировать запись",
+        "Сменить модель, не теряя этой",
+        "Состояние хранится в ссылке и в этом браузере, сохранять вручную ничего не нужно",
+        "Спрятать числа ответа и проверить себя",
+        "Ссылка на это состояние модели",
+        "Ставить свои точки и считать площади",
+        "Тянуть ручки и двигать график"
+      ]
+    },
+    "chartSize": [
+      680,
+      443
+    ]
+  },
+  "controls": [
+    {
+      "key": "#scene-back",
+      "kind": "button",
+      "label": "Ко всем моделям",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#model-switch",
+      "kind": "button",
+      "label": "Сменить модель, не теряя этой",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-undo",
+      "kind": "button",
+      "label": "Отменить (Ctrl+Z)",
+      "section": "",
+      "props": {
+        "disabled": true
+      }
+    },
+    {
+      "key": "#btn-redo",
+      "kind": "button",
+      "label": "Повторить (Ctrl+Shift+Z)",
+      "section": "",
+      "props": {
+        "disabled": true
+      }
+    },
+    {
+      "key": "#btn-self",
+      "kind": "button",
+      "label": "Спрятать числа ответа и проверить себя",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#btn-model-reset",
+      "kind": "button",
+      "label": "Вернуть стартовые функции и параметры",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#dock-export",
+      "kind": "button",
+      "label": "Скачать график",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-share",
+      "kind": "button",
+      "label": "Ссылка на это состояние модели",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "mf:#firm-market-demand",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-costs",
+      "props": {
+        "value": "Q = 100 - 4*P"
+      }
+    },
+    {
+      "key": "#fh-auto-firm-market-demand",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-market-n",
+      "kind": "input:text",
+      "label": "Число фирм n",
+      "section": "#sec-costs",
+      "props": {
+        "value": "10"
+      }
+    },
+    {
+      "key": "#cm-tc",
+      "kind": "button",
+      "label": "Задам TC",
+      "section": "#sec-costs",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#cm-curves",
+      "kind": "button",
+      "label": "Задам кривые",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#costs-input-tc>button.btn-icon",
+      "kind": "button",
+      "label": "Настройки: Суммарные затраты",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "mf:#inp-tc",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-costs",
+      "props": {
+        "value": "Q^3 - 6*Q^2 + 15*Q + 18"
+      }
+    },
+    {
+      "key": "#fh-tc",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-capacity",
+      "kind": "input:text",
+      "label": "Не больше K единиц",
+      "section": "#sec-costs",
+      "props": {
+        "value": ""
+      }
+    },
+    {
+      "key": "#firm-period>button.seg-btn",
+      "kind": "button",
+      "label": "Краткосрочный (SR)",
+      "section": "#sec-costs",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#firm-period>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Долгосрочный (LR)",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-fixed>button.seg-btn",
+      "kind": "button",
+      "label": "Невозвратные",
+      "section": "#sec-costs",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#firm-fixed>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Квазипостоянные",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-tax-type>button.seg-btn",
+      "kind": "button",
+      "label": "Нет",
+      "section": "#sec-costs",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#firm-tax-type>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Потоварный",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-tax-type>button.seg-btn[2]",
+      "kind": "button",
+      "label": "% выручки",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#firm-tax-type>button.seg-btn[3]",
+      "kind": "button",
+      "label": "Аккордный",
+      "section": "#sec-costs",
+      "props": {}
+    },
+    {
+      "key": "#tool-cursor",
+      "kind": "button",
+      "label": "Тянуть ручки и двигать график",
+      "section": "",
+      "props": {
+        "pressed": "true"
+      }
+    },
+    {
+      "key": "#tool-pts",
+      "kind": "button",
+      "label": "Ставить свои точки и считать площади",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#btn-zoomout",
+      "kind": "button",
+      "label": "Отдалить (клавиша «−»)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-zoomin",
+      "kind": "button",
+      "label": "Приблизить (клавиша «+»)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-resetview",
+      "kind": "button",
+      "label": "Вернуться к изначальному масштабу (или двойной клик)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-view",
+      "kind": "button",
+      "label": "Вид графика: оси, сетка, подписи, заголовок",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-focus",
+      "kind": "button",
+      "label": "Развернуть график",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#ans-hide",
+      "kind": "button",
+      "label": "Спрятать «Ответ»",
+      "section": "#params-panel",
+      "props": {}
+    },
+    {
+      "key": "#info-final>button.ff-expand",
+      "kind": "button",
+      "label": "Показать запись целиком",
+      "section": "#scoreboard",
+      "props": {}
+    },
+    {
+      "key": "#info-final>button.ff-copy",
+      "kind": "button",
+      "label": "Скопировать запись",
+      "section": "#scoreboard",
+      "props": {}
+    },
+    {
+      "key": "#info-final>button.ff-expand[1]",
+      "kind": "button",
+      "label": "Показать запись целиком",
+      "section": "#scoreboard",
+      "props": {}
+    },
+    {
+      "key": "#info-final>button.ff-copy[1]",
+      "kind": "button",
+      "label": "Скопировать запись",
+      "section": "#scoreboard",
+      "props": {}
+    },
+    {
+      "key": "#ex-bar",
+      "kind": "button",
+      "label": "Разбор4 вопроса",
+      "section": "#explain",
+      "props": {}
+    }
+  ],
+  "steps": [
+    {
+      "path": [
+        "mf:#firm-market-demand"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    },
+    {
+      "path": [
+        "mf:#inp-tc"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    }
+  ],
+  "errors": []
+}

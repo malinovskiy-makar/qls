@@ -1,0 +1,121 @@
+Места, где сцены создают path, на коммите e165aff: файл:строка | функция | вид по первому взгляду | запись сейчас | начало строки
+Вид определён грубо (есть ли fill none в операторе). Это перечень для сверки, а не истина: проверяй по коду.
+
+20-plane.js:481 | addDefs | наконечник стрелки (defs) | — | .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', COL.ink);
+30-curves.js:213 | drawMarginalCurve | кривая | — | g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
+30-curves.js:217 | drawMarginalCurve | кривая | — | const p = g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
+30-curves.js:1120 | drawCurves | кривая | data-curve | gLip.append('path').datum(ghost)
+30-curves.js:1127 | drawCurves | кривая | data-curve | g.append('path').datum(real)
+30-curves.js:1133 | drawCurves | кривая | data-curve | const path = g.append('path').datum(pts)
+30-curves.js:1162 | drawCurves | кривая | data-skip-export (в файл не идёт) | const hit = g.append('path').datum(pts)
+40-scenes-market.js:626 | drawOpenAreas | область | — | g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend',
+40-scenes-market.js:630 | drawOpenAreas | область | — | g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend',
+40-scenes-market.js:653 | drawOpenAreas | область | — | g.append('path').datum(samp(a1, b1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legen
+40-scenes-market.js:856 | drawOffQuadIntersection | кривая | data-skip-export (в файл не идёт) | g.append('path').datum(pts)
+40-scenes-market.js:2145 | drawAreas | область | — | g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend'
+40-scenes-market.js:2150 | drawAreas | область | — | g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend'
+40-scenes-market.js:2227 | drawShiftedSupply | кривая | markExpr | markExpr(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', base.color)
+40-scenes-market.js:2316 | drawTaxPivot | кривая | — | g.append('path').datum(pts)
+40-scenes-market.js:2348 | drawTaxAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек
+40-scenes-market.js:2352 | drawTaxAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек
+40-scenes-market.js:2358 | drawTaxAreas | область | — | g.append('path').datum(s1).attr('d', aTx)
+40-scenes-market.js:2365 | drawTaxAreas | область | — | g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', '
+40-scenes-market.js:3060 | drawElasticityZones | область | — | g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.10);        
+40-scenes-market.js:3061 | drawElasticityZones | область | — | g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', COL.reg).attr('opacity', 0.10);  
+40-scenes-market.js:3208 | drawExtAreas | область | — | g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend',
+40-scenes-market.js:3222 | drawExtCurves | кривая | — | g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr
+40-scenes-market.js:3226 | drawExtCurves | кривая | — | g.append('path').datum(pts(e.msb)).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2.5).attr(
+40-scenes-market.js:3231 | drawExtCurves | кривая | — | g.append('path').datum(pts(q => evalCurve(STATE.S, q) + e.corrective))
+40-scenes-market.js:3416 | drawPcAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек
+40-scenes-market.js:3420 | drawPcAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек
+40-scenes-market.js:3427 | drawPcAreas | область | — | g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', '
+40-scenes-market.js:3584 | drawQuotaAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16)
+40-scenes-market.js:3589 | drawQuotaAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16)
+40-scenes-market.js:3597 | drawQuotaAreas | область | — | g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28)
+42-scenes-mono.js:75 | drawMonopolyAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Перем
+42-scenes-mono.js:79 | drawMonopolyAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:83 | drawMonopolyAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:93 | drawMonopolyAreas | область | — | g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', '
+42-scenes-mono.js:113 | drawMonopoly | кривая | — | g.append('path').datum(sample(mcAt))
+42-scenes-mono.js:278 | drawMonoCeilingAreas | область | — | if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('p
+42-scenes-mono.js:279 | drawMonoCeilingAreas | область | — | if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(P)); g.append('p
+42-scenes-mono.js:280 | drawMonoCeilingAreas | область | — | if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('pa
+42-scenes-mono.js:284 | drawMonoCeilingAreas | область | — | if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d 
+42-scenes-mono.js:464 | drawMonoQuotaAreas | область | — | if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('p
+42-scenes-mono.js:465 | drawMonoQuotaAreas | область | — | if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(qt.price)); g.ap
+42-scenes-mono.js:466 | drawMonoQuotaAreas | область | — | if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(qt.price)).y1(d => sy(evalCurve(D, d))); g.app
+42-scenes-mono.js:473 | drawMonoQuotaAreas | область | — | g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', '
+42-scenes-mono.js:607 | drawNaturalCurves | кривая | — | g.append('path').datum(sample(naturalATC, CONFIG.Qmax * 0.005))
+42-scenes-mono.js:702 | drawMonoTaxAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Перем
+42-scenes-mono.js:707 | drawMonoTaxAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:711 | drawMonoTaxAreas | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:715 | drawMonoTaxAreas | область | — | g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE
+42-scenes-mono.js:720 | drawMonoTaxAreas | область | — | if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d 
+42-scenes-mono.js:732 | drawMonoTaxShiftedMC | кривая | — | g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2).attr('stroke-d
+42-scenes-mono.js:768 | drawMonoFloorAreas | область | — | if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('p
+42-scenes-mono.js:769 | drawMonoFloorAreas | область | — | if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(fl.price)); g.ap
+42-scenes-mono.js:770 | drawMonoFloorAreas | область | — | if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); g.app
+42-scenes-mono.js:772 | drawMonoFloorAreas | область | — | if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp
+42-scenes-mono.js:954 | drawDiscr1 | кривая | — | g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', lin
+42-scenes-mono.js:964 | drawDiscr1 | область | — | g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20).attr('data-legend', 'Изл
+42-scenes-mono.js:1108 | drawMiniMarket | кривая | — | gc.append('path').datum(sample(q => evalCurve(D, q))).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-
+42-scenes-mono.js:1109 | drawMiniMarket | кривая | — | gc.append('path').datum(sample(q => marginalRevenue(D, q))).attr('fill', 'none').attr('stroke', COL.MR).attr('
+42-scenes-mono.js:1110 | drawMiniMarket | кривая | — | gc.append('path').datum(sample(q => evalCurve(mcCurve, q))).attr('fill', 'none').attr('stroke', COL.S).attr('s
+42-scenes-mono.js:1246 | drawMonoExport | кривая | — | g.append('path').datum(sample(q => evalCurve(d.c1, q)))
+42-scenes-mono.js:1252 | drawMonoExport | кривая | — | g.append('path').datum(sample(q => evalCurve(d.cm, q)))
+42-scenes-mono.js:1521 | drawKinkedFull | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Перем
+42-scenes-mono.js:1525 | drawKinkedFull | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:1529 | drawKinkedFull | область | — | g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек
+42-scenes-mono.js:1534 | drawKinkedFull | область | — | g.append('path').datum(s2).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'П
+42-scenes-mono.js:1539 | drawKinkedFull | кривая | — | g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', li
+42-scenes-mono.js:1559 | drawKinkedFull | кривая | — | g.append('path').datum(mcPts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', l
+44-scenes-firm.js:307 | drawCostCurves | кривая | markExpr (ниже по коду) | const p = g.append('path').datum(costPoints(f)).attr('fill', 'none')
+44-scenes-firm.js:812 | redrawProduction | кривая | markExpr (ниже по коду) | const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', width
+44-scenes-firm.js:1066 | redrawPlants | кривая | markExpr | markExpr(g.append('path').datum(mkMC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 
+44-scenes-firm.js:1068 | redrawPlants | кривая | markExpr | markExpr(g.append('path').datum(mkMC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 
+44-scenes-firm.js:1073 | redrawPlants | кривая | data-numeric | g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-
+44-scenes-firm.js:1081 | redrawPlants | кривая | markExpr | markExpr(g.append('path').datum(mkTC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 
+44-scenes-firm.js:1083 | redrawPlants | кривая | markExpr | markExpr(g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 
+44-scenes-firm.js:1085 | redrawPlants | кривая | data-numeric | g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('s
+46-scenes-labor.js:231 | drawLaborSurpluses | область | — | g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Изли
+46-scenes-labor.js:234 | drawLaborSurpluses | область | — | g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Изли
+46-scenes-labor.js:249 | drawLaborMinWelfare | область | — | g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излише
+46-scenes-labor.js:252 | drawLaborMinWelfare | область | — | g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излише
+46-scenes-labor.js:258 | drawLaborMinWelfare | область | — | g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', '
+46-scenes-labor.js:275 | drawLaborMCL | кривая | — | g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('str
+46-scenes-labor.js:288 | drawLaborMCL | кривая | — | g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', COL.warn).attr('stroke-width', 3).attr('
+46-scenes-labor.js:308 | drawLaborDWL | область | — | g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 
+46-scenes-labor.js:452 | drawLaborGapDWL | область | — | g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 
+48-scenes-consumer.js:100 | drawLevelCurve | кривая | — | const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
+50-scenes-macro.js:223 | drawMacroCurve | кривая | — | const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).att
+50-scenes-macro.js:254 | redrawMacro | область | — | g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12).attr('data-legend', 
+50-scenes-macro.js:255 | redrawMacro | кривая | — | g.append('path').datum(r.pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2.8).attr('d',
+54-scenes-ppf.js:297 | drawPpfCurve | область | — | g.append('path').datum(pts).attr('d', out)
+54-scenes-ppf.js:302 | drawPpfCurve | область | — | g.append('path').datum(pts).attr('d', area)
+54-scenes-ppf.js:306 | drawPpfCurve | кривая | — | g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line);
+54-scenes-ppf.js:311 | drawPpfCurve | кривая | — | g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line);
+54-scenes-ppf.js:2193 | drawPpfSumCurves | кривая | — | g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
+54-scenes-ppf.js:2199 | drawPpfSumCurves | область | — | g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
+54-scenes-ppf.js:2201 | drawPpfSumCurves | кривая | — | g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d',
+54-scenes-ppf.js:2431 | drawPpfSumSchema | область | — (функция нигде не вызывается: в файл не идёт) | g.append('path').attr('d', fillPath).attr('fill', COL.D).attr('opacity', 0.07);
+54-scenes-ppf.js:2432 | drawPpfSumSchema | кривая | — (функция нигде не вызывается: в файл не идёт) | g.append('path').attr('d', dPath).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8);
+54-scenes-ppf.js:2560 | drawPpfTrade | область | — | g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06);
+54-scenes-ppf.js:2561 | drawPpfTrade | кривая | — | g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d'
+54-scenes-ppf.js:2564 | drawPpfTrade | кривая | — | g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', lin
+54-scenes-ppf.js:2932 | drawTradeB | кривая | — | g.append('path').datum(co.ppts).attr('fill', 'none')
+54-scenes-ppf.js:2936 | drawTradeB | кривая | — | if (!d.noTrade) g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
+56-scenes-inequality.js:236 | drawInequalityAreas | область | — | g.append('path').datum(pts).attr('d', bArea).attr('fill', COL.dwl).attr('opacity', 0.15);
+56-scenes-inequality.js:238 | drawInequalityAreas | область | — | g.append('path').datum(pts).attr('d', aArea).attr('fill', COL.D).attr('opacity', 0.12);
+56-scenes-inequality.js:247 | drawLorenzCurve | кривая | — | const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).
+56-scenes-inequality.js:345 | drawRedistArrow | кривая | — | g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
+60-overlays.js:1626 | drawCrossPoints | значок-булавка зажжённой точки (служебный узел: в файл не идёт) | — | pin.append('path').attr('d', 'M5 1.5h4l-.6 4.2 2.6 2.3v1.4H3v-1.4l2.6-2.3zM7 9.4v4.1')
+60-overlays.js:1744 | drawCurveHits | кривая | data-skip-export (в файл не идёт) | g.append('path').datum(pts)
+60-overlays.js:2250 | drawAreaVerts | область | — | g.append('path')
+60-overlays.js:2455 | drawAreaCalc | область | — | g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
+60-overlays.js:2459 | drawAreaCalc | область | — | g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
+70-scenes-math.js:198 | mathLine | кривая | — | const p = g.append('path').datum(pts).attr('fill', 'none')
+70-scenes-math.js:537 | drawMathTangent | область | — | gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
+70-scenes-math.js:864 | drawMathConstraint | кривая | — | g.append('path').datum(pts).attr('fill', 'none')
+70-scenes-math.js:896 | drawLevelCurveOn | кривая | — | const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
+
+Всего мест: 116. По файлам: 20-plane.js 1, 30-curves.js 6, 40-scenes-market.js 24, 42-scenes-mono.js 37, 44-scenes-firm.js 8, 46-scenes-labor.js 9, 48-scenes-consumer.js 1, 50-scenes-macro.js 3, 54-scenes-ppf.js 14, 56-scenes-inequality.js 4, 60-overlays.js 5, 70-scenes-math.js 4

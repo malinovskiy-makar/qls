@@ -157,6 +157,11 @@ class Calc2View(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # Заголовок и описание SEO — отсюда, а не литералом в шаблоне: в них
+        # длинное тире, а сканер типографики смотрит .html, но не .py.
+        from catalog import seo
+        ctx['seo_title'] = seo.CALC_TITLE
+        ctx['seo_description'] = seo.CALC_DESCRIPTION
         # Честно говорим интерфейсу, умеет ли ЭТОТ сервер собирать PDF.
         # Если компилятора нет, кнопка «Скачать PDF» не показывается вовсе —
         # как это уже сделано на странице экспорта подборок

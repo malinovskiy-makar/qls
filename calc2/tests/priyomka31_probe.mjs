@@ -1142,6 +1142,16 @@ if (need('Д10')) {
   for (const W of [1000, 380]) {
     await page.setViewportSize({ width: W, height: 900 });
     await page.waitForTimeout(400);
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 3): на 760–1239 px «Ответ» —
+       выезжающая панель по кнопке «Ответ», на телефоне — вкладка. Открываем её,
+       как человек, прежде чем мерить блок итоговой функции. */
+    await page.evaluate(() => {
+      const b = document.getElementById('btn-answer');
+      if (b && b.offsetParent && !document.body.classList.contains('ans-open')) b.click();
+      const t = document.querySelector('#ph-tabs .ph-tab[data-tab="ans"]');
+      if (t && t.offsetParent) t.click();
+    });
+    await page.waitForTimeout(300);
     const r = await page.evaluate(() => {
       resetSceneMemory(); pickScene('sdsum'); redrawAll();
       p31Expand(); redrawAll();

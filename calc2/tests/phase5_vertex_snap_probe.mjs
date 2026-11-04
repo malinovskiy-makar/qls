@@ -24,7 +24,9 @@ const report = (name, pass, detail) => { console.log((pass ? 'OK  ' : 'FAIL') + 
 await page.evaluate(() => {
   resetSceneMemory(); pickScene('sd');
   // Своя точка НЕ на кривой и не в пересечении — единственный кандидат её найти это snapVertexAt.
-  STATE.marks = [{ x: 22, y: 71, name: '' }];
+  // С сессии 7 вершина площади — сама точка списка (README пакета calc2_panels_20261014, 9): щелчок по своей
+  // точке в наборе берёт её id в CANVAS.buildIds, а не ставит копию координат в STATE.areaVerts.
+  STATE.marks = [{ id: 1, x: 22, y: 71, text: 'A' }];
   STATE.areaVerts = [];
   armVerts(true);
   redrawAll();
@@ -45,7 +47,8 @@ await page.waitForTimeout(150);
 
 const result = await page.evaluate(({ dataX, dataY }) => {
   const s = mainScales();
-  const v = (STATE.areaVerts || [])[0];
+  const id = (CANVAS.buildIds || [])[0];
+  const v = id != null ? markById(id) : null;
   if (!v) return { placed: false };
   const missPx = Math.hypot(s.mx(v.x) - s.mx(dataX), s.my(v.y) - s.my(dataY));
   return { placed: true, vx: v.x, vy: v.y, missPx: Math.round(missPx * 100) / 100 };

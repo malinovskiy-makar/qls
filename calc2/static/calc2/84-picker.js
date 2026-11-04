@@ -31,7 +31,9 @@ function loadScene(name) {
   STATE.quota = 0; STATE.quotaPos = 0.5; STATE.qt = null;
   ['quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const qv = document.getElementById('quota-val'); if (qv) qv.textContent = '0';
-  const qp = document.getElementById('quota-price-slider'); if (qp) qp.value = 50;
+  // Пределы «Цены внутри коридора» ставит коридор прошлой модели (updateQuotaPriceLabel) — к разметке страницы.
+  const qp = document.getElementById('quota-price-slider');
+  if (qp) { qp.min = '0'; qp.max = '100'; qp.step = '1'; qp.value = 50; delete qp._modelValue; }
   setTaxKind('unit');
   ['tax-slider', 'tax-input', 'pc-slider', 'pc-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const tv = document.getElementById('tax-val'); if (tv) tv.textContent = '0';
@@ -51,8 +53,8 @@ function loadScene(name) {
       setMarket('comp');
       if (name === 'tax' || name === 'taxes') { setType('tax'); setTax(20); }
       else if (name === 'ceil') { setType('ceiling'); setPReg(30); }
-      // Квота 40 при D = 100 − Q, S = Q: коридор от 40 до 60, цена по центру.
-      else if (name === 'quota') { setType('quota'); setQuota(40); setQuotaPos(0.5); }
+      // Квота 40 при D = 100 − Q, S = Q: коридор от 40 до 60, цена — цена спроса 60 (решение 24.10, …81e0…9219…).
+      else if (name === 'quota') { setType('quota'); setQuota(40); setQuotaPos(1); }
       else { setType('tax'); }                                  // 'sd' — чистое равновесие
     }
   } else if (name === 'sdsum') {
@@ -78,12 +80,11 @@ function loadScene(name) {
       STATE.elastQ = null; STATE.elastQS = null;   // точки встанут в «умные» стартовые позиции
       setScenario('elasticity');
     } else {
-      /* Сцена открывается ЧИСТОЙ: MSB и MSC равны частным кривым и ВЫКЛЮЧЕНЫ,
-         поэтому оптимум совпадает с рыночным равновесием, а DWL равен нулю.
-         Расхождение появляется только после того, как человек включит чекбокс
-         и поправит формулу. */
-      STATE.msbOn = false; STATE.mscOn = false;
-      STATE.msbExpr = ''; STATE.mscExpr = '';     // подставятся формулы D и S
+      /* Старт С ВНЕШНИМ ЭФФЕКТОМ (решение владельца 24.10, Notion …81e7…; пересматривает стартовую часть
+         решения 21.08): MSC = Q + 20 и ВИДНА — открыл модель и сразу видишь эффект: рынок 50; 50, оптимум
+         40; 60, DWL 100, налог Пигу 20. MSB равна спросу и спрятана, как раньше. */
+      STATE.msbOn = false; STATE.mscOn = true;
+      STATE.msbExpr = ''; STATE.mscExpr = 'Q + 20';   // MSB подставится формулой D
       STATE.applyPigou = false;
       const ep = document.getElementById('ext-pigou'); if (ep) ep.checked = false;
       setScenario('externality');
@@ -173,28 +174,13 @@ function openPicker() {
   p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
-  /* Н5. Из сюжета возвращаемся РОВНО на предыдущий экран, то есть в тот блок,
-     где этот сюжет лежит, а не в общий список десяти блоков. (Прежнее правило
-     П2 говорило обратное; оно отменено.) Блок ищем по самой карточке текущей
-     сцены: так он верен всегда, в том числе после восстановления состояния.
-     Если сцены ещё не выбирали, открывается полная карта. */
-  const blocks = document.getElementById('picker-blocks');
-  const back = document.getElementById('picker-back');
-  p.querySelectorAll('.picker-group').forEach(g => g.classList.remove('open'));
-  const card = STATE.sceneKey
-    ? p.querySelector('.scard[data-scene="' + CSS.escape(STATE.sceneKey) + '"]') : null;
-  const group = card ? card.closest('.picker-group') : null;
-  if (group) {
-    group.classList.add('open');
-    if (blocks) blocks.classList.add('hidden');
-    if (back) back.classList.add('shown');
-  } else {
-    if (blocks) blocks.classList.remove('hidden');
-    if (back) back.classList.remove('shown');
-  }
-  const first = group
-    ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
-    : (p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])'));
+  /* Редизайн 10.2026 (фаза 8) и решение 09.10: блоков-ступенек нет. Сверху
+     «Продолжить» и недавние, ниже вкладки блоков, фокус в поиске (О2). */
+  if (typeof renderPickerContinue === 'function') renderPickerContinue();
+  if (typeof pickerOpenTab === 'function') pickerOpenTab();   // вкладка блока при входе (95-picker-screen.js)
+  const q = document.getElementById('picker-search');
+  if (typeof pickerFilter === 'function') pickerFilter(q ? q.value : '');
+  const first = q || p.querySelector('.scard:not([disabled])');
   /* ⚠️ ПРОГРАММНЫЙ ФОКУС — НЕ ЗНАЧИТ ВИДИМОЕ КОЛЬЦО. focus() здесь нужен ради
      доступности: открыли окно — Tab и стрелки сразу работают, не нужно
      проходить всю шапку сайта заново. Но браузер не различает «фокус дала
@@ -254,8 +240,11 @@ const SCENE_ROUTE = {
      экран нечего покрутить, и первое, что видел человек, — чистый холст.
      Парабола x² − 4 выбрана нарочно: у неё видны оба нуля и вершина, то есть
      сразу заполнены «Ключевые значения». */
+  /* Окно — по функции (ADR 0143): вершина и оба нуля внутри с запасом, ось y
+     посередине. Прежний экономический подбор раздвигал его до 100 × 100. */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows(); } },
+                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows();
+                                 setGraphWindow(graphFitWindow()); redrawAll(); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },
@@ -297,6 +286,11 @@ const SCENE_ROUTE = {
 
   /* --- Блок 4 · Теория фирмы ---------------------------------------- */
   costs:    { run: () => { loadScene('costs'); setCostsSub('costs'); },      lock: ['costs-seg'] },
+  firmmarket: { base: 'costs', run: () => {
+    loadScene('costs'); setCostsSub('costs'); STATE.costsMCOnly=true;
+    STATE.firmMarket={n:10,demand:'Q = 100 - 4*P'};
+    document.getElementById('firm-market-demand').value=STATE.firmMarket.demand;
+  }, lock: ['costs-seg','lr-price-field','chk-lr'] },
   prod:     { base: 'costs', run: () => { loadScene('costs'); setCostsSub('production'); }, lock: ['costs-seg'] },
   plants:   { base: 'costs', run: () => { loadScene('costs'); setCostsSub('plants'); },     lock: ['costs-seg'] },
   isoquant: { base: 'costs', run: () => { loadScene('costs'); setCostsSub('isoquant'); },   lock: ['costs-seg'] },
@@ -312,10 +306,15 @@ const SCENE_ROUTE = {
   labor:         { run: () => { setMode('labor'); setLaborStruct('competition'); }, lock: ['labor-seg'] },
   'labor-mono':  { base: 'labor', run: () => { setMode('labor'); setLaborStruct('monopsony'); }, lock: ['labor-seg'] },
   'labor-union': { base: 'labor', run: () => { setMode('labor'); setLaborStruct('union'); },     lock: ['labor-seg'] },
-  'labor-bilat': { base: 'labor', run: () => { setMode('labor'); setLaborStruct('bilateral'); }, lock: ['labor-seg'] },
+  // МРОТ на старте выключен (галочка видна; решение …8168…): классический диапазон торга без МРОТ.
+  'labor-bilat': { base: 'labor', run: () => { setMode('labor'); setLaborMinOn(false); setLaborStruct('bilateral'); }, lock: ['labor-seg'] },
 
   /* --- Блок 7 · Международная торговля -------------------------------- */
   smallopen:  { run: () => loadScene('smallopen'),  lock: [L_INTERV] },
+  bigopen: { base:'market', run:()=>{
+    STATE.bigTrade=bigTradeDefaults();STATE.curves=[];STATE.scenario='none';setMode('market');setMarket('comp');
+    for(const key of['A','B'])for(const role of['D','S'])document.getElementById('big-'+key+'-'+role).value=STATE.bigTrade[key][role];
+  },lock:[L_INTERV,'sec-curves','sec-eq','sec-mono'] },
   monoexport: { run: () => loadScene('monoexport'), lock: [L_MONOSUB, L_INTERV] },
 
   /* --- Блок 8 · Выбор потребителя ------------------------------------- */
@@ -536,8 +535,17 @@ function plural(n, forms) {
 }
 
 function pickScene(key) {
+  /* Смена модели возвращает «Курсор» (ADR 0148). Только СМЕНА: «Сбросить» и
+     «Отменить» зовут pickScene той же модели, и режим у человека остаётся. */
+  if (STATE.sceneKey && STATE.sceneKey !== key && typeof CANVAS !== 'undefined' && CANVAS.pts
+      && typeof setPtsMode === 'function') setPtsMode(false);
   // П51: уходя из модели, кладём её состояние на полку — вернёмся, достанем.
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
+  /* Канонический старт (89-model-state.js): все входы — и в STATE, и в форме —
+     возвращаются к свежей странице, и только потом маршрут ставит обстановку
+     модели. Без этого 22 маршрута, которые лишь переключают режим, наследовали
+     входы своей семьи от модели, открытой раньше. */
+  if (typeof restorePristine === 'function') restorePristine();
   resetDecor();           // П20: новая модель начинается с чистого состояния
   STATE.zoomLock = false; // и своего масштаба, а не унаследованного от колеса
   if (typeof resetPanelWins === 'function') resetPanelWins();   // и окон её панелей
@@ -552,8 +560,11 @@ function pickScene(key) {
      Чинить надо не конкретный переход, а жизненный цикл: маршрут, которому
      кривые нужны, строит их сам сразу после этой строки. */
   STATE.curves = []; curveCounter = 0;
+  if (typeof resetPultShiftHalf === 'function') resetPultShiftHalf();   // размах ползунков сдвига — заново (88-params.js)
   const r = SCENE_ROUTE[key] || SCENE_ROUTE.sd;
   r.run();
+  // Стартовые записи кривых — для «Вернуть стартовую запись» в меню «…».
+  if (typeof rememberStartCurves === 'function') rememberStartCurves(key);
   // Возврат в модель, где уже работали: восстанавливаем именно её изменения.
   // Строго ПОСЛЕ run(): тот ставит сцене её стартовый вид, а снимок его
   // перекрывает. Между моделями при этом не течёт ничего — снимок свой у каждой.
@@ -573,5 +584,8 @@ function pickScene(key) {
   // виден сразу, а разворачивается только нужное.
   setToolsOpen(true);
   closePicker();
+  // Адрес показывает модель (?m=): перезагрузка вернёт её (91-session.js).
+  if (typeof writeModelToUrl === 'function') writeModelToUrl(typeof modelKeyOf === 'function' ? modelKeyOf(key) : key);
+  if (typeof historyBaseline === 'function') historyBaseline();
 }
 

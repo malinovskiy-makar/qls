@@ -1,0 +1,22 @@
+### calc2/tests/redesign/answer_panel_probe.mjs  код 1  829с
+  OK   [webkit] 1000: стрелки и полоски нет, «Ответ» открывается прежним способом (выезжает)
+  OK   [webkit] 1000: ошибок страницы нет
+  OK   [webkit] 390: стрелки и полоски нет, «Ответ» открывается прежним способом (вкладка)
+  OK   [webkit] 390: ошибок страницы нет
+
+Node.js v24.16.0
+### calc2/tests/redesign/quiet_probe.mjs  код 1  339с
+  OK   [webkit] mono-d1: «Сдвиг MC» одним обозначением (без индекса)
+  OK   [webkit] smallopen: «Pw» с индексом
+  OK   [webkit] ошибок страницы нет
+ИТОГ quiet_probe: 36 из 38, провалов 2
+
+ИТОГ quiet_probe: 36 из 38, провалов 2
+### calc2/tests/redesign/view_probe.mjs  код 0  405с
+  OK   [webkit] «Вид по умолчанию»: «На графике» — к старту модели
+  OK   [webkit] старая ссылка с showCS: false — CS спрятан, галочка снята
+  OK   [webkit] ошибок страницы нет
+ИТОГ view_probe: 26 из 26, всё сошлось
+
+ИТОГ view_probe: 26 из 26, всё сошлось
+DONE

@@ -8,6 +8,9 @@
    заголовок графика и свои точки рисуются НЕ внутри сцены, а обёрткой после неё:
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 function redrawAll() {
+  syncTaxPairUI();
+  const labelsBeforeFit=new Map([..._labelPos].map(([k,v])=>[k,{...v}]));
+  _coordMarginLeft=0;
   syncParams();          // формулы могли завести или потерять буквы-параметры
   refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
   /* Естественная область модели считается раз на кадр (см. modelSpanQ). Метку
@@ -15,24 +18,38 @@ function redrawAll() {
      ниже начинается счёт, который этой областью и пользуется. */
   bumpModelSpan();
   redrawScene();
+  // Сначала готов расчёт, затем окно по его ключевым точкам. Если оно
+  // изменилось, холст пересобирается сразу — без ожидания следующего жеста.
+  const beforeWindow = [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax].join('|');
+  if (typeof growWindowToModel === 'function') growWindowToModel();
+  if (beforeWindow !== [CONFIG.Qmin, CONFIG.Qmax, CONFIG.Pmin, CONFIG.Pmax].join('|')) {
+    redrawScene();
+    _sceneRangedFrame = false;
+  }
   drawOverlays();
   applyLabelSize();      // общий размер подписей — одним проходом по холсту (П50)
+  // Все слои уже собраны. Итоговый шрифт нужен ДО замера рамок: в WebKit
+  // смена шрифта после разведения снова сталкивала ATC и AVC (Э1).
+  typesetChartLabels();
+  if (fitCoordinateMargin()) {
+    // Первый проход только измерил точные координаты. Его более узкое поле
+    // не должно становиться промежуточным кадром анимации: иначе каждый
+    // следующий кадр снова тянет подпись к узкому полю и обратно, без конца.
+    if(_labelFrame!=null){cancelAnimationFrame(_labelFrame);_labelFrame=null;}
+    _labelPos.clear();labelsBeforeFit.forEach((v,k)=>_labelPos.set(k,v));
+    redrawScene(); drawOverlays(); applyLabelSize(); typesetChartLabels();
+  }
   unclipLabels();        // подпись, которую режет её же обрезка, переезжает наружу
   keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
   applyLabelInk();       // и читаемые чернила подписей — тем же приёмом (П75)
-  /* ⚠️ ОБОЗНАЧЕНИЯ НАБИРАЮТСЯ МАТЕМАТИКОЙ В САМОМ КОНЦЕ, ПОСЛЕ ВСЕХ СЛОЁВ.
-     Первый заход стоял внутри drawOverlays, и подписи, которые сцена рисует
-     позже (S в «Налогах», ATC и MC в естественной монополии, TC в «Сложении
-     заводов»), правило уже не заставало: замер 24.08 находил их обычным
-     шрифтом. Здесь холст собран целиком, кто бы что ни дорисовал. */
-  typesetChartLabels();
   /* ⚠️ ОБОЗНАЧЕНИЯ В ПАНЕЛЯХ РАЗМЕЧАЮТСЯ ТУТ ЖЕ, В САМОМ КОНЦЕ, И ПО ТОЙ ЖЕ
      ПРИЧИНЕ. Первый заход стоял внутри refreshAnalyticsPanel, и прозу, которую
      сцена дописывает позже («продав единицу X, получаешь 2 ед…»), проход уже не
      заставал: замер 24.08 находил 26 таких мест в семи сценах. Здесь панель
      собрана целиком, кто бы что ни дописал. */
   markNotationsIn(document.getElementById('tools-panel'));
+  markNotationsIn(document.getElementById('pts-panel'));   // панель режима «Точки и площади» (ADR 0148)
   markNotationsIn(document.getElementById('params-panel'));
   refreshRegulators();   // строки «имя = значение» идут за значениями ползунков
   // Заголовок раздела равновесия — свойство сцены (А52). Синхронизируем здесь,
@@ -47,13 +64,16 @@ function redrawAll() {
   // А6: обычных текстовых окошек в панели не остаётся — имена правятся на
   // месте тем же способом, что и числа. Строки сцен собираются на лету,
   // поэтому проходим по панели после каждой перерисовки.
-  if (typeof upgradeTextFieldsIn === 'function') upgradeTextFieldsIn('tools-panel');
+  if (typeof upgradeTextFieldsIn === 'function') { upgradeTextFieldsIn('tools-panel'); upgradeTextFieldsIn('pts-panel'); }
   // Кусочная запись обязана помещаться в поле целиком (решение владельца 24.08):
   // строка отдаёт полю всю ширину, кегль подбирается вниз до предела 11 px.
   if (typeof fitFormulaFieldsSoon === 'function') fitFormulaFieldsSoon();
   // Последним: карточка блока прячет переключатели соседних моделей. Идёт после
   // обычной логики видимости, иначе та вернула бы их на место.
   applyCardScope();
+  renderFirmMarketControls();
+  renderBigTradeControls();
+  renderTradePolicyControls();
   // И только теперь — вопросики: знак без живой подсказки прячется. Раньше
   // applyCardScope нельзя, иначе проход не увидит спрятанного соседа.
   if (typeof syncHintDots === 'function') syncHintDots();
@@ -61,11 +81,15 @@ function redrawAll() {
      же причине, что и разметка обозначений: сцены дописывают разбор позже, и
      проход, стоящий раньше, мерил бы не всю врезку. */
   if (typeof fitPanelMath === 'function') fitPanelMath();
-  /* И самым последним — авто-расширение окна: оно смотрит на то, что сцена уже
-     нарисовала и посчитала. Сжать окно оно не может, поэтому решение 20.08
-     («окно идёт за формулой, а не за буквой») остаётся в силе: рычаг
-     по-прежнему видимо двигает кривую внутри выбранного окна. */
-  if (typeof growWindowToModel === 'function') growWindowToModel();
+  if (typeof syncFormulaEditBases === 'function') syncFormulaEditBases();
+  // История и автосохранение (91-session.js): сверка состояния после затишья,
+  // а не на каждом кадре протяжки.
+  if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
+  if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
+  if (typeof syncOnChart === 'function') syncOnChart();           // «На графике» в «Виде графика» (92-ui-kit.js, ADR 0152)
+  if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
+  markServiceNodes();
+  if (typeof selfCanvas === 'function') selfCanvas();   // «Сначала сам»: обозначения вместо чисел (96-self.js)
 }
 
 function redrawScene() {
@@ -78,6 +102,7 @@ function redrawScene() {
   resetDrawnKeyPoints();   // и пары нарисованных ключевых точек — тоже заново
   computeSize();
   makeScales();
+  if (STATE.sceneKey === 'bigopen') { redrawBigTrade(); return; }
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
   if (STATE.mode === 'ppf')   { redrawPpf();   return; }   // режим КПВ (Задача 3)
   if (STATE.mode === 'labor') { redrawLabor(); return; }   // режим рынка труда (Чекпоинт 1)
@@ -179,6 +204,8 @@ function redrawScene() {
     // Равновесия нет, а пересечение есть — показываем, куда оно уехало.
     if (typeof drawOffQuadIntersection === 'function') drawOffQuadIntersection();
   }
+  // MC в монополии тянется мышью (ADR 0149): полоса поверх всего, что нарисовано выше.
+  if (STATE.market === 'monopoly' && typeof drawMcDragHandle === 'function') drawMcDragHandle();
   updateInfoPanel();
   updateAreasPanel();
   // Табло «По группам» сюжета сложения: в остальных сценах оно молчит само.
@@ -219,6 +246,7 @@ function redrawGraphMode() {
   drawGrid();
   drawAxes('x', 'y');
   drawCurves();
+  refreshAnswerSeg();   // отрезок ответа (ADR 0143): на нём, а не в окне, считается «Ответ»
   updateGraphPanel();   // А53: нули, вершины и пересечения построенных кривых
 }
 
@@ -248,7 +276,11 @@ function renderMmRows() {
     inp.value = mmGet(i);
     inp.placeholder = i === 0 ? 'Например: x^2' : 'Например: 4 - x';
     inp.setAttribute('aria-label', 'Функция ' + mmLabel(i));
-    inp.addEventListener('input', () => { mmSet(i, inp.value); redrawAll(); });
+    // Неверная запись в модель не уходит (82-input.js, formulaInputError).
+    inp.addEventListener('input', () => {
+      const err = formulaInputError(inp); markFormulaField(inp, err); if (err) return;
+      mmSet(i, inp.value); redrawAll();
+    });
     slot.appendChild(inp);
     line.appendChild(slot);
     row.appendChild(line);
@@ -260,6 +292,7 @@ function renderMmRows() {
     if (!inp.id) inp.id = 'mm-f' + i;
     equipFormulaField(inp.id, 'MATHF');
   }
+  if (typeof scMmRows === 'function') scMmRows();   // строка — карточка f₁, f₂ … (тихие панели, сессия 6, Г4)
 }
 
 /* Список функций как в графопостроителе: внизу всегда одна пустая строка.
@@ -280,6 +313,7 @@ function renderGraphRows() {
   STATE.curves.forEach(c => box.appendChild(buildGraphRow(c)));
   box.appendChild(buildGraphRow(null));
   equipGraphRows(box);
+  if (typeof scGraphRows === 'function') scGraphRows(box);   // строка — карточка (тихие панели, сессия 6, Г2)
   /* Поля формул собираются лениво и только когда видны (А56), а строки мы
      вставили в разметку только что: разбираем очередь здесь, иначе поле
      остаётся обычным текстовым окошком до следующей перерисовки. */
@@ -402,7 +436,7 @@ function graphRowInput(row, inp, del, name) {
     row.dataset.cid = c.id;
     del.style.visibility = '';
     const box = graphRowsBox();
-    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); }
+    if (box) { box.appendChild(buildGraphRow(null)); equipGraphRows(box); if (typeof scGraphRows === 'function') scGraphRows(box); }
     redrawAll();
     return;
   }
@@ -462,6 +496,7 @@ function drawOverlays() {
     ? (activePanel() ? activePanel().id : '') : crossPanel);
   STATE.crosses = crossPoints(crossPanel);
   if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
+  if (typeof applyAreaHidden === 'function') applyAreaHidden();   // спрятанные закраски «Вида» (ADR 0152)
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
   drawAreaVerts();           // набранные вершины будущей площади
@@ -482,6 +517,7 @@ function drawOverlays() {
   refreshAnalyticsPanel();
   renderMathIn(document.getElementById('ex-body'));    // и в объяснении модели
   renderMathIn(document.getElementById('tools-panel'));// и в подсказках панели
+  renderMathIn(document.getElementById('pts-panel'));  // и панели режима «Точки и площади»
   /* Обозначения в подписях панели размечает redrawAll в самом конце: сцена
      дописывает часть текста позже, и проход отсюда её не застаёт. */
 }
@@ -638,6 +674,11 @@ function typesetStats(root) {
     const val = row.querySelector(':scope > b');
     if (!lab || !val) return;
     row._typeset = true;
+    /* Строка без прямоугольника (колонка «Ответ» спрятана): замер ширины ниже
+       пустой. Запоминаем исходное значение — при показе колонки answerReflow
+       (94-answer.js) вернёт его и наберёт строку заново (ADR 0150). */
+    row._typesetSrc = val.innerHTML;
+    if (!row.getClientRects().length) row._typesetBlind = true;
     /* Значение уже набрано формулой самой сценой (renderMathIn прошёл раньше
        нас). Тогда трогать его нельзя: textContent у готового KaTeX это тройка
        «MathML + исходная запись + видимый текст», и мы напечатали бы её целиком.
@@ -648,13 +689,15 @@ function typesetStats(root) {
        видимую часть. Проверку на «не помещается» делаем ДО остального: длинная
        фраза с формулой внутри («эластичный, |E_d| > 1») это тоже KaTeX. */
     const own = !!val.querySelector('.katex');
+    delete val.dataset.valueText;
     const raw = (own ? katexVisibleText(val) : (val.textContent || '')).trim();
+    val.dataset.valueText = raw;
     if (!raw) { if (own) row.classList.add('stat-eq', 'stat-own', 'stat-nosign'); return; }
     // Составное значение и фраза не помещаются в ячейку для числа (Б39, Б40).
     if (restatWide(row, lab, val, raw, own)) { addStatSign(row, val, raw); return; }
     if (own) { row.classList.add('stat-eq', 'stat-own'); addStatSign(row, val, raw); return; }
     // Числовое ли значение: число, пара, проценты, знак — да; фраза — нет.
-    const numeric = /^[(\[]?\s*[-−+]?[\d.,]/.test(raw) || /^[-−+]?\d/.test(raw);
+    const numeric = /^[(\[]?\s*[-−+]?[\d.,√≈∞]/.test(raw);
     if (numeric && typeof katex !== 'undefined') {
       try {
         if (!katexInto(val, statToTex(raw))) throw new Error('katex');
@@ -678,6 +721,7 @@ function typesetStats(root) {
    Единственное исключение — значение со СВОИМ равенством внутри («SW = CS +
    PS»): второй знак дал бы «SW = = CS + PS». */
 function addStatSign(row, val, raw) {
+  if (/^≈/.test(String(raw||'').trim())) { row.classList.add('stat-nosign'); return; }
   if (!row || !val) return;
   if (row.querySelector(':scope > .stat-sign')) return;
   if (String(raw || '').indexOf('=') >= 0) { row.classList.add('stat-nosign'); return; }
@@ -691,15 +735,21 @@ function addStatSign(row, val, raw) {
 /* Значение табло в запись для KaTeX. Числа и разделители оставляем как есть,
    проценты и градусы экранируем, юникодный минус переводим в математический. */
 function statToTex(s) {
-  return String(s)
+  return CalcNumber.texText(String(s)
     .replace(/−/g, '-')
+    /* Пробел разрядов («1 250») — неразрывный пробел KaTeX «~», у которого в тексте
+       есть символ: «\\,» даёт только отступ, и «Ответ», читающий текст строки,
+       получал «1250» (13.10, карточка Notion …81b4…). */
+    .replace(/(\d)[\u00a0\u202f\u2009](?=\d)/g, '$1~')
     .replace(/ /g, '\\,')
     // Запятая между цифрами — десятичный разделитель, а не перечисление: без
     // скобок KaTeX ставит после неё пробел, и «3,67» читается как «3, 67».
     .replace(/(\d),(\d)/g, '$1{,}$2')
     .replace(/%/g, '\\%')
-    .replace(/°/g, '^{\\circ}')
-    .replace(/([A-Za-zА-Яа-я ]{2,})/g, (w) => '\\text{' + w + '}');
+    .replace(/([A-Za-zА-Яа-я ]{2,})/g, (w) => '\\text{' + w + '}')
+    // Градусы — ПОСЛЕ обёртки слов: иначе «circ» из \circ заворачивался в
+    // \text{circ}, и угол наклона печатался как «63,4 3 textcirc».
+    .replace(/°/g, '^{\\circ}'));
 }
 
 /* Строка табло, в которую значение не помещается (Б39, Б40).
@@ -723,9 +773,7 @@ function statToTex(s) {
    копию узла и выбрасываем из неё MathML: он и есть тот невидимый двойник,
    из-за которого textContent приходит утроенным. */
 function katexVisibleText(val) {
-  const clone = val.cloneNode(true);
-  clone.querySelectorAll('.katex-mathml').forEach(e => e.remove());
-  return clone.textContent || '';
+  return CalcNumber.readText(val);
 }
 
 function restatWide(row, lab, val, raw, own) {
@@ -753,6 +801,12 @@ function restatWide(row, lab, val, raw, own) {
       } else line.textContent = p;
       val.appendChild(line);
     });
+    val.classList.add('stat-tex');
+  } else if (!isPhrase && typeof katex !== 'undefined' && katexInto(val, statToTex(raw))) {
+    /* Не список и не фраза, а просто длинное значение («(50,005; 2 499,5)»):
+       строка стопкой, но число набрано формулой. Прежде оно уходило сюда как
+       фраза обычным текстом — и оставалось сырым: замер ширины при загрузке
+       иной, а табло тем же текстом второй раз не набирается (13.10, …815c…). */
     val.classList.add('stat-tex');
   } else {
     row.classList.add('stat-phrase');
@@ -857,7 +911,7 @@ function renderMathIn(root) {
 /* ---------------------------------------------------------------------
    ЛЕГЕНДА ЗАКРАШЕННЫХ ОБЛАСТЕЙ
    Цвет площади сам по себе ничего не говорит: синее пятно над ценой это
-   излишек покупателя, серое между кривыми это потери общества, и без
+   излишек потребителя, серое между кривыми это потери общества, и без
    подписи их не различить.
    Сцены не ведут никакого реестра: каждая заливка помечена при отрисовке
    атрибутом data-legend, а легенда просто собирает то, что уже нарисовано.
@@ -933,10 +987,10 @@ function areaOfPathEl(el) {
 /* Короткие обозначения для легенды: на графике место дорого, а CS и DWL
    школьник читает быстрее любой фразы. Полное название остаётся в подсказке. */
 const AREA_SHORT = {
-  'Излишек покупателя (CS)': 'CS',
+  'Излишек потребителя (CS)': 'CS',
   // Коридор возможных цен при квоте: полное имя вдвое шире всей легенды.
   'Коридор возможных цен': 'Коридор',
-  'Излишек продавца (PS)': 'PS',
+  'Излишек производителя (PS)': 'PS',
   'Излишек производителя (TR - VC)': 'PS',
   /* ⚠️ п. 41. НА РЫНКЕ ТРУДА ПРОДАЮТ РАБОТНИКИ, А ПОКУПАЮТ ФИРМЫ.
      Обозначения стояли наоборот, и получалось противоречие между сценами:
@@ -982,6 +1036,7 @@ function drawLegend() {
   if (!STATE.showLegend) return;
   const seen = currentAreas();
   if (!seen.length) return;
+  if(STATE.sceneKey==='bigopen'&&STATE.bigTrade?.view!=='world'&&W<500){bigTradeSmallLegend(seen);return;}
   const m = CONFIG.margin;
   /* А27 · А59. Легенда кричала громче графика: кегль 18.7 против 10 у делений
      осей и 14 у подписей кривых, коробка 75×112 при поле 262×344 — девять
@@ -1042,6 +1097,9 @@ function drawLegend() {
    место: выбору места легенды и разведению подписей. Второго списка «кто над
    холстом висит» не заводим — он разъехался бы с разметкой. */
 function floatRects() {
+  /* На бумажном прогоне выгрузки .tex плавающих блоков нет: файл не должен
+     зависеть от того, взведён ли инструмент (полоса режима #cv-mode). */
+  if (typeof texPaperActive === 'function' && texPaperActive()) return [];
   const node = svg.node();
   const wrap = document.getElementById('graph-wrap');
   if (!node || !wrap) return [];
@@ -1461,7 +1519,7 @@ function keyTargets(panelId) {
 const KEY_SNAP_PX = 22;
 /* Запас попадания по кружку ключевой точки. Больше половины ширины полосы
    кривой (16 px): иначе зазора между «взял точку» и «взял кривую» нет вовсе. */
-const KEY_HIT_PX = 11;
+const KEY_HIT_PX = 12;   // зона попадания по ключевой точке (README макета, 7.5; было 11)
 /* п. 33. ВОЗМОЖНОСТЬ, О КОТОРОЙ ЗНАЕТ ТОЛЬКО НАВЕДЕНИЕ МЫШИ, НЕ СУЩЕСТВУЕТ.
 
    «Двойной щелчок, чтобы переименовать», «Добавить в список точек» и
@@ -1502,7 +1560,7 @@ function snapVertexAt(px, py) {
   // Своя точка — кандидат только в СВОЕЙ панели: в соседней её нет на экране.
   (STATE.marks || []).filter(mk => markPanelId(mk) === pid).forEach(mk => {
     const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d, panel: pid };
+    if (d <= KEY_SNAP_PX && (!best || d <= best.d)) best = { x: mk.x, y: mk.y, name: mk.text || 'своя точка', key: true, d, panel: pid, mark: mk.id };   // своя точка в ключевой — сильнее ключевой (сессия 7: её берут вершиной, а не ставят копию)   // имя точки — mk.text (у точки нет .name; сессия 7)
   });
   if (best) return best;
   const hit = snapPointAt(px, py);
@@ -1556,7 +1614,8 @@ function drawCrossPoints() {
   // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
   // ставилась вовсе. Прилипание к этим же точкам работает и без их кликабельности.
-  if (STATE.vertArm || STATE.markArm) g.style('pointer-events', 'none');
+  // То же в режиме «Точки и площади» (ADR 0148): щелчок там ставит свою точку.
+  if (canvasArmed()) g.style('pointer-events', 'none');
 
   pts.forEach((p, i) => {
     const px = mx(p.x), py = my(p.y);
@@ -1574,44 +1633,82 @@ function drawCrossPoints() {
        пикселей уносил руку в кривую вместо точки. Прозрачный круг радиусом 11
        лежит выше полос (см. порядок в drawOverlays), и пока курсор внутри
        него, кривая на указатель не отзывается. */
+    /* ── ВИД Б (решение владельца 04.10; README макета, 7.5) ───────────────
+       Точка — кружок цветом кривой в мягком ореоле того же цвета; координаты —
+       графитовая капсула, как у ручек, со значком закрепки за тонкой чертой.
+       Капсула читается одинаково в обеих темах: её цвета — токены кнопки. */
+    const halo = item.append('circle').attr('cx', px).attr('cy', py)
+      .attr('fill', litColor).style('pointer-events', 'none');
     item.append('circle').attr('cx', px).attr('cy', py).attr('r', KEY_HIT_PX)
       .attr('fill', 'transparent').attr('data-skip-export', '1').style('cursor', 'pointer');
     const dot = item.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
-    // Подпись живёт в своей группе: её показываем и прячем, не трогая остальное.
+    // Капсула собирается при КАЖДОМ показе: ширину текста меряем у видимого
+    // узла, а «Сначала сам» решает, открыты ли координаты, в момент наведения
+    // (ADR 0143): прежняя сборка один раз, после прохода selfCanvas, показывала
+    // настоящие числа, а верный ответ без перерисовки их бы не открыл.
     const lab = item.append('g').attr('class', 'cross-label').style('display', 'none');
-    haloText(lab, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
-    // «Закрепка» рядом с координатами: кладёт точку в список своих точек.
-    const pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer');
-    pin.append('rect').attr('x', px + 9).attr('y', py - 5).attr('width', 15).attr('height', 15)
-      .attr('rx', 3).attr('fill', COL.halo).attr('stroke', COL.inkSoft).attr('stroke-width', 1);
-    pin.append('path')
-      .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
-      .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
-      .attr('stroke-linejoin', 'round');
-    /* Значок без подписи и без пояснения — просто точка (решение владельца).
-       Он единственный выносит точку в список насовсем. */
-    pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
+    let pin = null;
+    const buildCapsule = () => {
+      lab.selectAll('*').remove();
+      const shown = (typeof selfPointOpen !== 'function') || selfPointOpen(p.x, p.y);
+      const btnBg = cssVar('--btn-bg'), onBtn = cssVar('--on-btn');
+      const font = getComputedStyle(document.body).fontFamily;
+      // Кегль — ступень шкалы FS (макет даёт 13; шкала проекта сильнее картинки).
+      const txt = lab.append('text').attr('font-size', FS.base).attr('font-weight', 600)
+        .attr('font-family', font).attr('fill', onBtn).attr('dominant-baseline', 'central')
+        .text(shown ? '(' + fmt(p.x) + '; ' + fmt(p.y) + ')' : '(?; ?)');
+      const tw = txt.node().getComputedTextLength ? txt.node().getComputedTextLength() : 7 * txt.text().length;
+      const cw = 12 + tw + 9 + 28, ch = 28;
+      // Место: справа сверху, у края поля — зеркально (за край поля не выходит).
+      const m = CONFIG.margin, right = W - m.right, topY = m.top;
+      let x = px + 10, y = py - 10 - ch;
+      if (x + cw > right) x = px - 10 - cw;
+      if (y < topY) y = py + 10;
+      lab.insert('rect', 'text').attr('x', x).attr('y', y).attr('width', cw).attr('height', ch)
+        .attr('rx', ch / 2).attr('fill', btnBg);
+      txt.attr('x', x + 12).attr('y', y + ch / 2);
+      lab.append('line').attr('x1', x + 12 + tw + 9).attr('x2', x + 12 + tw + 9)
+        .attr('y1', y + 6).attr('y2', y + ch - 6).attr('stroke', onBtn).attr('stroke-opacity', 0.3).attr('stroke-width', 1);
+      // Закрепка: контурная канцелярская кнопка 14 px; зона нажатия шире значка.
+      pin = lab.append('g').attr('class', 'cross-pin' + (shown ? '' : ' is-off'))
+        .style('cursor', shown ? 'pointer' : 'not-allowed').attr('opacity', shown ? 1 : 0.4)
+        .attr('data-tip', shown ? 'Сохранить в свои точки' : 'Сначала ответьте')
+        .attr('transform', 'translate(' + (x + cw - 21) + ',' + (y + 7) + ')');
+      pin.append('rect').attr('x', -5).attr('y', -5).attr('width', 24).attr('height', 24).attr('fill', 'transparent');
+      pin.append('path').attr('d', 'M5 1.5h4l-.6 4.2 2.6 2.3v1.4H3v-1.4l2.6-2.3zM7 9.4v4.1')
+        .attr('fill', 'none').attr('stroke', onBtn).attr('stroke-width', 2.1)
+        .attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round');
+      /* Значок без подписи и без пояснения — просто точка (решение владельца).
+         Он единственный выносит точку в список насовсем. */
+      /* Пока координаты скрыты, закрепить точку нельзя: она унесла бы ответ
+         в «Свои точки». */
+      pin.on('click', (ev) => {
+        ev.stopPropagation();
+        if (!shown) { if (typeof toast === 'function') toast('Сначала ответьте'); return; }
+        pinKeyPoint(p);
+      });
+    };
 
-    /* Точка взведённой кривой горит цветом этой кривой и жирнее обычного, но
-       БЕЗ координат: координаты показывает наведение и только оно. */
+    /* Точка взведённой кривой горит цветом этой кривой, БЕЗ координат:
+       координаты показывает наведение и только оно. */
     const paint = () => {
       const hover = (STATE.hoverCross === i);
-      dot.attr('r', hover ? 5.5 : 4.5)
-         .attr('fill', hover ? litColor : COL.halo)
-         .attr('stroke', litColor)
-         .attr('stroke-width', hover ? 2.6 : 2.2)
+      halo.attr('r', hover ? 13 : 9.5).attr('opacity', hover ? 0.28 : 0.2);
+      dot.attr('r', hover ? 4.8 : 4)
+         .attr('fill', litColor)
+         .attr('stroke', COL.halo)
+         .attr('stroke-width', 1.5)
          .attr('opacity', 1);
+      if (hover) buildCapsule();
       lab.style('display', hover ? null : 'none');
-      pin.style('display', hover ? null : 'none');
     };
     paint();
     /* ⚠️ ПЛАШКА ОБЯЗАНА ПЕРЕЖИТЬ ПЕРЕХОД С ТОЧКИ НА ЗНАЧОК.
        Значок лежит внутри плашки, то есть в стороне от кружка. Скрой плашку
-       сразу по уходу курсора с кружка — и до значка не дотянуться никогда:
-       он исчезает ровно в тот момент, когда рука к нему движется. Поэтому
-       уход даёт короткую отсрочку, а вход в саму плашку её отменяет.
-       Второй раз в проекте: тем же способом лечится любая плашка с кнопкой. */
+       сразу по уходу курсора с кружка — и до значка не дотянуться никогда.
+       Поэтому уход даёт отсрочку 220 мс (README макета, 7.5), а вход в саму
+       плашку её отменяет. */
     let leaveTimer = null;
     const show = () => {
       if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
@@ -1622,7 +1719,7 @@ function drawCrossPoints() {
       leaveTimer = setTimeout(() => {
         leaveTimer = null;
         if (STATE.hoverCross === i) { STATE.hoverCross = null; paint(); }
-      }, 160);
+      }, 220);
     };
     item.on('pointerenter', show).on('pointerleave', hide);
     /* Щелчок по самой точке НЕ закрепляет её: закрепки больше нет, выносит
@@ -1677,7 +1774,7 @@ function keyPointLit(p) {
    Имена, у которых полоса уже есть, пропускаем: две полосы на одну кривую
    означали бы, что верхняя молча съедает щелчок по нижней. */
 function drawCurveHits() {
-  if (STATE.markArm || STATE.vertArm) return;   // сейчас на холсте ставят точку
+  if (canvasArmed()) return;   // сейчас на холсте ставят точку или строят площадь
   /* Полосы нужны у ВСЕХ кривых сцены, а не только у панели под курсором:
      щёлкнуть по кривой соседней панели человек вправе. Считает каждую полосу
      её собственная панель. */
@@ -1925,8 +2022,9 @@ function axisLetter(which) {
 function armVerts(on) {
   const was = STATE.vertArm;
   STATE.vertArm = !!on;
+  if (was !== STATE.vertArm) CANVAS.buildIds = [];
   const wrap = document.getElementById('graph-wrap');
-  if (wrap) wrap.style.cursor = STATE.vertArm ? 'crosshair' : '';
+  if (wrap) wrap.style.cursor = (STATE.vertArm || CANVAS.pts) ? 'crosshair' : '';
   if (!STATE.vertArm) showSnapHint(null);
   renderVertList();
   syncCanvasMode();
@@ -1949,14 +2047,39 @@ const CANVAS_MODE_TEXT = {
      здесь же. Считает площадь по-прежнему одна кнопка — та, под которой
      появляется результат. */
   vert: () => {
-    const n = (STATE.areaVerts || []).length;
-    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ''))
+    const n = (CANVAS.buildIds || []).length;
+    const tail = n ? ('· отмечено ' + n + (n < 3 ? ', нужно хотя бы три' : ', щелчок по первой замкнёт'))
                    : '· каждый щелчок ставит вершину';
     return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
   },
+  /* Режим «Точки и площади» без построения строки не показывает: о режиме
+     говорят рамка холста, нажатая кнопка и «Esc: выйти из режима» (ADR 0148). */
 };
 
+/* Служебные узлы холста (COVERAGE, 6.8): ручки (кружки, которые тянут
+   мышью), зажжённые ключевые точки, кружок прилипания. В файл они не идут:
+   PNG вырезает их из клона по признаку data-service, TeX пропускает по
+   data-skip-export. Метка ставится после каждой перерисовки: ручки рисуют
+   семнадцать мест в восьми файлах, и признак в каждом разошёлся бы. */
+function markServiceNodes() {
+  const el = document.getElementById('chart');
+  if (!el) return;
+  const mark = (c) => { c.setAttribute('data-service', 'handle'); c.setAttribute('data-skip-export', '1'); };
+  const knob = (c) => c && c.tagName === 'circle' && !c.classList.contains('kp-mark')
+    && +c.getAttribute('r') > 0 && +c.getAttribute('r') <= 10 && !/^(none|transparent)$/.test(c.getAttribute('fill') || 'none');
+  el.querySelectorAll('*').forEach(c => {
+    if (!(c.__on && c.__on.some(o => o.name === 'drag'))) return;
+    if (c.tagName === 'circle') { mark(c); return; }
+    // Захват — прозрачная полоса, а видимый кружок ручки стоит сразу за ней
+    // (перед ней бывает точка модели радиусом 4 — её не трогаем).
+    const n = c.nextElementSibling;
+    if (knob(n) && +n.getAttribute('r') >= 5) mark(n);
+  });
+  el.querySelectorAll('g.crosses, #snap-hint').forEach(g => { g.setAttribute('data-service', 'kp'); g.setAttribute('data-skip-export', '1'); });
+}
+
 function syncCanvasMode() {
+  if (typeof syncToolSeg === 'function') syncToolSeg();   // кнопки инструмента в панели холста (93-shell.js)
   // Пока вершины отмечаются, закончить набор предлагает полоса режима над
   // холстом; кнопка в панели на это время уходит, чтобы одно и то же действие
   // не стояло на экране дважды. Состояние у обеих одно — `canvasMode()`.
@@ -1974,11 +2097,18 @@ function syncCanvasMode() {
   if (stop) stop.textContent = t.stop;
 }
 
-// Выйти из любого взведённого режима холста. Одна дверь на кнопку «Готово»,
-// на Escape и на всё, что режим прерывает.
+// Выйти из любого взведённого режима холста. Одна дверь на Escape и на всё,
+// что режим прерывает. Построение площади отменяется, НЕ выходя из режима
+// «Точки и площади»; без построения Esc возвращает «Курсор» (ADR 0148).
 function leaveCanvasMode() {
   if (STATE.markArm) { cancelMarkDraft(); return; }
-  if (STATE.vertArm) armVerts(false);
+  if (STATE.vertArm) { cancelAreaBuild(); return; }
+  if (CANVAS.pts && typeof setPtsMode === 'function') setPtsMode(false);
+}
+// «Готово» в строке построения: набор вершин заканчивается площадью.
+function finishCanvasMode() {
+  if (STATE.markArm) { cancelMarkDraft(); return; }
+  if (STATE.vertArm) finishPolyBuild();
 }
 
 function addAreaVert(x, y, name, panel) {
@@ -2001,76 +2131,12 @@ function vertsMixed() { return vertPanels().length > 1; }
 
 function clearAreaVerts() { STATE.areaVerts = []; renderVertList(); redrawAll(); }
 
-/* Список набранных вершин (П42). Пока не выбрана ни одна точка, вместо списка
-   стоит надпись «Выберите точки на графике»; с первой же вершиной вместо неё
-   появляется кнопка «Убрать все вершины», а под ней сам список: у каждой
-   строки крестик, а по двойному щелчку координата правится прямо в строке. */
+/* Списка набранных вершин больше нет (сессия 7, В3; README пакета 9): вершина площади — точка списка «Точки», набор
+   «+ По точкам» держит их id в CANVAS.buildIds (вид). STATE.areaVerts остаётся пустым массивом ради старых ссылок:
+   сохранение с недонабранной площадью (непустой areaVerts) открывается без ошибки, набор отбрасывается. */
 function renderVertList() {
-  const box = document.getElementById('ac-verts');
-  if (!box) return;
-  const list = STATE.areaVerts || [];
-  const empty = document.getElementById('ac-verts-empty');
-  const btns = document.getElementById('ac-vert-btns');
-  if (empty) empty.style.display = list.length ? 'none' : '';
-  if (btns) btns.style.display = list.length ? '' : 'none';
-  syncCanvasMode();   // подпись кнопки «Отмечать вершины» идёт за состоянием
-  box.innerHTML = '';
-  if (vertsMixed()) {
-    const warn = document.createElement('div');
-    warn.className = 'vert-mixed warn';
-    warn.textContent = 'Вершины стоят на разных графиках: площадь считается внутри одного.';
-    box.appendChild(warn);
-  }
-  list.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'vert-row';
-    const n = document.createElement('b'); n.textContent = (i + 1) + '.';
-
-    const t = document.createElement('span');
-    t.className = 'vert-co';
-    t.setAttribute('data-tip', 'Двойной щелчок поправит координаты');
-    const paint = () => {
-      t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
-    };
-    paint();
-    t.addEventListener('dblclick', () => {
-      const ed = document.createElement('span');
-      ed.className = 'vert-edit';
-      const mk = (key) => {
-        const inp = document.createElement('input');
-        inp.type = 'number'; inp.step = 'any'; inp.value = Math.round(p[key] * 1000) / 1000;
-        inp.addEventListener('input', () => {
-          const v = parseFloat(inp.value);
-          if (isFinite(v)) { p[key] = v; p.name = ''; redrawAll(); }
-        });
-        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
-        return inp;
-      };
-      const ix = mk('x'), iy = mk('y');
-      ed.append(ix, document.createTextNode(';'), iy);
-      t.replaceWith(ed);
-      ix.focus(); ix.select();
-      const done = () => {
-        // Уходим из строки, только когда фокус ушёл из обоих полей.
-        setTimeout(() => {
-          if (document.activeElement === ix || document.activeElement === iy) return;
-          paint(); ed.replaceWith(t); redrawAll();
-        }, 0);
-      };
-      ix.addEventListener('blur', done); iy.addEventListener('blur', done);
-    });
-
-    const del = document.createElement('button');
-    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '✕';
-    del.setAttribute('data-tip', 'Убрать эту вершину');
-    del.addEventListener('click', () => {
-      STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
-      renderVertList(); syncAreaCalcButton(); redrawAll();
-    });
-
-    row.append(n, t, del);
-    box.appendChild(row);
-  });
+  if ((STATE.areaVerts || []).length) STATE.areaVerts = [];
+  syncCanvasMode();
   syncAreaCalcButton();
 }
 
@@ -2087,6 +2153,20 @@ function syncAreaCalcButton() {
   btn.setAttribute('data-tip', ready ? '' : (STATE.areaCalcMode === 'poly'
     ? 'Отметьте на графике хотя бы три точки'
     : 'Сначала выберите кривую'));
+  /* Подпись говорит, что именно посчитается (ADR 0144): «Сначала выберите
+     кривую» → «Посчитать площадь под f». Имя кривой — как во всей панели. */
+  const name = (STATE.areaCalcMode === 'poly') ? '' : ((areaPickedCurve() || {}).name || '');
+  const text = (STATE.areaCalcMode === 'poly') ? 'Посчитать площадь'
+    : (name ? 'Посчитать площадь под ' + name : 'Сначала выберите кривую');
+  if (btn._text !== text) {
+    btn._text = text;
+    btn.textContent = name ? 'Посчитать площадь под ' : text;
+    if (name) {
+      const nm = document.createElement('span'); nm.className = 'ac-cname';
+      curveNameInto(nm, name);
+      btn.appendChild(nm);
+    }
+  }
 }
 
 function areaPickedCurve() {
@@ -2136,12 +2216,15 @@ function syncAreaRangeLabel() {
     tex: (v, text) => text,
     title: key === 'acFrom' ? 'Начало отрезка' : 'Конец отрезка',
   });
+  /* «на отрезке [0; 100]»: пробел перед скобкой и после «;», а у самих
+     чисел здесь нет запасной ширины .edval (1,6em) — она ставила зазор между
+     «0» и «;» (карточка «на отрезке[0 ;100]», 10.10.2026). */
   const word = document.createElement('span');
   word.className = 'ac-range-word'; word.textContent = 'на отрезке';
   const open = document.createElement('span'); open.textContent = '[';
-  const semi = document.createElement('span'); semi.textContent = ';';
+  const semi = document.createElement('span'); semi.textContent = '; ';
   const close = document.createElement('span'); close.textContent = ']';
-  el.append(word, open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
+  el.append(word, ' ', open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
 }
 
 /* п. 29. ИМЯ ВЕРШИНЫ УСТАРЕВАЕТ ВМЕСТЕ С КАРТИНКОЙ.
@@ -2167,73 +2250,35 @@ function freshenVertNames() {
   return changed;
 }
 
-// Набранные вершины на графике: номер у каждой и бледный контур будущей фигуры.
+/* Набор «+ По точкам» на графике (сессия 7, В3): вершины — точки списка (их рисует drawMarks), здесь — номер у
+   каждой и бледный контур будущей фигуры РОВНО того обхода, что будет посчитан (П43). Точки на разных графиках
+   контура не дают. Щелчки — в обработчике холста (88-params.js). */
 function drawAreaVerts() {
-  const list = STATE.areaVerts || [];
-  if (!list.length) return;
-  // Список перекладываем ПОСЛЕ проверки имён и только если что-то изменилось:
-  // renderVertList не перерисовывает холст, поэтому петли здесь нет.
-  if (freshenVertNames()) renderVertList();
-  /* Контур собирается ТОЛЬКО из вершин одной панели: у смешанного набора
-     фигуры нет, и рисовать её было бы враньём (см. vertsMixed). Кружки при
-     этом рисуются у всех вершин — каждый по шкалам своей панели. */
+  if ((STATE.areaVerts || []).length) STATE.areaVerts = [];   // старая недонабранная площадь — отброшена
+  // На месте, а не новым массивом: обработчик щелчка держит ссылку на набор, пока ставит точку.
+  const ids = CANVAS.buildIds || (CANVAS.buildIds = []);
+  for (let i = ids.length - 1; i >= 0; i--) if (!markById(ids[i]) || markById(ids[i]).pending) ids.splice(i, 1);
+  if (!STATE.vertArm || !ids.length) return;
+  const list = ids.map(id => markById(id));
+  const mixed = new Set(list.map(markPanelId)).size > 1;
   const { mx, my } = mainScales(markPanelId(list[0]));
-  const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
-  if (vertsMixed()) {
-    // нечего соединять
-  } else if (list.length >= 3) {
-    /* П43: контур показывает РОВНО ту фигуру, которая будет посчитана.
-       Раньше пунктир соединял вершины в порядке щелчков, а площадь считалась
-       по другому обходу — картинка и число расходились. */
-    const ring = bestAreaRing(list).ring;
+  const g = svg.append('g').attr('class', 'area-verts').attr('data-service', '1').style('pointer-events', 'none');
+  if (!mixed && list.length >= 3) {
+    const ring = bestAreaRing(list.map(m => ({ x: m.x, y: m.y }))).ring;
     g.append('path')
       .attr('d', 'M' + ring.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
       .attr('fill', COL.reg).attr('fill-opacity', 0.1)
       .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
-  } else if (list.length === 2) {
+  } else if (!mixed && list.length === 2) {
     g.append('line').attr('x1', mx(list[0].x)).attr('y1', my(list[0].y))
       .attr('x2', mx(list[1].x)).attr('y2', my(list[1].y))
       .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
   }
-  /* Вершины на графике (П42): при наведении явно выделяются, щелчок по уже
-     выбранной снимает её, а зажатую можно перетащить — координата в списке
-     меняется сама. Рядом с кривой вершина катится по ней, как и при постановке. */
-  list.forEach((p, i) => {
-    const ps = mainScales(markPanelId(p));
-    const pmx = ps.mx, pmy = ps.my;
-    const [xLo, xHi] = pmx.domain(), [yLo, yHi] = pmy.domain();
-    const dot = g.append('circle').attr('cx', pmx(p.x)).attr('cy', pmy(p.y)).attr('r', 4.5)
-      .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
-      .style('pointer-events', 'all').style('cursor', 'grab');
-    // Номер вершины стоит вплотную к своей точке: на 8 px вправо и вверх,
-    // то есть в углу её же кружка радиусом 4,5.
-    haloText(g, pmx(p.x) + 8, pmy(p.y) - 8, String(i + 1), 'start', 'auto');
-
-    dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
-       .on('pointerleave', () => dot.attr('r', 4.5).attr('stroke-width', 2));
-
-    let moved = false;
-    dot.call(d3.drag().container(() => svg.node())
-      .on('start', () => { moved = false; })
-      .on('drag', (ev) => {
-        moved = true;
-        const hit = snapVertexAt(ev.x, ev.y);
-        // Вершина не переезжает в чужую панель протяжкой: хозяин у неё один.
-        const inOwn = hit && markPanelId(hit) === markPanelId(p);
-        p.x = inOwn ? hit.x : Math.max(xLo, Math.min(xHi, pmx.invert(ev.x)));
-        p.y = inOwn ? hit.y : Math.max(yLo, Math.min(yHi, pmy.invert(ev.y)));
-        p.name = (inOwn && hit.key) ? hit.name : '';
-        renderVertList(); redrawAll();
-      })
-      .on('end', () => {
-        if (moved) return;
-        // Щелчок без движения по уже выбранной вершине снимает её. Щелчок по
-        // холсту, который придёт следом, надо погасить: иначе на том же месте
-        // тут же появится новая вершина.
-        STATE._vertClickEaten = true;
-        STATE.areaVerts = (STATE.areaVerts || []).filter(v => v !== p);
-        renderVertList(); redrawAll();
-      }));
+  list.forEach((m, i) => {
+    const ps = mainScales(markPanelId(m));
+    g.append('circle').attr('cx', ps.mx(m.x)).attr('cy', ps.my(m.y)).attr('r', 7.5)
+      .attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2);
+    haloText(g, ps.mx(m.x) - 10, ps.my(m.y) + 14, String(i + 1), 'end', 'auto');
   });
 }
 
@@ -2348,24 +2393,103 @@ function calcAreaPolygon() {
 let areaCalcCounter = 0;
 const AREA_PALETTE = () => [COL.MR, COL.D, COL.S, COL.tax, COL.reg, COL.MC];
 
+/* ЖИВАЯ ПЛОЩАДЬ (сессия 7 «тихих панелей», В1 и В4; README пакета 9; решения …81e0…, …81be… (П43); ADR 0155).
+   Площадь по точкам хранит вершины ССЫЛКАМИ — id точек STATE.marks (r.ids), а не копиями координат: двинули
+   точку — площадь пересчиталась. Обход и число считаются заново по правилу П43 (bestAreaRing: наибольшая фигура
+   без самопересечений через все вершины, порядок отметки не важен) ОДНОЙ функцией перед каждым чтением — отрисовкой,
+   строкой панели, «Ответом», подписью «Ответа», границами нарисованного; r.ring, r.value, r.order (id в порядке
+   обхода) обновляются на месте, и все прежние читатели видят живое. Площадь под кривой: число = заливка — по
+   текущей кривой на её отрезке [a; b] из записи (до сессии 7 заливка шла по живой кривой, а число замерзало).
+   Запись без ids (старые ссылки и сохранения: только ring) — как была: замороженный контур и число. */
+function areaLive(r) {
+  if (!r) return r;
+  if (r.kind === 'poly' && Array.isArray(r.ids) && r.ids.length) {
+    const pts = r.ids.map(id => markById(id)).filter(m => m && !m.pending && isFinite(m.x) && isFinite(m.y));
+    if (pts.length >= 3) {
+      const best = bestAreaRing(pts.map(m => ({ x: m.x, y: m.y, id: m.id })));
+      r.ring = best.ring.map(p => [p.x, p.y]);
+      r.order = best.ring.map(p => p.id);
+      r.value = ringArea(best.ring);
+      r.exact = best.exact;
+      r.crosses = !best.exact && ringSelfCrosses(best.ring);
+    }
+  } else if (r.kind === 'curve' && isFinite(r.a) && isFinite(r.b)) {
+    const t = areaTargets(markPanelId(r)).filter(x => x.name === r.name)[0];
+    if (t) {
+      const v = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, r.a, r.b);
+      if (isFinite(v)) r.value = v;
+    }
+  }
+  return r;
+}
+function areasLive() { (STATE.areaCalcList || []).forEach(areaLive); return STATE.areaCalcList || []; }
+
 function runAreaCalc() {
   const err = document.getElementById('ac-error');
   const res = (STATE.areaCalcMode === 'poly') ? calcAreaPolygon() : calcAreaUnderCurve();
   if (res.error) {
     if (err) { err.textContent = res.error; err.style.display = 'block'; }
-    return;
+    return false;
   }
   if (err) { err.textContent = ''; err.style.display = 'none'; }
+  pushArea(res);
+  return true;
+}
+/* Новая площадь в список: id, цвет, имя. Одна дверь для «Под кривой», «Площади по точкам» и набора «+ По точкам». */
+function pushArea(res) {
   STATE.areaCalcList = STATE.areaCalcList || [];
   const pal = AREA_PALETTE();
-  res.id = ++areaCalcCounter;
-  res.color = pal[(STATE.areaCalcList.length) % pal.length];
+  areaCalcCounter = Math.max(areaCalcCounter, STATE.areaCalcList.reduce((m, r) => Math.max(m, +r.id || 0), 0)) + 1;
+  res.id = areaCalcCounter;
   /* Н27: короткое имя с настоящим индексом — S₁, S₂, S₃. Прежние «Площадь под
      D» и «Площадь по точкам» не помещались в легенду и вытесняли из неё сами
-     области. Что именно посчитано, видно рядом в строке таблицы. */
-  res.label = 'S' + subDigits(STATE.areaCalcList.length + 1);
+     области. Что именно посчитано, видно рядом в строке таблицы.
+     Сессия 7 (В6): индекс — ПЕРВЫЙ СВОБОДНЫЙ, а не длина списка (убрали S₁, добавили — снова S₁, а не второй S₂);
+     цвет — первый не занятый другой площадью цвет палитры. */
+  const labels = new Set(STATE.areaCalcList.map(r => String(r.label || '')));
+  let k = 1; while (labels.has('S' + subDigits(k))) k++;
+  res.label = 'S' + subDigits(k);
+  const used = new Set(STATE.areaCalcList.map(r => String(r.color || '').toLowerCase()));
+  res.color = pal.find(c => !used.has(String(c).toLowerCase())) || pal[(STATE.areaCalcList.length) % pal.length];
   STATE.areaCalcList.push(res);
   redrawAll();
+  return res;
+}
+/* «Площадь по точкам» (сессия 7, В2): вершины — отмеченные точки списка (по id), обход — П43 (areaLive). Точки на
+   разных графиках (панелях) площади не дают — как и прежний набор вершин. */
+function addPolyArea(ids) {
+  const pts = (ids || []).map(id => markById(id)).filter(m => m && !m.pending);
+  const err = document.getElementById('ac-error');
+  const say = (t) => { if (err) { err.textContent = t; err.style.display = t ? 'block' : 'none'; } };
+  if (pts.length < 3) { say('Нужно хотя бы три точки.'); return null; }
+  if (new Set(pts.map(markPanelId)).size > 1) { say('Точки стоят на разных графиках: площадь считается внутри одного.'); return null; }
+  say('');
+  const r = { kind: 'poly', ids: pts.map(m => m.id), panel: markPanelId(pts[0]) };
+  areaLive(r);
+  return pushArea(r);
+}
+/* Плашка выбора (В2; макет 04_screen_points): отмечено ≥ 3 точек — «Выбрано N» и «Площадь по точкам». Выбор — вид
+   (CANVAS.ptsSel), нажатие — один шаг истории (появилась площадь), выбор снимается. */
+function syncPtsSelBar() {
+  const bar = document.querySelector('#sec-view .pts-selbar');
+  if (!bar) return;
+  const ids = (CANVAS.ptsSel || []).filter(id => markById(id) && !markById(id).pending);
+  CANVAS.ptsSel = ids;
+  bar.hidden = ids.length < 3;
+  if (bar.hidden) { bar.innerHTML = ''; return; }
+  const sig = ids.length;
+  if (bar._n === sig && bar.firstChild) return;
+  bar._n = sig;
+  bar.innerHTML = '';
+  const n = document.createElement('span'); n.className = 'pts-selbar-n'; n.textContent = 'Выбрано ' + ids.length;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pts-selbar-go'; b.textContent = 'Площадь по точкам';
+  b.addEventListener('click', () => {
+    const made = addPolyArea(CANVAS.ptsSel);
+    if (!made) return;
+    CANVAS.ptsSel = [];
+    renderMarkList();
+  });
+  bar.append(n, b);
 }
 
 function clearAreaCalc() {
@@ -2376,7 +2500,7 @@ function clearAreaCalc() {
 }
 
 function drawAreaCalc() {
-  const list = STATE.areaCalcList || [];
+  const list = areasLive();
   if (!list.length) { updateAreaCalcPanel(); return; }
   const g = svg.append('g').attr('class', 'areacalc').attr('clip-path', 'url(#plot-clip)');
   list.forEach(r => {
@@ -2391,101 +2515,97 @@ function drawAreaCalc() {
       const yBase = Math.max(my.domain()[0], Math.min(0, my.domain()[1]));
       const ar = d3.area().x(d => mx(d)).y0(my(yBase))
         .y1(d => my(Math.max(0, t.f(d) || 0)));
-      g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
+      /* запись для .tex: верхняя граница — формула кривой из списка привязки,
+         прижатая к нулю (так и считается число); у кривой списка без формулы
+         (сумма по точкам, кривая уровня, расчёт сцены) — узлы с причиной */
+      const tE = t.curve ? curveFormula(t.curve) : null;
+      const ap = g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
         .attr('data-legend', r.label);
+      if (tE) markArea(ap, { from: r.a, to: r.b, lo: yBase, hi: tE, floor0: 'hi' });
+      else markNumeric(ap, 'площадь под кривой, у которой в списке привязки нет записи формулой: по точкам расчёта');
     } else if (r.ring && r.ring.length > 2) {
       const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
-      g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
+      markPoly(g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
         .attr('fill', color).attr('opacity', 0.2).attr('stroke', color).attr('stroke-width', 1.5)
-        .attr('data-legend', r.label);
+        .attr('data-legend', r.label), 'посчитанная площадь: многоугольник по вершинам', r.label);
     }
   });
   updateAreaCalcPanel();
 }
 
-/* Таблица результатов: что посчитано, на каком отрезке, сколько вышло и каким
-   цветом закрашено. Название и цвет правятся прямо здесь. */
+/* СТРОКИ СВОИХ ПЛОЩАДЕЙ (сессия 7, В6; README пакета 9; макет 04_screen_points). Строка: образец цвета 14 px
+   (щелчок — выбор цвета), имя S₁ (KaTeX), вершины «ABC» — имена точек в порядке обхода П43 (у площади под кривой —
+   кривая и отрезок «D, [0; 100]»; у записи старой ссылки без ids — «по координатам»), число справа (fmt), «⋯»
+   (Переименовать, Цвет, Убрать) — всплывающим окном в body: строки пересобираются на каждой перерисовке. Числа
+   живые (areaLive). Строк закрасок модели здесь нет с 14.10 (их цвет — в «Виде», числа — в «Ответе»); мёртвый цикл
+   их строк и шапка «Название | Площадь» убраны. */
+/* Конец правки имени на месте (Enter, Esc, уход фокуса) — один раз, после того как makeEditableValue отдал итог. */
+function renameCommit(el, fn) {
+  let done = false;
+  const go = () => setTimeout(() => { if (done || el.classList.contains('editing')) return; done = true; fn(); }, 0);
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') go(); });
+  el.addEventListener('blur', go);
+}
+function areaById(id) { return (STATE.areaCalcList || []).find(r => String(r.id) === String(id)) || null; }
+function areaVertsLabel(r) {
+  if (r.kind === 'curve') return { tex: null, text: null, curve: r.name, range: '[' + fmt(r.a) + '; ' + fmt(r.b) + ']' };
+  if (!Array.isArray(r.ids) || !r.ids.length) return { text: 'по координатам' };
+  const names = (r.order || r.ids).map(id => { const m = markById(id); return m ? String(m.text || '') : '?'; });
+  if (names.every(n => /^[A-Z][₀-₉]*$/.test(n))) return { tex: names.map(markNameTex).join('') };
+  return { text: names.join(', ') };
+}
 function updateAreaCalcPanel() {
   const box = document.getElementById('info-areacalc');
   if (!box) return;
-  const list = STATE.areaCalcList || [];
-  /* Свх-5, Н59. Таблица это единый список ВСЕГО закрашенного на графике: и
-     посчитанного пользователем, и нарисованного самой сценой (излишки, сбор
-     бюджета, потери общества). Раньше сценовые области жили только в отдельном
-     разделе «Цвета областей», и там у них не было ни числа, ни соседства с
-     посчитанными площадями. Раздел удалён, ничего не потеряно. */
-  /* Области, которые нарисовала САМА МОДЕЛЬ. Посчитанные человеком площади
-     тоже помечены `data-legend` — иначе они не попали бы в легенду на холсте,
-     а там они нужны. Но в ТАБЛИЦЕ им не место: они уже идут своими строками
-     ниже, со своим именем, цветом и крестиком. Без этой отсечки одна и та же
-     площадь стояла дважды: S₁ без крестика и S₁ с крестиком, с одним числом. */
-  const mine = {};
-  (list || []).forEach(r => { mine[areaKey(r.label)] = 1; });
-  const scene = currentAreas().filter(e => !mine[e.key]);
+  const list = areasLive();
   box.innerHTML = '';
-  if (!list.length && !scene.length) return;
-
+  if (!list.length) return;
   const table = document.createElement('div');
-  table.className = 'area-table';
-  // П44: столбцы «Название» и «Площадь». «Отрезок» убран — он и так виден
-  // рядом с выбором кривой, а в таблице только занимал место.
-  const head = document.createElement('div');
-  head.className = 'area-row area-head';
-  ['Название', 'Площадь', ''].forEach(t => {
-    const c = document.createElement('span'); c.textContent = t; head.appendChild(c);
-  });
-  table.appendChild(head);
-
-  // Сначала области сцены: их не удаляют (их рисует сама модель), поэтому
-  // вместо крестика пустая клетка, а цвет правится тем же пикером.
-  scene.forEach(e => {
-    const row = document.createElement('div');
-    row.className = 'area-row';
-    const c1 = document.createElement('span');
-    c1.className = 'area-what';
-    const pick = makeColorPicker(e.color, (hex) => { STATE.areaColor[e.key] = hex; redrawAll(); },
-                                 tipName('Цвет области: ' + e.key));
-    pick.setAttribute('data-area', e.key);
-    const lab = document.createElement('span');
-    lab.className = 'area-name-fixed';
-    paintNotation(lab, areaShort(e.key));   // «CS», «PS», «DWL» — формулой
-    lab.setAttribute('data-tip', tipName(e.key));
-    c1.append(pick, lab);
-    const c2 = document.createElement('b');
-    c2.textContent = (e.value == null) ? '' : fmt(e.value);
-    const c3 = document.createElement('span');
-    row.append(c1, c2, c3);
-    table.appendChild(row);
-  });
-
+  table.className = 'area-list';
   list.forEach(r => {
     const row = document.createElement('div');
-    row.className = 'area-row';
-
-    const c1 = document.createElement('span');
-    c1.className = 'area-what';
-    // Шесть образцов, как и у всех остальных мест выбора цвета (П34).
-    const pick = makeColorPicker(r.color, (hex) => { r.color = hex; redrawAll(); }, 'Цвет площади');
-    const nameInp = document.createElement('input');
-    nameInp.type = 'text'; nameInp.className = 'area-name'; nameInp.value = r.label;
-    nameInp.setAttribute('data-tip', 'Название площади');
-    nameInp.addEventListener('input', () => { r.label = nameInp.value; });
-    nameInp.addEventListener('change', () => redrawAll());
-    c1.append(pick, nameInp);
-
-    const c3 = document.createElement('b');
-    c3.textContent = fmt(r.value);
-    if (r.kind === 'poly' && r.exact === false) c3.classList.add('area-approx');
-
-    const del = document.createElement('button');
-    del.type = 'button'; del.className = 'btn-icon'; del.textContent = '×';
-    del.setAttribute('data-tip', 'Убрать эту площадь');
-    del.addEventListener('click', () => {
-      STATE.areaCalcList = STATE.areaCalcList.filter(x => x !== r);
-      redrawAll();
-    });
-
-    row.append(c1, c3, del);
+    row.className = 'area-line';
+    row.dataset.area = String(r.id);
+    const pick = makeColorPicker(r.color, (hex) => { const a = areaById(r.id); if (a) { a.color = hex; redrawAll(); } }, 'Цвет площади');
+    pick.classList.add('area-sw');
+    let name;
+    if (String(CANVAS.areaRename) === String(r.id)) {
+      /* Правка на месте зовёт set на каждый символ, а строки пересобираются на каждой перерисовке: имя кладётся в
+         площадь, когда правка кончилась (Enter, Esc, уход фокуса) — renameCommit. */
+      let pend = r.label || '';
+      name = makeEditableValue({
+        kind: 'text',
+        get: () => pend,
+        set: (v) => { pend = String(v); },
+        tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
+        title: 'Название площади',
+      });
+      name.classList.add('area-name');
+      renameCommit(name, () => { const a = areaById(r.id); const t = String(pend).trim(); if (a && t) a.label = t; CANVAS.areaRename = null; redrawAll(); });
+    } else {
+      name = document.createElement('span');
+      name.className = 'area-name';
+      katexInto(name, markNameTex(String(r.label || '').replace(/^S([₀-₉]+)$/, 'S$1')));
+    }
+    const verts = document.createElement('span');
+    verts.className = 'area-verts';
+    const vl = areaVertsLabel(r);
+    if (vl.curve != null) {
+      const c = document.createElement('span'); curveNameInto(c, vl.curve);
+      verts.append(c, document.createTextNode(', ' + vl.range));
+    } else if (vl.tex) katexInto(verts, vl.tex);
+    else verts.textContent = vl.text;
+    const val = document.createElement('b');
+    val.className = 'area-val';
+    val.textContent = fmt(r.value);
+    if (r.kind === 'poly' && r.exact === false) val.classList.add('area-approx');
+    const more = document.createElement('button');
+    more.type = 'button'; more.className = 'btn-icon area-more';
+    more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
+    more.setAttribute('aria-label', 'Действия с площадью ' + (r.label || ''));
+    more.innerHTML = ICON_DOTS;
+    more.addEventListener('click', (e) => { e.stopPropagation(); openAreaMenu(more, r.id); });
+    row.append(pick, name, verts, val, more);
     /* Оговорка идёт СТРОКОЙ ПОД числом, а не подсказкой браузера: подсказку
        на планшете не открыть вовсе, а знать про приближение надо до того, как
        число выпишут в тетрадь. */
@@ -2501,6 +2621,50 @@ function updateAreaCalcPanel() {
   });
   box.appendChild(table);
 }
+/* Меню «⋯» площади — то же окно, что у точки (openMarkMenu), со своими пунктами. Убрать площадь — точки остаются. */
+function openAreaMenu(anchor, id) {
+  if (!_markMenu) {
+    _markMenu = document.createElement('div');
+    _markMenu.className = 'pop pts-menu';
+    _markMenu.setAttribute('role', 'menu');
+    document.body.appendChild(_markMenu);
+  }
+  if (_markMenu.classList.contains('open') && _markMenu.dataset.area === String(id)) { closePop(); return; }
+  delete _markMenu.dataset.mark;
+  _markMenu.dataset.area = String(id);
+  const menu = _markMenu;
+  const r = areaById(id);
+  menu.innerHTML = '';
+  if (!r) return;
+  menu.setAttribute('aria-label', 'Площадь ' + (r.label || ''));
+  const item = (text, fn, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pts-mi' + (cls ? ' ' + cls : ''); b.setAttribute('role', 'menuitem');
+    b.textContent = text;
+    b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    menu.appendChild(b);
+  };
+  item('Переименовать', () => {
+    closePop();
+    CANVAS.areaRename = id;
+    updateAreaCalcPanel();
+    const ed = document.querySelector('#info-areacalc [data-area="' + String(id) + '"] .area-name.edval');
+    if (ed) ed.focus();
+  });
+  const crow = document.createElement('div');
+  crow.className = 'pts-mi pts-mi-color';
+  const cl = document.createElement('span'); cl.textContent = 'Цвет';
+  crow.append(cl, makeColorPicker(r.color, (hex) => { const a = areaById(id); if (a) { a.color = hex; redrawAll(); } }, 'Цвет площади'));
+  menu.appendChild(crow);
+  const sep = document.createElement('div'); sep.className = 'pts-mi-sep'; sep.setAttribute('role', 'separator');
+  menu.appendChild(sep);
+  item('Убрать', () => {
+    closePop();
+    STATE.areaCalcList = (STATE.areaCalcList || []).filter(a => String(a.id) !== String(id));
+    redrawAll();
+  }, 'pts-mi-danger');
+  openPop(anchor, menu, { alignRight: true, noFocus: true });
+}
 
 // Выпадашка кривых и список точек: пересобираются под текущую сцену.
 function syncAreaCalcUI() {
@@ -2510,8 +2674,10 @@ function syncAreaCalcUI() {
   document.querySelectorAll('.ac-var').forEach(el => { el.textContent = v; });
   const sel = document.getElementById('ac-pick');
   if (sel) {
-    const names = areaTargets().map(t => t.name);
-    const sig = names.join('|');
+    const targets = areaTargets();
+    const names = targets.map(t => t.name);
+    // Цвет — в подписи списка: перекрасили кривую — перекрасилась точка её кнопки.
+    const sig = targets.map(t => t.name + ':' + (t.color || '')).join('|');
     if (sel._sig !== sig) {
       sel._sig = sig;
       const prev = sel.value;
@@ -2529,7 +2695,9 @@ function syncAreaCalcUI() {
       sel.value = (names.indexOf(prev) >= 0) ? prev : '';
       // Список пересобран: своя кнопка выбора должна показать новое значение.
       if (typeof sel._paint === 'function') sel._paint();
+      buildAreaCurveButtons();
     }
+    syncAreaCurveButtons();
   }
   renderVertList();
   syncAreaRangeLabel();
@@ -2540,17 +2708,116 @@ function syncAreaCalcUI() {
 // Сколько вершин набрано — говорит полоса режима над холстом (п. 80).
 function updateQuickArea() { syncCanvasMode(); }
 
+/* ВЫБОР КРИВОЙ ДЛЯ ПЛОЩАДИ — КНОПКАМИ (решение владельца 09.10, ADR 0144).
+   Кнопка на кривую: цветная точка и имя, набранное как во всей панели (внутри
+   кнопки разметка обозначений работает, в <option> — нет). Группа — радио:
+   role="radiogroup", у кнопки role="radio" и aria-checked, стрелки ходят по
+   кнопкам. Ни одна не выбрана на старте (П41: выбор осознанный). Источник
+   правды — скрытый select#ac-pick: кнопка пишет в него значение и шлёт change,
+   поэтому сцены, форма модели и приборы читают его, как раньше. */
+// Имя кривой в кнопке: одна латинская буква («f») — формулой, прочее — как во всей панели.
+function curveNameInto(el, name) {
+  if (/^[A-Za-z]$/.test(name) && typeof katexInto === 'function') { katexInto(el, name); return; }
+  if (typeof paintNotation === 'function') paintNotation(el, name); else el.textContent = name;
+}
+function buildAreaCurveButtons() {
+  const box = document.getElementById('ac-pick-btns');
+  const sel = document.getElementById('ac-pick');
+  if (!box || !sel) return;
+  box.innerHTML = '';
+  areaTargets().forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ac-cbtn';
+    b.setAttribute('role', 'radio');
+    b.dataset.name = t.name;
+    const dot = document.createElement('span'); dot.className = 'ac-cdot'; dot.setAttribute('aria-hidden', 'true');
+    if (t.color) dot.style.background = t.color;
+    const nm = document.createElement('span'); nm.className = 'ac-cname';
+    curveNameInto(nm, t.name);
+    b.setAttribute('aria-label', t.name);
+    b.append(dot, nm);
+    b.addEventListener('click', () => pickAreaCurve(t.name));
+    b.addEventListener('keydown', (e) => {
+      const list = [...box.querySelectorAll('.ac-cbtn')];
+      const i = list.indexOf(b);
+      let j = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % list.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + list.length) % list.length;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = list.length - 1;
+      if (j < 0) return;
+      e.preventDefault();
+      pickAreaCurve(list[j].dataset.name);
+      list[j].focus();
+    });
+    box.appendChild(b);
+  });
+  syncAreaCurveButtons();
+}
+function pickAreaCurve(name) {
+  const sel = document.getElementById('ac-pick');
+  if (!sel || sel.value === name) return;
+  sel.value = name;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  syncAreaCurveButtons();
+}
+// Отметка выбранной и «бегущий» tabindex: в группу заходят одним Tab.
+function syncAreaCurveButtons() {
+  const box = document.getElementById('ac-pick-btns');
+  const sel = document.getElementById('ac-pick');
+  if (!box || !sel) return;
+  const list = [...box.querySelectorAll('.ac-cbtn')];
+  const cur = list.find(b => b.dataset.name === sel.value);
+  list.forEach((b, i) => {
+    const on = b === cur;
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+    b.classList.toggle('active', on);
+    b.tabIndex = (cur ? on : i === 0) ? 0 : -1;
+  });
+}
+
+/* «+ Под кривой» и «+ Между точками» (ADR 0148): кнопка сегмента ОТКРЫВАЕТ
+   построение площади своим способом. Открытое построение — класс .ac-open у
+   #sec-areascalc (вид, не модель: класс секции в форму не входит); без него
+   панели способа и «Посчитать площадь» спрятаны стилем. Способ — по-прежнему
+   STATE.areaCalcMode, «Между точками» взводит набор вершин (armVerts). */
 function setAreaCalcMode(mode) {
+  const sec = document.getElementById('sec-areascalc');
+  if (sec) sec.classList.add('ac-open');
   STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
   const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
-  if (c) c.classList.toggle('active', STATE.areaCalcMode === 'curve');
-  if (p) p.classList.toggle('active', STATE.areaCalcMode === 'poly');
+  if (c) { c.classList.toggle('active', STATE.areaCalcMode === 'curve'); c.setAttribute('aria-checked', STATE.areaCalcMode === 'curve' ? 'true' : 'false'); }
+  if (p) { p.classList.toggle('active', STATE.areaCalcMode === 'poly'); p.setAttribute('aria-checked', STATE.areaCalcMode === 'poly' ? 'true' : 'false'); }
   const pc = document.getElementById('ac-pane-curve'), pp = document.getElementById('ac-pane-poly');
   if (pc) pc.style.display = (STATE.areaCalcMode === 'curve') ? '' : 'none';
   if (pp) pp.style.display = (STATE.areaCalcMode === 'poly') ? '' : 'none';
   armVerts(STATE.areaCalcMode === 'poly');
   updateQuickArea();
   redrawAll();   // кружки ключевых точек перестают ловить щелчок (см. drawCrossPoints)
+}
+// Закрыть построение площади: панели способа уходят, набор вершин снимается.
+function closeAreaBuild() {
+  const sec = document.getElementById('sec-areascalc');
+  if (sec) sec.classList.remove('ac-open');
+  if (STATE.vertArm) armVerts(false);
+}
+// Esc посреди набора вершин: набранное забывается, режим холста остаётся.
+function cancelAreaBuild() {
+  STATE.areaVerts = [];
+  CANVAS.buildIds = [];   // поставленные при наборе точки остаются обычными точками (В3)
+  const err = document.getElementById('ac-error');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+  renderVertList();
+  closeAreaBuild();
+  redrawAll();
+}
+/* «Готово» или щелчок по первой вершине: три вершины и больше дают площадь,
+   набор очищается и построение закрывается. Ошибка расчёта (вершины на разных
+   графиках) оставляет построение открытым: поправить есть что. */
+function finishPolyBuild() {
+  const ids = (CANVAS.buildIds || []).slice();
+  if (ids.length >= 3 && !addPolyArea(ids)) return;
+  cancelAreaBuild();
 }
 
 /* Сворачивание секций. Одна проводка на все складные заголовки: кнопка
@@ -2587,16 +2854,22 @@ function wireAreaCalc() {
   if (p) p.addEventListener('click', () => setAreaCalcMode('poly'));
   const calc = document.getElementById('ac-calc');
   if (calc) calc.addEventListener('click', () => runAreaCalc());
+  /* «Убрать всё» внизу панели режима (ADR 0148): свои точки, набранные
+     вершины и посчитанные площади разом. Шагом истории это становится само
+     (настоящее событие человека). */
   const clr = document.getElementById('ac-clear');
-  if (clr) clr.addEventListener('click', () => clearAreaCalc());
+  if (clr) clr.addEventListener('click', () => {
+    if (STATE.markArm) cancelMarkDraft();
+    STATE.marks = []; STATE.areaVerts = [];
+    renderMarkList(); renderVertList();
+    if (STATE.vertArm) closeAreaBuild();
+    clearAreaCalc();
+  });
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
-  if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
-  const vClear = document.getElementById('ac-vert-clear');
-  if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
-  const vArm = document.getElementById('ac-vert-arm');
-  if (vArm) vArm.addEventListener('click', () => armVerts(!STATE.vertArm));
+  if (pick) pick.addEventListener('change', () => { syncAreaCurveButtons(); syncAreaRangeLabel(); syncAreaCalcButton(); });
   setAreaCalcMode('curve');
+  closeAreaBuild();   // на старте построение закрыто: видны только две кнопки
 }
 
 /* ── Ползунки параметров ──────────────────────────────────────────────
@@ -2690,7 +2963,7 @@ function expandImplicitMul(expr) {
        (prepExpr), но и здесь имя за слэшем неприкосновенно: непереведённая
        команда обязана дойти до Math.js целой и получить честный отказ. */
     if (at > 0 && s[at - 1] === '\\') return name;
-    if (ECON_WORDS.has(name) || MATH_CONSTS.has(name)) return name;
+    if (ECON_WORDS.has(name) || MATH_CONSTS.has(name) || sceneReserved().has(name)) return name;
     try { if (typeof math[name] !== 'undefined') return name; } catch (e) {}
     // Имя перед скобкой — вызов функции, разбирать его на буквы нельзя.
     const after = s.slice(at + name.length).match(/^\s*\(/);
@@ -2710,7 +2983,7 @@ function expandImplicitMul(expr) {
    как \mathrm{MC}.
 
    ⚠️ ТРОГАЕМ ТОЛЬКО ПОДПИСЬ, КОТОРАЯ ЦЕЛИКОМ ОБОЗНАЧЕНИЕ. Смешанную фразу
-   («Излишек покупателя (CS)») пришлось бы резать на куски и собирать из
+   («Излишек потребителя (CS)») пришлось бы резать на куски и собирать из
    tspan, а это переносы и съехавшая привязка. Такие подписи остаются в
    описи долга (night2_font_audit.mjs) и чинятся отдельной задачей. */
 const CHART_MATH_WORDS = new Set(['MC','MR','TC','ATC','AVC','AFC','FC','VC','TR','TP','MP','AP',
@@ -2925,6 +3198,9 @@ function sceneReserved() {
   const taxField = document.getElementById('tax-field');
   if (taxField && fieldActive(taxField)) { s.add('t'); s.add('s'); }
   if (STATE.mode === 'labor') s.add('w');
+  if (STATE.mode === 'inequality') {s.add('alpha');s.add('α');}
+  if (STATE.mode === 'macro' && STATE.macroModel === 'adas') {s.add('Y');s.add('P');s.add('L');s.add('w');}
+  if (STATE.mode === 'macro' && STATE.macroModel === 'islm') {s.add('Y');s.add('r');s.add('i');}
   return s;
 }
 
@@ -3083,8 +3359,8 @@ function buildParamChip(box, name) {
   const syncSlider = () => {
     sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step);
     sl.value = p.value;
-    loLab.textContent = fmt(p.min);
-    hiLab.textContent = fmt(p.max);
+    loLab.textContent = boundText(p.min);   // настоящий минус в подписи предела (сессия 6, Д1)
+    hiLab.textContent = boundText(p.max);
     val.textContent = fmt(p.value);
     paintEq();
   };
@@ -3146,7 +3422,9 @@ function buildParamChip(box, name) {
   loLab.addEventListener('click', () => bounds.open('min'));
   hiLab.addEventListener('click', () => bounds.open('max'));
 
+  chip.dataset.param = name;   // по букве чип находит свою карточку (92-ui-kit.js)
   box.appendChild(chip);
+  return chip;
 }
 
 /* Цвета кривых сцены (издержки, производство, вееры, «Математика»).
@@ -3329,14 +3607,31 @@ function onDocClosePick(e) {
   if (openCPick && (openCPick.contains(e.target) || (openCPick._owner && openCPick._owner.contains(e.target)))) return;
   closeColorMenu();
 }
-function onEscClosePick(e) { if (e.key === 'Escape') closeColorMenu(); }
+/* Esc закрывает только окно цвета: событие дальше не идёт (сессия 7, Б3). Раньше окно убиралось, а сторож режима
+   «Точки и площади» (88-params.js, тоже фаза захвата) следом выходил из режима — он видел уже закрытое окно. */
+function onEscClosePick(e) {
+  if (e.key !== 'Escape' || !openCPick) return;
+  e.preventDefault(); e.stopPropagation();
+  closeColorMenu();
+}
 
 /* Выбор цвета: ряд из шести образцов плюс «Свой цвет» (П34).
    Возвращает ОБЁРТКУ, а не сам input: меню уезжает в <body> с position:fixed,
    иначе панель с прокруткой обрезала бы его по своему краю.
    ВАЖНО: из onChange нельзя перерисовывать список, в котором живёт эта кнопка,
    иначе нативная палитра «Своего цвета» захлопнется на первом же клике. */
-function makeColorPicker(value, onChange, title) {
+/* Двенадцать образцов окна «Цвет кривой» (редизайн 10.2026, README макета,
+   раздел 10): шесть цветов ролей и вторая шестёрка палитры групп сложения.
+   Значения — токены calc2.css, а не числа в коде. */
+const PALETTE_12 = [
+  ['--curve-d', 'Синий'], ['--curve-s', 'Кирпичный'], ['--curve-mr', 'Фиолетовый'],
+  ['--curve-mc', 'Бирюзовый'], ['--curve-tax', 'Зелёный'], ['--curve-reg', 'Охра'],
+  ['--sum-g2', 'Тёмная бирюза'], ['--sum-g4', 'Тёмно-зелёный'], ['--sum-g5', 'Маджента'],
+  ['--sum-g6', 'Сиреневый'], ['--sum-g7', 'Сланцевый'], ['--sum-g8', 'Пыльная роза'],
+];
+function paletteTwelve() { return PALETTE_12.map(([v, n]) => [normHex(cssVar(v)), n]); }
+function makeColorPicker(value, onChange, title, opts) {
+  opts = opts || {};
   const wrap = document.createElement('span');
   wrap.className = 'cpick';
 
@@ -3354,7 +3649,12 @@ function makeColorPicker(value, onChange, title) {
   const paint = () => { btn.style.background = cur; own.value = cur; };
   paint();
 
-  const apply = (hex) => { cur = normHex(hex); paint(); onChange(cur); };
+  // onChange может вернуть итоговый цвет (у «Цвета по умолчанию» его знает
+  // только хозяин: цвет роли кривой).
+  const apply = (hex) => {
+    const got = onChange(hex == null ? null : normHex(hex));
+    cur = normHex(got || hex || cur); paint();
+  };
   own.addEventListener('input', () => apply(own.value));
 
   btn.addEventListener('click', (e) => {
@@ -3366,28 +3666,47 @@ function makeColorPicker(value, onChange, title) {
     const menu = document.createElement('div');
     menu.className = 'cpick-menu';
     menu.setAttribute('role', 'dialog');
-    menu.setAttribute('aria-label', btn.title);
+    const head = opts.title || (title || 'Цвет кривой');
+    menu.setAttribute('aria-label', head);
+    const h = document.createElement('div');
+    h.className = 'cpick-title'; h.textContent = head;
+    menu.appendChild(h);
     const grid = document.createElement('div');
     grid.className = 'cpick-grid';
-    paletteSix().forEach((hex) => {
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Цвета');
+    paletteTwelve().forEach(([hex, name]) => {
       const sw = document.createElement('button');
       sw.type = 'button';
       sw.className = 'cpick-sw';
       sw.style.background = hex;
       sw.setAttribute('role', 'radio');
       sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
-      sw.setAttribute('data-tip', hex);
+      sw.setAttribute('aria-label', name);
+      sw.setAttribute('data-tip', name);
       sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
       grid.appendChild(sw);
     });
     menu.appendChild(grid);
 
+    const foot = document.createElement('div');
+    foot.className = 'cpick-foot';
     const ownRow = document.createElement('label');
     ownRow.className = 'cpick-own';
     own.style.display = '';
+    own.setAttribute('aria-label', 'Свой цвет');
     ownRow.append(own, document.createTextNode('Свой цвет'));
     ownRow.addEventListener('click', (ev) => ev.stopPropagation());
-    menu.appendChild(ownRow);
+    foot.appendChild(ownRow);
+    // «Цвет по умолчанию» — там, где хозяин его знает (у кривой это цвет роли).
+    if (typeof opts.dflt === 'function') {
+      const d = document.createElement('button');
+      d.type = 'button'; d.className = 'cpick-dflt';
+      d.textContent = 'Цвет по умолчанию';
+      d.addEventListener('click', (ev) => { ev.stopPropagation(); apply(null); closeColorMenu(); });
+      foot.appendChild(d);
+    }
+    menu.appendChild(foot);
 
     document.body.appendChild(menu);
     menu._owner = wrap;
@@ -3464,15 +3783,16 @@ function drawMarks() {
     const px = mx(mk.x), py = my(mk.y);
     const col = mk.color || COL.ink;
     // Пунктирные проекции на оси — как у равновесия: так точка читается по осям.
+    // data-mark-id — чей это узел (меню «⋯» находит подпись для «Переименовать», приборы — точку; сессия 7).
     if (mk.showDash !== false) {
       g.append('line').attr('x1', mx(0)).attr('y1', py).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5).attr('data-mark-id', mk.id);
       g.append('line').attr('x1', px).attr('y1', my(0)).attr('x2', px).attr('y2', py)
         .attr('stroke', COL.inkSoft).attr('stroke-width', 1)
-        .attr('stroke-dasharray', '3 3').attr('opacity', .5);
+        .attr('stroke-dasharray', '3 3').attr('opacity', .5).attr('data-mark-id', mk.id);
     }
-    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+    g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('data-mark-id', mk.id)
       .attr('fill', col).attr('stroke', COL.halo).attr('stroke-width', 1.6)
       .style('cursor', 'move')
       /* Перетаскивание (П30) с сопротивлением при отрыве (П31).
@@ -3489,7 +3809,8 @@ function drawMarks() {
         const key = snapVertexAt(ev.x, ev.y);
         // Магнит соседней панели точке не хозяин: она живёт в своей.
         const own = (h) => h && markPanelId(h) === markPanelId(mk);
-        if (key && key.key && own(key)) { mk.snapTo = null; mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
+        if (key && key.key && own(key) && key.mark !== mk.id) { mk.snapTo = null; mk.on = keyOnText(key); mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
+        mk.on = '';   // ушла с ключевой точки: «на чём стоит» теперь скажет привязка к кривой
         if (!mk.snapTo) {
           const hit = snapPointAt(ev.x, ev.y);
           if (hit && !hit.cross && own(hit)) mk.snapTo = hit.name;
@@ -3522,7 +3843,10 @@ function drawMarks() {
         .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6)
         .text(s);
       // Первая строка — имя точки, его и правим двойным щелчком.
-      if (i === 0) makeRenamable(t, mk.text, px + 9, ty, (v) => { mk.text = v; renderMarkList(); });
+      if (i === 0 && mk.text) {
+        t.attr('data-mark-id', mk.id).attr('data-lx', px + 9).attr('data-ly', ty);
+        makeRenamable(t, mk.text, px + 9, ty, (v) => { mk.text = v; renderMarkList(); });
+      } else t.attr('data-mark-coords', mk.id);
     });
   });
 }
@@ -3560,6 +3884,24 @@ function snapTargets(panelId) {
 
 function snapTargetsAll() {
   const out = [];
+  if(STATE.sceneKey==='bigopen'){
+    const r=STATE.bigTradeResult,prepared=_bigTradeCache?.prepared;if(!r||r.error||!prepared)return out;
+    if(STATE.bigTrade?.view==='world'){
+      if(r.Pw!==null)out.push({name:'Pw',f:()=>r.Pw,panel:'big-world'});
+    }else for(const key of['A','B'])for(const role of['D','S'])out.push({name:role+'_'+key,f:Q=>evalCurve(prepared[key][role].curve,Q),color:COL[role],panel:'big-'+key});
+    return out;
+  }
+  if (STATE.sceneKey === 'firmmarket') {
+    const r=STATE.firmMarketResult;
+    if (r?.firm&&!r.firm.error) {
+      if (STATE.showMC) out.push({name:'MC',f:costMC,panel:'firm-market-firm'});
+      if (STATE.showATC) out.push({name:'ATC',f:costATC,panel:'firm-market-firm'});
+      if (STATE.showAVC) out.push({name:'AVC',f:costAVC,panel:'firm-market-firm'});
+      if (r.found) out.push({name:'P',f:()=>r.P,panel:'firm-market-firm'});
+    }
+    if (r?.D&&!r.D.error) out.push({name:'D',f:Q=>evalCurve(r.D.curve,Q),panel:'firm-market-market'});
+    return out;
+  }
   if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
     if (STATE.showMC)  out.push({ name: 'MC',  f: costMC });
     if (STATE.showATC) out.push({ name: 'ATC', f: costATC });
@@ -3596,8 +3938,8 @@ function snapTargetsAll() {
     if (d.found) {
       out.push({ name: 'D₁', f: (q) => evalCurve(d.c1, q), color: COL.D, panel: 'mini-1' });
       out.push({ name: 'D₂', f: (q) => evalCurve(d.c2, q), color: COL.D, panel: 'mini-2' });
-      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-1' });
-      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-2' });
+      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q+d.q2), color: COL.S, panel: 'mini-1' });
+      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q+d.q1), color: COL.S, panel: 'mini-2' });
       return out;
     }
     return out;
@@ -3620,8 +3962,7 @@ function snapTargetsAll() {
   if (STATE.mode === 'costs' && STATE.costsSub === 'plants' && STATE.plants) {
     const p = STATE.plants;
     const mc = (STATE.plView === 'mc');
-    const pts = p.table.map(r => [r.Q, mc ? r.m : r.tcDirect]);
-    out.push({ name: mc ? 'MC' : 'TC', f: (q) => interpY(pts, q) });
+    out.push({ name: mc ? 'MC' : 'TC', f: q => {const r=plantsShownAt(q);return r?(mc?r.m:r.tcDirect):NaN;} });
     return out;
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'single' && STATE.ppfReady) {
@@ -3664,12 +4005,15 @@ function snapTargetsAll() {
   if (STATE.mode === 'macro')      { macroSnapTargets(out); return out; }
   if (STATE.mode === 'consumer')   { consumerSnapTargets(out); return out; }
   if (STATE.mode === 'inequality') { ineqSnapTargets(out); return out; }
+  const d1=STATE.mode==='market'&&STATE.market==='monopoly'&&STATE.monoMode==='discr1';
   STATE.curves.filter(c => c.visible && !isVertical(c)).forEach(c => {
+    if(d1&&c.role==='tc')return; // TC не рисуется на ценовой оси и не расширяет её.
     /* Цвет и сама кривая нужны взведению (фаза 3): загоревшаяся точка красится
        цветом своей кривой, а полоса попадания должна знать, какую кривую
        взводит. Раньше сюда попадало только имя и функция. */
     out.push({ name: curveShortName(c), f: (q) => evalCurve(c, q), color: c.color, curve: c });
   });
+  if(d1&&!mcSourceCurve()&&curveByRole('tc'))out.push({name:'MC',f:mcAt,color:COL.S});
   return out;
 }
 
@@ -3803,8 +4147,25 @@ function mathSnapTargets(out) {
      по СПРЯТАННОЙ формуле из чужого поля, то есть по кривой, которой на экране
      нет. Катаем по самому ограничению: его точки сцена уже посчитала. */
   if (sub === 'constraint') {
-    const pts = (STATE.mathRes && STATE.mathRes.conPts) || [];
-    if (pts.length >= 2) out.push({ name: 'ограничение', f: (x) => interpY(pts, x) });
+    // Замкнутое ограничение не является одной функцией y(x). Каждая
+    // монотонная по x часть — отдельная цель; верх и низ не склеиваются.
+    const branches = (STATE.mathRes && STATE.mathRes.conBranches) || [];
+    for (const branch of branches) {
+      let part = [], direction = 0;
+      const add = () => {
+        if (part.length < 2) return;
+        const pts = part.slice().sort((a, b) => a[0] - b[0]);
+        if (pts.at(-1)[0] - pts[0][0] < 1e-10) return;
+        out.push({ name: 'ограничение', f: x => x < pts[0][0] || x > pts.at(-1)[0] ? NaN : interpY(pts, x) });
+      };
+      for (const point of branch) {
+        const next = part.length ? Math.sign(point[0] - part.at(-1)[0]) : 0;
+        if (next && direction && next !== direction) { add(); part = [part.at(-1)]; }
+        if (next) direction = next;
+        part.push(point);
+      }
+      add();
+    }
     return;
   }
   if (f) out.push({ name: 'f', f });
@@ -3941,7 +4302,7 @@ function armMark(on) {
   const was = STATE.markArm;
   STATE.markArm = !!on;
   const wrap = document.getElementById('graph-wrap');
-  if (wrap) wrap.style.cursor = on ? 'crosshair' : '';
+  if (wrap) wrap.style.cursor = (on || CANVAS.pts) ? 'crosshair' : '';
   if (!on) showSnapHint(null);   // снятый режим не оставляет кружок-подсказку
   syncCanvasMode();
   if (was !== STATE.markArm && typeof redrawAll === 'function') redrawAll();
@@ -3978,7 +4339,7 @@ const SCENE_DEFAULTS = {
   // Заливки и цвета.
   showCS: true, showPS: true, showGhost: false,
   showMonoCS: true, showMonoPS: true, showMonoVC: false,
-  colorOverride: {}, areaColor: {}, titlePos: null,   // своё место названия (доли поля, Н22)
+  colorOverride: {}, areaColor: {}, areaHidden: [], titlePos: null,   // своё место названия (доли поля, Н22)
   // Плоскость и подписи.
   labelSize: LABEL_SIZE_DEFAULT, firstQuad: true, xStep: null, yStep: null,
   quadSaved: null,            // окно до включения первой четверти (обратный ход тумблера)
@@ -4016,6 +4377,7 @@ function resetDecor() {
   const panel = document.getElementById('params-panel');
   if (panel) { panel._extraSig = PULT_REBUILD; panel._curveSig = PULT_REBUILD; }
   ['params-extra', 'params-curves'].forEach(id => {
+    if (typeof clearPultBox === 'function') { clearPultBox(id); return; }
     const box = document.getElementById(id);
     if (box) box.innerHTML = '';
   });
@@ -4109,7 +4471,14 @@ function _undoCopy(v) {
    которые действительно меняют модель: сдвиг кривой, вынос и удаление точки,
    удаление кривой, переименование, правка формулы, значение и границы
    параметра. Тихо ничего не делает, пока сцена не открыта. */
-function pushUndo() {
+/* ⚠️ С РЕДИЗАЙНА 10.2026 ИСТОРИЯ ЖИВЁТ В 91-session.js: у каждой модели свой
+   стек, есть «Повторить», шаг пишется после ЛЮБОГО изменения модели (ползунки,
+   ручки, вмешательство, галочки, цвета), а не только здесь. pushUndo остаётся
+   единой дверью «сейчас будет правка» для прежних мест вызова: она отдаёт метку
+   склейки. Старый стек ниже больше не используется и оставлен только как
+   запасной путь на случай, если 91-session.js не загрузился. */
+function pushUndo(label) {
+  if (typeof historyMark === 'function') { historyMark(label); return; }
   if (!STATE.sceneKey) return;
   const snap = { scene: STATE.sceneKey, data: {} };
   SNAPSHOT_KEYS.forEach(k => { snap.data[k] = _undoCopy(STATE[k]); });
@@ -4120,6 +4489,7 @@ function pushUndo() {
 /* Шаг назад. Снимок чужой модели не применяем: человек ушёл в другую сцену,
    и вернуть туда состояние отсюда значило бы менять то, чего он не видит. */
 function undoLast() {
+  if (typeof historyUndo === 'function') return historyUndo();
   while (_undoStack.length) {
     const snap = _undoStack.pop();
     if (snap.scene !== STATE.sceneKey) continue;
@@ -4144,7 +4514,16 @@ function clearUndo() { _undoStack.length = 0; }
    Без этого pickScene тут же восстановил бы то, что мы только что отменили. */
 function forgetSceneSnapshot(key) { delete _sceneSnaps[key]; }
 
-function resetSceneMemory() { Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; }); }
+function resetSceneMemory() {
+  Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; });
+  // И историю моделей: прогоны приборов начинают каждый случай с нуля.
+  if (typeof historyClearAll === 'function') historyClearAll();
+  /* И автосохранения моделей (91-session.js): щелчок по карточке теперь
+     поднимает сохранённое состояние, и прибор, открывающий модель щелчком,
+     получал бы правки собственных прошлых случаев. Человек эту функцию не
+     вызывает: её зовут приборы, чтобы начать с чистого листа (COVERAGE О34). */
+  if (typeof forgetAutosaves === 'function') forgetAutosaves();
+}
 
 function saveSceneSnapshot(key) {
   if (!key) return;
@@ -4152,6 +4531,10 @@ function saveSceneSnapshot(key) {
   SNAPSHOT_KEYS.forEach(k => { snap[k] = STATE[k]; });
   snap._view = { Qmin: CONFIG.Qmin, Qmax: CONFIG.Qmax, Pmin: CONFIG.Pmin, Pmax: CONFIG.Pmax };
   snap._counters = { mark: markCounter, area: areaCalcCounter };
+  /* Полные входы модели (89-model-state.js): вход в модель теперь сбрасывает
+     всё к чистому старту, поэтому память обязана хранить и то, что раньше
+     переживало уход только потому, что его никто не сбрасывал. */
+  if (typeof captureMemory === 'function') snap._full = captureMemory();
   _sceneSnaps[key] = snap;
 }
 
@@ -4164,6 +4547,7 @@ function restoreSceneSnapshot(key) {
     CONFIG.Pmin = snap._view.Pmin; CONFIG.Pmax = snap._view.Pmax;
   }
   if (snap._counters) { markCounter = snap._counters.mark; areaCalcCounter = snap._counters.area; }
+  if (snap._full && typeof applyMemory === 'function') applyMemory(snap._full);
   if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
   // Способ ввода издержек — часть обстановки модели, поэтому его переключатель
   // и поля надо вернуть в согласие с восстановленным состоянием (Б24).
@@ -4174,22 +4558,73 @@ function restoreSceneSnapshot(key) {
   return true;
 }
 
-function addMarkAt(x, y, snapTo, panel) {
+/* «На чём стоит» своя точка — строкой в списке панели режима (ADR 0148):
+   «на спросе», «на кривой f», «пересечение D и S», «точка E». Привязка к кривой
+   (snapTo) живая и говорит сама; ключевая точка и пересечение запоминаются
+   при постановке (mk.on) и забываются, когда точку увели. */
+/* «На чём стоит» — обозначениями, как на холсте (сессия 7, Б2; README пакета 9): «на D», «на S», «на оси Q»,
+   «на кривой Лоренц» (у кривой без обозначения — её имя), «пересечение D и S», «точка Q1 и Pb»; в строке
+   обозначения набираются формулой (markOnTex). Раньше роль словами: «на спросе», «на предложении». */
+const NOTATION_TOKEN_RE = /^[A-Za-z][A-Za-z0-9]{0,4}['′*]?$/;
+function keyOnText(hit) {
+  if (!hit) return '';
+  if (hit.cross) return 'пересечение ' + hit.name;
+  if (!hit.key || hit.mark) return '';
+  const n = String(hit.name || '');
+  return /^(пересечение|максимум|минимум|плато|излом|проекция|начало|точка|отмеченная)/.test(n) ? n : 'точка ' + n;
+}
+function markOnText(mk) {
+  const t = mk.snapTo;
+  if (t) {
+    if (/^ось /.test(t)) return 'на оси ' + t.slice(4);
+    if (t === 'начало координат') return 'в начале координат';
+    return NOTATION_TOKEN_RE.test(t) ? 'на ' + t : 'на кривой ' + t;
+  }
+  return mk.on || '';
+}
+/* Обозначение словом → TeX: «Q1» → Q_{1}, «Pb» → P_{b}, «MC» → \mathrm{MC}, «TC1» → \mathrm{TC}_{1}, «D» → D. */
+function notationTex(w) {
+  let m = /^([A-Z]{2,})(\d*)$/.exec(w);
+  if (m) return '\\mathrm{' + m[1] + '}' + (m[2] ? '_{' + m[2] + '}' : '');
+  m = /^([A-Za-z])(\d+|[a-z]{1,4})?(['′*])?$/.exec(w);
+  if (m) return m[1] + (m[2] ? '_{' + m[2] + '}' : '') + (m[3] ? (m[3] === '*' ? '^{*}' : "'") : '');
+  return null;
+}
+function markOnInto(el, text) {
+  el.textContent = '';
+  String(text || '').split(/(\s+)/).forEach(w => {
+    const tex = /\S/.test(w) ? notationTex(w) : null;
+    if (tex && typeof katexInto === 'function') { const k = document.createElement('span'); k.className = 'tex'; katexInto(k, tex); el.appendChild(k); }
+    else el.appendChild(document.createTextNode(w));
+  });
+}
+/* Имя точки в строке — формулой: буква «A», «A₁» → A, A_{1}; своё имя человека — текстом, как было. */
+function markNameTex(text) {
+  const t = String(text || '');
+  const m = /^([A-Z])([₀-₉]*)$/.exec(t);
+  if (m) return m[1] + (m[2] ? '_{' + m[2].replace(/[₀-₉]/g, (d) => '₀₁₂₃₄₅₆₇₈₉'.indexOf(d)) + '}' : '');
+  return '\\text{' + t.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
+}
+
+function addMarkAt(x, y, snapTo, panel, on) {
   const pid = panel || (activePanel() ? activePanel().id : null);
   // Щелчок по графику в режиме «Указать на графике» достраивает уже заведённую
   // заготовку, а не плодит вторую точку (П28).
   const draft = pendingMark();
-  if (draft) {
-    draft.x = x; draft.y = y; draft.snapTo = snapTo || null;
+  if (draft && draft.mode === 'graph') {
+    draft.x = x; draft.y = y; draft.snapTo = snapTo || null; draft.on = on || '';
     draft.panel = pid;
     draft.pending = false;
     renderMarkList();
     redrawAll();
     return;
   }
-  STATE.marks.push(newMark(x, y, snapTo, 'graph', pid));
+  const mk = newMark(x, y, snapTo, 'graph', pid);
+  mk.on = on || '';
+  STATE.marks.push(mk);
   renderMarkList();
   redrawAll();
+  return mk;
 }
 
 /* Заготовка точки: строка списка уже есть, а на плоскости точки ещё нет.
@@ -4252,10 +4687,43 @@ function nextMarkColor() {
   return pal[(STATE.marks || []).length % pal.length];
 }
 
+/* ИМЯ СВОЕЙ ТОЧКИ — БУКВА (сессия 7 «тихих панелей», Б4; README пакета 9; ADR 0155).
+   Новая точка получает первую свободную букву A … Z, потом A₁ … Z₁, A₂ … Свободная — не занята ни своей точкой,
+   ни обозначением на холсте модели: буквой кривой (D, S), подписью ключевой точки и области (E, M; в «Неравенстве
+   доходов» области A и B), буквой оси (P, Q, L, W …). Буква, занятая на холсте, пропускается на всех уровнях
+   (D₁ рядом с кривой D читалась бы её копией). Не счётчиком: markCounter съедает номера черновиков и откатывается
+   «Отменить» — были бы пропуски и повторы. Точки старых ссылок и сохранений («Точка 1») сохраняют свои имена. */
+const NOTATION_LETTER_RE = /^([A-Z])(?:[′'*]|\^\{?[′'*]\}?|_\{?[^{}]*\}?|[₀-₉]+)?$/;
+function canvasNameLetters() {
+  const out = new Set();
+  const take = (v) => { const m = NOTATION_LETTER_RE.exec(String(v == null ? '' : v).replace(/\u200b/g, '').trim()); if (m) out.add(m[1]); };
+  const node = (typeof svg !== 'undefined' && svg && svg.node) ? svg.node() : null;
+  if (node) {
+    node.querySelectorAll('text').forEach(t => { if (!t.closest('g.marks')) take(t.getAttribute('data-raw') || t.textContent); });
+    node.querySelectorAll('[data-legend]').forEach(e => take(e.getAttribute('data-legend')));
+  }
+  (typeof snapTargets === 'function' ? snapTargets() : []).forEach(t => take(t.name));
+  take(axisLetter('x')); take(axisLetter('y'));
+  return out;
+}
+function nextMarkName() {
+  const taken = canvasNameLetters();
+  const own = new Set((STATE.marks || []).map(m => String(m.text || '').trim()));
+  for (let k = 0; k < 100; k++) {
+    for (let i = 0; i < 26; i++) {
+      const L = String.fromCharCode(65 + i);
+      const name = k ? L + subDigits(k) : L;
+      if (!taken.has(L) && !own.has(name)) return name;
+    }
+  }
+  return 'Точка ' + ((STATE.marks || []).length + 1);
+}
 function newMark(x, y, snapTo, mode, panel) {
-  markCounter++;
+  /* id — больше любого id в списке: старое сохранение могло принести точки с id выше счётчика, а площади держат
+     вершины по id (этап В). */
+  markCounter = Math.max(markCounter, (STATE.marks || []).reduce((m, k) => Math.max(m, +k.id || 0), 0)) + 1;
   return {
-    id: markCounter, x, y, text: 'Точка ' + markCounter,
+    id: markCounter, x, y, text: nextMarkName(),
     // Хозяйская панель: в ней точку поставили, по её шкалам и рисуем.
     panel: panel || (activePanel() ? activePanel().id : null),
     showCoords: true, showDash: true, color: nextMarkColor(),
@@ -4284,53 +4752,41 @@ function markSnapFn(mk) {
   return t ? t.f : null;
 }
 
-/* Список своих точек (П28, П29).
-   Порядок на экране: сначала уже созданные точки, потом заготовка, если она
-   есть, и в самом низу кнопка «Добавить точку». Пока заготовка не превратилась
-   в точку, кнопки нет: два незаконченных ввода разом только путают. */
+/* Список своих точек (П28, П29; сессия 7, Б2 — README пакета 9, макет 04_screen_points).
+   Строка точки: галочка выбора (для площади, этап В; вид, не модель — CANVAS.ptsSel), имя KaTeX 19 px,
+   координаты «(40; 60)» KaTeX 16 px, «на D» / «пересечение D и S» 12 / 500 --text3, справа «⋯». Больше в строке
+   ничего нет: цвет, переименование, координаты, галочки «Пунктир к осям», «Координаты на графике» и «Убрать» — в
+   меню «⋯» (Б3). «+ По координатам» — в строке заголовка раздела; пока заготовка не стала точкой, кнопки нет. */
 function renderMarkList() {
   const box = document.getElementById('mark-list');
   if (!box) return;
   box.innerHTML = '';
   (STATE.marks || []).forEach(mk => box.appendChild(buildMarkRow(mk)));
-
   if (!pendingMark()) ensureAddMarkButton();
+  else { const add = document.querySelector('#sec-view .btn-mark-add'); if (add) add.remove(); }
+  syncPtsSelBar();
 }
 
-/* Н38. Кнопка «Добавить точку» всегда стоит ПОД списком: новая точка появляется
-   выше неё, а кнопка съезжает вниз. Отдельная функция, потому что кнопку надо
-   вернуть и в тот момент, когда заготовка превратилась в точку прямо во время
-   набора координат, без пересборки всего списка (иначе теряется фокус). */
+/* «+ По координатам» — тихая кнопка в строке заголовка раздела «Точки» (рядом с h3, не внутри: его текст сверяют
+   приборы). Та же кнопка, что «+ Точка по координатам» под списком до сессии 7: класс и действие прежние. */
 function ensureAddMarkButton() {
-  const box = document.getElementById('mark-list');
-  if (!box || box.querySelector('.btn-mark-add')) return;
+  const row = document.querySelector('#sec-view .pts-sec-row');
+  const host = row || document.getElementById('mark-list');
+  if (!host || document.querySelector('#sec-view .btn-mark-add')) return;
   const add = document.createElement('button');
   add.type = 'button'; add.className = 'btn-sm btn-mark-add';
-  add.textContent = 'Добавить точку';
+  add.textContent = '+ По координатам';
   add.addEventListener('click', () => startMarkDraft());
-  box.appendChild(add);
+  host.appendChild(add);
 }
 
 function buildMarkRow(mk) {
   const row = document.createElement('div');
   row.className = 'mark-row';
+  row.dataset.mark = String(mk.id);
   if (mk.pending) row.classList.add('mark-draft');
 
-  /* Тумблер «Ввести координаты | Указать на графике» (П28). Он живёт только
-     у заготовки: как только точка появилась на плоскости, способ ввода уже
-     выбран и менять его нечем — тумблер из строки уходит совсем. Держать его
-     навсегда серым в каждой строке было бы мёртвым элементом. */
-  let seg = null;
-  if (mk.pending) {
-    seg = makeToggle('Ввести координаты', 'Указать на графике', mk.mode === 'graph', (v) => {
-      if (!mk.pending) return;
-      mk.mode = (v === 'right') ? 'graph' : 'coords';
-      armMark(mk.mode === 'graph');
-      renderMarkList();
-    });
-    row.appendChild(seg);
-  }
-
+  /* С 13.10 (ADR 0148) заготовка «на графике» (mode 'graph') осталась только у прежнего входа armMark. */
   if (mk.pending && mk.mode === 'graph') {
     const hint = document.createElement('div');
     hint.className = 'mark-hint';
@@ -4339,113 +4795,231 @@ function buildMarkRow(mk) {
     return row;
   }
 
-  /* Координаты. У заготовки они и есть способ создания: точка появляется, как
-     только оба поля заполнены, и переезжает на каждый введённый символ —
-     поэтому слушаем input, а не change, и НЕ пересобираем список (иначе
-     потерялся бы фокус посреди набора). */
-  const xy = document.createElement('div');
-  xy.className = 'mark-xy';
-  const nums = {};
-  /* Н47, Н36. Координата это набранное «x = 50», а не подпись и прямоугольное
-     поле рядом. Правится тем же компонентом, что и всюду: пунктир снизу, правка
-     на месте, применение на каждый символ. */
-  const mkNum = (key) => {
-    // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
-    const letter = axisLetter(key);
-    const n = makeEditableValue({
-      get: () => (isFinite(mk[key]) ? Math.round(mk[key] * 1000) / 1000 : ''),
-      tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
-      title: 'Координата ' + letter,
-      set: (v) => {
-        mk[key] = isFinite(v) ? v : NaN;
-        // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
-        const f = markSnapFn(mk);
-        if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
-        const ready = isFinite(mk.x) && isFinite(mk.y);
-        if (mk.pending && ready) {
-          mk.pending = false;
-          if (seg) seg.remove();          // способ ввода выбран, тумблер больше не нужен
-          row.classList.remove('mark-draft');
-          ensureAddMarkButton();
-        } else if (!ready && !mk.pending) {
-          mk.pending = true;                     // стёрли координату — точка ушла
-        }
-        redrawAll();
-      },
-    });
-    nums[key] = n;
-    xy.append(n);
-  };
-  mkNum('x');
-  mkNum('y');
-  if (mk.pending) {
-    /* Н37. Галочка подтверждения. Точка встаёт и сама, как только заполнены обе
-       координаты, но без видимого «готово» заготовка выглядит незавершённой. */
+  /* Поля координат: у заготовки они и есть способ создания (точка появляется, как только оба поля заполнены, и
+     переезжает на каждый введённый символ — слушаем input, список НЕ пересобираем, иначе потерялся бы фокус); у
+     готовой точки — по «Изменить координаты» из «⋯» (CANVAS.markEdit, вид). «✓» заканчивает. */
+  const editing = mk.pending || String(CANVAS.markEdit) === String(mk.id);
+  if (editing) {
+    const xy = document.createElement('div');
+    xy.className = 'mark-xy mark-xy-edit';
+    /* «Изменить координаты» готовой точки — ОДНО действие (сессия 7, В; README 9): поля правят черновик
+       (CANVAS.markDraft), «✓» кладёт обе координаты в точку разом — один шаг истории, площадь на ней пересчитается
+       один раз. У заготовки новой точки — как раньше: точка появляется и едет на каждый символ. */
+    const own = !mk.pending;
+    if (own && (!CANVAS.markDraft || String(CANVAS.markDraft.id) !== String(mk.id))) CANVAS.markDraft = { id: mk.id, x: mk.x, y: mk.y };
+    const src = own ? CANVAS.markDraft : mk;
+    const mkNum = (key) => {
+      // п. 32. Координата подписана буквой ТОЙ ЖЕ оси, что нарисована на графике.
+      const letter = axisLetter(key);
+      const n = makeEditableValue({
+        get: () => (Number.isFinite(src[key]) ? src[key] : ''),
+        tex: (v, text) => letter + ' = ' + (text === '' ? '{?}' : text),
+        title: 'Координата ' + letter,
+        set: (v) => {
+          if (own) { src[key] = isFinite(v) ? v : NaN; return; }
+          mk[key] = isFinite(v) ? v : NaN;
+          mk.on = '';   // координаты правят руками: с ключевой точки она ушла
+          // Точка на кривой держится за неё: меняем x, высоту берём с кривой.
+          const f = markSnapFn(mk);
+          if (f && key === 'x' && isFinite(v)) { const y = f(v); if (isFinite(y)) mk.y = y; }
+          const ready = isFinite(mk.x) && isFinite(mk.y);
+          if (mk.pending && ready) {
+            mk.pending = false;
+            row.classList.remove('mark-draft');
+            ensureAddMarkButton();
+          } else if (!ready && !mk.pending) {
+            mk.pending = true;                     // стёрли координату — точка ушла
+          }
+          redrawAll();
+        },
+      });
+      xy.append(n);
+    };
+    if (!mk.pending) {
+      const nm = document.createElement('span');
+      nm.className = 'mark-name';
+      katexInto(nm, markNameTex(mk.text));
+      row.appendChild(nm);
+    }
+    mkNum('x');
+    mkNum('y');
+    /* Н37. Галочка подтверждения: точка встаёт и сама, как только заполнены обе координаты, но без видимого
+       «готово» строка выглядит незавершённой. */
     const ok = document.createElement('button');
     ok.type = 'button'; ok.className = 'btn-icon mark-ok';
     ok.textContent = '✓';
-    ok.setAttribute('data-tip', 'Поставить точку');
+    ok.setAttribute('aria-label', mk.pending ? 'Поставить точку' : 'Готово');
     ok.addEventListener('click', () => {
+      if (own) {
+        const d = CANVAS.markDraft || {};
+        if (!isFinite(d.x) || !isFinite(d.y)) return;
+        const m = markById(mk.id) || mk;
+        // Правка руками уводит с ключевой точки; с кривой — если новая точка на ней не лежит.
+        const f = markSnapFn(m);
+        if (f && Math.abs(f(d.x) - d.y) > 1e-9 * (1 + Math.abs(d.y))) m.snapTo = null;
+        m.x = d.x; m.y = d.y; m.on = '';
+        CANVAS.markDraft = null;
+      }
       if (!isFinite(mk.x) || !isFinite(mk.y)) return;
       mk.pending = false;
+      CANVAS.markEdit = null;
       ensureAddMarkButton();
       renderMarkList(); redrawAll();
     });
     xy.appendChild(ok);
     row.appendChild(xy);
-    return row;                                  // остальное — когда точка встанет
+    return row;
   }
 
-  /* Н46. Сразу после цвета идёт ИМЯ точки, и правится оно щелчком по самому
-     имени, а не в отдельном текстовом поле под строкой. Надписи «Своя точка»
-     больше нет: она ничего не сообщала. */
-  const top = document.createElement('div');
-  top.className = 'mark-top';
-  const pick = makeColorPicker(mk.color || COL.ink, (hex) => { mk.color = hex; redrawAll(); }, 'Цвет точки');
-  const nameEl = makeEditableValue({
-    kind: 'text',
-    get: () => mk.text || '',
-    set: (v) => { mk.text = String(v).trim(); redrawAll(); },
-    // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает
-    // пробелы, и «Точка A» превратилась бы в «ТочкаA».
-    tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
-    title: 'Имя точки',
+  // Галочка выбора — для площади по точкам (этап В). Вид, не модель: без id, состояние в CANVAS.ptsSel.
+  const pickW = document.createElement('label');
+  pickW.className = 'mark-pick';
+  const pick = document.createElement('input');
+  pick.type = 'checkbox';
+  pick.checked = (CANVAS.ptsSel || []).some(x => String(x) === String(mk.id));
+  pick.setAttribute('aria-label', 'Выбрать точку ' + (mk.text || ''));
+  pick.addEventListener('change', () => {
+    const sel = (CANVAS.ptsSel || []).filter(x => String(x) !== String(mk.id));
+    if (pick.checked) sel.push(mk.id);
+    CANVAS.ptsSel = sel;
+    if (typeof syncPtsSelBar === 'function') syncPtsSelBar();
   });
-  nameEl.classList.add('mark-name');
-  const del = document.createElement('button');
-  del.className = 'btn-icon'; del.type = 'button'; del.textContent = '✕'; del.setAttribute('data-tip', 'Убрать точку');
-  del.addEventListener('click', () => {
-    STATE.marks = STATE.marks.filter(m => m.id !== mk.id);
-    renderMarkList(); redrawAll();
-  });
-  top.append(pick, nameEl, del);
+  pickW.appendChild(pick);
 
-  const toggle = (label, key, def) => {
-    const w = document.createElement('label');
-    w.className = 'chk';
-    const c = document.createElement('input');
-    c.type = 'checkbox';
-    c.checked = (mk[key] === undefined) ? def : !!mk[key];
-    c.addEventListener('change', () => { mk[key] = c.checked; redrawAll(); });
-    w.append(c, document.createTextNode(label));
-    return w;
-  };
+  // Имя: формулой; «Переименовать» при точке за окном правит его здесь (CANVAS.markRename).
+  let nameEl;
+  if (String(CANVAS.markRename) === String(mk.id)) {
+    let pend = mk.text || '';
+    nameEl = makeEditableValue({
+      kind: 'text',
+      get: () => pend,
+      set: (v) => { pend = String(v); },
+      // Имя это ТЕКСТ, а не формула: в математическом наборе KaTeX съедает пробелы.
+      tex: (v, text) => (text ? '\\text{' + String(text).replace(/([{}\\$&#^_~%])/g, '\\$1') + '}' : '\\text{без имени}'),
+      title: 'Имя точки',
+    });
+    nameEl.classList.add('mark-name');
+    renameCommit(nameEl, () => { const m = markById(mk.id); const t = String(pend).trim(); if (m && t) m.text = t; CANVAS.markRename = null; renderMarkList(); redrawAll(); });
+  } else {
+    nameEl = document.createElement('span');
+    nameEl.className = 'mark-name';
+    katexInto(nameEl, markNameTex(mk.text));
+  }
 
-  /* Н48. Координаты в столбик, галочки правее: две строки вместо четырёх, и
-     строка точки перестала быть самой высокой в панели. */
-  const body = document.createElement('div');
-  body.className = 'mark-body';
-  const chks = document.createElement('div');
-  chks.className = 'mark-chks';
-  chks.append(toggle('Пунктир к осям', 'showDash', true),
-              toggle('Координаты', 'showCoords', true));
-  xy.classList.add('mark-xy-col');
-  body.append(xy, chks);
-  row.append(top, body);
+  const xy = document.createElement('span');
+  xy.className = 'mark-xy';
+  katexInto(xy, '(' + fmt(mk.x) + ';\\ ' + fmt(mk.y) + ')');
 
-  /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому
-     поведению — отдельная строка «Удерживать точку на КПВ» ничего не добавляла
-     и только занимала место в списке. Отпустить точку по-прежнему можно:
-     достаточно оттащить её от линии дальше порога отрыва. */
+  const on = document.createElement('span');
+  on.className = 'mark-on';
+  markOnInto(on, markOnText(mk));
+
+  // «⋯» точки (Б3): меню всплывающим окном; кнопка без id и с aria-haspopup — вне формы модели.
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'btn-icon mark-more';
+  more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
+  more.setAttribute('aria-label', 'Действия с точкой ' + (mk.text || ''));
+  more.innerHTML = ICON_DOTS;
+  more.addEventListener('click', (e) => { e.stopPropagation(); openMarkMenu(more, mk.id); });
+
+  /* Н45. Точка, посаженная на кривую, скользит по ней, и это видно по самому поведению. */
+  row.append(pickW, nameEl, xy, on, more);
   return row;
+}
+
+/* ═══ Меню «⋯» своей точки (сессия 7 «тихих панелей», Б3; README пакета 9) ═══
+   Всплывающим окном в body (openPop, 92-ui-kit.js), а не внутри строки: список точек пересобирается на каждом шаге
+   перетаскивания, и меню в строке гибло бы вместе с ней. Окно — .pop: его органы не модель (formNodes), открыть и
+   закрыть — не шаг истории; изменение через меню — ровно один шаг (настоящее событие человека и перерисовка).
+   Точка ищется по id в момент действия: «Отменить» и применение снимка заменяют объекты STATE.marks. Пункты:
+   «Переименовать» (то же редактирование, что двойной щелчок по подписи на холсте), «Изменить координаты» (поля
+   строки), «Цвет» (makeColorPicker), «Пунктир к осям», «Координаты на графике», черта, «Убрать». Esc при открытом
+   меню закрывает только меню (onPopKey), при открытом окне цвета — только окно цвета (onEscClosePick). */
+let _markMenu = null;
+function markById(id) { return (STATE.marks || []).find(m => String(m.id) === String(id)) || null; }
+function openMarkMenu(anchor, id) {
+  if (!_markMenu) {
+    _markMenu = document.createElement('div');
+    _markMenu.className = 'pop pts-menu';
+    _markMenu.setAttribute('role', 'menu');
+    document.body.appendChild(_markMenu);
+  }
+  if (_markMenu.classList.contains('open') && _markMenu.dataset.mark === String(id)) { closePop(); return; }
+  delete _markMenu.dataset.area;
+  _markMenu.dataset.mark = String(id);
+  fillMarkMenu();
+  openPop(anchor, _markMenu, { alignRight: true, noFocus: true });
+}
+function fillMarkMenu() {
+  const menu = _markMenu;
+  const id = menu.dataset.mark;
+  const mk = markById(id);
+  menu.innerHTML = '';
+  if (!mk) return;
+  menu.setAttribute('aria-label', 'Точка ' + (mk.text || ''));
+  const item = (text, fn, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pts-mi' + (cls ? ' ' + cls : ''); b.setAttribute('role', 'menuitem');
+    b.textContent = text;
+    b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    menu.appendChild(b);
+    return b;
+  };
+  item('Переименовать', () => { closePop(); renameMark(id); });
+  item('Изменить координаты', () => { closePop(); editMarkCoords(id); });
+  const crow = document.createElement('div');
+  crow.className = 'pts-mi pts-mi-color';
+  const cl = document.createElement('span'); cl.textContent = 'Цвет';
+  const pick = makeColorPicker(mk.color || COL.ink, (hex) => { const m = markById(id); if (m) { m.color = hex; redrawAll(); } }, 'Цвет точки');
+  crow.append(cl, pick);
+  menu.appendChild(crow);
+  const chk = (text, get, set) => {
+    const w = document.createElement('label');
+    w.className = 'pts-mi pts-mi-chk';
+    const c = document.createElement('input');
+    c.type = 'checkbox'; c.checked = get(mk);
+    c.addEventListener('change', () => { const m = markById(id); if (m) { set(m, c.checked); redrawAll(); } });
+    w.append(c, document.createTextNode(text));
+    menu.appendChild(w);
+  };
+  // Умолчания — те, что видит человек на холсте (drawMarks): пунктир есть, пока не выключен; координаты — только
+  // если включены (у точки без поля showCoords их на холсте нет).
+  chk('Пунктир к осям', (m) => m.showDash !== false, (m, v) => { m.showDash = v; });
+  chk('Координаты на графике', (m) => !!m.showCoords, (m, v) => { m.showCoords = v; });
+  const sep = document.createElement('div'); sep.className = 'pts-mi-sep'; sep.setAttribute('role', 'separator');
+  menu.appendChild(sep);
+  item('Убрать', () => { closePop(); removeMark(id); }, 'pts-mi-danger');
+}
+/* «Переименовать»: подпись точки на холсте правится на месте (editInlineLabel), как по двойному щелчку. Точки на
+   холсте не видно (она за окном) — правится имя в строке списка. */
+function renameMark(id) {
+  const mk = markById(id);
+  if (!mk) return;
+  const t = document.querySelector('#chart g.marks text[data-mark-id="' + String(id) + '"]');
+  if (t && typeof editInlineLabel === 'function') {
+    editInlineLabel(mk.text || '', +t.getAttribute('data-lx'), +t.getAttribute('data-ly'),
+      (v) => { const m = markById(id); if (m) m.text = v; renderMarkList(); }, t);
+    return;
+  }
+  CANVAS.markRename = id;
+  renderMarkList();
+  const ed = document.querySelector('#mark-list .mark-row[data-mark="' + String(id) + '"] .mark-name.edval');
+  if (ed) ed.focus();
+}
+/* «Изменить координаты»: строка точки показывает поля координат (как у черновика), «✓» — закончить. */
+function editMarkCoords(id) {
+  CANVAS.markEdit = id;
+  CANVAS.markDraft = null;
+  renderMarkList();
+  const ed = document.querySelector('#mark-list .mark-row[data-mark="' + String(id) + '"] .mark-xy .edval');
+  if (ed) ed.focus();
+}
+/* Убрали точку — уходят и площади, у которых она вершина (как в GeoGebra; сессия 7, В5): одно действие, один шаг
+   истории, одно «Отменить» возвращает и точку, и площади. Убрали площадь — точки остаются. */
+function removeMark(id) {
+  STATE.marks = (STATE.marks || []).filter(m => String(m.id) !== String(id));
+  STATE.areaCalcList = (STATE.areaCalcList || []).filter(r => !(Array.isArray(r.ids) && r.ids.some(x => String(x) === String(id))));
+  if (CANVAS.ptsSel) CANVAS.ptsSel = CANVAS.ptsSel.filter(x => String(x) !== String(id));
+  renderMarkList();
+  redrawAll();
 }

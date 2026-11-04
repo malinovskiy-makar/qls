@@ -183,6 +183,11 @@ const STATE = {
   mathSub: 'tangent',            // сюжет: tangent|optimum|transform|minmax|constraint
   mathFormula: 'x^2',            // общая f(x)
   mathXmin: -6, mathXmax: 6, mathYmin: -4, mathYmax: 20,
+  /* Отрезок ответа (ADR 0143): на нём считаются корни, экстремумы и
+     пересечения. Это ВХОД МОДЕЛИ, а не вид: масштаб и сдвиг его не трогают.
+     ansHand = false — отрезок подобран по формуле и идёт за ней (ansA/ansB
+     пустые); true — человек вписал свои границы. */
+  ansA: null, ansB: null, ansHand: false,
   mathX0: 1,                     // точка касания (7а)
   mathDx: 1,                     // шаг Δx: единичный, так треугольник читается сразу
   mathSecant: false,             // показывать секущую через две точки
@@ -352,7 +357,7 @@ const STATE = {
   // 'competition' | 'monopsony' | 'union' | 'bilateral' (двусторонняя монополия, Фаза 12)
   laborStruct: 'competition',
   laborBilateral: null,        // диапазон зарплат [Wм; Wп] — модель НЕ даёт одной точки
-  unionModel: 'monopoly',      // профсоюз: 'monopoly': монополист труда (MRL=S), 'wagefloor' — диктат зарплаты
+  unionModel: 'monopoly',      // профсоюз: 'monopoly': монополист труда (фонд оплаты W·L, MRL = 0; ADR 0156), 'wagefloor' — диктат зарплаты
   unionWage: 0,                // уровень зарплаты профсоюза при диктате (0 = не задан)
   unionWageVisited: false,     // первый вход в диктат — выставить зарплату-ориентир
   laborUnion: null,            // результат профсоюза (Lп, Wп, безработица, DWL)
@@ -417,11 +422,11 @@ const STATE = {
   ppftPrice: 2,          // мировое соотношение цен Px/Py (режим КТВ)
   ppfTradeData: null,    // результат расчёта КТВ
   // ЧК5: сценарий торговли. 'A' — мировая цена задана (исходный КТВ),
-  // 'B' — две страны сами определяют равновесную мировую цену (эндогенно).
+  // 'B' — две линейные КПВ и пример цены в интервале альтернативных издержек.
   tradeScenario: 'A',
   tbF1: '100 - X',       // КПВ страны 1 (сценарий Б)
   tbF2: '100 - 2*X',     // КПВ страны 2 (сценарий Б)
-  tbManualPrice: null,   // своя мировая цена (Задача 4); null = равновесная (эндогенная)
+  tbManualPrice: null,   // своя цена; null = пример цены (среднее геометрическое)
   tradeBData: null,      // результат расчёта сценария Б
   tbNames: [],           // свои имена стран (Фаза 15.2)
   // Неравенство доходов (ЧК1–3). Оси — доля населения / доля дохода (обе 0..100 %).
@@ -540,9 +545,19 @@ function refreshColors() {
    нём не рисуется вовсе (`30-curves.js`), прокатывание точки не
    перехватывает нажатие (`52-modes.js`). Состояние названо словами в полосе
    над холстом (`canvasModeBanner`) и показано курсором-перекрестием.        */
+/* Режим холста «Точки и площади» (решение владельца 13.10, ADR 0148): щелчок
+   по пустому месту ставит свою точку, площади строятся кнопками панели режима.
+   Это ВИД, а не модель: живёт здесь, а не в STATE, — в историю, автосохранение
+   и ссылку «Поделиться» не идёт. Включает и выключает его setPtsMode (93-shell.js).
+   Внутри режима бывают взведены построение площади (vert) и заготовка точки (mark):
+   они старше, поэтому проверяются раньше. */
+/* Сессия 7 (README пакета 9): тоже вид — markEdit (id точки, у которой в строке открыты поля координат),
+   markRename (id точки, чьё имя правится в строке), ptsSel (id точек, отмеченных галочкой для площади). */
+const CANVAS = { pts: false, markEdit: null, markDraft: null, markRename: null, ptsSel: [], buildIds: [], areaRename: null };
 function canvasMode() {
   if (STATE.markArm) return 'mark';
   if (STATE.vertArm) return 'vert';
+  if (CANVAS.pts) return 'pts';
   return 'look';
 }
 function canvasArmed() { return canvasMode() !== 'look'; }

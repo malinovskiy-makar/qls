@@ -6,12 +6,16 @@
 //   ./venv/Scripts/python.exe manage.py runserver 8099 --noreload
 //   node calc2/tests/calc2_blocks.mjs
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
@@ -26,6 +30,7 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle', timeout: 30000 });
 await page.waitForTimeout(900);
 
 const checks = [];
+checks.push([(await answerShown(page)) ? 'OK' : 'FAIL', 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', '']);
 // Блоки окна сценариев свёрнуты (Фаза 6) — раскрываем их перед щелчком по карточке.
 // П2: на главном экране видны карточки блоков, модели живут внутри открытого
 // блока. Для щелчка по карточке модели раскрываем все блоки разом.
@@ -46,38 +51,35 @@ const t = async (name, fn) => {
 await t('в окне ровно десять блоков', async () =>
   (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
-await t('Математика идёт первой карточкой блока', async () =>
-  (await page.locator('.bcard-name').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+/* ПЕРЕНАЦЕЛЕНО дважды: редизайн 10.2026 (фаза 8) свёл двухуровневое окно в
+   один экран, решение 09.10 (ADR 0141) — во вкладки блоков с сеткой карточек.
+   Смысл трёх проверок тот же: порядок блоков, у моделей есть картинка (теперь
+   — настоящее превью из записи при рисовании), номеров нет, модель блока
+   видна и открывается. */
+await t('Математика идёт первым блоком экрана', async () =>
+  (await page.locator('#scene-picker .pk-tname').first().textContent()).trim() === 'Математика' || 'первый не Математика');
 
-/* П2: главный экран — десять больших карточек блоков с картинками, по две в
-   ряд, без нумерации; ни один блок не раскрыт, кнопки возврата не видно. */
-await t('главный экран — карточки блоков с картинками', () => page.evaluate(() => {
-  const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
+await t('главный экран — десять вкладок блоков, у каждой рабочей модели превью', () => page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('#picker-tabs .pk-tab')];
   const bad = [];
-  if (cards.length !== 10) bad.push('карточек ' + cards.length);
-  cards.forEach(c => {
-    const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
-    if (!c.querySelector('.bcard-spec svg')) bad.push('без картинки: ' + nm.trim());
+  if (tabs.length !== 10) bad.push('вкладок ' + tabs.length);
+  tabs.forEach(tb => {
+    const nm = (tb.querySelector('.pk-tname') || {}).textContent || '';
     if (/^\s*\d+\s*·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
   });
-  if (document.querySelectorAll('#scene-picker .picker-group.open').length) bad.push('блок уже раскрыт');
-  if (document.getElementById('picker-back').classList.contains('shown')) bad.push('кнопка возврата видна');
+  document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])').forEach(c => {
+    if (!c.querySelector('.pk-well svg.pk-pv path')) bad.push('без превью: ' + ((c.querySelector('.scard-name') || {}).textContent || '').trim());
+  });
+  if (document.querySelector('.scard-spec')) bad.push('ручная схема .scard-spec ещё в разметке');
+  if (document.getElementById('picker-blocks')) bad.push('лестница блоков ещё в разметке');
   return !bad.length || bad.join('; ');
 }));
 
-await t('щелчок по блоку показывает его модели и возврат', () => page.evaluate(() => {
-  const card = document.querySelectorAll('#picker-blocks .bcard')[1];
-  card.click();
-  const open = document.querySelectorAll('#scene-picker .picker-group.open');
-  const hidden = document.getElementById('picker-blocks').classList.contains('hidden');
-  const back = document.getElementById('picker-back');
-  const shown = back.classList.contains('shown');
-  const models = open.length ? open[0].querySelectorAll('.scard').length : 0;
-  back.click();                                   // и возврат работает
-  const restored = !document.getElementById('picker-blocks').classList.contains('hidden')
-                && !document.querySelectorAll('#scene-picker .picker-group.open').length;
-  return (open.length === 1 && hidden && shown && models > 0 && restored)
-    || `открыто ${open.length}, блоки скрыты ${hidden}, возврат ${shown}, моделей ${models}, вернулись ${restored}`;
+await t('модели выбранного блока видны сразу, у карточки превью и имя', () => page.evaluate(() => {
+  const card = document.querySelector('#scene-picker .pk-block.open .scard:not(.soon)');
+  if (!card || card.offsetParent === null) return 'карточки модели не видно';
+  const ok = card.querySelector('.pk-well svg.pk-pv') && (card.querySelector('.scard-name') || {}).textContent;
+  return !!ok || 'у карточки нет превью или имени';
 }));
 
 await t('модель «Потребление в комплектах» вырезана', () => page.evaluate(() =>
@@ -255,7 +257,18 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
    вровень. Всё три — сквозные правила, поэтому проверяются перебором сцен, а
    не на одной удобной. */
 
-const WANT_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): регуляторы больше не уезжают в
+   правую панель, и по макету у «Условия» две карточки сверх трёх прежних —
+   «Параметры» и «Вмешательство государства», каждая только там, где ей есть
+   что показать. Порядок по-прежнему один на все сцены; обязательные три
+   карточки на месте в каждой сцене. */
+/* ПЕРЕНАЦЕЛЕНО 13.10 (ADR 0148): «Точки» (#sec-view) и «Площади» (#sec-areascalc)
+   переехали из «Условия» в панель режима «Точки и площади» (#pts-panel). Правило
+   «одинаковая структура во всех сценах» осталось за обеими панелями: в «Условии»
+   прежний порядок без них, а в панели режима оба раздела стоят в каждой сцене. */
+const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-show'];
+const MUST_CARDS = ['sec-input'];
+const PTS_CARDS = ['sec-view', 'sec-areascalc'];
 const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const panelSweep = await page.evaluate(async (FORB) => {
@@ -267,10 +280,12 @@ const panelSweep = await page.evaluate(async (FORB) => {
       .filter(s => s.style.display !== 'none' && s.offsetParent !== null)
       .map(s => {
         const btn = s.querySelector(':scope > .fold-btn');
+        const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: btn ? btn.querySelector('span > b').textContent.trim() : '',
-                 open: btn ? btn.getAttribute('aria-expanded') === 'true' : null,
+                 name: head ? ((head.querySelector('span > b') || head).textContent.trim()) : '',
+                 fold: !!btn,
+                 open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
                                     .filter(e => e.offsetParent !== null).length : 0 };
       });
@@ -285,24 +300,33 @@ const panelSweep = await page.evaluate(async (FORB) => {
       .map(e => [...e.childNodes].filter(n => n.nodeType === 3)
                                  .map(n => n.nodeValue).join('').trim())
       .filter(Boolean).join(' | ');
-    rows.push({ key: k, cards, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
+    // Панель режима: разделы на месте и не спрятаны сценой (сама панель видна только в режиме).
+    const pts = [...document.querySelectorAll('#pts-panel .section')]
+      .filter(s => s.style.display !== 'none').map(s => s.id);
+    rows.push({ key: k, cards, pts, seen: FORB.filter(t => visText.indexOf(t) >= 0) });
   }
   return rows;
 }, FORBIDDEN_HEADS);
 
-// (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
-await t('(г) в каждой из 44 сцен три карточки панели в одном порядке', async () => {
-  const bad = panelSweep.filter(r =>
-    r.cards.map(c => c.id).join() !== WANT_CARDS.join()
-    || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
-    || r.cards[0].name !== 'Ввод функций'
-    || r.cards[0].controls === 0);
+// (г) Карточки «Условия» в одном порядке, три обязательные есть везде,
+//     все раскрыты и без кнопки сворачивания, первая — «Функции» с органами.
+await t('(г) в каждой из 44 сцен карточки «Условия» в одном порядке', async () => {
+  const bad = panelSweep.filter(r => {
+    const ids = r.cards.map(c => c.id);
+    return ids.join() !== WANT_CARDS.filter(id => ids.indexOf(id) >= 0).join()
+      || ids.some(id => WANT_CARDS.indexOf(id) < 0)
+      || MUST_CARDS.some(id => ids.indexOf(id) < 0)
+      || r.cards.some(c => c.fold || c.open !== true)
+      || r.cards[0].name !== 'Функции'
+      || r.cards[0].controls === 0
+      || r.pts.join() !== PTS_CARDS.join();
+  });
   // 44 маршрута: 41 прежняя сцена, ключ 'taxes' (объединённый сюжет налогов,
   // рядом с которым 'tax' и 'tax-adv' оставлены синонимами), 'quota' и
   // 'sdsum' — сложение спросов и предложений (ночная сессия 24.08).
   if (panelSweep.length !== 44) return `сцен ${panelSweep.length}, а не 44`;
   return bad.length === 0
-    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
+    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-') + (c.fold ? '(кнопка)' : '')).join(' ') + '] первая «' + (r.cards[0] || {}).name + '», панель режима [' + r.pts.join(' ') + ']').join('; ');
 });
 
 // (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.
@@ -320,7 +344,7 @@ await t('(д) «Что изучаем», «Структура рынка» и «
   return bad.length === 0 || bad.map(r => r.key + ' ' + JSON.stringify(r.seen)).join('; ');
 });
 
-// (ж) Левый край дорожек всех ползунков панели совпадает до пикселя.
+// (ж) Левый край дорожек ползунков совпадает до пикселя (в карточках — между собой, в секции — между собой).
 await t('(ж) левый край дорожек всех ползунков панели совпадает', async () => {
   const r = await page.evaluate(async () => {
     const w = ms => new Promise(res => setTimeout(res, ms));
@@ -331,19 +355,30 @@ await t('(ж) левый край дорожек всех ползунков п�
     const inp = document.querySelector('#curve-list .curve-expr-inp');
     inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
     await w(600); redrawAll(); await w(400);
-    const tracks = [...document.querySelectorAll('#params-panel .param-track')]
+    // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
+    const tracks = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(el => el.offsetParent !== null && el.getBoundingClientRect().width > 0);
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): ползунок кривой
+       стоит внутри её карточки, регулятор сцены — прямо в секции, и карточка
+       сдвигает дорожку на свой внутренний отступ. Вровень обязаны стоять
+       дорожки одного вида контейнера: все карточные между собой (разные
+       карточки и разные границы «−10» / «−50») и все секционные. */
     return tracks.map(el => {
       const s = el.querySelector('input[type=range]');
       return { left: Math.round(s.getBoundingClientRect().left * 100) / 100,
+               group: el.closest('.fc-card') ? 'карточки' : 'секция',
                bound: (el.querySelector('.param-bound') || {}).textContent };
     });
   });
   if (r.length < 3) return 'дорожек всего ' + r.length + ' — проба ничего не проверила';
-  const uniq = [...new Set(r.map(x => x.left))];
-  return uniq.length === 1
-    || `дорожек ${r.length}, разных координат ${uniq.length}: ${uniq.join(', ')}`
-       + ` | границы: ${r.map(x => x.bound).join(', ')}`;
+  const card = r.filter(x => x.group === 'карточки');
+  if (card.length < 2 || new Set(card.map(x => x.bound)).size < 2) return 'в карточках меньше двух дорожек с разными границами — проба ничего не проверила';
+  const bad = ['карточки', 'секция'].map(g => {
+    const u = [...new Set(r.filter(x => x.group === g).map(x => x.left))];
+    return u.length > 1 ? g + ': разных координат ' + u.length + ' (' + u.join(', ') + ')' : '';
+  }).filter(Boolean);
+  return bad.length === 0
+    || bad.join('; ') + ` | границы: ${r.map(x => x.group + ' ' + x.bound).join(', ')}`;
 });
 
 /* ═══ ПРОВЕРКИ ЗАКРЫВАЮЩЕЙ НОЧНОЙ СЕССИИ (24.08) ══════════════════════════
@@ -352,50 +387,30 @@ await t('(ж) левый край дорожек всех ползунков п�
 
 // (б) Подсказка: наведение показывает, уход прячет, клавиатура тоже
 //     показывает, и формула внутри набрана математикой.
-await t('(б) подсказка живёт по наведению, доступна с клавиатуры и несёт формулу', async () => {
+/* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, решение владельца «никаких подсказок», Notion …81eb…; ADR 0151): было
+   «подсказка живёт по наведению, доступна с клавиатуры и несёт формулу». Плашки больше нет: ни наведение, ни
+   фокус с клавиатуры её не показывают, а текст data-tip — невидимая подпись aria-label для диктора. */
+await t('(б) подсказки нет: наведение и фокус с клавиатуры плашку не показывают, текст — в aria-label', async () => {
   await page.evaluate(() => { resetSceneMemory(); pickScene('mono'); });
   await page.waitForTimeout(500);
-  await page.evaluate(() => {
-    setToolsOpen(true);
-    document.querySelectorAll('.fold-btn[aria-controls]').forEach(b => {
-      const bd = document.getElementById(b.getAttribute('aria-controls'));
-      if (bd) { bd.classList.add('open'); b.setAttribute('aria-expanded', 'true'); }
-    });
-  });
-  await page.waitForTimeout(400);
-  // Ищем видимую подсказку, в которой ЕСТЬ математика (доллары).
   const found = await page.evaluate(() => {
     const el = Array.from(document.querySelectorAll('[data-tip*="$"]'))
       .find(e => e.getBoundingClientRect().width > 1);
     if (!el) return null;
     el.setAttribute('data-probe-tip', '1');
-    return el.getAttribute('data-tip');
+    return { tip: el.getAttribute('data-tip'), aria: el.getAttribute('aria-label') || '' };
   });
-  if (!found) return 'ни одной видимой подсказки с формулой не нашлось';
+  if (!found) return 'ни одного видимого узла с data-tip и формулой не нашлось';
+  if (!found.aria.trim() || /\$/.test(found.aria)) return `aria-label «${found.aria}» пустой или с долларами (data-tip «${found.tip}»)`;
+  const tipShown = () => page.evaluate(() => { const t = document.getElementById('hint-tip'); return !!(t && getComputedStyle(t).display !== 'none' && t.getClientRects().length); });
   const h = await page.$('[data-probe-tip]');
   await h.hover();
   await page.waitForTimeout(250);
-  const shown = await page.evaluate(() => {
-    const t = document.getElementById('hint-tip');
-    if (!t) return { нет: true };
-    return { display: getComputedStyle(t).display, формул: t.querySelectorAll('.katex').length };
-  });
-  if (shown.нет) return 'узла #hint-tip нет вовсе';
-  if (shown.display === 'none') return 'наведение подсказку не показало';
-  if (!shown.формул) return `подсказка «${found}» показана, но формула НЕ набрана (узлов KaTeX 0)`;
-  // Уход мыши гасит.
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(250);
-  const gone = await page.evaluate(() =>
-    getComputedStyle(document.getElementById('hint-tip')).display);
-  if (gone !== 'none') return 'мышь ушла, а подсказка осталась на экране';
-  // Клавиатура: флаг «работают с клавиатуры» поднимает Tab, потом фокус.
+  if (await tipShown()) return 'наведение показало плашку';
   await page.keyboard.press('Tab');
   await page.evaluate(() => { document.querySelector('[data-probe-tip]').focus(); });
   await page.waitForTimeout(250);
-  const kb = await page.evaluate(() =>
-    getComputedStyle(document.getElementById('hint-tip')).display);
-  if (kb === 'none') return 'фокус с клавиатуры подсказку не показал';
+  if (await tipShown()) return 'фокус с клавиатуры показал плашку';
   return true;
 });
 
@@ -575,8 +590,10 @@ await t('(ж) обозначений обычным шрифтом на экра
      Осталось одно место: «W_s» в подсказке монопсонии — обозначение написано
      через подчёркивание, и разбор его намеренно не берёт (подчёркивание может
      быть частью имени). Потолок держит долг на виду: вырос — красное, упал —
-     тоже красное, потому что потолок забыли опустить. */
-  const CEILING = 1;
+     тоже красное, потому что потолок забыли опустить.
+     14.10 (тихие панели): 1 → 0 — подсказка монопсонии с «W_s» больше не на экране (её текст в «Разборе»,
+     решение «никаких подсказок», Notion …81eb…). */
+  const CEILING = 0;
   if (all.length > CEILING)
     return `случаев ${all.length}, потолок ${CEILING} — долг ВЫРОС на ${all.length - CEILING}: `
            + all.slice(0, 5).join(' | ');

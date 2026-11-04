@@ -24,9 +24,15 @@
 function compileMath(expr, name) { return compileVar(expr, [name]); }
 function evalMathAt(compiled, name, v) { return compiled ? evalVar(compiled, v, [name]) : NaN; }
 
-// Шаг численного дифференцирования: доля видимого диапазона, а не константа —
-// иначе на окне 0..0.1 шаг «съест» всю картинку, а на 0..1000 потеряет точность.
-function mathH() { return Math.max(1e-6, (STATE.mathXmax - STATE.mathXmin) * 1e-4); }
+// Шаг численного дифференцирования: доля ОТРЕЗКА ОТВЕТА, а не константа —
+// иначе на отрезке 0..0.1 шаг «съест» всю картинку, а на 0..1000 потеряет точность.
+// ⚠️ Не доля окна (ADR 0143): тогда приближение меняло бы f′(x₀) в «Ответе».
+// Отрезок на кадр один (_ansSeg ставит перерисовка); до первой перерисовки — окно.
+function mathH() {
+  const s = _ansSeg;
+  const w = s ? (s.b - s.a) : (STATE.mathXmax - STATE.mathXmin);
+  return Math.max(1e-6, w * 1e-4);
+}
 function dNum(f, x, h) {
   h = h || mathH();
   const a = f(x + h), b = f(x - h);
@@ -74,10 +80,11 @@ function rootsOf(g, lo, hi, N) {
 // Экстремумы и перегибы. Экстремум — нуль первой производной, тип определяет
 // знак второй; перегиб — смена знака второй производной.
 function mathAnalyse(f, lo, hi) {
-  const ext = rootsOf((x) => dNum(f, x), lo, hi).map(x => {
-    const s = d2Num(f, x);
-    return { x, y: f(x), kind: (s > 0 ? 'min' : (s < 0 ? 'max' : 'flat')) };
-  }).filter(p => !isNaN(p.y));
+  /* Локальные экстремумы — те же, что в «Ответе» любой модели (ansAnalyse):
+     смена знака производной внутри отрезка. Прежняя проверка знаком второй
+     производной объявляла «плато» узел, где f′ = 0 без смены знака. */
+  const an = ansAnalyse(f, lo, hi);
+  const ext = an.max.concat(an.min).sort((a, b) => a.x - b.x);
   const inf = rootsOf((x) => d2Num(f, x), lo, hi)
     .map(x => ({ x, y: f(x) })).filter(p => !isNaN(p.y));
   // Глобальные — с учётом концов отрезка: у школьных задач ответ часто на краю.
@@ -90,6 +97,405 @@ function mathAnalyse(f, lo, hi) {
   ext.forEach(p => consider(p.x));
   consider(lo); consider(hi);
   return { ext, inf, gMax, gMin };
+}
+
+/* ── ОТРЕЗОК ОТВЕТА (ADR 0143) ──────────────────────────────────────────
+   Корни, экстремумы и пересечения «Математики» и «Построения графиков»
+   считаются на ОТРЕЗКЕ ОТВЕТА, а не в окне: ответ — свойство функции, а не
+   кадра (то же правило, что ADR 0020 для экономики). Окно решает только, что
+   нарисовано; приближение и сдвиг на ответ не влияют.
+   Отрезок — вход модели (STATE.ansA/ansB/ansHand): его задаёт человек в
+   «Условии», а пока не задал, он подобран по формуле (autoAnswerSeg) и идёт за
+   ней при каждой её смене. */
+const ANS_AUTO_SPAN = 100;     // подбор по формуле перебирает [−100; 100]
+const ANS_AUTO_N = 1000;       // шаг 0,2: подбору хватает, ответ считается гуще
+const ANS_N = 1200;            // сетка на самом отрезке ответа
+const ANS_MAX_KEYS = 12;       // ключевых точек больше — функция периодическая
+// Пробные x для подписи функции: совпали значения — функция та же (кэш).
+const ANS_PROBE = [-7.31, -2.17, -0.53, 0.37, 1.13, 2.71, 4.49, 9.07];
+let _ansSeg = null;            // отрезок текущего кадра (ставит refreshAnswerSeg)
+const _ansCache = new Map();
+
+/* Э3: корни и вершины используют общую запись чисел, как экономика. */
+function ansFmt(v) {
+  return CalcNumber.format(v);
+}
+function ansPt(x, y) { return '(' + ansFmt(x) + '; ' + ansFmt(y) + ')'; }
+// Несколько значений — через «; », нет ни одного — «нет» (решение владельца 09.10).
+function ansList(xs) { return xs.length ? xs.map(v => ansFmt(v)).join('; ') : 'нет'; }
+function ansPts(ps) { return ps.length ? ps.map(p => ansPt(p.x, p.y)).join('; ') : 'нет'; }
+
+function fnSig(f) {
+  return ANS_PROBE.map(x => { let v; try { v = f(x); } catch (e) { v = NaN; } return isFinite(v) ? v.toPrecision(12) : 'n'; }).join(',');
+}
+function ansCached(key, make) {
+  if (_ansCache.has(key)) return _ansCache.get(key);
+  if (_ansCache.size > 60) _ansCache.clear();
+  const v = make();
+  _ansCache.set(key, v);
+  return v;
+}
+
+/* Нули на отрезке: смена знака и бисекция (rootsOf). Отсеиваются полюса и
+   скачки через ноль (у 1/x знак меняется в нуле, а корня нет: значение в
+   найденной точке не мало рядом с соседями) и участки, где функция равна
+   нулю целиком (совпадение кривых — не точка пересечения). */
+function ansZeros(f, lo, hi, N) {
+  const d = (hi - lo) / N / 2;
+  return rootsOf(f, lo, hi, N).filter(x => {
+    const y = f(x);
+    if (!isFinite(y)) return false;
+    const l = Math.abs(f(x - d)), r = Math.abs(f(x + d));
+    const nb = Math.max(isFinite(l) ? l : 0, isFinite(r) ? r : 0);
+    if (!(nb > 0)) return false;
+    return Math.abs(y) <= 1e-6 * (1 + nb);
+  });
+}
+
+/* Локальные экстремумы: производная меняет знак внутри отрезка; концы
+   отрезка экстремумами не считаются. Вид — по знаку производной слева и
+   справа, а не по второй производной: так ловится и излом (|x|, огибающая
+   min/max), и не ловится плато (x³ в нуле). Полюс (1/x² в нуле) отсеивается
+   скачком значения: у настоящей вершины соседние значения рядом. */
+function ansExtrema(f, lo, hi, N) {
+  const d = (hi - lo) / N / 2, h = Math.max(1e-9, (hi - lo) * 1e-5);
+  const df = (x) => dNum(f, x, h);
+  const out = [];
+  rootsOf(df, lo, hi, N).forEach(x => {
+    if (x <= lo + d || x >= hi - d) return;
+    const y = f(x);
+    if (!isFinite(y)) return;
+    const l = df(x - d), r = df(x + d);
+    const kind = (l > 0 && r < 0) ? 'max' : ((l < 0 && r > 0) ? 'min' : null);
+    if (!kind) return;
+    const yl = f(x - d), yr = f(x + d), yl2 = f(x - 2 * d), yr2 = f(x + 2 * d);
+    const jump = Math.max(Math.abs(y - yl), Math.abs(y - yr));
+    const ref = Math.max(Math.abs(yl - yl2), Math.abs(yr - yr2));
+    if (!(jump <= 4 * ref + 1e-9 * (1 + Math.abs(y)))) return;
+    out.push({ x, y, kind });
+  });
+  return out;
+}
+
+/* Всё, что «Ответ» знает об одной функции на отрезке: нули (вместе с
+   касанием оси — у x² корень есть, а смены знака нет), локальные максимумы и
+   минимумы, значение в нуле (если ноль на отрезке). Кэш по подписи функции и
+   отрезку: кадр колеса пересчёта не стоит. */
+function ansAnalyse(f, lo, hi, sig) {
+  return ansCached('a|' + (sig || fnSig(f)) + '|' + lo + '|' + hi, () => {
+    const ext = ansExtrema(f, lo, hi, ANS_N);
+    const step = (hi - lo) / ANS_N;
+    const zeros = ansZeros(f, lo, hi, ANS_N);
+    ext.forEach(p => { if (Math.abs(p.y) <= 1e-8 && !zeros.some(z => Math.abs(z - p.x) < step)) zeros.push(p.x); });
+    zeros.sort((a, b) => a - b);
+    const v0 = (lo <= 0 && hi >= 0) ? f(0) : NaN;
+    return {
+      zeros,
+      max: ext.filter(p => p.kind === 'max'),
+      min: ext.filter(p => p.kind === 'min'),
+      y0: isFinite(v0) ? v0 : null,
+    };
+  });
+}
+
+// Пересечения двух функций на отрезке: нули разности, точка — по первой.
+function ansCrosses(f, g, lo, hi) {
+  return ansZeros((x) => f(x) - g(x), lo, hi, ANS_N)
+    .map(x => ({ x, y: f(x) })).filter(p => isFinite(p.y));
+}
+
+/* «Круглое» число 1, 2, 5 × 10ᵏ наружу: нижний край вниз, верхний вверх. */
+function niceOut(v, up) {
+  if (v === 0 || !isFinite(v)) return v;
+  const a = Math.abs(v), grow = (up === (v > 0));     // от нуля или к нулю
+  const k = Math.floor(Math.log10(a));
+  const steps = [1, 2, 5, 10].map(m => m * Math.pow(10, k));
+  const eps = a * 1e-9;
+  const n = grow ? steps.find(s => s >= a - eps) : steps.slice().reverse().find(s => s <= a + eps);
+  return Math.sign(v) * n;
+}
+
+/* Отрезок по формуле: ключевые точки на [−100; 100] — нули, локальные
+   экстремумы, пересечение с осью y и пересечения кривых. Их не больше 12 —
+   [min; max] с запасом max(1; 25 % размаха) с каждой стороны, не уже [−5; 5],
+   края округлены наружу до круглых. Больше 12 (периодическая функция) — [−10; 10]. */
+function autoAnswerSeg(keyFns, diffFns) {
+  const L = -ANS_AUTO_SPAN, R = ANS_AUTO_SPAN, N = ANS_AUTO_N;
+  const xs = [];
+  const add = (x) => { if (isFinite(x) && !xs.some(v => Math.abs(v - x) < 1e-6)) xs.push(x); };
+  keyFns.forEach(f => {
+    ansZeros(f, L, R, N).forEach(add);
+    ansExtrema(f, L, R, N).forEach(p => add(p.x));
+    if (isFinite(f(0))) add(0);
+  });
+  diffFns.forEach(g => ansZeros(g, L, R, N).forEach(add));
+  if (xs.length > ANS_MAX_KEYS) return { a: -10, b: 10 };
+  if (!xs.length) return { a: -5, b: 5 };
+  const lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs);
+  const pad = Math.max(1, (hi - lo) * 0.25);
+  return { a: Math.min(-5, niceOut(lo - pad, false)), b: Math.max(5, niceOut(hi + pad, true)) };
+}
+
+/* Функции, о которых говорит «Ответ» текущей модели: keyFns — у них нули,
+   экстремумы и ось y; diffFns — у них нули это пересечения кривых. null —
+   у модели отрезка ответа нет («С ограничением»: две переменные, область
+   задаёт само ограничение) или формула не разобралась. */
+function answerSpec() {
+  if (STATE.mode === 'graph') {
+    const fs = STATE.curves.filter(c => c.visible && !isVertical(c)).map(c => (x) => evalCurve(c, x));
+    if (!fs.length) return null;
+    const diff = [], pairs = [];
+    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
+      diff.push((x) => fs[i](x) - fs[j](x)); pairs.push([fs[i], fs[j]]);
+    }
+    return { keyFns: fs, diffFns: diff, pairs };
+  }
+  if (STATE.mode !== 'math' || STATE.mathSub === 'constraint') return null;
+  const f = mathF();
+  if (!f) return null;
+  if (STATE.mathSub === 'transform') return { keyFns: [mathTransformed(f, STATE.mathTrans, paramValue('a', 1))], diffFns: [], pairs: [] };
+  if (STATE.mathSub === 'minmax') {
+    const mm = mmParts(f);
+    if (mm.parts.length < 2) return { keyFns: [f], diffFns: [], pairs: [] };
+    const diff = [], pairs = [];
+    for (let i = 0; i < mm.parts.length; i++) for (let j = i + 1; j < mm.parts.length; j++) {
+      const a = mm.parts[i].fn, b = mm.parts[j].fn;
+      diff.push((x) => a(x) - b(x)); pairs.push([a, b]);
+    }
+    return { keyFns: [mm.z], diffFns: diff, pairs };
+  }
+  return { keyFns: [f], diffFns: [], pairs: [] };
+}
+
+/* Ключевые точки ответа на отрезке: нули, локальные экстремумы, пересечение
+   с осью y, пересечения кривых. По ним строится окно (фаза 3, ADR 0143). */
+function answerKeyPoints(spec, seg) {
+  spec = spec || answerSpec();
+  seg = seg || answerSeg();
+  if (!spec) return [];
+  const out = [];
+  const add = (x, y) => { if (isFinite(x) && isFinite(y)) out.push({ x, y }); };
+  spec.keyFns.forEach(f => {
+    const r = ansAnalyse(f, seg.a, seg.b);
+    r.zeros.forEach(x => add(x, 0));
+    r.max.concat(r.min).forEach(p => add(p.x, p.y));
+    if (r.y0 != null) add(0, r.y0);
+  });
+  (spec.pairs || []).forEach(([f, g]) => ansCrosses(f, g, seg.a, seg.b).forEach(p => add(p.x, p.y)));
+  return out;
+}
+
+/* ОКНО ПО ФУНКЦИИ («Построение графиков»: старт, «Вписать», «Вернуть
+   исходный вид»). Полный план, все четыре четверти:
+     · по x — отрезок, подобранный ПО ФОРМУЛЕ (autoSeg), и ключевые точки ответа
+       с запасом. Ручной отрезок ответа сам окно не растягивает (ADR 0146): x² − 4
+       на отрезке −5…200 давал окно 200 × 40 000, корни и вершина сливались с осью;
+     · по y — ключевые точки, ноль (ось x видна) и основная масса значений
+       кривых на этом отрезке (5–95 %: полюс 1/x не раздувает окно);
+     · запас 10 % с каждой стороны: у любой ключевой точки до края ≥ 8 %.
+   Кривых нет — привычные −10…10 по обеим осям. */
+function graphFitWindow() {
+  const spec = answerSpec();
+  if (!spec) return { x0: -10, x1: 10, y0: -10, y1: 10 };
+  const auto = autoSegOf(spec);
+  const pts = answerKeyPoints(spec, answerSeg());
+  let x0 = auto.a, x1 = auto.b;
+  for (let k = 0; k < 3; k++) {                  // ключевые точки по x — с запасом
+    const m = (x1 - x0) * 0.1;
+    pts.forEach(p => { x0 = Math.min(x0, p.x - m); x1 = Math.max(x1, p.x + m); });
+  }
+  const vals = [];
+  spec.keyFns.forEach(f => {
+    for (let i = 0; i <= 400; i++) { const v = f(x0 + (x1 - x0) * i / 400); if (isFinite(v)) vals.push(v); }
+  });
+  vals.sort((a, b) => a - b);
+  const q = (t) => vals.length ? vals[Math.min(vals.length - 1, Math.max(0, Math.round(t * (vals.length - 1))))] : 0;
+  let lo = Math.min(0, q(0.05)), hi = Math.max(0, q(0.95));
+  pts.forEach(p => { lo = Math.min(lo, p.y); hi = Math.max(hi, p.y); });
+  if (!(hi - lo > 1e-9)) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.1;
+  let y0 = lo - pad, y1 = hi + pad;
+  if (STATE.firstQuad) { x0 = Math.max(0, x0); y0 = Math.max(0, y0); }
+  return { x0, x1, y0, y1 };
+}
+
+// Поставить окно «Построения графиков» ровно (старт и «Вписать»).
+function setGraphWindow(w) {
+  CONFIG.Qmin = w.x0; CONFIG.Qmax = w.x1; CONFIG.Pmin = w.y0; CONFIG.Pmax = w.y1;
+  syncViewFields();
+}
+
+/* ОКНО ИДЁТ ЗА КЛЮЧЕВЫМИ ТОЧКАМИ, А НЕ ЗА КРАЯМИ ОТРЕЗКА (ADR 0146, решение
+   владельца 13.10). После изменения входов модели (формула, параметр, отрезок
+   ответа) все ключевые точки ответа — корни, пересечение с осью y, экстремумы,
+   пересечения кривых — видны с запасом от края. Невидимая точка: окно
+   сдвигается (если по размеру точки помещаются) или расширяется ровно до неё
+   с запасом, а не до краёв отрезка. Срабатывает и после ручного сдвига или
+   масштаба (zoomLock здесь не помеха). Все точки видны — окно не трогается.
+   Сам сдвиг или масштаб человеком окно не возвращает: проверка идёт, только
+   когда набор ключевых точек сменился (_graphKeySig).
+   Прежнее правило «рост без сжатия до окна по функции» растягивало окно до
+   краёв ручного отрезка: −5…200 у x² − 4 давало 200 × 40 000. */
+const KEY_IN = 0.08;     // точка считается видной, если до края не меньше 8 % размаха
+const KEY_PAD = 0.1;     // подтянутое окно оставляет до точки 10 % размаха
+let _graphKeySig = null;
+
+function keyPointsSig(pts) {
+  return pts.map(p => p.x.toPrecision(10) + ',' + p.y.toPrecision(10)).sort().join(';');
+}
+// Одна ось окна [lo; hi] так, чтобы значения vals были внутри с запасом.
+function axisShowing(lo, hi, vals) {
+  if (!vals.length) return [lo, hi];
+  const span = hi - lo;
+  if (vals.every(v => v >= lo + KEY_IN * span && v <= hi - KEY_IN * span)) return [lo, hi];
+  const a = Math.min.apply(null, vals), b = Math.max.apply(null, vals);
+  if ((b - a) <= span * (1 - 2 * KEY_PAD)) {          // по размеру помещаются — сдвиг
+    let n0 = lo;
+    if (a < n0 + KEY_IN * span) n0 = a - KEY_PAD * span;
+    if (b > n0 + span - KEY_IN * span) n0 = b + KEY_PAD * span - span;
+    return [n0, n0 + span];
+  }
+  // Не помещаются — расширение до них; окно далеко от точек — на точки целиком.
+  let n0 = (hi < a || lo > b) ? a : Math.min(lo, a), n1 = (hi < a || lo > b) ? b : Math.max(hi, b);
+  for (let k = 0; k < 4; k++) {
+    const m = (n1 - n0) * KEY_PAD;
+    n0 = Math.min(n0, a - m); n1 = Math.max(n1, b + m);
+  }
+  return [n0, n1];
+}
+function graphShowKeyPoints() {
+  const spec = answerSpec();
+  if (!spec) { _graphKeySig = null; return; }
+  const pts = answerKeyPoints(spec, answerSeg());
+  const sig = keyPointsSig(pts);
+  if (sig === _graphKeySig) return;               // входы не менялись: окно — дело человека
+  _graphKeySig = sig;
+  if (!pts.length) return;
+  let [x0, x1] = axisShowing(CONFIG.Qmin, CONFIG.Qmax, pts.map(p => p.x));
+  let [y0, y1] = axisShowing(CONFIG.Pmin, CONFIG.Pmax, pts.map(p => p.y));
+  if (STATE.firstQuad) { x0 = Math.max(0, x0); y0 = Math.max(0, y0); }
+  const same = (u, v) => Math.abs(u - v) <= 1e-9 * Math.max(1, Math.abs(v));
+  if (same(x0, CONFIG.Qmin) && same(x1, CONFIG.Qmax) && same(y0, CONFIG.Pmin) && same(y1, CONFIG.Pmax)) return;
+  setGraphWindow({ x0, x1, y0, y1 });
+  redrawAll();
+}
+
+// Отрезок ответа текущей модели: свой у человека или подобранный по формуле.
+function answerSeg() {
+  const a = +STATE.ansA, b = +STATE.ansB;
+  if (STATE.ansHand && STATE.ansA != null && STATE.ansB != null && isFinite(a) && isFinite(b) && b > a) return { a, b, hand: true };
+  const spec = answerSpec();
+  if (!spec) return { a: -5, b: 5, hand: false };
+  const s = autoSegOf(spec);
+  return { a: s.a, b: s.b, hand: false };
+}
+// Отрезок, подобранный по формуле (кэш по подписи функций), — без ручного.
+function autoSegOf(spec) {
+  const sig = 's|' + spec.keyFns.map(fnSig).join('/') + '|' + spec.diffFns.map(fnSig).join('/');
+  return ansCached(sig, () => autoAnswerSeg(spec.keyFns, spec.diffFns));
+}
+
+/* Две главные строки «Ответа» любой модели вида y = f(x): локальные
+   максимум и минимум на отрезке ответа (решение владельца 09.10). Точкой
+   «(x; y)», несколько — через «; », нет — «нет». tail — приписка к подписи
+   (обозначение кривой, когда кривых несколько), group — группа строк в
+   колонке «Ответ» (data-ans-group, 94-answer.js; ADR 0144). */
+function ansExtremaRows(r, tail, group) {
+  const t = tail || '';
+  const g = group ? ` data-ans-group="${ansAttr(group)}"` : '';
+  return `<div class="stat ans-main"${g}><span>Локальный максимум${t}</span><b>${ansPts(r.max)}</b></div>`
+       + `<div class="stat ans-main"${g}><span>Локальный минимум${t}</span><b>${ansPts(r.min)}</b></div>`;
+}
+/* Текст для атрибута разметки (группа, запись кривой). */
+function ansAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+/* Приписка к подписи, которую табло и печать показывают, а колонка «Ответ»
+   снимает: там её роль у заголовка группы (ADR 0144). */
+function ansCtx(t) { return t ? `<span class="ans-ctx">${t}</span>` : ''; }
+/* Имя кривой в подписи: одна латинская буква — формулой, иначе текстом. */
+function ansNameMd(name) { return /^[A-Za-z]$/.test(name) ? '$' + name + '$' : name; }
+/* Запись кривой для заголовка группы: «f(x) = x² − 4». Уравнение со своим
+   знаком равенства («y = …», неявная кривая) идёт как есть. */
+function graphHeadTex(c, name) {
+  const e = String(c.expr || '').trim();
+  let body = e;
+  try { body = mathToLatexField(e); } catch (er) { body = e; }
+  if (/=/.test(e)) return body;
+  return (/^[A-Za-z]$/.test(name) ? name : '\\text{' + name + '}') + '(x) = ' + body;
+}
+
+/* Отрезок кадра: считается один раз в начале перерисовки модели и тут же
+   показывается в строке «Ответ ищем на отрезке». */
+function refreshAnswerSeg() {
+  _ansSeg = answerSeg();
+  syncAnsSegUI(_ansSeg);
+  return _ansSeg;
+}
+
+// Запись числа в поле отрезка: запятая и настоящий минус, как в «Ответе».
+function ansSegText(v) { return CalcNumber.format(v); }
+function ansSegParse(t) {
+  const result = CalcNumber.parse(t);
+  return result ? result.value : null;
+}
+
+/* Строка «Ответ ищем на отрезке x от [ ] до [ ]» живёт под полями функций
+   своего сюжета: в «Построении графиков» — под строками кривых, в «Функциях
+   min и max» — под их полями, в остальных — под полем f(x). Узел один и
+   переезжает; у «С ограничением» строки нет. */
+function syncAnsSegUI(seg) {
+  const row = document.getElementById('ans-seg-row');
+  if (!row) return;
+  const graph = (STATE.mode === 'graph');
+  const show = graph || (STATE.mode === 'math' && STATE.mathSub !== 'constraint');
+  const after = document.getElementById(graph ? 'graph-rows'
+    : (STATE.mathSub === 'minmax' ? 'mm-rows' : 'math-error'));
+  /* Перенос узла с полем в фокусе снимает фокус (Safari, 13.10: набор «50»
+     обрывался после «5»). Пока человек в строке, она стоит, где стоит. */
+  if (show && after && after.nextElementSibling !== row && !row.contains(document.activeElement)) after.after(row);
+  if (row.style.display !== (show ? '' : 'none')) row.style.display = show ? '' : 'none';
+  if (!show) return;
+  [['ans-a', seg.a], ['ans-b', seg.b]].forEach(([id, v]) => {
+    const e = document.getElementById(id);
+    if (e && document.activeElement !== e) {
+      const t = ansSegText(v); if (e.value !== t) e.value = t;
+      e.dataset.shownValue=t; e.dataset.exactValue=String(v);
+    }
+  });
+  const back = document.getElementById('ans-seg-auto');
+  if (back) back.hidden = !seg.hand;
+  // Буква оси в начале строки «x от … до …» — формулой (ADR 0144).
+  const xv = row.querySelector('.ans-seg-var');
+  if (xv && !xv.querySelector('.katex') && typeof katexInto === 'function') katexInto(xv, 'x');
+  // Ползунок точки касания ходит по отрезку ответа, а не по окну.
+  if (STATE.mode === 'math' && STATE.mathSub === 'tangent') {
+    const sl = document.getElementById('mathx0-slider');
+    if (sl && (+sl.min !== seg.a || +sl.max !== seg.b)) {
+      sl.min = seg.a; sl.max = seg.b; sl.step = (seg.b - seg.a) / 200; sl.value = STATE.mathX0;
+    }
+  }
+}
+
+/* Человек вписал границы. Пусто или «от ≥ до» — отрезок возвращается к
+   подобранному по формуле, и об этом говорит короткая подсказка. */
+function applyAnsSegInputs() {
+  const read = id => {
+    const e=document.getElementById(id);
+    return e && e.value===e.dataset.shownValue ? Number(e.dataset.exactValue) : ansSegParse(e?.value);
+  };
+  const a = read('ans-a'), b = read('ans-b');
+  if (a == null || b == null || !(b > a)) {
+    STATE.ansHand = false; STATE.ansA = null; STATE.ansB = null;
+    if (typeof toast === 'function') toast(a == null || b == null
+      ? 'Пустое поле: отрезок снова подобран по формуле'
+      : '«От» должно быть меньше «до»: отрезок снова подобран по формуле');
+  } else {
+    STATE.ansHand = true; STATE.ansA = a; STATE.ansB = b;
+  }
+  redrawAll();
+}
+function resetAnsSegToAuto() {
+  STATE.ansHand = false; STATE.ansA = null; STATE.ansB = null;
+  redrawAll();
 }
 
 // Преобразование графика (7в). Возвращает новую функцию и человеческую подпись.
@@ -170,7 +576,7 @@ function planeTicksX(g, mx, oy) {
     g.append('text').attr('x', mx(t)).attr('y', oy + 7).attr('class', 'axis-num')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t).replace(/-/g, '−'));
   });
 }
 function planeTicksY(g, my, ox) {
@@ -181,12 +587,41 @@ function planeTicksY(g, my, ox) {
     g.append('text').attr('x', ox - 6).attr('y', my(t)).attr('class', 'axis-num')
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
       .attr('font-size', FS.small).attr('fill', COL.inkSoft)
-      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t));
+      .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.2).text(fmt(t).replace(/-/g, '−'));
   });
 }
 
+/* Запись для .tex графика «Математики»: rec.expr — формула от x (запись
+   человека или собранная из неё), иначе узлы расчёта с причиной rec.why. */
+function mathMark(sel, rec) {
+  if (rec && rec.expr) return markExpr(sel, rec.expr, 'x', null, { name: rec.name || '' });
+  return markNumeric(sel, (rec && rec.why) || 'график посчитан по точкам: записи формулой у него нет', (rec && rec.name) || '');
+}
+// Формула expr с подстановкой вместо x (деревом Math.js, а не правкой строки); null — не разобралась.
+function mathSubst(expr, by) {
+  try {
+    return math.parse(prepExpr(String(expr))).transform(n => (n.isSymbolNode && n.name === 'x') ? math.parse(by) : n).toString();
+  } catch (e) { return null; }
+}
+// Запись деформации графика: та же формула f(x), собранная по виду деформации.
+function mathTransformExpr(expr, kind, a) {
+  const A = '(' + a + ')';
+  switch (kind) {
+    case 'up':     return '(' + expr + ') + ' + A;
+    case 'left':   return mathSubst(expr, '(x + ' + A + ')');
+    case 'scaleY': return A + ' * (' + expr + ')';
+    case 'scaleX': return mathSubst(expr, '(' + A + ' * x)');
+    case 'negY':   return '-(' + expr + ')';
+    case 'negX':   return mathSubst(expr, '(-x)');
+    case 'absY':   return 'abs(' + expr + ')';
+    case 'absX':   return mathSubst(expr, 'abs(x)');
+    default:       return expr;
+  }
+}
+
 // Кривая на полном плане: разрывы (NaN или далеко за окном) режут линию.
-function mathLine(g, f, mx, my, color, width, dash) {
+// rec — запись для .tex (mathMark).
+function mathLine(g, f, mx, my, color, width, dash, rec) {
   const [lo, hi] = mx.domain(), [ylo, yhi] = my.domain();
   const pad = (yhi - ylo) * 2;
   const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
@@ -197,7 +632,17 @@ function mathLine(g, f, mx, my, color, width, dash) {
   }
   const p = g.append('path').datum(pts).attr('fill', 'none')
     .attr('stroke', color).attr('stroke-width', width || 2.5).attr('d', line);
+  // Каждая панель имеет собственные шкалы; режем путь по её полю, а не по CONFIG.
+  const clipId = 'math-line-clip-' + svg.selectAll('clipPath').size();
+  let defs = svg.select('defs');
+  if (defs.empty()) defs = svg.append('defs');
+  defs.append('clipPath').attr('id', clipId).append('rect')
+    .attr('x', Math.min(...mx.range())).attr('y', Math.min(...my.range()))
+    .attr('width', Math.abs(mx.range()[1] - mx.range()[0]))
+    .attr('height', Math.abs(my.range()[1] - my.range()[0]));
+  p.attr('clip-path', 'url(#' + clipId + ')');
   if (dash) p.attr('stroke-dasharray', dash);
+  mathMark(p, rec);
   return pts;
 }
 
@@ -511,7 +956,8 @@ function drawMathTangent(f) {
   // Подписи панелей крупнее и в цвет своей кривой: сразу видно, где сама
   // функция, а где производная.
   gUi.append('text').attr('x', m.left + 4).attr('y', L.top + 14)
-    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF).text('f(x), сама функция');
+    .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanF)
+    .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 4).text('f(x), сама функция');
   /* ⚠️ Подпись панели идёт через ОБЩИЙ разбор, а не через .text().
      Прямой .text() печатал «$f'(x)$, производная» вместе с долларами: KaTeX
      на холсте нет, и снимать разделители умеет только renderLabelText. */
@@ -520,8 +966,9 @@ function drawMathTangent(f) {
       .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD),
     "$f'(x)$, производная");
 
-  mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
-  mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
+  mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6, null, { expr: STATE.mathFormula, name: 'f(x)' });
+  mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4, null,
+    { expr: derivativeExpr(STATE.mathFormula, 'x'), name: 'производная', why: 'производная посчитана численно: символьной записи у неё нет' });
 
   const x0 = STATE.mathX0, y0 = f(x0), k = dfun(x0);
   STATE.mathRes = { x0, y0, k, secant: null };
@@ -529,15 +976,18 @@ function drawMathTangent(f) {
 
   // Касательная: y = y0 + k·(x − x0).
   if (!isNaN(k)) {
-    mathLine(gTop, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null);
+    mathLine(gTop, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null,
+      { expr: '(' + y0 + ') + (' + k + ') * (x - (' + x0 + '))', name: 'касательная' });
     // Треугольник Δx / Δy — наглядное «отношение катетов = тангенс = производная».
     const dx = Math.min(STATE.mathDx, (wTop.xmax - wTop.xmin) * 0.25);
     const xa = x0, xb = x0 + dx, ya = y0, yb = y0 + k * dx;
     const tri = [[s1.mx(xa), s1.my(ya)], [s1.mx(xb), s1.my(ya)], [s1.mx(xb), s1.my(yb)]];
-    gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
+    markPoly(gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
       .attr('fill', COL.reg).attr('opacity', 0.14)
-      .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3');
-    gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
+      .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3'),
+    'треугольник приращений Δx и Δy: по трём вершинам', 'треугольник приращений');
+    const dxY = dodgeLabel((s1.mx(xa) + s1.mx(xb)) / 2, s1.my(ya) + 13, s1.my(0), 60);
+    gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', dxY)
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
       .text('Δx = ' + fmt(dx));
@@ -552,7 +1002,8 @@ function drawMathTangent(f) {
     const dx = STATE.mathDx, y1 = f(x0 + dx);
     if (!isNaN(y1)) {
       const ks = (y1 - y0) / dx;
-      mathLine(gTop, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4');
+      mathLine(gTop, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4',
+        { expr: '(' + y0 + ') + (' + ks + ') * (x - (' + x0 + '))', name: 'секущая' });
       mathDot(gTop, s1.mx, s1.my, x0 + dx, y1, COL.tax, null);
       STATE.mathRes.secant = ks;
     }
@@ -584,7 +1035,8 @@ function drawMathOptimum(f) {
   const g = svg.append('g');
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
-  const lo = STATE.mathXmin, hi = STATE.mathXmax;
+  const lo = STATE.mathXmin, hi = STATE.mathXmax;   // окно — только для заливки
+  const seg = _ansSeg || answerSeg();               // ответ — на отрезке (ADR 0143)
 
   // Заливка по знаку второй производной: вверх выпуклая или вниз.
   if (STATE.mathConvex) {
@@ -597,9 +1049,9 @@ function drawMathOptimum(f) {
         .attr('fill', s > 0 ? COL.D : COL.S).attr('opacity', 0.055);
     }
   }
-  mathLine(g, f, mx, my, COL.D, 2.8);
+  mathLine(g, f, mx, my, COL.D, 2.8, null, { expr: STATE.mathFormula, name: 'f(x)' });
 
-  const a = mathAnalyse(f, lo, hi);
+  const a = mathAnalyse(f, seg.a, seg.b);
   STATE.mathRes = a;
   /* Подпись «максимум 2» не говорила, что это: координата точки или значение
      функции. Пишем обе величины и называем их: x* — где, y* — сколько. */
@@ -624,8 +1076,9 @@ function drawMathTransform(f) {
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   const t = mathTransformed(f, STATE.mathTrans, paramValue('a', 1));
-  mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
-  mathLine(g, t, mx, my, COL.D, 2.8);
+  mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4', { expr: STATE.mathFormula, name: 'исходная' });   // исходная — бледным пунктиром
+  mathLine(g, t, mx, my, COL.D, 2.8, null,
+    { expr: mathTransformExpr(STATE.mathFormula, STATE.mathTrans, paramValue('a', 1)), name: MATH_TRANS[STATE.mathTrans] ? MATH_TRANS[STATE.mathTrans].tex : '' });
   labelCurveMath(g, f, mx, my, 'Исходная', COL.ghost);
   labelCurveMath(g, t, mx, my, MATH_TRANS[STATE.mathTrans].tex, COL.D);
   STATE.mathRes = { trans: STATE.mathTrans, a: paramValue('a', 1) };
@@ -655,6 +1108,7 @@ function labelCurveMath(g, f, mx, my, txt, color, key) {
         g.append('text').attr('class', 'curve-name')
           .attr('x', sm.px - 4).attr('y', sm.py - 7).attr('text-anchor', 'end')
           .attr('font-size', curveLabelSize()).attr('font-weight', 600).attr('fill', color)
+          .style('font-family', /^[А-Яа-яЁё ]+$/.test(txt) ? 'var(--font-ui)' : null)
           .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6),
         txt);
       return;
@@ -686,20 +1140,17 @@ function mmColor(i) {
   return pal[i % pal.length];
 }
 
-function drawMathMinMax(f) {
-  const { mx, my } = mathScales();
-  const g = svg.append('g');
-  drawGrid(mx, my, g);
-  drawPlaneAxes(g, mx, my, 'x', 'y');
-  const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0) }];
+/* Исходные функции сюжета и итоговая Z — одна сборка на рисунок и на
+   «Ответ» (отрезок ответа подбирается по Z и по парам исходных). */
+function mmParts(f) {
+  const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0), expr: STATE.mathFormula }];
   for (let i = 1; i < mmSlots(); i++) {
     const expr = mmGet(i);
     if (!expr.trim()) continue;
     const { compiled } = compileMath(expr, 'x');
     if (!compiled) continue;
-    parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i) });
+    parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i), expr });
   }
-  if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   const isMin = (STATE.mathMinMax === 'min');
   const z = (x) => {
     let best = NaN;
@@ -711,24 +1162,38 @@ function drawMathMinMax(f) {
     });
     return best;
   };
+  return { parts, isMin, z };
+}
+
+function drawMathMinMax(f) {
+  const { mx, my } = mathScales();
+  const g = svg.append('g');
+  drawGrid(mx, my, g);
+  drawPlaneAxes(g, mx, my, 'x', 'y');
+  const { parts, isMin, z } = mmParts(f);
+  if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   parts.forEach(p => {
-    mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4');
+    mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4', { expr: p.expr, name: p.name });
     labelCurveMath(g, p.fn, mx, my, p.name, p.color);
   });
   const zName = (STATE.mmName || 'Z').trim() || 'Z';
   const zColor = COL.mmZ || COL.MC;
-  mathLine(g, z, mx, my, zColor, 3.2);
+  // запись Z: наименьшая или наибольшая из тех же формул
+  mathLine(g, z, mx, my, zColor, 3.2, null,
+    { expr: (isMin ? 'min(' : 'max(') + parts.map(p => '(' + p.expr + ')').join(', ') + ')', name: zName });
   labelCurveMath(g, z, mx, my, zName, zColor);
   // Точки, где ветви меняются местами: корни разности каждой пары, но в зачёт
   // идут только те, где обе функции в этот момент и есть итоговая Z.
+  const seg = _ansSeg || answerSeg();
   const sw = [];
   for (let a = 0; a < parts.length; a++) {
     for (let b2 = a + 1; b2 < parts.length; b2++) {
-      rootsOf((x) => parts[a].fn(x) - parts[b2].fn(x), STATE.mathXmin, STATE.mathXmax).forEach(x => {
+      // На отрезке ответа, а не в окне (ADR 0143): точка вне окна просто не видна.
+      ansZeros((x) => parts[a].fn(x) - parts[b2].fn(x), seg.a, seg.b, ANS_N).forEach(x => {
         const y = parts[a].fn(x);
         if (isNaN(y)) return;
         if (Math.abs(y - z(x)) > Math.max(1e-6, Math.abs(y) * 1e-6)) return;   // ветвь не главная
-        if (sw.some(v => Math.abs(v - x) < (STATE.mathXmax - STATE.mathXmin) * 1e-4)) return;
+        if (sw.some(v => Math.abs(v - x) < (seg.b - seg.a) * 1e-4)) return;
         sw.push(x);
         mathDot(g, mx, my, x, y, COL.MC, null);
       });
@@ -775,60 +1240,146 @@ function parseConstraint(src) {
   };
 }
 
-/* Точки ограничения в прямоугольнике окна: для каждого x — первый y, где
-   G(x, y) меняет знак. Границы приходят снаружи, поэтому кривую видно и в
-   отрицательной части плоскости, если пользователь снял первую четверть. */
-function constraintPointsIn(G, x0, x1, y0, y1, N) {
-  N = N || 260;
-  const out = [];
-  for (let i = 0; i <= N; i++) {
-    const a = x0 + (x1 - x0) * i / N;
-    const g = (b) => G(a, b);
-    let prevB = y0, prevV = g(y0);
-    for (let j = 1; j <= 160; j++) {
-      const b = y0 + (y1 - y0) * j / 160, v = g(b);
-      if (!isNaN(prevV) && !isNaN(v) && prevV * v <= 0 && prevV !== v) {
-        const root = (prevV === 0) ? prevB : (v === 0 ? b : bisect(g, prevB, b));
-        if (isFinite(root)) { out.push([a, root]); break; }
-      }
-      prevB = b; prevV = v;
+/* Трассировка G=0 по ячейкам, а не «первый корень на вертикали».
+   Узлы общих рёбер общие для соседних ячеек; компоненты не соединяются
+   поперёк пустоты. Так сохраняются обе половины окружности и вертикали. */
+function constraintContoursIn(G, x0, x1, y0, y1, N) {
+  N = N || 160;
+  const dx = (x1 - x0) / N, dy = (y1 - y0) / N;
+  const values = Array.from({ length: N + 1 }, (_, i) =>
+    Array.from({ length: N + 1 }, (_, j) => G(x0 + i * dx, y0 + j * dy)));
+  const nodes = new Map(), edges = new Map();
+  const crossing = (i, j, k, l) => {
+    const va = values[i][j], vb = values[k][l];
+    if (!isFinite(va) || !isFinite(vb) || (va >= 0) === (vb >= 0)) return null;
+    const key = va === 0 ? `p${i},${j}` : vb === 0 ? `p${k},${l}` : `${i},${j}:${k},${l}`;
+    if (nodes.has(key)) return key;
+    const ax = x0 + i * dx, ay = y0 + j * dy, bx = x0 + k * dx, by = y0 + l * dy;
+    const h = t => G(ax + t * (bx - ax), ay + t * (by - ay));
+    const t = va === 0 ? 0 : vb === 0 ? 1 : bisect(h, 0, 1);
+    if (!isFinite(t)) return null;
+    const p = [ax + t * (bx - ax), ay + t * (by - ay)];
+    // Разрыв (например 1/x) не является нулём ограничения.
+    if (Math.abs(G(...p)) > 1e-6 * Math.max(1, Math.abs(va), Math.abs(vb))) return null;
+    nodes.set(key, p); edges.set(key, new Set());
+    return key;
+  };
+  const join = (a, b) => {
+    if (a != null && b != null && a !== b) { edges.get(a).add(b); edges.get(b).add(a); }
+  };
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const e = [crossing(i, j, i + 1, j), crossing(i + 1, j, i + 1, j + 1),
+      crossing(i, j + 1, i + 1, j + 1), crossing(i, j, i, j + 1)];
+    const hits = e.filter(v => v != null);
+    if (hits.length === 2) join(hits[0], hits[1]);
+    else if (hits.length === 4) {
+      // В седловой ячейке знак центра определяет, какие стороны связаны.
+      const center = G(x0 + (i + .5) * dx, y0 + (j + .5) * dy);
+      if ((center >= 0) === (values[i][j] >= 0)) { join(e[0], e[1]); join(e[2], e[3]); }
+      else { join(e[0], e[3]); join(e[1], e[2]); }
     }
   }
+  const out = [];
+  const walk = start => {
+    const pts = [nodes.get(start)];
+    let at = start;
+    while (edges.get(at).size) {
+      const next = edges.get(at).values().next().value;
+      edges.get(at).delete(next); edges.get(next).delete(at);
+      pts.push(nodes.get(next)); at = next;
+      if (at === start) break;
+    }
+    if (pts.length > 1) out.push(pts);
+  };
+  for (const [key, links] of edges) if (links.size === 1) walk(key);
+  for (const [key, links] of edges) if (links.size) walk(key);
   return out;
 }
-// Прежняя форма вызова (от нуля до предела) — через общий вариант.
+function constraintPointsIn(G, x0, x1, y0, y1, N) {
+  return constraintContoursIn(G, x0, x1, y0, y1, N).flat();
+}
 function constraintPoints(G, aMax, bMax, N) {
   return constraintPointsIn(G, 0, aMax, 0, bMax, N);
 }
 
-// Максимум (или минимум) F вдоль произвольного ограничения.
-function optimizeAlongCurve(f, pts, wantMax) {
-  let best = null;
-  pts.forEach(([a, b]) => {
-    const v = f(a, b);
-    if (!isFinite(v)) return;
-    if (!best || (wantMax ? v > best.value : v < best.value)) best = { a, b, value: v };
-  });
+/* Сетка находит кандидатов на ВСЕХ ветвях. Затем уточняем их на G=0:
+   пробный шаг, проекция по нормали и уменьшение шага. Значение в узле
+   сетки не выдаётся за точный оптимум. Окно изображения не участвует. */
+function optimizeAlongCurve(f, pts, wantMax, G, bounds) {
+  const candidates = pts.map(([a, b]) => ({ a, b, value: f(a, b) })).filter(p => isFinite(p.value));
+  candidates.sort((a, b) => wantMax ? b.value - a.value : a.value - b.value);
+  if (!candidates.length) return null;
+  if (!G || !bounds) return candidates[0];
+  const { xMin, xMax, yMin, yMax } = bounds;
+  const span = Math.max(xMax - xMin, yMax - yMin), h = span * 1e-6;
+  const project = (a, b) => {
+    for (let n = 0; n < 16; n++) {
+      const v = G(a, b), gx = (G(a + h, b) - G(a - h, b)) / (2 * h),
+        gy = (G(a, b + h) - G(a, b - h)) / (2 * h), norm = gx * gx + gy * gy;
+      if (!isFinite(v) || !isFinite(norm) || norm < 1e-24) return null;
+      const step = v / norm;
+      a -= step * gx; b -= step * gy;
+      if (Math.abs(step) * Math.sqrt(norm) < span * 1e-11) break;
+    }
+    if (a < xMin || a > xMax || b < yMin || b > yMax || !isFinite(f(a, b))) return null;
+    const gx = (G(a + h, b) - G(a - h, b)) / (2 * h), gy = (G(a, b + h) - G(a, b - h)) / (2 * h);
+    if (Math.abs(G(a, b)) > span * 1e-8 * Math.hypot(gx, gy)) return null;
+    return { a, b, value: f(a, b) };
+  };
+  const better = (a, b) => {
+    const delta = (wantMax ? 1 : -1) * (a.value - b.value);
+    const tol = 1e-12 * Math.max(1, Math.abs(a.value), Math.abs(b.value));
+    if (Math.abs(delta) > tol) return delta > 0;
+    // При равных экстремумах оставляем привычный неотрицательный вариант
+    // (например ±(5/√2,5/√2)). Это выбор представителя, не сужение поиска.
+    return a.a >= 0 && a.b >= 0 && (b.a < 0 || b.b < 0);
+  };
+  let best = candidates[0];
+  const seeds = [];
+  for (const p of candidates) {
+    if (seeds.every(q => Math.hypot(p.a - q.a, p.b - q.b) > span / 40)) seeds.push(p);
+    if (seeds.length === 12) break;
+  }
+  for (const seed of seeds) {
+    let p = seed, step = span / 80;
+    for (let n = 0; n < 180 && step > span * 1e-10; n++) {
+      let next = p;
+      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const q = project(p.a + step * da, p.b + step * db);
+        if (q && better(q, next)) next = q;
+      }
+      if (next === p) step /= 2; else p = next;
+    }
+    if (better(p, best)) best = p;
+  }
   return best;
 }
 
-/* Подогнать окно под ограничение. Делается ОДИН раз при входе в сюжет и при
-   смене формулы, а не на каждой перерисовке: иначе своё окно, выбранное
-   колесом, сцена возвращала бы себе обратно, и зум не работал бы вовсе. */
+/* Область задачи запоминается при смене ограничения. Начальная мелкая
+   сетка видит небольшие замкнутые кривые, которые пропускала сетка 0..1000.
+   Отрицательные координаты учитываются независимо от режима первой четверти.
+   Это конечная численная область, а не доказательство глобального оптимума
+   произвольной функции на всей плоскости. */
 function constraintFit() {
-  let xMax = 12, yMax = 12;
   const G = parseConstraint(STATE.mathGC);
+  let pts = [], extent = 12;
   if (G) {
-    const probe = constraintPoints(G, 1e3, 1e3, 120);
-    if (probe.length) {
-      xMax = padMax(Math.max.apply(null, probe.map(q => q[0])));
-      yMax = padMax(Math.max.apply(null, probe.map(q => q[1])));
+    for (let n = 0; n < 8; n++) {
+      pts = constraintPointsIn(G, -extent, extent, -extent, extent, 160);
+      if (pts.length) break;
+      extent *= 2;
     }
   }
-  // Запоминаем размах задачи: по нему ищется оптимум независимо от того,
-  // насколько человек приблизил картинку.
-  STATE.consFit = { xMax: xMax || 12, yMax: yMax || 12 };
-  setMathWindow(0, xMax || 12, 0, yMax || 12);
+  let xMin = -extent, xMax = extent, yMin = -extent, yMax = extent;
+  if (pts.length) {
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const loX = Math.min(...xs), hiX = Math.max(...xs), loY = Math.min(...ys), hiY = Math.max(...ys);
+    const px = Math.max(1, hiX - loX) * .15, py = Math.max(1, hiY - loY) * .15;
+    xMin = Math.min(0, loX - px); xMax = Math.max(0, hiX + px);
+    yMin = Math.min(0, loY - py); yMax = Math.max(0, hiY + py);
+  }
+  STATE.consFit = { xMin, xMax, yMin, yMax };
+  setMathWindow(xMin, xMax, yMin, yMax);
   STATE.viewDirty = false;
   updateResetViewBtn();
 }
@@ -859,27 +1410,36 @@ function drawMathConstraint() {
   }
   const [x0, x1] = mx.domain(), [y0, y1] = my.domain();
   // Рисуем ту часть ограничения, что попала в окно.
-  const pts = constraintPointsIn(G, x0, x1, y0, y1);
-  if (pts.length > 1) {
-    g.append('path').datum(pts).attr('fill', 'none')
+  const branches = constraintContoursIn(G, x0, x1, y0, y1);
+  const pts = branches.flat();
+  for (const branch of branches) {
+    const cp = g.append('path').datum(branch).attr('fill', 'none')
       .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
+    /* запись для .tex — по форме ввода ограничения (тот же разбор, что у
+       строки КПВ): y = f(x) — формула, x = g(y) — «по вертикали», общее
+       уравнение — узлы трассировки с причиной */
+    const r = parsePpfEquation(STATE.mathGC);
+    if (!r.error && r.kind === 'explicit') markExpr(cp, r.src, 'x', null, { name: 'ограничение' });
+    else if (!r.error && r.kind === 'inverse') markExpr(cp, r.src, 'y', null, { axis: 'y', name: 'ограничение' });
+    else markNumeric(cp, 'ограничение задано общим уравнением и найдено численно (трассировкой): формулы y = f(x) у него нет', 'ограничение');
   }
-  /* А ищем по всей задаче, а не по видимому куску: приблизили картинку — ответ
-     не должен меняться. Область поиска это размах ограничения, объединённый с
-     текущим окном. */
-  const fit = STATE.consFit || { xMax: x1, yMax: y1 };
-  const sx0 = Math.min(x0, 0), sx1 = Math.max(x1, fit.xMax);
-  const sy0 = Math.min(y0, 0), sy1 = Math.max(y1, fit.yMax);
-  const searchPts = (sx0 === x0 && sx1 === x1 && sy0 === y0 && sy1 === y1)
-    ? pts : constraintPointsIn(G, sx0, sx1, sy0, sy1);
-  const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false);
-  /* Точки ограничения кладём в состояние: по ним катается точка и по ним же
-     ищутся ключевые точки сюжета (Н66). Пересчитывать их второй раз в
-     mathSnapTargets значило бы делать ту же тяжёлую работу дважды за кадр. */
-  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts };
+  /* А ищем по всей задаче, а не по видимому куску: приблизили или сдвинули
+     картинку — ответ не меняется (ADR 0143). Область поиска — размах самого
+     ограничения (consFit, считается при входе и смене формулы), БЕЗ окна:
+     объединение с окном меняло шаг сетки при отдалении и сдвиге. */
+  if (!STATE.consFit) constraintFit();
+  const fit = { xMin: 0, yMin: 0, ...STATE.consFit };
+  const searchBranches = constraintContoursIn(G, fit.xMin, fit.xMax, fit.yMin, fit.yMax);
+  const searchPts = searchBranches.flat();
+  const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false, G, fit);
+  const tol = Math.max(fit.xMax - fit.xMin, fit.yMax - fit.yMin) * 1e-6;
+  const touchesEdge = searchPts.some(([a, b]) => isFinite(f(a, b)) && Math.min(a - fit.xMin, fit.xMax - a, b - fit.yMin, fit.yMax - b) < tol);
+  STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts, conBranches: branches, fit, touchesEdge };
   if (opt) {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
-    [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
+    // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
+    // при прозрачности 0,35 контраст к холсту был 1,5 : 1 (инвариант 3 : 1, contrast_probe.mjs).
+    [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.6, 0.95, '5 4'));
     drawLevelCurveOn(g, mx, my, f, opt.value, COL.D, 2.6, 1);
     mathDot(g, mx, my, opt.a, opt.b, COL.ink,
       (STATE.mathConsWantMax === false ? 'минимум (' : 'максимум (') + fmt(opt.a) + '; ' + fmt(opt.b) + ')', null, 'opt');
@@ -887,12 +1447,17 @@ function drawMathConstraint() {
   updateMathPanel();
 }
 // Линия уровня F = const на своих шкалах (движок трассировки — общий).
-function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity) {
-  const pts = traceLevelCurve(f, level, mx.domain()[1], my.domain()[1], 220);
-  if (!pts || pts.length < 2) return;
+function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity, dash) {
+  const [x0, x1] = mx.domain(), [y0, y1] = my.domain();
+  const branches = constraintContoursIn((a, b) => f(a, b) - level, x0, x1, y0, y1, 100);
+  const pts = branches.flatMap(branch => [...branch, null]);
+  if (!pts.length) return;
   const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
+  const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
+  if (dash) p.attr('stroke-dasharray', dash);
+  // запись для .tex: формулы y = f(x) у линии уровня нет, в файл идут узлы трассировки
+  markNumeric(p, 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
 }
 
 /* Разбор «как получен ответ» для сюжета с экстремумами. Не пересказ учебника,
@@ -944,19 +1509,22 @@ function updateMathPanel() {
     if (isNaN(r.y0)) html = '<div class="warn">В этой точке функция не определена.</div>';
     else {
       html += `<div class="stat"><span>Точка $x_0$</span><b>${fmt(r.x0)}</b></div>`;
-      html += `<div class="stat"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
-      html += `<div class="stat"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
-      html += `<div class="stat"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
+      const tg = ' data-ans-group="Касательная в точке $x_0$"';
+      html += `<div class="stat ans-main"${tg}><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
+      html += `<div class="stat ans-main"${tg}><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
+      html += `<div class="stat ans-main"${tg}><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
       if (r.secant != null) {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
-      html += `<div class="stat"><span>Касательная</span><b>y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})</b></div>`;
+      html += `<div class="stat"><span>Касательная</span><b>$y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${CalcNumber.factor(Math.abs(r.k))}\\,(x ${r.x0 >= 0 ? '-' : '+'} ${CalcNumber.factor(Math.abs(r.x0))})$</b></div>`;
+      // Экстремумы f — ПОСЛЕ прежних строк: их номера держит паритет со старым экраном.
+      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b), '', 'Экстремумы функции'); }
       // Разбор: откуда взялось это число и что показывает треугольник.
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Что вообще такое производная?</b> Это скорость: на сколько меняется y, если x подвинуть чуть-чуть. `
         + `Берём две близкие точки слева и справа от x₀ и делим прирост y на прирост x. `
-        + `Шаг подбирается от ширины окна, поэтому счёт одинаково точен и на отрезке 0…0.1, и на 0…1000.</p>`
+        + `Шаг подбирается от ширины отрезка ответа, поэтому счёт одинаково точен и на отрезке 0…0.1, и на 0…1000, а масштаб графика на него не влияет.</p>`
         + `<p><b>При чём здесь треугольник?</b> Он и есть это отношение: горизонтальный катет Δx, `
         + `вертикальный Δy = ${fmt(r.k)}·Δx. Их частное не зависит от размера треугольника, `
         + `оно и равно наклону.</p>`
@@ -977,12 +1545,13 @@ function updateMathPanel() {
         + '</div>';
     }
   } else if (STATE.mathSub === 'optimum') {
-    if (r.gMax) html += `<div class="stat"><span>Наибольшее на отрезке</span><b>$y^* = ${fmt(r.gMax.y)}$ при $x^* = ${fmt(r.gMax.x)}$</b></div>`;
-    if (r.gMin) html += `<div class="stat"><span>Наименьшее на отрезке</span><b>$y^* = ${fmt(r.gMin.y)}$ при $x^* = ${fmt(r.gMin.x)}$</b></div>`;
-    (r.ext || []).forEach(p => {
-      html += `<div class="stat"><span>${p.kind === 'max' ? 'Локальный максимум' : (p.kind === 'min' ? 'Локальный минимум' : 'Плато')}</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`;
-    });
-    (r.inf || []).forEach(p => { html += `<div class="stat"><span>Перегиб</span><b>$(x^*; y^*) = (${fmt(p.x)}; ${fmt(p.y)})$</b></div>`; });
+    /* Всё точкой «(x*; y*)», как в задачах: «y* = 18 при x* = 3» ответом в
+       формате «Сначала сам» не читалось (ADR 0143). */
+    const og = ' data-ans-group="Наибольшее и наименьшее на отрезке"';
+    if (r.gMax) html += `<div class="stat ans-main"${og}><span>Наибольшее на отрезке</span><b>${ansPt(r.gMax.x, r.gMax.y)}</b></div>`;
+    if (r.gMin) html += `<div class="stat ans-main"${og}><span>Наименьшее на отрезке</span><b>${ansPt(r.gMin.x, r.gMin.y)}</b></div>`;
+    html += ansExtremaRows({ max: (r.ext || []).filter(p => p.kind === 'max'), min: (r.ext || []).filter(p => p.kind === 'min') }, '', 'Экстремумы функции');
+    html += `<div class="stat"><span>Перегибы</span><b>${ansPts(r.inf || [])}</b></div>`;
     // Разбор: как машина к этому пришла, шаг за шагом и с числами.
     html += mathOptimumReasoning(r);
     if (!html) html = '<div class="muted">На этом отрезке ни экстремумов, ни перегибов.</div>';
@@ -991,6 +1560,10 @@ function updateMathPanel() {
     const a = paramValue('a', 1);
     html += `<div class="stat"><span>Преобразование</span><b>${t.tex}</b></div>`;
     html += `<div class="stat"><span>Параметр $a$</span><b>${fmt(a)}</b></div>`;
+    /* Главные величины — экстремумы ИТОГОВОЙ функции; параметр a — вход,
+       ответом он не был (раньше стоял единственной главной ячейкой). */
+    { const f = mathF(), seg = _ansSeg || answerSeg();
+      if (f) html += ansExtremaRows(ansAnalyse(mathTransformed(f, STATE.mathTrans, a), seg.a, seg.b), '', 'Экстремумы новой функции'); }
     html += `<div class="hint">${t.note}</div>`;
     // А53: у сюжета не было разбора вовсе, блок «Объяснение модели» открывался пустым.
     html += '<div class="sb-note"><b>Как это получилось</b>'
@@ -1022,7 +1595,11 @@ function updateMathPanel() {
       for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
       html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
       html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
-      html += `<div class="stat"><span>Кривые меняются местами</span><b>${(r.switches || []).length ? r.switches.map(v => fmt(v)).join('; ') : 'нигде'}</b></div>`;
+      const zg = 'Огибающая ' + ansNameMd(nm);
+      html += `<div class="stat ans-main" data-ans-group="${ansAttr(zg)}"><span>Кривые меняются местами</span><b>${ansList(r.switches || [])}</b></div>`;
+      // Экстремумы итоговой огибающей Z на отрезке ответа (излом тоже экстремум).
+      { const f = mathF(), seg = _ansSeg || answerSeg();
+        if (f) html += ansExtremaRows(ansAnalyse(mmParts(f).z, seg.a, seg.b), '', zg); }
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Как строится итоговая кривая?</b> В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
         + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
@@ -1042,22 +1619,23 @@ function updateMathPanel() {
     }
   } else if (STATE.mathSub === 'constraint') {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
-    else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
+    else if (!r.opt) html = '<div class="muted">Точка не нашлась в численной области поиска: проверьте формулы ограничения и цели.</div>';
     else {
-      html += `<div class="stat"><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
-      html += `<div class="stat"><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat"><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
+      if (r.touchesEdge) html += '<div class="warn">Ограничение выходит за область поиска. Показано лучшее найденное значение в этой области; глобальный оптимум на всей кривой не установлен.</div>';
+      const cg = ' data-ans-group="Условный оптимум"';
+      html += `<div class="stat ans-main"${cg}><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat ans-main"${cg}><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat ans-main"${cg}><span>$f(x^*,\\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
       /* Строки «Ищем = максимум» здесь больше нет (решение владельца 01.09):
          переключатель «Какую функцию ищем» стоит в левой панели, и повторять
          его выбор среди ПОСЧИТАННЫХ величин незачем. Слово осталось в разборе
          ниже — там оно объясняет способ, а не повторяет орган управления. */
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + '<p><b>Что такое ограничение на графике?</b> Это кривая: точки, где g(x, y) обращается в ноль. '
-        + 'Она ищется численно, для каждого x подбирается свой y, поэтому подходит '
-        + 'любая форма, а не только прямая.</p>'
+        + 'Все обнаруженные ветви трассируются численно по сетке, включая замкнутые кривые. Очень мелкие детали и изолированные точки могут не обнаружиться.</p>'
         + `<p><b>Как ищется оптимум?</b> Вдоль этой кривой перебирается значение цели, и берётся ${r.wantMax ? 'наибольшее' : 'наименьшее'}. `
-        + 'Тонкими линиями нарисован веер линий уровня цели, жирной та, что проходит через найденную точку.</p>'
-        + '<p><b>Почему именно касание?</b> Линия уровня касается ограничения, а не пересекает его. Это и есть признак оптимума: '
+        + 'Лучшие кандидаты уточняются на самом ограничении. Тонкими линиями нарисован веер линий уровня цели, жирной та, что проходит через найденную точку.</p>'
+        + '<p><b>Когда возникает касание?</b> В гладкой внутренней точке оптимума линия уровня обычно касается ограничения. Одного касания недостаточно: значения цели нужно сравнить, чтобы убедиться, что '
         + 'сдвинуться вдоль ограничения в любую сторону значит перейти на линию уровня хуже.</p>'
         + '<p><b>Почему это одна и та же задача во всей микроэкономике?</b> Потребитель максимизирует полезность '
         + 'при бюджете, фирма максимизирует выпуск при затратах или минимизирует затраты при выпуске, страна '
@@ -1066,8 +1644,7 @@ function updateMathPanel() {
         + '<p><b>Когда касания не будет?</b> Когда оптимум упирается в угол: у совершенных заменителей берут '
         + 'только один товар, и решение сидит на оси. Тогда равенства наклонов нет, а ответ всё равно верный. '
         + 'Поэтому касание это признак оптимума внутри области, а не закон на все случаи.</p>'
-        + '<p><b>Вывод.</b> Сначала проверяют, есть ли внутреннее решение по касанию, и только потом смотрят '
-        + 'углы. Обратный порядок в олимпиадных задачах чаще всего и приводит к потере ответа.</p>'
+        + '<p><b>Вывод.</b> Сравнивают внутренние решения, углы и границы. Численная сетка даёт приближение и не доказывает существование глобального оптимума для произвольной функции.</p>'
         + '</div>';
     }
   }
@@ -1077,6 +1654,7 @@ function updateMathPanel() {
 function redrawMath() {
   svg.selectAll('*').remove();
   addDefs();
+  refreshAnswerSeg();    // отрезок ответа кадра — до любого расчёта (ADR 0143)
   /* Панель раздела: окно здесь полный план, а не первая четверть, поэтому
      'main', зарегистрированная makeScales по CONFIG, тут не годится совсем.
      Сюжет про производную заменит эту запись двумя своими. */
@@ -1146,9 +1724,10 @@ function setMathWindow(x0, x1, y0, y1) {
   }
   STATE.mathXmin = x0; STATE.mathXmax = x1; STATE.mathYmin = y0; STATE.mathYmax = y1;
   syncViewFields();     // поля границ в меню плоскости идут за окном вживую
-  const sl = document.getElementById('mathx0-slider');
-  if (sl) { sl.min = x0; sl.max = x1; sl.step = (x1 - x0) / 200; }
-  setMathX0(Math.max(x0, Math.min(x1, STATE.mathX0)));
+  /* Точку касания окно больше не трогает (ADR 0143): раньше приближение мимо
+     x₀ зажимало её в окно, и f(x₀) в «Ответе» менялось от масштаба. Ползунок
+     x₀ ходит по отрезку ответа (syncAnsSegUI). */
+  redrawAll();
 }
 function setMathX0(x) {
   STATE.mathX0 = x;
@@ -1158,7 +1737,7 @@ function setMathX0(x) {
   // Поле точного значения не трогаем, пока в нём печатают: иначе округление
   // отгрызает у «-11.78» последний знак прямо под руками.
   const n = document.getElementById('mathx0-input');
-  if (n && document.activeElement !== n) n.value = Math.round(x * 1000) / 1000;
+  if (n && document.activeElement !== n) n.value = fmtInput(x);
   redrawAll();
 }
 
@@ -1166,10 +1745,10 @@ function setMathX0(x) {
    ЭКСПОРТ (Фаза 5). Три формата:
      PNG — целиком на клиенте: SVG → картинка → canvas → файл. Работает
            всегда, сервер не нужен.
-     TeX — нарисованный холст переводится в TikZ (buildTex): на бумаге
-           выходит ровно то же, что на экране, в том же масштабе и сразу для
-           любой сцены. Чистый TikZ без pgfplots, поэтому файл собирается
-           обычным pdflatex.
+     TeX — buildTex: холст на миг перерисовывается на белом листе
+           постоянного размера, опись нарисованного (кривые — формулами по
+           записи места рисования, области — границами) собирается в pgfplots
+           (72-export-tex.js). Файл собирается обычным pdflatex.
      PDF — тот же .tex компилируется на сервере (calc2/views.export_pdf).
            На бесплатном тарифе Render компилятора нет, поэтому кнопка там
            отключена и об этом написано прямо в окне.
@@ -1190,22 +1769,83 @@ function exportBaseName() {
   return String(t).trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 60) || 'график';
 }
 
-function exportPNG(scale) {
-  const node = document.getElementById('chart');
-  if (!node) return;
-  const w = node.clientWidth || W, h = node.clientHeight || H;
-  const clone = node.cloneNode(true);
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  clone.setAttribute('width', w); clone.setAttribute('height', h);
+/* ── БЕЛЫЙ ЛИСТ (редизайн 10.2026, README макета, раздел 13) ──────────────
+   В файл график уходит светлыми токенами на белом, какая бы тема ни стояла
+   на экране: картинка уходит в чужой документ и на бумагу. Холст на миг
+   перерисовывается в светлой теме с белым фоном, клонируется, и тема
+   возвращается — всё в одной задаче браузера, поэтому экран не мигает.
+   Из клона вырезаются служебные узлы (data-service: ручки, зажжённые
+   ключевые точки, кружок прилипания) — в файл они не идут (COVERAGE, 6.8). */
+function paperChartClone() {
+  const root = document.documentElement;
+  const theme = root.getAttribute('data-theme');
+  const paper = cssVar('--paper');
+  root.setAttribute('data-theme', 'light');
+  root.style.setProperty('--canvas', paper);
+  root.style.setProperty('--halo', paper);
+  let clone = null, w = W, h = H;
+  try {
+    refreshColors(); redrawAll();
+    const node = document.getElementById('chart');
+    if (node) {
+      w = node.clientWidth || W; h = node.clientHeight || H;
+      clone = node.cloneNode(true);
+      clone.querySelectorAll('[data-service]').forEach(n => n.remove());
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', w); clone.setAttribute('height', h);
+    }
+  } finally {
+    if (theme) root.setAttribute('data-theme', theme); else root.removeAttribute('data-theme');
+    root.style.removeProperty('--canvas');
+    root.style.removeProperty('--halo');
+    refreshColors(); redrawAll();
+  }
+  return { clone, w, h, paper };
+}
+// Главные числа ответа строкой: «Q = 40   Pb = 60 …» (ячейки «Ответа»).
+function exportNumbersLine() {
+  // Свои площади (.ans-own-cell, ADR 0148) в строку чисел не идут: выгрузка не меняется.
+  return [...document.querySelectorAll('#ans-hero .ans-cell:not(.ans-own-cell)')].map(c => {
+    const t = (el) => { if (!el) return ''; const k = el.cloneNode(true); k.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return k.textContent.replace(/\s+/g, ' ').trim(); };
+    const n = t(c.querySelector('.ans-not'));
+    const v = (typeof selfMasked === 'function' && selfMasked()) ? '?' : t(c.querySelector('.ans-val'));   // «Сначала сам»
+    return (n ? n + ' = ' : t(c.querySelector('.ans-lab')) + ': ') + v;
+  }).filter(Boolean).join('    ');
+}
+function exportExtras() {
+  const title = expValue('exp-title').trim();
+  const cap = expValue('exp-caption').trim();
+  const nb = document.getElementById('exp-nums');
+  const nums = (nb && nb.checked) ? exportNumbersLine() : '';
+  return { title, cap, nums };
+}
+
+function exportPNG(scale, toPreview) {
+  const { clone, w, h, paper } = paperChartClone();
+  if (!clone) return;
   const src = new XMLSerializer().serializeToString(clone);
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  if (toPreview) { toPreview.src = url; return; }
+  const ex = exportExtras();
+  const font = getComputedStyle(document.body).fontFamily;
+  const ink = cssVar('--ink') || 'black';
+  const inkSoft = cssVar('--ink-soft') || ink;
   const img = new Image();
   img.onload = () => {
+    const top = ex.title ? 34 : 0;
+    const below = (ex.cap ? 24 : 0) + (ex.nums ? 26 : 0) + ((ex.cap || ex.nums) ? 8 : 0);
     const cv = document.createElement('canvas');
-    cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+    cv.width = Math.round(w * scale); cv.height = Math.round((h + top + below) * scale);
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = cssVar('--canvas') || '#ffffff';   // фон под тему, иначе прозрачный
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = paper || 'white';     // белый лист, в любой теме
+    ctx.fillRect(0, 0, w, h + top + below);
+    ctx.drawImage(img, 0, top, w, h);
+    ctx.textAlign = 'center';
+    if (ex.title) { ctx.fillStyle = ink; ctx.font = '600 15px ' + font; ctx.fillText(ex.title, w / 2, 22); }
+    let y = top + h + 18;
+    if (ex.cap) { ctx.fillStyle = inkSoft; ctx.font = '400 13px ' + font; ctx.fillText(ex.cap, w / 2, y); y += 24; }
+    if (ex.nums) { ctx.fillStyle = ink; ctx.font = '500 14px ' + font; ctx.fillText(ex.nums, w / 2, y); }
     cv.toBlob(b => {
       if (!b) { toast('Не получилось собрать картинку'); return; }
       downloadBlob(b, exportBaseName() + '.png');
@@ -1213,1051 +1853,46 @@ function exportPNG(scale) {
     });
   };
   img.onerror = () => toast('Не получилось собрать картинку');
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  img.src = url;
 }
 
 // ── .tex ────────────────────────────────────────────────────────────────
-function texEscape(s) {
-  return String(s == null ? '' : s)
-    .replace(/\\/g, '\\textbackslash{}')
-    .replace(/([&%$#_{}])/g, '\\$1')
-    .replace(/~/g, '\\textasciitilde{}')
-    .replace(/\^/g, '\\textasciicircum{}');
-}
-const r2 = (v) => (Math.round(v * 100) / 100);
-
-/* ---------------------------------------------------------------------
-   ЭКСПОРТ В LaTeX
-   Раньше .tex собирался заново из формул рыночной сцены, и в остальных
-   тридцати сюжетах выходила не та картинка и не в том масштабе: оси брались
-   из CONFIG.Qmax, а «Математика», КПВ, макро, труд и потребитель живут в
-   своих окнах, да и заливки с MR, DWL и вмешательством генератор просто не
-   знал. Теперь в TikZ переводится уже НАРИСОВАННЫЙ холст, поэтому на бумаге
-   получается ровно то же, что на экране, сразу для любой сцены.
-   Чистый TikZ без pgfplots: файл собирается обычным pdflatex.
-   --------------------------------------------------------------------- */
-/* Размер картинки на странице — ОДНА величина на весь калькулятор (А45).
-
-   Было: ширина 16 см, а высота бралась из пропорций холста браузера и при
-   узком окне упиралась в верхний предел — выходило 16 × 22,4 см. На A4 с
-   полями 2 см текстовый блок 17 × 25,7 см, то есть картинка занимала 87
-   процентов высоты страницы. От той же пропорции считался и коэффициент
-   пересчёта подписей: деления осей выходили 25,9 пункта, легенда 41,4 — при
-   основном тексте статьи в 10–12.
-
-   Хуже того, размер картинки и кегли зависели от ШИРИНЫ ОКНА БРАУЗЕРА в
-   момент выгрузки: один и тот же график из разных окон давал разные файлы.
-
-   Теперь размер постоянный. Это то же правило, что и в вёрстке научных
-   работ: одна договорённость о размере на весь проект, чтобы все рисунки
-   выстраивались в ряд. Диапазоны осей приходят из шкал сцены и от окна
-   браузера не зависят, поэтому файл выходит одинаковым при любой ширине. */
-const TEX_WIDTH_CM = 12;      // ширина поля графика на странице
-const TEX_HEIGHT_CM = 8;      // высота поля графика на странице
-
-function texPlotSize() {
-  return { w: TEX_WIDTH_CM, h: TEX_HEIGHT_CM };
-}
-const TEX_SAMPLES = 240;      // точек на одну кривую при оцифровке (постоянно)
-
-// Символы, которых нет в кириллических шрифтах pdflatex: уводим их в математику.
-// Применяется ПОСЛЕ texEscape, потому что подстановки содержат $ и обратный слэш.
-const TEX_UNICODE = [
-  ['₀', '$_0$'], ['₁', '$_1$'], ['₂', '$_2$'], ['₃', '$_3$'], ['₄', '$_4$'],
-  ['₅', '$_5$'], ['₆', '$_6$'], ['₇', '$_7$'], ['₈', '$_8$'], ['₉', '$_9$'],
-  ['⁰', '$^0$'], ['¹', '$^1$'], ['²', '$^2$'], ['³', '$^3$'],
-  ['′', "$'$"], ['″', "$''$"], ['−', '$-$'], ['–', '--'], ['–', '---'],
-  ['×', '$\\times$'], ['·', '$\\cdot$'], ['÷', '$\\div$'], ['±', '$\\pm$'],
-  ['≈', '$\\approx$'], ['≤', '$\\le$'], ['≥', '$\\ge$'], ['≠', '$\\ne$'],
-  ['∞', '$\\infty$'], ['∫', '$\\int$'], ['∑', '$\\sum$'], ['√', '$\\sqrt{\\ }$'],
-  ['°', '$^\\circ$'], ['→', '$\\to$'], ['←', '$\\leftarrow$'], ['↔', '$\\leftrightarrow$'],
-  ['Δ', '$\\Delta$'], ['α', '$\\alpha$'], ['β', '$\\beta$'], ['γ', '$\\gamma$'],
-  ['π', '$\\pi$'], ['τ', '$\\tau$'], ['σ', '$\\sigma$'], ['λ', '$\\lambda$'],
-  ['μ', '$\\mu$'], ['ε', '$\\varepsilon$'], ['θ', '$\\theta$'], ['Σ', '$\\Sigma$'],
-  ['∈', '$\\in$'], ['∂', '$\\partial$'], [' ', '~'],
-  // Узкий неразрывный пробел (U+202F) — это наш разделитель разрядов. В
-  // шрифтах T2A такого знака нет вовсе, и «30 000» приезжало склеенным (Б8).
-  [' ', '\\,'],
-];
-function texText(s) {
-  let out = texEscape(s);
-  TEX_UNICODE.forEach(([from, to]) => { out = out.split(from).join(to); });
-  return out;
-}
-
-/* Читаемый текст подписи с холста.
-
-   Собирать только собственные текстовые узлы больше нельзя: с А28 величина
-   разложена на tspan'ы (символ, индекс, остаток), и такой сбор давал огрызок
-   или пустую строку — подписи пропали бы из файла целиком. Полный textContent
-   тоже не годится: у подписи бывает дочерний <title> с подсказкой («Двойной
-   щелчок, чтобы переименовать»), и он приехал бы в .tex как часть названия. */
-function labelPlainText(el) {
-  // Исходная разметка, если её сохранил рисователь подписей: только в ней
-  // остались индексы и степени (см. renderLabelText).
-  const raw = el.getAttribute && el.getAttribute('data-raw');
-  if (raw) return raw;
-  let out = '';
-  const walk = (n) => {
-    n.childNodes.forEach(c => {
-      if (c.nodeType === 3) { out += c.nodeValue; return; }
-      if (c.nodeType !== 1) return;
-      const tag = c.tagName.toLowerCase();
-      if (tag === 'title' || tag === 'desc') return;    // подсказка, не текст
-      walk(c);
-    });
-  };
-  walk(el);
-  // Нулевой ширины пробел ставится, чтобы вернуть базовую линию после индекса.
-  return out.replace(/​/g, '');
-}
-
-/* Подпись с холста → запись для .tex (А46).
-
-   Величина уходит математикой ($P_b = 60$), проза — обычным текстом. Решает
-   ОДНА функция на весь калькулятор (qtyIsQuantity), та же, что решает это на
-   экране, поэтому одна и та же величина не может быть написана на экране
-   одним способом, а в файле другим. */
-// Голое число и разделители разрядов в нём. Вынесены отдельными константами,
-// чтобы в одной строке кода не встречались доллары и регулярное выражение:
-// проверка check_tex_escapes читает такую строку как один кусок LaTeX.
-const QTY_PLAIN_NUMBER = /^[-−+]?\d[\d    ]*([.,]\d+)?$/;
-const QTY_THIN_SPACE = /[    ]/g;
-
-function quantityTex(raw) {
-  const s = String(raw == null ? '' : raw).trim();
-  if (!s) return '';
-  /* Голое число — тоже математика, а не проза (Б8). Иначе «30 000» уходило
-     обычным текстом вместе с узким неразрывным пробелом, которого в шрифтах
-     T2A нет: на бумаге получалось «30000». В математике разряды разделяет
-     штатное \, — и цифры набираются тем же начертанием, что и в формулах. */
-  if (QTY_PLAIN_NUMBER.test(s)) {
-    const body = s.replace(QTY_THIN_SPACE, '\\,').replace(/−/g, '-');
-    return '$' + body + '$';
-  }
-  if (!qtyIsQuantity(s)) return texText(s);
-  return '$' + qtyLatex(s) + '$';
-}
-
-// Любой CSS-цвет → шесть шестнадцатеричных цифр. Браузер уже отдаёт
-// вычисленное значение, поэтому переменные темы разворачивать не нужно.
-function texHex(css) {
-  const s = String(css || '').trim();
-  const m = s.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
-  const two = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).toUpperCase().padStart(2, '0');
-  if (m) return two(+m[1]) + two(+m[2]) + two(+m[3]);
-  if (/^#[0-9a-f]{6}$/i.test(s)) return s.slice(1).toUpperCase();
-  if (/^#[0-9a-f]{3}$/i.test(s)) return s.slice(1).split('').map(c => (c + c).toUpperCase()).join('');
-  return '000000';
-}
-
-/* Оцифровка нарисованного элемента. getPointAtLength обходит фигуру по длине
-   и потому одинаково хорошо берёт и ломаные, и кривые Безье. Пути с разрывами
-   (d3 .defined) состоят из нескольких кусков; переход между ними занимает
-   нулевую длину, поэтому в выборке он виден скачком — по нему и режем, иначе
-   TikZ соединил бы куски прямой через весь график. */
-function texSamplePath(el) {
-  let len = 0;
-  try { len = el.getTotalLength(); } catch (e) { return []; }
-  if (!(len > 0)) return [];
-  // Число точек ПОСТОЯННО, а не «по длине в пикселях»: иначе один и тот же
-  // график из окна пошире и поуже давал разные файлы (А45).
-  const n = TEX_SAMPLES;
-  const m = el.getCTM();
-  const pts = [];
-  for (let i = 0; i <= n; i++) {
-    const p = el.getPointAtLength(len * i / n);
-    pts.push(m ? [m.a * p.x + m.c * p.y + m.e, m.b * p.x + m.d * p.y + m.f] : [p.x, p.y]);
-  }
-  const step = len / n, jump = Math.max(6, step * 6);
-  const runs = [];
-  let run = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1];
-    if (Math.hypot(dx, dy) > jump) { if (run.length > 1) runs.push(run); run = [pts[i]]; }
-    else run.push(pts[i]);
-  }
-  if (run.length > 1) runs.push(run);
-  return runs;
-}
-
-/* Прореживание ломаной в КООРДИНАТАХ ДАННЫХ до постоянного числа точек.
-
-   Оцифровка холста идёт по длине дуги в пикселях, а она зависит от пропорций
-   окна браузера: та же кривая из широкого и узкого окна давала чуть разные
-   наборы точек. Здесь ломаная переразбивается по собственной длине в
-   координатах данных — величине, от окна не зависящей. Файл выходит
-   одинаковым при любой ширине. */
-function texResample(pts, want) {
-  if (!pts || pts.length <= 2) return pts || [];
-  const n = Math.min(want, pts.length);
-  // Накопленная длина по данным. Оси разного масштаба, поэтому нормируем
-  // каждую координату её размахом: иначе длинная ось съест короткую.
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-  pts.forEach(([x, y]) => {
-    if (x < xMin) xMin = x; if (x > xMax) xMax = x;
-    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
-  });
-  const sx = (xMax - xMin) || 1, sy = (yMax - yMin) || 1;
-  const acc = [0];
-  for (let i = 1; i < pts.length; i++) {
-    const dx = (pts[i][0] - pts[i - 1][0]) / sx, dy = (pts[i][1] - pts[i - 1][1]) / sy;
-    acc.push(acc[i - 1] + Math.hypot(dx, dy));
-  }
-  const total = acc[acc.length - 1];
-  if (!(total > 0)) return [pts[0], pts[pts.length - 1]];
-  const out = [];
-  let j = 0;
-  for (let i = 0; i < n; i++) {
-    const target = total * i / (n - 1);
-    while (j < acc.length - 2 && acc[j + 1] < target) j++;
-    const span = acc[j + 1] - acc[j];
-    const t = span > 0 ? (target - acc[j]) / span : 0;
-    out.push([
-      pts[j][0] + (pts[j + 1][0] - pts[j][0]) * t,
-      pts[j][1] + (pts[j + 1][1] - pts[j][1]) * t,
-    ]);
-  }
-  return out;
-}
-
-/* ── Перевод выражения Math.js в язык pgfplots ────────────────────────
-   Кривая, записанную формулой, незачем выгружать сотнями координат: pgfplots
-   умеет рисовать её сам, и файл получается коротким и читаемым. Переводим
-   только то, что pgfplots точно понимает; всё остальное честно уходит
-   точками (см. комментарий в самом файле). */
-const PGF_FUNCS = {
-  sqrt: 'sqrt', abs: 'abs', exp: 'exp', ln: 'ln', log: 'ln',
-  min: 'min', max: 'max', sin: 'sin', cos: 'cos', tan: 'tan',
-};
-
-function mathToPgf(expr, varName) {
-  const src = String(expr || '').trim();
-  if (!src) return null;
-  let node;
-  try { node = math.parse(prepExpr(src)); } catch (e) { return null; }
-  const vars = new Set([varName, 'x', 'Q', 'L', 'X']);
-  let bad = false;
-
-  const walk = (n) => {
-    if (bad) return '';
-    switch (n.type) {
-      case 'ConstantNode': return String(n.value);
-      case 'SymbolNode': {
-        if (vars.has(n.name)) return 'x';
-        if (n.name === 'pi') return 'pi';
-        if (n.name === 'e') return 'e';
-        const p = (STATE.params || {})[n.name];
-        if (p) return '(' + p.value + ')';       // параметр печатаем его значением
-        bad = true; return '';
-      }
-      case 'ParenthesisNode': return '(' + walk(n.content) + ')';
-      case 'OperatorNode': {
-        if (n.args.length === 1) return (n.op === '-' ? '(-' : '(+') + walk(n.args[0]) + ')';
-        if (n.args.length !== 2) { bad = true; return ''; }
-        if ('+-*/^'.indexOf(n.op) < 0) { bad = true; return ''; }
-        return '(' + walk(n.args[0]) + ' ' + n.op + ' ' + walk(n.args[1]) + ')';
-      }
-      case 'FunctionNode': {
-        const name = n.fn && n.fn.name;
-        if (name === 'nthRoot' && n.args.length === 2) {
-          return '((' + walk(n.args[0]) + ')^(1/(' + walk(n.args[1]) + ')))';
-        }
-        const f = PGF_FUNCS[name];
-        if (!f) { bad = true; return ''; }
-        // Тригонометрия в pgfplots считает В ГРАДУСАХ — переводим явно.
-        if (f === 'sin' || f === 'cos' || f === 'tan') {
-          return f + '(deg(' + n.args.map(walk).join(',') + '))';
-        }
-        return f + '(' + n.args.map(walk).join(',') + ')';
-      }
-      default: bad = true; return '';
-    }
-  };
-  const out = walk(node);
-  return bad ? null : out;
-}
-
-/* Свойства нарисованной линии для pgfplots. */
-function pgfStroke(el, cs, colorName) {
-  const o = ['color=' + colorName(cs.stroke)];
-  const w = parseFloat(cs.strokeWidth) || 1;
-  o.push('line width=' + (w * 0.35).toFixed(2) + 'pt');
-  const dash = (el.getAttribute('stroke-dasharray') || cs.strokeDasharray || '').trim();
-  if (dash && dash !== 'none') o.push('dashed');
-  const op = parseFloat(cs.strokeOpacity) * parseFloat(cs.opacity || 1);
-  if (isFinite(op) && op < 0.99) o.push('opacity=' + op.toFixed(2));
-  return o;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   ГЕНЕРАТОР .tex ОТ СОСТОЯНИЯ (решение владельца 26.08, ADR 0030)
-
-   Старый сборщик (`buildTexLegacy` ниже) обходит НАРИСОВАННЫЙ SVG и переводит
-   найденное в TeX. Кривая с формулой уходит формулой, а всё остальное —
-   заливки, пунктиры, точки, подписи — списками координат, снятых с ПИКСЕЛЕЙ
-   экрана. Отсюда три известных долга:
-     • выгрузка теряет толщину и пунктир (толщина читалась из `strokeWidth`
-       готового узла и переводилась в одну и ту же «very thick»);
-     • в файл попадает спрятанное до щелчка и не попадает то, что за краем;
-     • файл зависит от того, как было развёрнуто окно браузера.
-
-   Здесь файл строится из НАСТРОЕК, которые задал человек. Все функции —
-   формулами, ни одной таблицы точек.
-
-   ⚠️ ЗДЕСЬ НЕТ И НЕ ДОЛЖНО БЫТЬ: ни одного `getComputedStyle`, ни одного
-   обхода `#chart`, ни одного `getBoundingClientRect`. Чего-то не хватает в
-   состоянии — значит это надо в состояние ДОБАВИТЬ, а не подглядеть в DOM.
-   На это стоит постоянная проверка в `calc2/tests/export_audit.mjs`.
-   ⚠️ Обратный слэш в строке JS обязан быть удвоен (`check_tex_escapes.mjs`).
-   ⚠️ Список настроек осей идёт ОДНОЙ строкой: пустая строка внутри
-   `\begin{axis}[...]` роняет pgfplots.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-const TEX_STATE_SAMPLES = 120;
-
-/* Штрих SVG («5 4») → штрих pgf («on 5pt off 4pt»). Одна и та же шкала на
-   экране и на бумаге: числа берутся у curveDash, а не у готового узла. */
-function texDashPattern(dash) {
-  const parts = String(dash || '').trim().split(/[\s,]+/).filter(Boolean);
-  if (!parts.length) return null;
-  const out = [];
-  parts.forEach((v, i) => { out.push((i % 2 ? 'off ' : 'on ') + (parseFloat(v) * 0.5).toFixed(1) + 'pt'); });
-  return 'dash pattern=' + out.join(' ');
-}
-
-/* Разобрать цепочку условий на участки: [{lo, hi, body}].
-   Кусочную кривую pgfplots одной строкой не нарисует, а рисовать её сеткой
-   точек значило бы вернуть ровно тот долг, ради которого всё и затевалось.
-   Разбираем ту же запись, по которой кривая считается на экране. */
-function texCondBounds(node) {
-  const unwrap = (n) => { let x = n; while (x && x.type === 'ParenthesisNode') x = x.content; return x; };
-  const c = unwrap(node);
-  if (!c || c.type !== 'OperatorNode' || c.fn !== 'and' || !c.args || c.args.length !== 2) return null;
-  const L = unwrap(c.args[0]), R = unwrap(c.args[1]);
-  if (!L || !R || L.type !== 'OperatorNode' || R.type !== 'OperatorNode') return null;
-  const lo = parseFloat(L.args[1] && L.args[1].toString());
-  const hi = parseFloat(R.args[1] && R.args[1].toString());
-  if (!isFinite(lo) || !isFinite(hi)) return null;
-  return { lo, hi };
-}
-function texCondPieces(expr) {
-  if (typeof math === 'undefined') return null;
-  const s = String(expr || '');
-  if (s.indexOf('?') < 0) return null;
-  let node;
-  try { node = math.parse(s); } catch (e) { return null; }
-  const unwrap = (n) => { let x = n; while (x && x.type === 'ParenthesisNode') x = x.content; return x; };
-  const out = [];
-  let cur = unwrap(node), guard = 0;
-  while (cur && cur.type === 'ConditionalNode' && guard++ < 64) {
-    const b = texCondBounds(cur.condition);
-    if (!b) return null;
-    out.push({ lo: b.lo, hi: b.hi, body: cur.trueExpr.toString() });
-    cur = unwrap(cur.falseExpr);
-  }
-  if (!out.length) return null;
-  // Хвост NaN означает «вне участков функции нет» — там она и не рисуется.
-  const tail = cur && cur.type === 'ConstantNode' && typeof cur.value === 'number' && isNaN(cur.value);
-  if (!tail) return null;
-  return out;
-}
-
-function buildTexFromState(title, label) {
-  const { mx, my } = mainScales();
-  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-  const econ = (typeof isEconScene === 'function') ? isEconScene() : true;
-  const yFloor = econ ? Math.max(0, yLo) : yLo;
-  const xFloor = econ ? Math.max(0, xLo) : xLo;
-
-  const defs = [];
-  const colorName = (css) => {
-    const h = texHex(css), key = 'c' + h;
-    const line = '\\definecolor{' + key + '}{HTML}{' + h + '}';
-    if (defs.indexOf(line) < 0) defs.push(line);
-    return key;
-  };
-  const num = (v) => (Math.round(v * 100) / 100);
-  const body = [];
-  const notes = [];
-  let needFill = false;                     // в файле есть \addplot fill between
-  const tally = { curves: 0, areas: 0, dots: 0, lines: 0, labels: 0 };
-  buildTexFromState._tally = tally;
-  const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
-
-  /* ── КРИВЫЕ ────────────────────────────────────────────────────────
-     Толщина и штрих берутся из ТЕХ ЖЕ правил, что на экране: шкала LW через
-     curveWidth и curveDash (30-curves.js). Это и есть починка долга
-     «выгрузка теряет толщину и пунктир». */
-  const plot = (opts, pgfBody, lo, hi) => {
-    body.push('\\addplot[' + opts.filter(Boolean).join(', ') + ', domain=' + num(lo) + ':' + num(hi)
-      + ', samples=' + TEX_STATE_SAMPLES
-      + ', restrict y to domain=' + num(yFloor) + ':' + num(yHi)
-      + ', forget plot] {' + pgfBody + '};');
-  };
-  const curveOpts = (color, width, dash, opacity) => [
-    colorName(color),
-    'line width=' + (width * 0.35).toFixed(2) + 'pt',
-    texDashPattern(dash),
-    (opacity < 0.99 ? ('opacity=' + opacity.toFixed(2)) : null),
-  ];
-
-  /* Одна кривая: цельная — одной строкой, кусочная — по строке на участок,
-     и границы берутся у самой ЗАПИСИ, а не у окна. */
-  const drawCurveTex = (expr, opts, varName, domFrom, domTo) => {
-    const pieces = texCondPieces(expr);
-    let drawn = false;
-    if (pieces) {
-      pieces.forEach(p => {
-        const pgf = mathToPgf(p.body, varName || 'Q');
-        if (!pgf) return;
-        const lo = Math.max(p.lo, xFloor, domFrom == null ? -Infinity : domFrom);
-        const hi = Math.min(p.hi, xHi, domTo == null ? Infinity : domTo);
-        if (!(hi > lo)) return;
-        plot(opts, pgf, lo, hi);
-        drawn = true;
-      });
-      return drawn;
-    }
-    const pgf = mathToPgf(expr, varName || 'Q');
-    if (!pgf) return false;
-    const lo = Math.max(xFloor, domFrom == null ? -Infinity : domFrom);
-    const hi = Math.min(xHi, domTo == null ? Infinity : domTo);
-    if (!(hi > lo)) return false;
-    plot(opts, pgf, lo, hi);
-    return true;
-  };
-
-  const labelNodes = [];
-  const putLabel = (x, y, txt, color, anchor) => {
-    if (!txt || !isFinite(x) || !isFinite(y)) return;
-    const fs = FS_PT[fsStep(FS.base, 1)];
-    labelNodes.push('\\node[anchor=' + (anchor || 'south west') + ', text=' + colorName(color)
-      + ', font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont, inner sep=1.5pt] at (axis cs:'
-      + num(x) + ',' + num(y) + ') {' + quantityTex(txt) + '};');
-    tally.labels++;
-  };
-
-  STATE.curves.forEach(c => {
-    if (!c.visible || !c.expr) return;
-    if (c.kind === 'vertical') return;
-    if (c.sumNumeric) {
-      notes.push('% ' + (curveShortName(c) || 'кривая') + ': сумма посчитана по точкам, формулы у неё нет');
-      return;
-    }
-    const w = (typeof curveWidth === 'function') ? curveWidth(c) : LW.base;
-    const dash = (typeof curveDash === 'function') ? curveDash(c) : null;
-    const op = (typeof curveOpacity === 'function') ? curveOpacity(c) : 1;
-    /* Участок «рынка здесь нет» — свой штрих и своя граница: это часть записи,
-       а не украшение (см. GHOST_DASH в 30-curves.js). */
-    const ghost = (typeof sumSceneOn === 'function' && sumSceneOn()) ? (c.sumGhostTo || 0) : 0;
-    let ok = false;
-    if (ghost > 1e-9) {
-      ok = drawCurveTex(c.expr, curveOpts(c.color, w, GHOST_DASH, op), 'Q', xFloor, ghost) || ok;
-      ok = drawCurveTex(c.expr, curveOpts(c.color, w, dash, op), 'Q', ghost, Infinity) || ok;
-    } else {
-      ok = drawCurveTex(c.expr, curveOpts(c.color, w, dash, op), 'Q', null, null);
-    }
-    if (!ok) { notes.push('% ' + (curveShortName(c) || 'кривая') + ': формулу pgfplots не понимает'); return; }
-    tally.curves++;
-    const a = (typeof curveLabelAnchor === 'function') ? curveLabelAnchor(c) : null;
-    if (a) putLabel(a.q, a.v, a.txt, c.color, 'south west');
-  });
-
-  /* ⚠️ ВМЕШАТЕЛЬСТВО И ЗАЛИВКИ — ТОЛЬКО В РЫНОЧНОЙ СЦЕНЕ.
-     Поля `taxCurveOn`, `showCS`, `eq` живут в состоянии и переживают
-     переключение сцены. Замер 26.08: выгрузка «Сложения КПВ» унесла в файл
-     кривую S + t и заливки CS/PS с прошлой, налоговой сцены. Спрашиваем
-     режим — тот же признак, по которому сцена и рисуется. */
-  const marketScene = (STATE.mode === 'market');
-
-  /* ── КРИВАЯ ПОСЛЕ ВМЕШАТЕЛЬСТВА ───────────────────────────────────
-     Тот же единственный источник, что и у экрана: texExpr, посчитанный в
-     recompute рядом с самой функцией. */
-  if (marketScene && STATE.taxCurveOn) {
-    const onBuyer = (typeof intervOnBuyer === 'function') ? intervOnBuyer() : false;
-    const after = onBuyer ? STATE.taxAfterD : STATE.taxAfterS;
-    const base = onBuyer ? STATE.D : STATE.S;
-    if (after && after.texExpr && base) {
-      if (drawCurveTex(after.texExpr, curveOpts(base.color, LW.base, '6 4', 1), 'Q', null, null)) {
-        tally.curves++;
-        const isSub = (STATE.intervType === 'subsidy');
-        const pf = (typeof pctForm === 'function') ? pctForm() : null;
-        const nm = onBuyer ? (pf ? pf.curveD : (isSub ? 'D + s' : 'D − t'))
-                           : (pf ? pf.curve : (isSub ? 'S − s' : 'S + t'));
-        const f = (q) => evalCurve(after, q);
-        const a = (typeof curveAnchor === 'function') ? curveAnchor(f, 0.82, 0.04, 'tex-after') : null;
-        if (a) putLabel(a.q, a.v, nm, base.color, 'south west');
-      }
-    }
-  }
-
-  /* ── ЗАЛИВКИ ──────────────────────────────────────────────────────
-     Границы аналитические: сама кривая и прямая цены. Никаких координат,
-     снятых с пикселей. */
-  let pathN = 0;
-  const namedPlot = (pgfBody, lo, hi) => {
-    const nm = 'texp' + (++pathN);
-    body.push('\\addplot[draw=none, name path=' + nm + ', domain=' + num(lo) + ':' + num(hi)
-      + ', samples=' + TEX_STATE_SAMPLES + ', forget plot] {' + pgfBody + '};');
-    return nm;
-  };
-  const fillBetween = (aName, bName, color, opacity, legend) => {
-    needFill = true;
-    body.push('\\addplot[' + colorName(color) + ', opacity=' + opacity.toFixed(2)
-      + ', forget plot] fill between[of=' + aName + ' and ' + bName + '];');
-    tally.areas++;
-    if (legend) notes.push('% заливка: ' + legend);
-  };
-  const areaUnderCurve = (curve, qFrom, qTo, price, color, opacity, legend) => {
-    if (!curve || !curve.expr || !(qTo > qFrom)) return;
-    /* ⚠️ КУСОЧНАЯ КРИВАЯ ЗАЛИВАЕТСЯ ПО УЧАСТКАМ, А НЕ ЦЕЛИКОМ.
-       У суммарного спроса запись кусочная, одной формулой её не залить, и
-       пропускать заливку нельзя: в сцене сложения CS и PS показаны по
-       умолчанию. Границы участков берутся у самой ЗАПИСИ. */
-    const pieces = texCondPieces(curve.expr);
-    if (pieces) {
-      let any = false;
-      pieces.forEach(pc => {
-        const lo = Math.max(pc.lo, qFrom), hi = Math.min(pc.hi, qTo);
-        if (!(hi > lo + 1e-9)) return;
-        const pg = mathToPgf(pc.body, 'Q');
-        if (!pg) return;
-        const a1 = namedPlot(pg, lo, hi);
-        const b1 = namedPlot(String(num(price)), lo, hi);
-        needFill = true;
-        body.push('\\addplot[' + colorName(color) + ', opacity=' + opacity.toFixed(2)
-          + ', forget plot] fill between[of=' + a1 + ' and ' + b1 + '];');
-        any = true;
-      });
-      if (any) {
-        tally.areas++; tally.legend = true;
-        const qMid = qFrom + (qTo - qFrom) * 0.45;
-        const vMid = evalCurve(curve, qMid);
-        if (legend && isFinite(vMid)) putLabel(qMid, (vMid + price) / 2, legend, color, 'center');
-      }
-      return;
-    }
-    const pgf = mathToPgf(curve.expr, 'Q');
-    if (!pgf) return;
-    const a = namedPlot(pgf, qFrom, qTo);
-    const b = namedPlot(String(num(price)), qFrom, qTo);
-    fillBetween(a, b, color, opacity, legend);
-    /* ⚠️ ИМЯ ПЯТНА ПИШЕТСЯ НА САМОМ ПЯТНЕ, А НЕ В УГЛОВОЙ ЛЕГЕНДЕ.
-       Угловая легенда — прямоугольник, посчитанный по пикселям экрана, и в
-       генератор от состояния ей дороги нет. На бумаге подпись внутри области
-       читается даже лучше: не надо сверяться с образцом цвета. */
-    const qMid = qFrom + (qTo - qFrom) * 0.45;
-    const vMid = evalCurve(curve, qMid);
-    if (legend && isFinite(vMid)) putLabel(qMid, (vMid + price) / 2, legend, color, 'center');
-    tally.legend = true;
-  };
-  const eqP = STATE.taxEq ? null : (STATE.eq ? STATE.eq.P : null);
-  const eqQ = marketScene ? (STATE.taxEq ? STATE.taxEq.Q : (STATE.eq ? STATE.eq.Q : null)) : null;
-  if (eqQ != null && eqQ > 0) {
-    const pB = STATE.taxEq ? STATE.taxEq.Pb : eqP;
-    const pS = STATE.taxEq ? STATE.taxEq.Ps : eqP;
-    if (STATE.showCS && STATE.D && pB != null) areaUnderCurve(STATE.D, 0, eqQ, pB, COL.D, 0.18, 'CS');
-    if (STATE.showPS && STATE.S && pS != null) areaUnderCurve(STATE.S, 0, eqQ, pS, COL.S, 0.18, 'PS');
-  }
-
-  const dot = (x, y, color, txt) => {
-    if (!inView(x, y)) return;
-    body.push('\\addplot[' + colorName(color) + ', only marks, mark size=2.0pt, forget plot] coordinates {('
-      + num(x) + ',' + num(y) + ')};');
-    tally.dots++;
-    if (txt) putLabel(x, y, txt, color, 'south west');
-  };
-
-  /* ── СЦЕНЫ, КОТОРЫЕ РИСУЮТ СВОИ КРИВЫЕ САМИ ───────────────────────
-     У «Сложения КПВ» кривых в STATE.curves нет вовсе: сцена держит свои
-     формулы в ppfSum* и свой результат в STATE.ppfSumData. Берём их ОТТУДА —
-     это по-прежнему состояние, а не холст. Суммарная кривая уходит своей
-     закрытой формой, слагаемые — теми формулами, которые набрал человек. */
-  if (STATE.mode === 'ppf' && STATE.ppfSub === 'sum' && STATE.ppfSumData && STATE.ppfSumData.ok) {
-    const d = STATE.ppfSumData;
-    for (let i = 0; i < (d.n || 0); i++) {
-      const src = (typeof ppfSumGet === 'function') ? ppfSumGet(i) : '';
-      const r = (typeof parsePpfEquation === 'function') ? parsePpfEquation(src) : null;
-      /* Правая часть «y = …» и есть та формула, которую человек набрал;
-         неявную и обратную запись pgfplots одной строкой не нарисует, и
-         подсовывать вместо них таблицу точек мы не будем. */
-      const rhs = (r && !r.error && r.kind === 'explicit') ? r.src : null;
-      const fx = (r && !r.error) ? r.f : null;
-      const col = (typeof ppfSumColor === 'function') ? ppfSumColor(i) : COL.D;
-      const xm = (d.xmax || [])[i];
-      // Слагаемая КПВ кончается на СВОЁМ Xmax, а не на краю окна.
-      if (rhs && drawCurveTex(rhs, curveOpts(col, LW.thin, SUM_GROUP_DASH, SUM_GROUP_OPACITY), 'X', 0,
-                              isFinite(xm) ? xm : null)) {
-        tally.curves++;
-        const nm = (typeof ppfSumName === 'function') ? ppfSumName(i) : ('КПВ ' + (i + 1));
-        if (isFinite(xm) && fx) putLabel(xm * 0.55, fx(xm * 0.55), nm, col, 'south west');
-      }
-    }
-    const sumCol = STATE.ppfSumColor || COL.D;
-    if (d.formulaExpr && drawCurveTex(d.formulaExpr, curveOpts(sumCol, LW.bold, null, 1), 'X', 0, null)) {
-      tally.curves++;
-      const yMid = (typeof interpY === 'function' && d.points) ? interpY(d.points, d.Xtot * 0.55) : NaN;
-      putLabel(d.Xtot * 0.55, yMid, 'Сумма', sumCol, 'south west');
-    } else if (!d.formulaExpr) {
-      notes.push('% суммарная КПВ построена численно: закрытой формы у этого набора нет');
-    }
-    (d.kinks || []).forEach(k => dot(k[0], k[1], sumCol, '(' + fmt(k[0]) + '; ' + fmt(k[1]) + ')'));
-  }
-
-  /* ── ТОЧКИ ────────────────────────────────────────────────────────
-     Свои точки человека и взведённые ключевые точки сцены. Координаты — если
-     у точки включена галочка «Координаты». */
-  (STATE.marks || []).forEach(mk => {
-    if (mk.pending) return;
-    const parts = [];
-    if (mk.text) parts.push(mk.text);
-    if (mk.showCoords) parts.push('(' + fmt(mk.x) + '; ' + fmt(mk.y) + ')');
-    dot(mk.x, mk.y, mk.color || COL.ink, parts.join(' '));
-  });
-  if (typeof keyTargets === 'function' && typeof keyPointLit === 'function') {
-    keyTargets().filter(keyPointLit).forEach(p => {
-      dot(p.x, p.y, COL.ink, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')');
-    });
-  }
-
-  /* ── ИТОГОВАЯ ФУНКЦИЯ ─────────────────────────────────────────────
-     Отдельной строкой ПОД картинкой, и латех берётся из того же места, что и
-     блок в «Ключевых значениях»: один и тот же LaTeX на экране и в файле. */
-  const finals = [];
-  const ff = document.getElementById('info-final');
-  if (ff) {
-    ff.querySelectorAll('.ff-math').forEach(m => {
-      const t = (m.getAttribute('data-ff-tex') || '').replace(/\s+/g, ' ').trim();
-      if (t) finals.push(t);
-    });
-  }
-
-  const cap = texText(title || STATE.graphTitle || '');
-  const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
-  const xName = texText(STATE.axisXName || STATE.axisXDefault || 'Q');
-  const yName = texText(STATE.axisYName || STATE.axisYDefault || 'P');
-  const uniq = [];
-  notes.forEach(n => { if (uniq.indexOf(n) < 0) uniq.push(n); });
-
-  return [
-    '% Собран калькулятором «Экономика 2.0» из настроек графика. Компилируется обычным pdflatex.',
-    '\\documentclass[12pt,a4paper]{article}',
-    '\\usepackage[T2A]{fontenc}',
-    '\\usepackage[utf8]{inputenc}',
-    '\\usepackage[english,russian]{babel}',
-    '\\usepackage{pgfplots}',
-    '\\pgfplotsset{compat=1.18}',
-    '\\usetikzlibrary{arrows.meta}',
-    needFill ? '\\usepgfplotslibrary{fillbetween}' : '',
-    '\\usepackage{geometry}',
-    '\\geometry{margin=2cm}',
-    ...defs,
-    '',
-    '\\begin{document}',
-    '',
-    '\\begin{figure}[h]',
-    '\\centering',
-    '\\begin{tikzpicture}',
-    '\\begin{axis}[' + [
-      'width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm',
-      'scale only axis',
-      'xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi),
-      'xlabel={' + xName + '}, ylabel={' + yName + '}',
-      'axis lines=left, axis line style={-{Stealth[length=6pt]}}',
-      'xlabel style={at={(axis description cs:1,0)}, anchor=west}',
-      'ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90}',
-      STATE.showGrid ? 'grid=major, grid style={very thin, gray!25}' : '',
-    ].filter(Boolean).join(', ') + ']',
-    ...uniq,
-    ...body,
-    ...labelNodes,
-    '\\end{axis}',
-    '\\end{tikzpicture}',
-    cap ? '\\caption{' + cap + '}' : '',
-    lab ? '\\label{' + lab + '}' : '',
-    '\\end{figure}',
-    ...finals.map(t => '\\[ ' + t + ' \\]'),
-    '',
-    '\\end{document}',
-  ].filter(s => s !== '').join('\n');
-}
-
-/* СТАРЫЙ сборщик: обход нарисованного SVG. Оставлен до приёмки владельца и
-   доступен параметром адреса `?texLegacy=1`. Удалять его нельзя, пока новый
-   генератор не принят глазами. */
-function buildTexLegacy(title, label) {
-  const svgEl = document.getElementById('chart');
-  if (!svgEl) return '';
-  const { mx, my } = mainScales();
-  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-  const notes = [];                       // пояснения, почему что-то ушло точками
-  let needPatterns = false;               // в файле есть заливка штриховкой
-
-  const defs = [];
-  const colorName = (css) => {
-    const h = texHex(css), key = 'c' + h;
-    const line = '\\definecolor{' + key + '}{HTML}{' + h + '}';
-    if (defs.indexOf(line) < 0) defs.push(line);
-    return key;
-  };
-  // Два знака после запятой: на картинке шириной 12 см это одна сотая доля
-  // процента ширины, глазу не видно вовсе, зато мелкая разница от округления
-  // пикселей перестаёт менять файл при другой ширине окна.
-  const num = (v) => (Math.round(v * 100) / 100);
-  const pt = (x, y) => '(' + num(x) + ',' + num(y) + ')';
-  const toData = (px, py) => [mx.invert(px), my.invert(py)];
-
-  const body = [];
-  /* п. 70. ОПИСЬ СЧИТАЕТ ТО, ЧТО ВИДИТ ЧЕЛОВЕК.
-
-     Раньше опись считала строки самого файла: одна кривая с разрывом даёт
-     несколько `\addplot`, одна область — два пути, и на экране с двумя
-     кривыми и двумя заливками стояло «Кривых точками 10, Закрашенных
-     областей 4». Числа были верны для файла и неверны для картинки.
-     Считаем ИСТОЧНИКИ: одна кривая холста — одна кривая описи, чем бы она ни
-     обернулась внутри. Счётчик заполняется здесь же, при обходе, поэтому
-     разойтись с выгрузкой ему не на чем. */
-  const tally = { curves: 0, areas: 0, dots: 0, lines: 0, labels: 0 };
-  /* Одна закрашенная область человека — это одно ПЯТНО, у которого есть имя
-     в легенде, даже если сцена рисует его двумя путями (излишек до и после
-     вмешательства, половинки клина). Пятна с именем считаем по именам,
-     безымянные — поштучно. */
-  const areaSeen = new Set();
-  /* Сама легенда в опись не входит ни одной строкой: её образцы это тоже
-     закрашенные прямоугольники, а подписи — тоже текст, и без этой отсечки
-     на графике с четырьмя пятнами опись показывала восемь. Легенда — один
-     предмет, и о ней отдельная строка «есть». */
-  const inLegend = (el) => !!(el.closest && el.closest('.legend'));
-  const countArea = (el) => {
-    if (inLegend(el)) { tally.legend = true; return; }
-    const k = el.getAttribute('data-legend');
-    if (!k) { tally.areas++; return; }
-    if (areaSeen.has(k)) return;
-    areaSeen.add(k); tally.areas++;
-  };
-  buildTexLegacy._tally = tally;
-  const inView = (x, y) => x >= xLo - 1e-9 && x <= xHi + 1e-9 && y >= yLo - 1e-9 && y <= yHi + 1e-9;
-  /* Цвет холста. Заливка им означает «здесь ничего нет»: так рисуются
-     подложки и пустые метки. На бумаге фон белый, поэтому переносить такую
-     заливку нельзя — вышло бы тёмное пятно на пустом месте (Б6). */
-  const canvasColor = () => texHex(getComputedStyle(document.documentElement).getPropertyValue('--canvas'));
-  const sameColor = (a, b) => texHex(a) === texHex(b);
-
-  /* Кегли на бумаге берутся из ОБЩЕЙ шкалы (FS → FS_PT), а не из пропорций
-     окна браузера: экранный размер сводится к своей ступени, ступень даёт
-     пункты. Пользовательский множитель подписей на бумагу не переносится —
-     иначе файл снова зависел бы от настройки экрана. */
-  const uiScale = (typeof labelScale === 'function') ? labelScale() : 1;
-  const texPt = (el, cs) => {
-    const px = parseFloat(cs.fontSize) || FS.base;
-    // Отметки осей общий множитель не трогает, поэтому и делить их не на что.
-    const k = el.classList && el.classList.contains('axis-num') ? 1 : uiScale;
-    return FS_PT[fsStep(px, k)];
-  };
-  // Маркеры: постоянный перевод пикселей холста в пункты страницы. Точка
-  // радиусом 4 px выходит примерно в 2 пункта — читается и не спорит с кривой.
-  const markPt = (r) => Math.min(3, Math.max(1, (r || 4) * 0.55));
-
-  /* Видно ли это человеку (А47). Раньше отбор шёл только по координатам
-     (inView), поэтому в файл попадали подписи координат ключевых точек, у
-     которых галочка «Координаты» выключена, а видимая подпись Q₁=40 в файл не
-     попадала вовсе. Спрашиваем у браузера: есть ли у элемента размер на
-     экране. Скрытый родитель, display:none и нулевая прозрачность отсекаются
-     сами. */
-  /* Размер по ОДНОЙ из сторон, а не по обеим: отвесная проекция имеет нулевую
-     ширину, горизонтальная — нулевую высоту, и требование «и то, и другое»
-     выбросило бы из файла все пунктиры к осям. У спрятанного родителем
-     элемента обе стороны нулевые, поэтому спрятанное по-прежнему отсекается. */
-  const onScreen = (el) => {
-    if (typeof el.getBoundingClientRect !== 'function') return true;
-    const r = el.getBoundingClientRect();
-    return r.width > 0.5 || r.height > 0.5;
-  };
-
-  // 1) Кривые, у которых есть формула, — одной строкой каждая.
-  const drawnByFormula = new Set();
-  if (STATE.mode !== 'math') {
-    STATE.curves.forEach(c => {
-      if (!c.visible || !c.expr || c.kind === 'vertical') return;
-      const pgf = mathToPgf(c.expr, 'Q');
-      if (!pgf) return;
-      drawnByFormula.add(c.id);
-      tally.curves++;
-      const lo = Math.max(0, xLo), hi = xHi;
-      // forget plot — чтобы pgfplots не заводил СВОЮ легенду. Имена кривых уже
-      // подписаны узлами на самих кривых (как на экране), а вторая легенда
-      // рядом с нашей легендой закрашенных областей подписывала бы всё дважды.
-      body.push('\\addplot[' + colorName(c.color) + ', very thick, domain=' + num(lo) + ':' + num(hi) +
-                ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
-                ', forget plot] {' + pgf + '};');
-    });
-  }
-
-  // 2) Всё остальное с холста: заливки, точки, пунктиры, подписи.
-  const walk = (node) => {
-    for (const el of node.children) {
-      const tag = el.tagName.toLowerCase();
-      if (tag === 'defs' || tag === 'clippath' || tag === 'marker') continue;
-      const cls = String(el.getAttribute('class') || '');
-      // Оси и сетку pgfplots рисует сам; легенда закрашенных областей нужна
-      // на бумаге ровно та же, что на экране, поэтому её переносим как есть.
-      if (cls === 'axes' || cls === 'grid') continue;
-      if (tag === 'g') { walk(el); continue; }
-
-      if (el.getAttribute('data-skip-export')) continue;
-      /* Б6. Видно человеку — единственное условие попадания на бумагу, и оно
-         относится ко ВСЕМУ, а не только к подписям. Раньше проверка стояла
-         лишь у текста, поэтому спрятанная группа отдавала свои фигуры: у
-         «закрепки» ключевой точки (display:none до наведения) в файл уходили
-         подложка цветом фона и обведённый по контуру значок из шестидесяти
-         точек. Свой computed-стиль у ребёнка при этом обычный: прячется
-         РОДИТЕЛЬ, и увидеть это можно только по размеру на экране.
-         Заодно отсекаются <title> (у них геометрии нет вовсе) и всё, что
-         вынесено за пределы холста. */
-      if (!onScreen(el)) continue;
-      const cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) continue;
-      // Полностью прозрачный цвет — это служебная фигура (дорожка для мыши,
-      // подложка под подсказку). На бумаге её быть не должно.
-      const solid = (c) => { const m = /rgba?\([^)]*?,\s*([\d.]+)\s*\)$/.exec(String(c || '')); return !m || parseFloat(m[1]) > 0.01; };
-      const hasFill = cs.fill && cs.fill !== 'none' && parseFloat(cs.fillOpacity) > 0 && solid(cs.fill);
-      // Заливка цветом холста — это подложка, а не данные (Б6). У кружков она
-      // означает «пустая метка» и разбирается отдельно; у остальных фигур на
-      // бумаге ей делать нечего.
-      const bgFill = hasFill && tag !== 'circle' && sameColor(cs.fill, '#' + canvasColor());
-      /* Заливка штриховкой (Б41) — это не цвет, а ссылка на образец, и texHex
-         прочёл бы её как чёрный. В TikZ ей отвечает pattern, а цвет берём из
-         имени образца. */
-      const hatch = /hatch-(profit|loss)/.exec(String(cs.fill || ''));
-      const hatchOpt = hatch ? ('pattern=north east lines, pattern color=' +
-        colorName(hatch[1] === 'profit' ? COL.profit : COL.bad)) : null;
-      const hasStroke = cs.stroke && cs.stroke !== 'none' && (parseFloat(cs.strokeWidth) || 0) > 0 && solid(cs.stroke);
-
-      if (tag === 'path') {
-        const cid = el.getAttribute('data-curve');
-        if (cid && drawnByFormula.has(+cid)) continue;          // уже нарисована формулой
-        /* А49. Кривая сцены, объявившая свою формулу, уходит формулой, а не
-           таблицей из шестидесяти точек. Так на бумагу попадает настоящая
-           линия: она гладкая, файл читаемый, и правку в редакторе видно.
-           Помечает путь сама сцена (markExpr при отрисовке) — общий способ,
-           к которому может подключиться любой сюжет. */
-        const declared = el.getAttribute('data-expr');
-        if (declared && hasStroke) {
-          const pgf = mathToPgf(declared, el.getAttribute('data-expr-var') || 'Q');
-          if (pgf) {
-            const opts = pgfStroke(el, cs, colorName);
-            // Свой отрезок построения, если кривая его объявила (Б5): кусок
-            // кусочной кривой обязан оставаться на своём промежутке.
-            const dFrom = parseFloat(el.getAttribute('data-expr-from'));
-            const dTo = parseFloat(el.getAttribute('data-expr-to'));
-            const lo = isFinite(dFrom) ? Math.max(dFrom, xLo) : Math.max(0, xLo);
-            const hi2 = isFinite(dTo) ? Math.min(dTo, xHi) : xHi;
-            body.push('\\addplot[' + opts.join(', ') + ', domain=' + num(lo) + ':' + num(hi2) +
-                      ', samples=120, restrict y to domain=' + num(Math.max(0, yLo)) + ':' + num(yHi) +
-                      ', forget plot] {' + pgf + '};');
-            tally.curves++;
-            continue;
-          }
-        }
-        // Оцифровка идёт по пикселям, поэтому сначала переводим в координаты
-        // данных, а прореживаем уже ТАМ (texResample): иначе один и тот же
-        // график из окна пошире и поуже давал слегка разные наборы точек и,
-        // значит, разные файлы (А45).
-        const runs = texSamplePath(el)
-          .map(r => texResample(r.map(p => toData(p[0], p[1])), 60));
-        if (hasFill && !bgFill) {
-          if (runs.some(r => r.length >= 3)) countArea(el);
-          runs.forEach(r => {
-            if (r.length < 3) return;
-            body.push('\\fill[' + colorName(cs.fill) + ', opacity=' +
-              (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2) + '] ' +
-              r.map(p => '(axis cs:' + num(p[0]) + ',' + num(p[1]) + ')').join(' -- ') + ' -- cycle;');
-          });
-        }
-        if (hasStroke) {
-          // Кривая это путь, объявивший себя кривой; остальные штрихи (пунктиры
-          // к осям, засечки, рамки) — линии, и в описи они названы линиями.
-          if (runs.some(r => r.length >= 2)) {
-            if (cid || declared) tally.curves++;
-            else if (!inLegend(el)) tally.lines++;
-          }
-          runs.forEach(r => {
-            if (r.length < 2) return;
-            const why = el.getAttribute('data-numeric');
-            if (why) notes.push('% ' + why + ': выгружена точками');
-            else if (cid) notes.push('% кривая выгружена точками: её формулу pgfplots не понимает');
-            body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
-              r.map(p => pt(p[0], p[1])).join(' ') + '};');
-          });
-        }
-      } else if (tag === 'line') {
-        if (!hasStroke) continue;
-        if (!inLegend(el)) tally.lines++;
-        const a = toData(+el.getAttribute('x1'), +el.getAttribute('y1'));
-        const b = toData(+el.getAttribute('x2'), +el.getAttribute('y2'));
-        body.push('\\addplot[' + pgfStroke(el, cs, colorName).join(', ') + ', forget plot] coordinates {' +
-          pt(a[0], a[1]) + ' ' + pt(b[0], b[1]) + '};');
-      } else if (tag === 'rect') {
-        const x = +el.getAttribute('x'), y = +el.getAttribute('y');
-        const w = +el.getAttribute('width'), h = +el.getAttribute('height');
-        if (!(w > 0 && h > 0) || !hasFill || bgFill) continue;
-        const a = toData(x, y + h), b = toData(x + w, y);
-        if (!inView(a[0], a[1]) && !inView(b[0], b[1])) continue;
-        const rectOpt = hatchOpt || (colorName(cs.fill) + ', opacity=' +
-          (parseFloat(cs.fillOpacity) * parseFloat(cs.opacity || 1) || 0.2).toFixed(2));
-        if (hatchOpt) needPatterns = true;
-        countArea(el);
-        body.push('\\fill[' + rectOpt + '] ' +
-          '(axis cs:' + num(a[0]) + ',' + num(a[1]) + ') rectangle (axis cs:' + num(b[0]) + ',' + num(b[1]) + ');');
-      } else if (tag === 'circle') {
-        const c = toData(+el.getAttribute('cx'), +el.getAttribute('cy'));
-        if (!inView(c[0], c[1])) continue;
-        /* Кружок цветом холста — это ПУСТАЯ метка: на экране сквозь неё видно
-           фон, и человек читает её как незакрашенное кольцо. Сплошной точкой
-           того же цвета на бумаге получалось бы тёмное пятно там, где на
-           экране пусто, поэтому такую метку рисуем открытой. */
-        const hollow = hasFill && sameColor(cs.fill, '#' + canvasColor());
-        const col = colorName((hasFill && !hollow) ? cs.fill : cs.stroke);
-        const mark = hollow ? ', mark=o' : '';
-        tally.dots++;
-        body.push('\\addplot[' + col + ', only marks' + mark + ', mark size=' +
-          markPt(+el.getAttribute('r')).toFixed(1) + 'pt, forget plot] coordinates {' + pt(c[0], c[1]) + '};');
-      } else if (tag === 'text') {
-        const raw = labelPlainText(el);
-        // А46. Величина набирается формулой: Pb=60 уходит как $P_b = 60$, а не
-        // обычным текстом. Логика перевода ОДНА на экран, бумагу и панель
-        // (quantityTex), поэтому одна и та же величина не может быть написана
-        // на экране одним способом, а в файле другим.
-        const txt = quantityTex(raw);
-        if (!txt.trim()) continue;
-        if (!onScreen(el)) continue;                  // А47: только то, что видно
-        const c = toData(+el.getAttribute('x') || 0, +el.getAttribute('y') || 0);
-        /* ⚠️ ПОДПИСЬ КООРДИНАТЫ ЖИВЁТ ЗА ОСЬЮ, И ВЫБРАСЫВАТЬ ЕЁ ЗА ЭТО НЕЛЬЗЯ.
-           Решение владельца 19.08 увело числа за оси: цена левее оси цены,
-           количество ниже оси количества. В координатах данных это «снаружи
-           окна», и общая отсечка inView уносила из файла ВСЕ подписи координат
-           разом — на бумаге пунктиры вели к осям и упирались в пустоту, ровно
-           как это было на экране. Поэтому такую подпись не выбрасываем, а
-           прижимаем к оси; наружу её отодвинет тот же сдвиг в пунктах, что
-           применяется к подписи, севшей на саму ось (ниже). */
-        const isCoord = el.classList && el.classList.contains('coord-num');
-        if (isCoord) {
-          c[0] = Math.min(xHi, Math.max(xLo, c[0]));
-          c[1] = Math.min(yHi, Math.max(yLo, c[1]));
-        } else if (!inView(c[0], c[1])) continue;
-        const ha = { start: 'west', middle: '', end: 'east' }[cs.textAnchor] ?? '';
-        const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || '';
-        const va = (bl === 'hanging' || bl === 'text-before-edge') ? 'north'
-                 : (bl === 'middle' || bl === 'central') ? '' : 'base';
-        const anchor = (va + (va && ha ? ' ' : '') + ha).trim() || 'base';
-        if (inLegend(el)) tally.legend = true; else tally.labels++;
-        const fs = texPt(el, cs);
-        const opt = ['anchor=' + anchor, 'text=' + colorName(cs.fill),
-                     'font=\\fontsize{' + fs + '}{' + (fs * 1.15).toFixed(1) + '}\\selectfont',
-                     'inner sep=1pt'];
-        /* Подпись, севшая ровно на ось, отодвигается ВНУТРЬ поля (Б8). На
-           экране между числом и осью есть зазор в несколько пикселей, но он
-           живёт в координатах вне окна и при переводе в данные схлопывается
-           на границу: на бумаге число упиралось в саму ось и вылезало за
-           рамку рисунка. Сдвиг задаём в пунктах — он не зависит от масштаба. */
-        const spanX = Math.abs(xHi - xLo), spanY = Math.abs(yHi - yLo);
-        const onLeft = Math.abs(c[0] - xLo) < spanX * 3e-3;
-        const onBottom = Math.abs(c[1] - yLo) < spanY * 3e-3;
-        if (onLeft && /east/.test(anchor)) opt.push('xshift=-3pt');
-        if (onLeft && /west/.test(anchor)) opt.push('xshift=3pt');
-        if (onBottom && /north/.test(anchor)) opt.push('yshift=-3pt');
-        if (onBottom && anchor === 'base') opt.push('yshift=3pt');
-        body.push('\\node[' + opt.join(', ') + '] at (axis cs:' + num(c[0]) + ',' + num(c[1]) + ') {' + txt + '};');
-      }
-    }
-  };
-  walk(svgEl);
-
-  const cap = texText(title || STATE.graphTitle || '');
-  const lab = String(label || '').trim().replace(/[^A-Za-z0-9:_-]/g, '');
-  const xName = texText(STATE.axisXName || STATE.axisXDefault || 'Q');
-  const yName = texText(STATE.axisYName || STATE.axisYDefault || 'P');
-  const uniq = [];
-  notes.forEach(n => { if (uniq.indexOf(n) < 0) uniq.push(n); });
-
-  return [
-    '% Собран калькулятором «Экономика 2.0». Компилируется обычным pdflatex.',
-    '\\documentclass[12pt,a4paper]{article}',
-    '\\usepackage[T2A]{fontenc}',
-    '\\usepackage[utf8]{inputenc}',
-    '\\usepackage[english,russian]{babel}',
-    '\\usepackage{pgfplots}',
-    '\\pgfplotsset{compat=1.18}',
-    '\\usetikzlibrary{arrows.meta}',
-    needPatterns ? '\\usetikzlibrary{patterns}' : '',
-    '\\usepackage{geometry}',
-    '\\geometry{margin=2cm}',
-    ...defs,
-    '',
-    '\\begin{document}',
-    '',
-    '\\begin{figure}[h]',
-    '\\centering',
-    '\\begin{tikzpicture}',
-    // Список настроек осей идёт ОДНОЙ строкой намеренно. Пустая строка внутри
-    // \begin{axis}[...] обрывает абзац, и pgfplots падает с «Paragraph ended
-    // before \pgfplots@@environment@axis was complete». Пустая строка тут
-    // берётся не из нашего кода, а из удвоенных переводов строк по дороге на
-    // сервер (см. normalize_newlines в calc2/views.py). Сервер это чинит, а
-    // одна строка не даёт пустой строке появиться в принципе.
-    '\\begin{axis}[' + [
-      'width=' + texPlotSize().w + 'cm, height=' + texPlotSize().h + 'cm',
-      // Размер относится к самому полю графика, а не ко всей картинке вместе
-      // с подписями: только так сантиметр на единицу совпадает с экраном.
-      'scale only axis',
-      'xmin=' + num(xLo) + ', xmax=' + num(xHi) + ', ymin=' + num(yLo) + ', ymax=' + num(yHi),
-      'xlabel={' + xName + '}, ylabel={' + yName + '}',
-      'axis lines=left, axis line style={-{Stealth[length=6pt]}}',
-      'xlabel style={at={(axis description cs:1,0)}, anchor=west}',
-      'ylabel style={at={(axis description cs:0,1)}, anchor=south, rotate=-90}',
-      STATE.showGrid ? 'grid=major, grid style={very thin, gray!25}' : '',
-    ].filter(Boolean).join(', ') + ']',
-    ...uniq,
-    ...body,
-    '\\end{axis}',
-    '\\end{tikzpicture}',
-    cap ? '\\caption{' + cap + '}' : '',
-    lab ? '\\label{' + lab + '}' : '',
-    '\\end{figure}',
-    '',
-    '\\end{document}',
-  ].filter(s => s !== '').join('\n');
-}
-/* КАКОЙ СБОРЩИК РАБОТАЕТ.
-   Фаза 11: по умолчанию по-прежнему СТАРЫЙ, новый включается параметром
-   адреса `?texState=1`. Переключение по умолчанию — отдельный стоп-гейт
-   (фаза 12), и делается оно только после зелёного аудита и просмотра
-   собранного PDF глазами. */
-function texWantState() {
-  try { return new URLSearchParams(location.search).get('texState') === '1'; }
-  catch (e) { return false; }
-}
+/* ЕДИНСТВЕННАЯ ДВЕРЬ ВЫГРУЗКИ .tex (решение владельца 07.10.2026, ADR 0139):
+   бумажный прогон → опись → сборка (72-export-tex.js). Её зовут «Скачать TeX»,
+   «Скачать PDF», окно «Скачать» и приборы. Прежние сборщики (обход SVG и
+   сборка «от состояния», ADR 0030) удалены вместе с переключателем адреса. */
 function buildTex(title, label) {
-  const fromState = texWantState();
-  const out = fromState ? buildTexFromState(title, label) : buildTexLegacy(title, label);
-  buildTex._tally = (fromState ? buildTexFromState._tally : buildTexLegacy._tally) || {};
-  return out;
+  const r = texEmit(texInventory(), { title: title || '', label: label || '' });
+  buildTex._tally = r.tally;      // опись окна «Скачать»
+  buildTex._stats = r.stats;      // счётчики сборки (приборы и тесты)
+  return r.tex;
+}
+
+/* Шрифты — до бумажного прогона: поля холста считаются по измеренной ширине
+   подписей, и кадр до загрузки шрифтов даёт поля на 3–5 px другие. */
+function afterFonts(fn) {
+  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(fn, fn);
+  else fn();
 }
 
 function exportTex() {
-  const title = (document.getElementById('exp-title') || {}).value || '';
-  const label = (document.getElementById('exp-label') || {}).value || '';
-  const tex = buildTex(title, label);
-  downloadBlob(new Blob([tex], { type: 'text/plain;charset=utf-8' }), exportBaseName() + '.tex');
-  toast('Файл .tex сохранён');
+  afterFonts(() => {
+    const title = (document.getElementById('exp-title') || {}).value || '';
+    const label = (document.getElementById('exp-label') || {}).value || '';
+    const tex = buildTex(title, label);
+    downloadBlob(new Blob([tex], { type: 'text/plain;charset=utf-8' }), exportBaseName() + '.tex');
+    toast('Файл .tex сохранён');
+  });
 }
 
 function exportPDF() {
   const title = (document.getElementById('exp-title') || {}).value || '';
   const label = (document.getElementById('exp-label') || {}).value || '';
-  const btn = document.getElementById('exp-pdf');
+  const btn = document.getElementById('exp-go');
   if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
+  afterFonts(() => exportPDFSend(title, label, btn));
+}
+function exportPDFSend(title, label, btn) {
   const body = new FormData();
   body.append('tex', buildTex(title, label));
   body.append('name', exportBaseName());
@@ -2266,13 +1901,23 @@ function exportPDF() {
     .then(r => r.ok ? r.blob() : r.text().then(t => { throw new Error(t.slice(0, 200)); }))
     .then(b => { downloadBlob(b, exportBaseName() + '.pdf'); toast('PDF готов'); })
     .catch(e => toast('PDF не собрался: ' + e.message))
-    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Скачать PDF'; } });
+    .finally(() => { if (btn) { btn.disabled = false; syncExportFormat(); } });
 }
 
 /* Поля окна экспорта правятся НА МЕСТЕ, как и всё остальное в калькуляторе
    (А50): щелчок по значению открывает правку прямо там, без окошка внутри
    окошка. Скрытые input сохранены как хранилище значения, чтобы весь
    остальной код (exportTex, exportPDF) читал их прежним способом. */
+/* Заголовок окна «Скачать» по МОДЕЛИ (решение владельца 09.10, ADR 0144).
+   Человек не правил заголовок в этой модели — при каждом открытии окна в нём
+   название модели (или заголовок графика); правил — остаётся его текст, пока
+   модель та же. Прежде поле заполнялось, только когда было пустым, и
+   «КТВ. Одна страна» выгружалась под именем «Построение графиков.tex».
+   Правки живут в памяти страницы: окно — не модель, в историю и в форму они
+   не идут (formNodes, 89-model-state.js). */
+const EXP_TITLE_BY_MODEL = {};
+function exportTitleDefault() { return STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || ''; }
+
 function buildExportFields() {
   [['exp-title', 'exp-title-slot', 'Например: Рынок хлеба'],
    ['exp-label', 'exp-label-slot', 'Например: fig:bread']].forEach(([id, slotId, hint]) => {
@@ -2282,30 +1927,47 @@ function buildExportFields() {
     slot.appendChild(makeEditableValue({
       kind: 'text',
       get: () => inp.value || '',
-      set: (v) => { inp.value = String(v == null ? '' : v).trim(); refreshExportPreview(); },
+      set: (v) => {
+        inp.value = String(v == null ? '' : v).trim();
+        /* Правил руками — помним по модели. Правка тоже зовёт set при Escape и
+           при Enter без изменений: текст, равный названию модели, правкой не считаем. */
+        if (id === 'exp-title') {
+          if (inp.value !== exportTitleDefault()) EXP_TITLE_BY_MODEL[STATE.sceneKey] = inp.value;
+          else delete EXP_TITLE_BY_MODEL[STATE.sceneKey];
+        }
+        refreshExportPreview(); refreshExportSheet();
+      },
       fmt: (v) => (String(v || '').trim() || hint),
       title: 'Щёлкните, чтобы изменить',
     }));
   });
 }
 
-/* Предпросмотр: что именно уйдёт в файл. Раньше человек жал «Скачать» вслепую. */
+/* Предпросмотр: что именно уйдёт в файл. Раньше человек жал «Скачать» вслепую.
+   Опись холста берётся ОДИН раз на открытие окна: бумажный прогон стоит
+   100–600 мс, а окно перестраивает опись на каждую правку поля заголовка;
+   под окном модель не меняется, на правку идёт только сборка. */
+let _expList = null;
 function refreshExportPreview() {
   const box = document.getElementById('exp-preview');
   if (!box) return;
-  let tex = '';
-  try { tex = buildTex(expValue('exp-title'), expValue('exp-label')); } catch (e) { tex = ''; }
-  if (!tex) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
-  const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
+  let r = null;
+  try {
+    if (!_expList) _expList = texInventory();
+    r = texEmit(_expList, { title: expValue('exp-title'), label: expValue('exp-label') });
+  } catch (e) { r = null; }
+  if (!r || !r.tex || !_expList.panels.length) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
+  const cm = (v) => String(v).replace('.', ',');
+  const size = r.tally.plotCm ? [cm(r.tally.plotCm[0]), cm(r.tally.plotCm[1])] : null;
   /* п. 70. Опись перечисляет то, что человек видит на графике, и его словами.
      «Кривых формулой» и «Кривых точками» — это про устройство файла: у одной
      и той же кривой разрыв даёт несколько записей, и на экране с двумя
      кривыми стояло «Кривых точками 10». Как именно кривая записана в файле,
      человека не касается: он выбирает, скачивать или нет. */
-  const t = buildTex._tally || {};
+  const t = r.tally || {};
   const cap = expValue('exp-title');
   const rows = [
-    ['Размер картинки', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
+    ['Размер картинки', size ? size[0] + ' на ' + size[1] + ' см' : 'по умолчанию'],
     ['Кривых', String(t.curves || 0)],
     ['Закрашенных областей', String(t.areas || 0)],
     ['Точек', String(t.dots || 0)],
@@ -2326,14 +1988,74 @@ function refreshExportPreview() {
 
 function expValue(id) { const el = document.getElementById(id); return el ? el.value : ''; }
 
+/* Формат и одна кнопка «Скачать …» (README макета, раздел 10). */
+const EXPORT_FORMATS = {
+  png: { btn: 'Скачать PNG', note: 'Картинка с двойной чёткостью для презентации и конспекта.' },
+  pdf: { btn: 'Скачать PDF', note: 'Лист A4 с полями для печати и домашки.' },
+  /* Выгружается целый документ, и собирается он только pdfLaTeX: под XeLaTeX
+     кириллица раньше молча пропадала (теперь файл сам остановит сборку). */
+  tex: { btn: 'Скачать TeX', note: 'Готовый документ LaTeX. Собирайте через pdfLaTeX, в Overleaf: Menu\u00a0→ Compiler\u00a0→ pdfLaTeX.' },   // путь в Overleaf не рвём по строкам
+};
+let exportFormat = 'png';
+function syncExportFormat() {
+  const f = EXPORT_FORMATS[exportFormat] || EXPORT_FORMATS.png;
+  document.querySelectorAll('#exp-fmt .seg-btn').forEach(b => {
+    const on = b.dataset.fmt === exportFormat;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  const go = document.getElementById('exp-go'); if (go) go.textContent = f.btn;
+  const note = document.getElementById('exp-fmt-note'); if (note) note.textContent = f.note;
+  // Метка для перекрёстной ссылки нужна только файлу LaTeX (К4).
+  const lf = document.getElementById('exp-label-field'); if (lf) lf.hidden = (exportFormat === 'png');
+}
+function refreshExportSheet() {
+  const ex = exportExtras();
+  const tt = document.getElementById('exp-sheet-title'); if (tt) { tt.textContent = ex.title; tt.hidden = !ex.title; }
+  const cp = document.getElementById('exp-sheet-cap'); if (cp) { cp.textContent = ex.cap; cp.hidden = !ex.cap; }
+  const nm = document.getElementById('exp-sheet-nums'); if (nm) { nm.textContent = ex.nums; nm.hidden = !ex.nums; }
+  const img = document.getElementById('exp-sheet-img');
+  if (img) exportPNG(1, img);
+}
+function wireExport() {
+  document.querySelectorAll('#exp-fmt .seg-btn').forEach(b => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    exportFormat = b.dataset.fmt; syncExportFormat(); refreshExportPreview();
+  }));
+  const go = document.getElementById('exp-go');
+  if (go) go.addEventListener('click', () => {
+    if (exportFormat === 'tex') exportTex();
+    else if (exportFormat === 'pdf') exportPDF();
+    else exportPNG(2);   // 2× — читаемо в печати
+  });
+  const x = document.getElementById('exp-x'); if (x) x.addEventListener('click', () => closeExport());
+  ['exp-caption', 'exp-nums'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener(e.type === 'checkbox' ? 'change' : 'input', () => refreshExportSheet());
+  });
+  // Окно модальное: Tab ходит по кругу внутри (DESIGN.md 2.15).
+  const m = document.getElementById('export-modal');
+  if (m) m.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const list = [...m.querySelectorAll('button:not([disabled]), input:not([type=hidden]), [tabindex="0"]')].filter(el => el.offsetParent !== null);
+    if (!list.length) return;
+    const first = list[0], last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  syncExportFormat();
+}
+
 function openExport() {
   const m = document.getElementById('export-modal');
   if (!m) return;
   const t = document.getElementById('exp-title');
-  if (t && !t.value) t.value = STATE.graphTitle || SCENE_NAMES[STATE.sceneKey] || '';
+  if (t) t.value = (STATE.sceneKey in EXP_TITLE_BY_MODEL) ? EXP_TITLE_BY_MODEL[STATE.sceneKey] : exportTitleDefault();
   m.classList.add('open');
   m.removeAttribute('inert');
   buildExportFields();
+  _expList = null;                 // опись — заново на каждое открытие окна
+  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { _expList = null; refreshExportPreview(); });
   const slot = document.getElementById('exp-title-slot');
   const ed = slot && slot.querySelector('.edval');
   if (ed && ed._repaint) ed._repaint();
@@ -2341,6 +2063,8 @@ function openExport() {
   const ed2 = slot2 && slot2.querySelector('.edval');
   if (ed2 && ed2._repaint) ed2._repaint();
   refreshExportPreview();
+  syncExportFormat();
+  refreshExportSheet();
   if (ed) ed.focus();
 }
 function closeExport() {
@@ -2348,6 +2072,7 @@ function closeExport() {
   if (!m) return;
   m.classList.remove('open');
   m.setAttribute('inert', '');
+  _expList = null;
   const b = document.getElementById('dock-export'); if (b) b.focus();
 }
 
@@ -2373,46 +2098,50 @@ function updateGraphPanel() {
       + graphExplainNote(0);
     return;
   }
-  const { mx } = mainScales();
-  const [lo, hi] = mx.domain();
+  /* ⚠️ ОТВЕТ СЧИТАЕТСЯ НА ОТРЕЗКЕ ОТВЕТА, А НЕ В ОКНЕ (ADR 0143). Раньше
+     здесь стояло mx.domain(): приближение к вершине x² − 4 меняло «−2; 2» на
+     «в окне не пересекает», и колонка «Ответ» дёргалась от колеса. */
+  const seg = _ansSeg || answerSeg();
+  const lo = seg.a, hi = seg.b;
   let html = '';
+  const fns = [];
+  const many = shown.length > 1;
   shown.forEach(c => {
     const f = (x) => evalCurve(c, x);
+    fns.push(f);
     const name = curveShortName(c);
-    const zeros = rootsOf(f, lo, hi, 700).filter(x => isFinite(f(x)));
-    const y0 = f(0);
-    // Экстремумы: нули производной со сменой знака (тот же приём, что в «Оптимизации»).
-    const h = (hi - lo) * 1e-4;
-    const d1 = (x) => (f(x + h) - f(x - h)) / (2 * h);
-    const ext = rootsOf(d1, lo, hi, 500).filter(x => isFinite(f(x)));
-    html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
+    const r = ansAnalyse(f, lo, hi);
+    /* Кривых несколько — у подписи величины обозначение кривой. В колонке
+       «Ответ» приписка снимается: строки кривой стоят под её заголовком —
+       цветная точка и запись (строка «Кривая» — источник заголовка, ADR 0144). */
+    const tail = many ? ansCtx(', кривая ' + name) : '';
+    const g = ` data-ans-group="${ansAttr(name)}"`;
+    html += `<div class="stat" data-ans-head="${ansAttr(name)}" data-color="${ansAttr(c.color || '')}" data-tex="${ansAttr(graphHeadTex(c, name))}"><span>Кривая</span><b>${name}</b></div>`;
     /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
        Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
        была десятичным знаком, прочитать это невозможно. Десятичная запятая —
-       требование канона 2.1, значит менять надо разделитель. Стало «0; 1». */
-    /* ⚠️ `.map(fmt)` ПЕРЕДАЁТ В fmt НОМЕР ЭЛЕМЕНТА ВТОРЫМ ДОВОДОМ, а второй
-       довод у fmt — «сколько знаков после запятой печатать не меньше». Поэтому
-       первый корень печатался как «0», а второй тем же числом знаков, что его
-       номер: «1,0». Именно это и увидел владелец в записи «0, 1,0» — половина
-       беды была не в разделителе списка, а здесь. */
-    html += `<div class="stat"><span>Пересекает ось $x$</span><b>${
-      zeros.length ? zeros.map(v => fmt(v)).join('; ') : 'в окне не пересекает'}</b></div>`;
-    html += `<div class="stat"><span>Пересекает ось $y$</span><b>${
-      (lo <= 0 && hi >= 0 && isFinite(y0)) ? fmt(y0) : 'ось вне окна'}</b></div>`;
-    if (ext.length) {
-      html += `<div class="stat"><span>Вершины</span><b>${
-        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join('; ')}</b></div>`;
-    }
+       требование канона 2.1, значит менять надо разделитель. Стало «0; 1».
+       ⚠️ fmt не отдавать в .map напрямую: второй довод у fmt — число знаков. */
+    html += `<div class="stat ans-main"${g}><span>Пересекает ось $x$${tail}</span><b>${ansList(r.zeros)}</b></div>`;
+    html += `<div class="stat ans-main"${g}><span>Пересекает ось $y$${tail}</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
+    // «Вершины» второстепенной строкой больше нет: максимум и минимум — главные величины.
+    html += ansExtremaRows(r, tail, name);
   });
-  // Пересечения кривых между собой — их уже считает общий движок ключевых точек.
-  const crosses = (typeof keyTargets === 'function' ? keyTargets() : [])
-    .filter(p => p.kind === 'cross');
-  /* ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ. Строка выводилась всегда и
-     повторяла точки пересечения с осями под другим заголовком: те же числа
-     дважды, причём второй раз под названием, которое их не описывает. */
-  if (crosses.length && shown.length > 1) {
-    html += `<div class="stat"><span>Кривые пересекаются</span><b>${
-      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join('; ')}</b></div>`;
+  /* Пересечения кривых между собой — нули разности на том же отрезке (раньше
+     брались у ключевых точек холста, то есть тоже по окну).
+     ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ: строки нет. */
+  /* По строке на пару (решение владельца 09.10, ADR 0144): «f и g» →
+     «(−2; 0); (3; 5)», пара без общих точек → «нет». */
+  if (fns.length > 1) {
+    const names = shown.map(c => curveShortName(c));
+    for (let i = 0; i < fns.length; i++) for (let j = i + 1; j < fns.length; j++) {
+      const cr = [];
+      ansCrosses(fns[i], fns[j], lo, hi).forEach(p => {
+        if (!cr.some(q => Math.abs(q.x - p.x) < (hi - lo) * 1e-6 && Math.abs(q.y - p.y) < 1e-6 * (1 + Math.abs(p.y)))) cr.push(p);
+      });
+      cr.sort((a, b) => a.x - b.x);
+      html += `<div class="stat ans-main" data-ans-group="Пересечения кривых"><span>${ansCtx('Пересечения кривых ')}${ansNameMd(names[i])} и ${ansNameMd(names[j])}</span><b>${ansPts(cr)}</b></div>`;
+    }
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }

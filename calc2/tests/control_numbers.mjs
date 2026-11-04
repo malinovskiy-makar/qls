@@ -9,12 +9,17 @@
    код запрещено: числа выверены и приняты владельцем.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import {parseShown,shownEquivalent,installShownReader} from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 950 } })).newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
@@ -24,13 +29,17 @@ await page.fill('#id_password', PASS);
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle' }), page.click('button[type=submit]')]);
 await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
+await installShownReader(page);
 
 let bad = 0, total = 0;
+{ const sh = await answerShown(page); total++; if (!sh) bad++; console.log('  ' + (sh ? 'OK  ' : 'FAIL') + ' предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
 const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
 function head(s) { console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 62 - s.length))); }
 function cmp(label, got, want, tol) {
   total++;
-  const ok = (typeof got === 'number' && isFinite(got)) ? Math.abs(got - want) <= tol : (got === want);
+  const parsed = typeof got === 'string' && typeof want === 'number' ? parseShown(got) : got;
+  const ok = (typeof parsed === 'number' && isFinite(parsed)) ? Math.abs(parsed - want) <= tol
+    : typeof got === 'string' && typeof want === 'string' ? shownEquivalent(got,want) : got === want;
   if (!ok) bad++;
   console.log('  ' + (ok ? 'OK  ' : 'FAIL') + ' ' + label.padEnd(46)
     + 'ожидалось ' + String(want).padEnd(12) + 'получилось ' + num(got));
@@ -226,7 +235,8 @@ cmp('MSC = Q + 20: рыночное Q', r.qm, 50, 0.3);
 cmp('MSC = Q + 20: оптимум Q', r.q, 40, 0.4);
 cmp('MSC = Q + 20: DWL', r.dwl, 100, 2);
 cmp('MSC = Q + 20: налог Пигу', r.tax, 20, 0.2);
-r = await run(`resetSceneMemory(); loadScene('ext'); STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+/* С 24.10 старт «Внешних эффектов» — MSC = Q + 20 и видна (решение …81e7…): положительный случай гасит её сам. */
+r = await run(`resetSceneMemory(); loadScene('ext'); STATE.mscOn = false; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
   recompileSocial(); redrawAll();
   var e = STATE.ext || {};
   return { qm: e.Qmkt, q: e.Qopt, dwl: e.dwl, sub: -e.corrective };`);
@@ -457,7 +467,9 @@ cmp('PS', r.ps, 1325, 1e-3);
    ================================================================ */
 const AREA = `
   var areaOf = function (legend) {
-    var el = document.querySelector('#chart [data-legend="' + legend + '"]');
+    var el = legend === 'Излишек производителя (TR - VC)'
+      ? document.querySelector('#chart [data-legend^="Излишек производителя"]')
+      : document.querySelector('#chart [data-legend="' + legend + '"]');
     if (!el) return 0;
     var pts = [];
     String(el.getAttribute('d') || '').replace(
@@ -471,7 +483,7 @@ const AREA = `
     }
     return Math.abs(a) / 2;
   };
-  var CSA = 'Излишек покупателя (CS)', PSA = 'Излишек производителя (TR - VC)';
+  var CSA = 'Излишек потребителя (CS)', PSA = 'Излишек производителя (TR - VC)';
   var VCA = 'Переменные издержки (VC)', DWLA = 'Потери общества (DWL)';
 `;
 
@@ -956,8 +968,10 @@ const PANEL = `
   /* Абзац ПРО ВМЕШАТЕЛЬСТВО, а не весь разбор сцены. Общий рассказ сцены
      «Потолок и пол цены» законно называет оба случая сразу, поэтому искать
      в нём слово «дефицит» бессмысленно: оно там есть всегда. */
+  /* С 14.10 первыми в «Разборе» стоят заметки, ушедшие из «Ответа» (.ex-from-answer, тихие панели,
+     README пакета calc2_panels_20261014, 5); абзац про вмешательство — первый после них. */
   var intervPara = function () {
-    var e = document.querySelector('#ex-body .sb-note');
+    var e = document.querySelector('#ex-body .sb-note:not(.ex-from-answer)');
     return e ? (e.textContent || '').replace(/\\s+/g, ' ').trim() : '';
   };
   var panelText = function () {
@@ -971,26 +985,35 @@ const PANEL = `
   };
 `;
 
-head('Сессия 01.09 (3) · карточки справа сворачиваются при смене модели');
+/* ⚠️ ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а; журнал, «Перенацеленные проверки»).
+   Было правило прежней раскладки: «после смены модели справа раскрытых карточек
+   ноль, слева ровно одна». Сворачивание карточек убрано по закрытому списку
+   (пункт (д)): секции всегда раскрыты, колонка прокручивается. Новое правило про
+   то же самое — смена модели не прячет ни одной секции: в обеих колонках каждая
+   видимая секция раскрыта, кнопок сворачивания нет. Второй край у каждой
+   проверки (секций больше нуля), чтобы пустая разметка не прошла вхолостую. */
+head('Сессия 01.09 (3) · карточки не сворачиваются: смена модели ничего не прячет');
 r = await run(PANEL + `resetSceneMemory(); pickScene('sd'); redrawAll();
-  openSection('scoreboard'); openSection('explain');
+  var vis = function (e) { return e.offsetParent !== null && e.getClientRects().length > 0; };
+  var count = function (sel) { return Array.prototype.filter.call(document.querySelectorAll(sel), vis).length; };
   var before = opened('#params-panel .side-part > .fold-body');
   resetSceneMemory(); pickScene('mono'); redrawAll();
   var after = opened('#params-panel .side-part > .fold-body');
-  var left = opened('#tools-panel .tools-body > .section > .fold-body');
+  /* Считаются только ВИДИМЫЕ секции: «Параметры» без ползунков не
+     показываются вовсе (ползунки кривых стоят под карточками, фаза 5б). */
+  var leftOpen = Array.prototype.filter.call(document.querySelectorAll('#tools-panel .tools-body > .section'), vis)
+    .filter(function (s) { var f = s.querySelector(':scope > .fold-body'); return f && f.classList.contains('open'); }).length;
+  var leftAll = count('#tools-panel .tools-body > .section');
   var inp = document.getElementById('sec-input');
   var inpOpen = (inp && inp.querySelector(':scope > .fold-body').classList.contains('open')) ? 1 : 0;
-  return { before: before, after: after, left: left, inpOpen: inpOpen };`);
-cmp('раскрыли две карточки справа', r.before, 2, 0);
-cmp('после смены модели справа раскрытых нет', r.after, 0, 0);
-/* Слева раскрытой остаётся РОВНО ОДНА карточка — «Ввод функций»: она открыта
-   всегда и во всех моделях (решение владельца 22.08), и правило это. */
-cmp('слева раскрыт ровно «Ввод функций»', r.left, 1, 0);
-cmp('и это именно он', r.inpOpen, 1, 0);
-r = await run(PANEL + `resetSceneMemory(); pickScene('mono'); redrawAll();
-  openSection('scoreboard');
-  return { ok: opened('#params-panel .side-part > .fold-body') };`);
-cmp('прибор по-прежнему может раскрыть карточку сам', r.ok, 1, 0);
+  return { before: before, after: after, leftOpen: leftOpen, leftAll: leftAll, inpOpen: inpOpen,
+           folds: document.querySelectorAll('.app .fold-btn').length };`);
+cmp('в «Ответе» обе части раскрыты', r.before, 2, 0);
+cmp('после смены модели в «Ответе» раскрыты обе', r.after, 2, 0);
+cmp('в «Условии» видимых секций больше нуля', r.leftAll > 0 ? 1 : 0, 1, 0);
+cmp('в «Условии» раскрыта каждая видимая секция', r.leftOpen, r.leftAll, 0);
+cmp('«Функции» раскрыты', r.inpOpen, 1, 0);
+cmp('кнопок сворачивания нет', r.folds, 0, 0);
 
 head('Сессия 01.09 (3) · пояснения вмешательства переехали в «Объяснение модели»');
 for (const [tag, setup, mark] of [
@@ -1048,25 +1071,27 @@ cmp('«Неравенство»: сам ползунок α на месте', r.
    СЕССИЯ 01.09 (3) · ПОЛЯ ВВОДА И СПИСКИ.
    ================================================================ */
 head('Сессия 01.09 (3) · выделение в поле формулы видно');
+// Проверяем видимый спрос этой сцены. Первый .f-slot страницы может
+// принадлежать скрытой модели (четыре поля bigopen стоят раньше рынка).
 r = await run(`resetSceneMemory(); pickScene('sd'); redrawAll();
-  var inp = document.querySelector('.f-slot input[type=text]');
+  var inp = document.getElementById('curve-expr-1');
   inp.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   inp.focus();
   return { woke: 1 };`);
 await page.waitForTimeout(700);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp && inp._mf;
   if (!mf) return { noMf: 1 };
   mf.blur();
   return { blurred: 1 };`);
 await page.waitForTimeout(200);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp._mf;
   mf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   mf.focus();
   return { ok: 1 };`);
 await page.waitForTimeout(500);
-r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+r = await run(`var inp = document.getElementById('curve-expr-1');
   var mf = inp._mf, sr = mf.shadowRoot;
   var box = sr.querySelector('.ML__selection');
   var cs = box ? getComputedStyle(box) : null;
@@ -1149,7 +1174,7 @@ cmp('пол 101: потери общества', r.dwl, 2500, 1e-3);
 /* ================================================================
    СЕССИЯ 01.09 (3) · РАЗДЕЛ «МАТЕМАТИКА».
    ================================================================ */
-head('Сессия 01.09 (3) · производная: регуляторы переехали в аналитику');
+head('Сессия 01.09 (3) · производная: регуляторы рядом со смыслом, в «Условии»');
 r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
   var inSide = function (id, panel) {
     var e = document.getElementById(id);
@@ -1160,15 +1185,22 @@ r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
   return { x0right: inSide('mathx0-field', '#params-panel'),
            x0left: inSide('mathx0-field', '#tools-panel'),
            secRight: inSide('math-secant-row', '#params-panel'),
+           secLeft: inSide('math-secant-row', '#tools-panel'),
            dxRight: inSide('mathdx-field', '#params-panel'),
+           dxLeft: inSide('mathdx-field', '#tools-panel'),
            dxShown: (document.getElementById('mathdx-field').style.display !== 'none') ? 1 : 0,
            inputLeft: inSide('inp-mathf', '#tools-panel'),
            numHidden: document.getElementById('mathx0-input').classList.contains('reg-num-hidden') ? 1 : 0,
            eq: !!document.querySelector('#mathx0-field .reg-eq') };`);
-cmp('ползунок x₀ в правой панели', r.x0right, 1, 0);
-cmp('его в левой больше нет', r.x0left, 0, 0);
-cmp('секущая тоже справа', r.secRight, 1, 0);
-cmp('её ползунок Δx уехал вместе с ней', r.dxRight, 1, 0);
+/* ⚠️ ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): было «регуляторы переехали в
+   правую панель». Решение владельца 27.09: ползунок стоит рядом со своим смыслом
+   в «Условии», правая колонка — «Ответ» (пункт (з) закрытого списка). */
+cmp('ползунок x₀ в «Условии»', r.x0left, 1, 0);
+cmp('в «Ответе» его нет', r.x0right, 0, 0);
+cmp('секущей нет в «Ответе»', r.secRight, 0, 0);
+cmp('секущая тоже в «Условии»', r.secLeft, 1, 0);   // положительный край (независимое ревью фазы 11)
+cmp('её ползунок Δx не в «Ответе»', r.dxRight, 0, 0);
+cmp('её ползунок Δx в «Условии»', r.dxLeft, 1, 0);
 cmp('и показался вместе с галочкой', r.dxShown, 1, 0);
 cmp('ввод функции остался слева', r.inputLeft, 1, 0);
 cmp('x₀ получил общий компонент регулятора', r.eq, true, 0);
@@ -1288,6 +1320,365 @@ await page.waitForTimeout(900);
 r = await run(`return { qc: (STATE.kinked || {}).Qc, q: CONFIG.Qmax };`);
 cmp('конкурентный выпуск', r.qc, 120, 1e-3);
 cmp('окно достало до конца потерь', r.q >= 120, true, 0);
+
+/* --- А1 24.10 (ADR 0157): монополия — максимум прибыли, «Итоговая функция» Q(P) ------
+   Числа сверены перебором и вручную (задачи Бахарева 6.4в, 6.5а, 9.13). Правила:
+   выпуск — наибольшая прибыль TR − VC по кандидатам, а не первый корень MR = MC;
+   убывающая MC кончается там, где падает до нуля (решение 24.10, Notion …81ba…);
+   безразличие — оба варианта словами (…81e0…); запись Q(P) после вмешательства — Q(P). */
+const A1 = `
+  var plain = function (el) { if (!el) return ''; var c = el.cloneNode(true);
+    [].forEach.call(c.querySelectorAll('.katex-mathml, annotation'), function (n) { n.remove(); }); return c.textContent.replace(/\\s+/g, ' '); };
+  var raws = function () { return [].slice.call(document.querySelectorAll('#chart [data-raw]')).map(function (e) { return e.getAttribute('data-raw'); }); };
+  var legends = function () { return [].slice.call(document.querySelectorAll('#chart [data-legend]')).map(function (e) { return e.getAttribute('data-legend'); }); };
+  var status = function () { return plain(document.getElementById('ans-status')); };
+  var ffTex = function () { var a = document.querySelector('#info-final annotation'); var all = document.querySelectorAll('#info-final annotation');
+    a = all.length ? all[all.length - 1] : null; return a ? a.textContent.replace(/\\\\cdot/g, '*').replace(/\\s/g, '') : ''; };
+`;
+head('А1 24.10 · монополия: максимум прибыли, а не первый корень MR = MC');
+for (const [mc, want] of [
+  ['160-4*Q', { Q: 40, P: 80, gain: 0, tie: 1, none: 0 }],
+  ['150-3*Q', { Q: 0, P: 120, none: 1 }],
+  ['Q^2-42*Q+520', { Q: 0, P: 120, none: 1 }],
+  ['2*Q', { Q: 30, P: 90, gain: 1800, tie: 0, none: 0 }],
+  ['40', { Q: 40, P: 80, gain: 1600, tie: 0, none: 0 }]]) {
+  r = await run(MKT + A1 + `setDS('mono', '120-P', '${mc}'); redrawAll();
+    var m = STATE.mono || {};
+    return { found: STATE.mono ? 1 : 0, Q: m.Qm, P: m.Pm, gain: m.gain, alts: (m.alts || []).join(','), none: m.noProd ? 1 : 0,
+      panel: plain(document.getElementById('info-mono')),
+      M: raws().indexOf('M') >= 0 ? 1 : 0, areas: legends().filter(function (s) { return /Излишек|Потери|Переменные/.test(s); }).length };`);
+  await page.waitForTimeout(250);
+  const st = await run(A1 + 'return status();');
+  const tag = 'D: Q = 120 − P, MC = ' + mc + ': ';
+  cmp(tag + 'ответ есть (не «не найден»)', r.found, 1, 0);
+  cmp(tag + 'выпуск', r.Q, want.Q, 1e-6);
+  cmp(tag + 'цена', r.P, want.P, 1e-6);
+  if (want.none) {
+    cmp(tag + '«Выгоднее не производить» в «Ответе»', /Выгоднее не производить/.test(st) ? 1 : 0, 1, 0);
+    cmp(tag + 'пояснение «выручка меньше переменных издержек»', /выручка меньше переменных издержек/.test(st) ? 1 : 0, 1, 0);
+    cmp(tag + 'точки M нет', r.M, 0, 0);
+    cmp(tag + 'закрасок излишков и DWL нет', r.areas, 0, 0);
+    cmp(tag + 'прежнего «не найден» нет', /не найден/.test(r.panel) ? 1 : 0, 0, 0);
+  } else {
+    cmp(tag + 'прибыль TR − VC', r.gain, want.gain, 1e-6);
+    cmp(tag + 'точка M на холсте', r.M, 1, 0);
+    cmp(tag + 'безразличие названо словами', /безразлично/.test(st) ? 1 : 0, want.tie, 0);
+    if (want.tie) {
+      cmp(tag + 'второй вариант — Q = 0', r.alts, '0', 0);
+      cmp(tag + 'в статусе оба варианта', (/Q\s*=\s*40/.test(st) && /Q\s*=\s*0/.test(st)) ? 1 : 0, 1, 0);
+    }
+  }
+}
+r = await run(MKT + `setDS('mono', '120-P', '150-3*Q'); var tr = 50 * 70, vc = integrate(function (q) { return mcFloor(150 - 3 * q); }, 0, 50); return { p50: tr - vc };`);
+cmp('MC = 150 − 3Q: при Q = 50 прибыль была бы', r.p50, -250, 1e-6);
+r = await run(MKT + `setDS('mono', '120-P', '2*Q+30'); setType('tax'); setTax(45); redrawAll();
+  var t = STATE.monoTax || {}; return { Q: t.Qt, P: t.Pt };`);
+cmp('MC = 2Q + 30, налог 45: выпуск', r.Q, 11.25, 1e-6);
+cmp('MC = 2Q + 30, налог 45: цена', r.P, 108.75, 1e-6);
+for (const [scene, d2, mc, wQ, wq1, wq2, tie, none] of [
+  ['mono-d3', '80 - Q', '160 - 4*Q', 40, 30, 10, 0, 0],
+  ['mono-d3', '80 - Q', '150 - 3*Q', 50, 35, 15, 0, 0],
+  ['monoexport', '30', '160 - 4*Q', 40, 40, 0, 1, 0],
+  ['monoexport', '30', '150 - 3*Q', 0, 0, 0, 0, 1]]) {
+  r = await run(A1 + `resetSceneMemory(); pickScene('${scene}'); STATE.d3D1 = '120 - Q'; STATE.d3D2 = '${d2}'; STATE.d3MC = '${mc}'; redrawAll();
+    var d = STATE.discr3 || {}; return { found: d.found ? 1 : 0, Q: d.Qtot, q1: d.q1, q2: d.q2, tie: (d.alts || []).length ? 1 : 0,
+      none: d.noProd ? 1 : 0, unb: d.unbounded ? 1 : 0, panel: plain(document.getElementById('info-d3')) };`);
+  const tag = scene + ', D₂ ' + d2 + ', MC ' + mc + ': ';
+  if (none) {
+    cmp(tag + 'выгоднее не производить', r.none, 1, 0);
+    cmp(tag + '«не ограничен» не пишется', r.unb, 0, 0);
+    cmp(tag + 'в табло словами', /Выгоднее не производить/.test(r.panel) ? 1 : 0, 1, 0);
+  } else {
+    cmp(tag + 'общий выпуск', r.Q, wQ, 1e-6);
+    cmp(tag + 'q₁', r.q1, wq1, 1e-6);
+    cmp(tag + 'q₂', r.q2, wq2, 1e-6);
+    cmp(tag + 'безразличие с Q = 0', r.tie, tie, 0);
+  }
+}
+
+head('А1 24.10 · «Итоговая функция» для записи Q(P) (задача 9.13)');
+for (const [tag, setup, ff, Pb, Q, money] of [
+  ['налог 24 на продавца', "setType('tax'); setTaxForm('unit'); setTaxSide('seller'); setTax(24);", 'Q=3*P-132', 78, 102, null],
+  ['НДС 50 %', "setType('tax'); setTaxForm('vat'); setTax(50);", 'Q=2*P-60', 80, 100, ['tx', 8000 / 3]],
+  ['субсидия 24 продавцу', "setType('subsidy'); setTaxForm('unit'); setTaxSide('seller'); setTax(24);", 'Q=3*P+12', 42, 138, ['spend', 3312]],
+  ['субсидия 25 % от цены продавца', "setType('subsidy'); setTaxForm('subseller'); setTax(25);", 'Q=4*P-60', 48, 132, null],
+  ['налог 24 на покупателя', "setType('tax'); setTaxForm('unit'); setTaxSide('buyer'); setTax(24);", 'Q=156-P', null, 102, null]]) {
+  r = await run(MKT + A1 + `setDS('taxes', '180-P', '3*P-60'); ${setup} redrawAll();
+    var e = STATE.taxEq || {}; return { ff: ffTex(), Pb: e.Pb, Ps: e.Ps, Q: e.Q, tx: STATE.tx, spend: Math.abs(STATE.budget || 0) };`);
+  cmp('Qd = 180 − P, Qs = 3P − 60, ' + tag + ': запись', r.ff, ff, 0);
+  if (Pb != null) cmp('…цена покупателя', r.Pb, Pb, 1e-6); else cmp('…цена продавца', r.Ps, 54, 1e-6);
+  cmp('…объём', r.Q, Q, 1e-6);
+  if (money) cmp('…' + (money[0] === 'tx' ? 'сбор' : 'расход'), r[money[0]], money[1], 1e-3);
+}
+for (const [tag, setup, ff] of [
+  ['субсидия покупателю', "setType('subsidy'); setTaxForm('unit'); setTaxSide('buyer'); setTax(20);", 'P=120-Q'],
+  ['субсидия продавцу', "setType('subsidy'); setTaxForm('unit'); setTaxSide('seller'); setTax(20);", 'P=Q-20'],
+  ['налог покупателю', "setType('tax'); setTaxForm('unit'); setTaxSide('buyer'); setTax(20);", 'P=80-Q'],
+  ['налог продавцу', "setType('tax'); setTaxForm('unit'); setTaxSide('seller'); setTax(20);", 'P=Q+20']]) {
+  r = await run(MKT + A1 + `setDS('taxes', '100-Q', 'Q'); ${setup} redrawAll(); return { ff: ffTex() };`);
+  cmp('P(Q) не сдвинулась (приёмка 31.08), ' + tag, r.ff, ff, 0);
+  cmp('…без «- (-», «+ (-», «(Q)»', /-\(-|\+\(-|\(Q\)/.test(r.ff) ? 1 : 0, 0, 0);
+}
+
+/* --- А2 24.10 (ADR 0158): «Ответ» при вмешательстве, внешние эффекты, квота, хвосты монополии -----------
+   Числа сверены перебором (сессия А2, claude/calc2_a2/README.md). */
+head('А2 24.10 · «Внешние эффекты»: SW с внешними издержками (решения …810e…, …81e7…)');
+r = await run(`resetSceneMemory(); pickScene('ext'); redrawAll();
+  var e = STATE.ext || {};
+  return { on: STATE.mscOn ? 1 : 0, expr: STATE.mscExpr, msb: STATE.msbOn ? 1 : 0, Q: e.Qmkt, P: e.Pmkt, cs: STATE.cs, ps: STATE.ps,
+    ext: e.extMkt, sw: STATE.cs + STATE.ps - e.extMkt, Qo: e.Qopt, Po: e.Popt, swo: e.swOpt, exto: e.extOpt, dwl: e.dwl, pig: e.corrective };`);
+cmp('старт: MSC включена', r.on, 1, 0);
+cmp('старт: MSC = Q + 20', r.expr, 'Q + 20', 0);
+cmp('старт: MSB спрятана', r.msb, 0, 0);
+cmp('рынок: Q', r.Q, 50, 1e-4); cmp('рынок: P', r.P, 50, 1e-4);
+cmp('рынок: CS', r.cs, 1250, 1e-3); cmp('рынок: PS', r.ps, 1250, 1e-3);
+cmp('рынок: внешние издержки', r.ext, 1000, 1e-3);
+cmp('рынок: SW = 2 500 − 1 000', r.sw, 1500, 1e-3);
+cmp('оптимум: Q', r.Qo, 40, 1e-4); cmp('оптимум: P', r.Po, 60, 1e-4);
+cmp('оптимум: внешние издержки', r.exto, 800, 1e-3);
+cmp('оптимум: SW', r.swo, 1600, 1e-3);
+cmp('DWL', r.dwl, 100, 1e-3);
+cmp('DWL = SW оптимума − SW рынка', r.swo - r.sw, 100, 1e-3);
+cmp('налог Пигу', r.pig, 20, 1e-4);
+r = await run(`resetSceneMemory(); pickScene('ext'); STATE.mscOn = false; STATE.mscExpr = ''; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+  syncSocialFields(); recompileSocial(); redrawAll();
+  var e = STATE.ext || {};
+  return { ext: e.extMkt, sw: STATE.cs + STATE.ps - e.extMkt, Qo: e.Qopt, swo: e.swOpt, dwl: e.dwl, sub: -e.corrective,
+    panel: (document.getElementById('info-areas') || {}).textContent || '' };`);
+cmp('MSB = 120 − Q: внешние выгоды', -r.ext, 1000, 1e-3);
+cmp('MSB = 120 − Q: в табло «Внешние выгоды»', /Внешние выгоды/.test(r.panel) ? 1 : 0, 1, 0);
+cmp('MSB = 120 − Q: SW рынка', r.sw, 3500, 1e-3);
+cmp('MSB = 120 − Q: оптимум Q', r.Qo, 60, 1e-4);
+cmp('MSB = 120 − Q: SW оптимума', r.swo, 3600, 1e-3);
+cmp('MSB = 120 − Q: DWL', r.dwl, 100, 1e-3);
+cmp('MSB = 120 − Q: корректирующая субсидия', r.sub, 20, 1e-4);
+
+head('А2 24.10 · квота: цена спроса по умолчанию, ползунок — коридор (…81e0…9219…)');
+r = await run(`resetSceneMemory(); pickScene('quota'); redrawAll();
+  var q = STATE.qt || {}, sl = document.getElementById('quota-price-slider');
+  return { Qq: q.Qq, lo: q.Plo, hi: q.Phi, P: q.P, cs: q.cs, ps: q.ps, dwl: q.dwl, smin: +sl.min, smax: +sl.max, sval: +sl.value };`);
+cmp('квота 40: коридор снизу', r.lo, 40, 1e-6); cmp('квота 40: коридор сверху', r.hi, 60, 1e-6);
+cmp('квота 40: цена по умолчанию = Pd', r.P, 60, 1e-6);
+cmp('квота 40: CS', r.cs, 800, 1e-3); cmp('квота 40: PS', r.ps, 1600, 1e-3); cmp('квота 40: DWL', r.dwl, 100, 1e-3);
+cmp('ползунок: нижний предел = S(квота)', r.smin, 40, 1e-9); cmp('ползунок: верхний предел = D(квота)', r.smax, 60, 1e-9);
+cmp('ползунок стоит на цене', r.sval, 60, 1e-9);
+r = await run(`resetSceneMemory(); pickScene('quota'); redrawAll();
+  var sl = document.getElementById('quota-price-slider');
+  sl.value = 100; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  var a = STATE.qt.P, v1 = +sl.value;
+  sl.value = 45; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  return { a: a, v1: v1, b: STATE.qt.P, pos: STATE.quotaPos };`);
+cmp('ввод 100 → прижата к 60', r.a, 60, 1e-9);
+cmp('…ползунок показывает 60', r.v1, 60, 1e-9);
+cmp('ввод 45 → цена 45', r.b, 45, 1e-9);
+cmp('…доля коридора 0,25', r.pos, 0.25, 1e-9);
+r = await run(`resetSceneMemory(); pickScene('quota'); STATE.quotaPos = 0.5; redrawAll();
+  return { P: (STATE.qt || {}).P, v: +document.getElementById('quota-price-slider').value };`);
+cmp('старая ссылка quotaPos = 0,5 → цена 50', r.P, 50, 1e-9);
+cmp('…ползунок 50', r.v, 50, 1e-9);
+
+head('А2 24.10 · монополия: Qc и DWL при убывающей MC (…811a…)');
+r = await run(MKT + `setDS('mono', '120-P', '160-4*Q'); var m = STATE.mono || {};
+  return { Qm: m.Qm, alts: (m.alts || []).join(','), Qc: m.Qc, Pc: m.Pc, dwl: m.dwl, dwl0: (m.dwlAlts || [])[0],
+    panel: (document.getElementById('info-mono') || {}).textContent || '' };`);
+cmp('D: Q = 120 − P, MC = 160 − 4Q: Qc', r.Qc, 40, 1e-6);
+cmp('…Pc (по спросу)', r.Pc, 80, 1e-6);
+cmp('…безразлично Q 40 или 0', r.Qm === 40 || Math.abs(r.Qm - 40) < 1e-6 ? r.alts : 'нет', '0', 0);
+cmp('…DWL при Q = 40', r.dwl, 0, 1e-6);
+cmp('…DWL при Q = 0', r.dwl0, 800, 1e-3);
+cmp('…в табло потери обоих вариантов', /потери общества 0 при/.test(r.panel) && /800 при/.test(r.panel) ? 1 : 0, 1, 0);
+r = await run(MKT + `setDS('mono', '100-Q', '20'); var m = STATE.mono || {}; return { Qc: m.Qc, Pc: m.Pc, dwl: m.dwl };`);
+cmp('регрессия D = 100 − Q, MC = 20: Qc', r.Qc, 80, 1e-6);
+cmp('…Pc', r.Pc, 20, 1e-6);
+cmp('…DWL', r.dwl, 800, 1e-3);
+
+head('А2 24.10 · «Составной спрос» при убывающей MC (…817a…)');
+r = await run(`resetSceneMemory(); pickScene('mono-kink'); STATE.kinkInput = 'individual';
+  STATE.kiD1 = '120 - P'; STATE.kiD2 = ''; STATE.kiD3 = ''; STATE.kinkMC = '160 - 4*Q'; redrawAll();
+  var k = STATE.kinked || {}; return { Q: k.Qstar, P: k.Pstar, alts: (k.alts || []).join(','), prof: k.profit,
+    st: [].map.call(document.querySelectorAll('#ans-status .ans-status'), function (x) { return x.textContent; }).join(' / ') };`);
+cmp('D₁: Q = 120 − P, MC = 160 − 4Q: Q', r.Q, 40, 1e-6);
+cmp('…P', r.P, 80, 1e-6);
+cmp('…второй вариант Q = 0', r.alts, '0', 0);
+cmp('…прибыль 0', r.prof, 0, 1e-6);
+r = await run(`resetSceneMemory(); pickScene('mono-kink'); STATE.kinkInput = 'individual';
+  STATE.kiD1 = '100 - Q'; STATE.kiD2 = '60 - Q'; STATE.kiD3 = ''; STATE.kinkMC = '20'; redrawAll();
+  var k = STATE.kinked || {}; var at = function (q) { return (k.cands.filter(function (c) { return Math.abs(c.Q - q) < 1e-6; })[0] || {}).profit; };
+  return { Q: k.Qstar, P: k.Pstar, p40: at(40), p60: at(60), alts: (k.alts || []).length };`);
+cmp('регрессия 01.09: Q', r.Q, 60, 1e-3); cmp('…P', r.P, 50, 1e-3);
+cmp('…кандидат 40 → 1 600', r.p40, 1600, 1e-2); cmp('…кандидат 60 → 1 800', r.p60, 1800, 1e-2);
+cmp('…безразличия нет', r.alts, 0, 0);
+
+head('А2 24.10 · открытая экономика: излишки после тарифа и квоты (…81e2…)');
+for (const [tool, money] of [['tariff', 200], ['quota', 200]]) {
+  r = await run(`resetSceneMemory(); pickScene('smallopen'); STATE.openTariff = 10; STATE.openQuota = 20; setOpenTool('${tool}');
+    var o = STATE.open || {}; return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, vol: o.vol1, money: o.money, dwl: o.dwlTotal, cs1: o.cs1, ps1: o.ps1 };`);
+  const tag = tool === 'tariff' ? 'тариф 10' : 'квота ввоза 20';
+  cmp(tag + ': цена', r.P1, 40, 1e-4); cmp(tag + ': Qd', r.Qd1, 60, 1e-4); cmp(tag + ': Qs', r.Qs1, 40, 1e-4);
+  cmp(tag + ': импорт', r.vol, 20, 1e-4); cmp(tag + ': ' + (tool === 'tariff' ? 'бюджет' : 'рента'), r.money, money, 1e-3);
+  cmp(tag + ': потери', r.dwl, 100, 1e-3); cmp(tag + ': CS', r.cs1, 1800, 1e-3); cmp(tag + ': PS', r.ps1, 800, 1e-3);
+}
+
+head('Ночь 29.10 · Э3 — единая запись чисел');
+r = await run(`return { values:[.625,100/3,171/64,1/7,5*Math.sqrt(2),2+Math.sqrt(21)/3,Math.cbrt(10),-100/3,1332].map(fmt),
+  self:['33,3','100/3','33'].map(v=>checkGuess(v,'100/3')),
+  percent:CalcNumber.format(167.1875,{percent:true}) };`);
+const e3Values=[.625,100/3,171/64,1/7,5*Math.sqrt(2),2+Math.sqrt(21)/3,Math.cbrt(10),-100/3,1332];
+e3Values.forEach((v,i)=>cmp('Э3: '+v,r.values[i],v,i===6?.0005:1e-8));
+cmp('Э3: 167,1875 % читаются из дроби',parseShown(r.percent),167.1875,1e-8);
+[true,true,false].forEach((v,i)=>cmp('Э3: Сначала сам — '+['33,3','100/3','33'][i],r.self[i],v,0));
+
+head('Ночь 29.10 · Э4 — два налоговых инструмента');
+r = await run(MKT + `setDS('taxes','Q=180-P','Q=3P-60');
+  setType('subsidy');setTaxForm('unit');setTaxSide('buyer');setTax(12);
+  addSecondTax();setSecondTax({type:'tax',form:'unit',side:'seller',rate:24});
+  return {...STATE.taxEq,budget:STATE.budget,cs:STATE.csTax,ps:STATE.psTax,dwl:STATE.dwl,
+    subsidy:STATE.taxPair.items[0].budget,tax:STATE.taxPair.items[1].budget};`);
+for(const [k,v] of Object.entries({Q:111,Pb:69,Ps:57,Pm:81,budget:1332,cs:6160.5,ps:2053.5,dwl:54,subsidy:-1332,tax:2664}))
+  cmp('Э4 9.13д: '+k,r[k],v,1e-6);
+r = await run(`setType('tax');setTaxForm('vat');setTax(20);
+  setSecondTax({type:'subsidy',form:'subbuyer',rate:10});
+  return {...STATE.taxEq,budget:STATE.budget};`);
+for(const [k,v] of Object.entries({Q:116,Pb:64,Ps:176/3,budget:1856/3}))cmp('Э4 две процентные формы: '+k,r[k],v,1e-6);
+
+head('Ночь 29.10 · Э5 — дискриминация, единая цена, TC');
+r = await run(`resetSceneMemory();pickScene('mono-d3');STATE.d3D1='180-Q';STATE.d3D2='120-Q';STATE.d3MC='30';redrawAll();return STATE.discr3.comparison;`);
+for(const [tag,x,w] of [['дискриминация',r.discrimination,{P1:105,P2:75,q1:75,q2:45,profit:7650,dwl:3825}],
+  ['единая цена',r.uniform,{P:90,q1:90,q2:30,profit:7200,dwl:3600}]])
+  for(const[k,v]of Object.entries(w))cmp('Э5 6.25 '+tag+': '+k,x[k],v,1e-6);
+for(const[i,v]of [2812.5,1012.5].entries())cmp('Э5 6.25 CS'+(i+1)+' дискриминация',r.discrimination.cs[i],v,1e-6);
+for(const[i,v]of [4050,450].entries())cmp('Э5 6.25 CS'+(i+1)+' единая',r.uniform.cs[i],v,1e-6);
+cmp('Э5 6.25 прирост прибыли',r.delta,450,1e-6);
+r = await run(`STATE.d3MC='TC=30*Q+200';redrawAll();return STATE.discr3.comparison;`);
+cmp('Э5 FC в дискриминации',r.discrimination.profit,7450,1e-6);cmp('Э5 FC при единой цене',r.uniform.profit,7000,1e-6);
+r = await run(`STATE.d3D2='40-Q';STATE.d3MC='30';redrawAll();return STATE.discr3.comparison;`);
+cmp('Э5 выпадение второй группы: цена',r.uniform.P,105,1e-6);cmp('Э5 выпадение второй группы: q2',r.uniform.q2,0,1e-6);cmp('Э5 выпадение второй группы: прирост',r.delta,25,1e-6);
+r = await run(`resetSceneMemory();pickScene('mono-d1');updateCurveExpr(curveByRoleAny('demand'),'120-Q');
+  var cost=mcSourceCurveAny();updateCurveExpr(cost,'Q^2+30*Q+200');setRole(cost,'tc');redrawAll();return STATE.discr1;`);
+cmp('Э5 6.27 выпуск',r.Qcomp,30,1e-6);cmp('Э5 6.27 прибыль с FC',r.profit,1150,1e-6);
+
+head('Ночь 29.10 · Э6 — глобальный раздел выпуска');
+r = await run(`resetSceneMemory();pickScene('plants');STATE.pl1='10*Q';STATE.pl2='Q^2';setPlantsQ(12);return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:7,q2:5,m:10,tcDirect:95,vc:95}))cmp('Э6 4.18г '+k,r[k],v,1e-7);
+r = await run(`STATE.pl2='6*Q';redrawAll();return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:0,q2:12,m:6,tcDirect:72,vc:72}))cmp('Э6 угол '+k,r[k],v,1e-7);
+r = await run(`STATE.pl1='Q^2';STATE.pl2='Q^2';redrawAll();return plantsAt(12);`);
+for(const[k,v]of Object.entries({q1:6,q2:6,tcDirect:72}))cmp('Э6 4.19а '+k,r[k],v,1e-7);
+r = await run(`setPlantInputRows([{expr:'Q^2+5',K:4,kind:'sunk'},{expr:'.5*Q^2+12',K:null,kind:'quasi'},{expr:'3*Q',K:6,kind:'sunk'}]);redrawAll();return plantsAt(12);`);
+[2,4,6].forEach((v,i)=>cmp('Э6 три завода: Q'+(i+1),r.qs[i],v,1e-7));cmp('Э6 три завода: TC',r.tcDirect,47,1e-7);
+
+head('Ночь 29.10 · Э7 — группы и союз стран');
+r=await run(`resetSceneMemory();pickScene('ineq');STATE.ineqGroups=[30,70];STATE.ineqPops=[60,40];redrawAll();return STATE.ineqStats;`);
+cmp('Э7 13.15 Джини',r.gini,.3,1e-8);cmp('Э7 невычислимые децили',r.decileAvailable,false,0);
+r=await run(`STATE.ineqGroups=[25,75];STATE.ineqPops=[50,50];STATE.ineqPopulation=4;STATE.ineqTotalIncome=1;STATE.ineqCountryB={input:'groups',groups:[25,75],pops:[50,50],population:1,totalIncome:1};redrawAll();return{g:STATE.ineqStats.gini,pts:STATE.ineqLorenz,gs:STATE.ineqCountries.map(c=>c.stats.gini)};`);
+cmp('Э7 13.14 Джини союза',r.g,17/40,1e-8);r.gs.forEach((v,i)=>cmp('Э7 13.14 Джини страны '+i,v,.25,1e-8));
+[[.4,.125],[.8,.5],[.9,.625]].forEach((q,i)=>q.forEach((v,j)=>cmp('Э7 13.14 точка '+i+' координата '+j,r.pts[i+1][j],v,1e-8)));
+r=await run(`STATE.ineqInput='formula';STATE.ineqFormula='p^2';STATE.ineqPopulation=3;STATE.ineqCountryB={input:'formula',formula:'p',population:1,totalIncome:1};redrawAll();return{g:STATE.ineqStats.gini,a:STATE.ineqDistribution.at(.5),b:STATE.ineqDistribution.at(.9)};`);
+cmp('Э7 13.18 Джини',r.g,3/8,1e-8);cmp('Э7 13.18 первая ветвь',r.a,2/9,1e-8);cmp('Э7 13.18 вторая ветвь',r.b,.8,1e-8);
+
+head('Ночь 29.10 · Э8 — параметры IS–LM');
+r=await run(`resetSceneMemory();pickScene('islm');STATE.macro.islm.input='params';STATE.macro.islm.params={a:10,b:.75,I0:40,d:0,G:10,T:10,Xn:10,md:'20+.6*Y/i',Ms:260,P:1};redrawAll();return STATE.islmResult;`);
+cmp('Э8 14.55 Y',r.eq.Q,250,1e-7);cmp('Э8 14.55 r',r.eq.P,.625,1e-7);
+r=await run(`STATE.macro.islm.params=islmDefaults();STATE.macro.islm.shock={G:16,T:0,Ms:0};redrawAll();return STATE.islmResult;`);
+for(const[k,v]of Object.entries({Y:40,r:40,I:-8}))cmp('Э8 14.56 изменение '+k,r.changes[k],v,1e-7);
+for(const[k,v]of Object.entries({kG:2.5,kT:-2,kHold:5,kTHold:-4,crowdingY:40,crowdingI:8,requiredDeltaMs:64}))cmp('Э8 14.56 '+k,r[k],v,1e-7);
+r=await run(`STATE.macro.islm.holdRate=true;redrawAll();return STATE.islmResult;`);
+cmp('Э8 ЦБ Y',r.eq.Q,593,1e-7);cmp('Э8 ЦБ r',r.eq.P,13,1e-7);
+r=await run(`STATE.macro.islm.shock.G=2;redrawAll();return STATE.islmResult;`);
+cmp('Э8 14.56а ΔMs',r.requiredDeltaMs,8,1e-7);
+
+head('Ночь 29.10 · Э9 — AD–AS с шоком');
+r=await run(`resetSceneMemory();pickScene('adas');STATE.macro.adas={...STATE.macro.adas,ad:'Y=400+1600/P',sras:'Y=2500*P-500',lrasMode:'initial',shock:{kind:'ad',ad:'Y=400+4275/P'}};redrawAll();return STATE.adasResult;`);
+for(const[tag,e,w]of[['base',r.base,{Q:2000,P:1}],['sr',r.sr,{Q:3250,P:1.5}],['lr',r.lr,{Q:2000,P:171/64}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.52 '+tag+' '+k,e[k],v,1e-6);
+cmp('Э9 14.52 SR изменениеY,%',r.srChange.Y,62.5,1e-6);cmp('Э9 14.52 SR инфляция,%',r.srChange.P,50,1e-6);cmp('Э9 14.52 LR инфляция,%',r.lrChange.P,167.1875,1e-6);cmp('Э9 14.52 разрыв,%',r.gapPct,62.5,1e-6);
+for(const[sras,V,p]of[['P=1',1.3,30],['Y=100*P',1.69,69]]){r=await run(`STATE.macro.adas={adMode:'mv',M:100,V:1,sras:${JSON.stringify(sras)},lrasMode:'initial',shock:{kind:'ad',M:100,V:${V}}};redrawAll();return STATE.adasResult;`);cmp('Э9 14.53 V'+V+' выпуск',r.sr.Q,130,1e-6);cmp('Э9 14.53 V'+V+' инфляцияLR,%',r.lrChange.P,p,1e-6);}
+r=await run(`STATE.macro.adas={adMode:'mv',M:256,V:1,srasMode:'labor',production:'16*sqrt(L)',laborSupply:'8*w/P',shock:{kind:'ad',M:576,V:1}};redrawAll();return STATE.adasResult;`);
+for(const[tag,e,w]of[['base',r.base,{Q:64,P:4}],['sr',r.sr,{Q:96,P:6}],['lr',r.lr,{Q:64,P:9}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 '+tag+' '+k,e[k],v,1e-6);
+for(const[tag,l,w]of[['base',r.labor.base,{L:16,realW:2,nominalW:8}],['sr',r.labor.sr,{L:36,realW:4/3,nominalW:8}],['lr',r.labor.lr,{L:16,realW:2,nominalW:18}]])for(const[k,v]of Object.entries(w))cmp('Э9 14.54 труд '+tag+' '+k,l[k],v,1e-6);
+
+head('Ночь 29.10 · Э10 — глобальное предложение фирмы');
+for(const[tag,c,P,Q,profit,shutdown]of[
+ ['7.1б',{expr:'Q^2+10*Q+100'},30,10,0,10],
+ ['7.2б',{expr:'16*Q-Q^2'},9,8,8,8],
+ ['7.2в',{expr:'Q^2+20*Q',K:10},50,10,200,20],
+ ['7.2г',{expr:'Q^2+400',kind:'quasi'},60,30,500,40],
+ ['7.3а',{expr:'Q^2',tax:{type:'unit',rate:10}},20,5,25,10],
+ ['7.3б',{expr:'Q^2',tax:{type:'unit',kind:'subsidy',rate:10}},20,15,225,-10],
+ ['7.3в',{expr:'Q^2',tax:{type:'revenue',rate:25}},20,7.5,56.25,0],
+ ['7.3г',{expr:'Q^2',tax:{type:'revenue',kind:'subsidy',rate:25}},20,12.5,156.25,0],
+ ['7.7в',{expr:'3*Q',mode:'mc',K:20},90,20,1200,0],
+ ['7.7г',{expr:'12-Q',mode:'mc'},7,12,12,6],
+ ['7.16 SR',{expr:'Q^2+30*Q+100'},40,5,-75,30],
+ ['7.16 LR',{expr:'Q^2+30*Q+100',period:'lr'},40,0,0,50],
+ ['Аккордный sunk',{expr:'Q^2+100',tax:{type:'lump',rate:125}},20,10,-125,0],
+ ['Аккордный quasi',{expr:'Q^2+100',kind:'quasi',tax:{type:'lump',rate:125}},20,0,0,30],
+]){
+ r=await run(`resetSceneMemory();pickScene('costs');var c=${JSON.stringify(c)};STATE.costsMode=c.mode==='mc'?'curves':'tc';STATE.costsMCOnly=c.mode==='mc';if(c.mode==='mc')STATE.costsMCx=c.expr;else STATE.costsTC=c.expr;STATE.costsSupply={K:c.K??null,period:c.period||'sr',kind:c.kind||'sunk',tax:c.tax||{type:'none'}};STATE.lrPrice=${P};redrawAll();return{Q:STATE.lr.Q,profit:STATE.lr.profit,shutdown:STATE.firmSupply.shutdown};`);
+ for(const[k,v]of Object.entries({Q,profit,shutdown}))cmp('Э10 '+tag+' '+k,r[k],v,1e-6);
+}
+r=await run(`var m=firmSupplyBuild({expr:'16*Q'});return{zero:m.at(15).Q,interval:m.at(16).intervals.some(x=>x[0]===0&&x[1]===Infinity),unbounded:m.at(17).unbounded};`);
+cmp('Э10 7.2а ниже MC',r.zero,0,0);cmp('Э10 7.2а интервал',r.interval,true,0);cmp('Э10 7.2а без предела',r.unbounded,true,0);
+
+head('Ночь 29.10 · Э11 — рынок и фирма в СК');
+for(const[tag,tc,D,n,period,want]of[
+ ['Старт','Q^3-6*Q^2+15*Q+18','Q=100-4*P',10,'sr',{P:15,q:4,Q:40,n:10,profit:14}],
+ ['7.5','2*Q^2','Q=140-P',10,'sr',{P:40,q:10,Q:100,profit:200}],
+ ['7.18а','Q^2+10*Q+25','Q=150-P',10,'lr',{P:20,q:5,Q:130,n:26,profit:0}],
+ ['7.18б','Q^2+10*Q+25','Q=290-P',26,'sr',{P:30,q:10,Q:260,n:26,profit:75}],
+ ['7.18в','Q^2+10*Q+25','Q=290-P',26,'lr',{P:20,q:5,Q:270,n:54,profit:0}],
+ ['Дробное n','Q^2+10*Q+25','Q=151-P',26,'lr',{P:20,q:5,Q:131,n:26.2,profit:0}],
+]){
+ r=await run(`resetSceneMemory();pickScene('firmmarket');STATE.costsTC=${JSON.stringify(tc)};STATE.costsSupply={period:${JSON.stringify(period)}};STATE.firmMarket={n:${n},demand:${JSON.stringify(D)}};redrawAll();const x=STATE.firmMarketResult;return{P:x.P,q:x.q,Q:x.Q,n:x.n,profit:x.profit};`);
+ for(const[k,v]of Object.entries(want))cmp('Э11 '+tag+' '+k,r[k],v,1e-6);
+}
+
+head('Ночь 29.10 · Э12 — три канала торговли');
+for(const[target,kind,rate,ban,want]of[
+ ['producer','tax',20,'free',[80,60,40,60,0,20,1200]],
+ ['producer','tax',40,'free',[80,40,40,20,20,0,800]],
+ ['internal','tax',10,'free',[90,80,30,100,0,70,300]],
+ ['consumer','tax',10,'free',[90,80,30,100,0,70,300]],
+ ['trade','tax',15,'free',[65,65,55,70,0,15,225]],
+ ['trade','subsidy',10,'free',[90,90,30,120,0,90,-900]],
+ ['producer','subsidy',10,'free',[80,90,40,120,0,80,-1200]],
+ ['consumer','subsidy',10,'free',[70,80,50,100,0,50,-500]],
+ ['internal','tax',20,'free',[100,80,20,100,0,80,400]],
+ ['producer','tax',25,'free',[80,55,40,50,0,10,1250]],
+ ['producer','tax',45,'noimport',[90,45,30,30,0,0,1350]],
+ ['producer','tax',45,'free',[80,35,40,10,30,0,450]],
+]){
+ r=await run(`return tradeCountry('Q=120-P','Q=2*P-60',80,${JSON.stringify({target,kind,rate,form:'unit'})},${JSON.stringify(ban)});`);
+ ['Pc','Pp','Qd','Qs','Im','Ex','budget'].forEach((key,i)=>cmp('Э12 экспорт '+[target,kind,rate,ban,key].join('/'),r[key],want[i],1e-6));
+}
+for(const[target,kind,want]of[
+ ['trade','tax',[40,40,60,40,20,200]],['producer','tax',[30,20,70,20,50,200]],
+ ['consumer','tax',[40,30,60,30,30,600]],['internal','tax',[30,20,70,20,50,200]],
+ ['trade','subsidy',[20,20,80,20,60,-600]],['producer','subsidy',[30,40,70,40,30,-400]],
+]){
+ r=await run(`return tradeCountry('100-Q','Q',30,${JSON.stringify({target,kind,rate:10,form:'unit'})});`);
+ ['Pc','Pp','Qd','Qs','Im','budget'].forEach((key,i)=>cmp('Э12 импорт '+[target,kind,key].join('/'),r[key],want[i],1e-6));
+}
+for(const[target,kind,form,rate,want]of[
+ ['producer','tax','unit',10,[40,25,75,15,400]],['internal','tax','unit',10,[50,20,80,30,200]],
+ ['trade','subsidy','unit',10,[60,20,80,40,-400]],['trade','tax','unit',10,[40,30,70,10,100]],
+ ['internal','tax','buyer',37.5,[50,10,90,40,337.5]],
+]){
+ r=await run(`return tradeMono('100-Q','Q',50,${JSON.stringify({target,kind,form,rate})});`);
+ ['Q','Qd','Pc','Ex','budget'].forEach((key,i)=>cmp('Э12 монополист '+[target,kind,form,key].join('/'),r[key],want[i],1e-6));
+}
+
+head('Ночь 29.10 · Э13 — две большие экономики');
+for(const[tag,A,B,want]of[
+ ['Свободная',{}, {},[45,30,45,45,0,0,0]],
+ ['ТарифA10',{policy:{kind:'tax',rate:10}}, {},[40,20,50,40,200,0,50]],
+ ['Максимум сборов',{policy:{kind:'tax',rate:15}}, {},[37.5,15,52.5,37.5,225,0,112.5]],
+ ['СубсидияB',{}, {policy:{kind:'subsidy',rate:10}},[40,40,40,50,0,-400,50]],
+ ['Обе страны',{policy:{kind:'tax',rate:10}},{policy:{kind:'tax',rate:5}},[42.5,15,52.5,37.5,150,75,112.5]],
+ ['Запретительный',{policy:{kind:'tax',rate:30}}, {},[null,0,60,30,0,0,450]],
+]){
+ r=await run(`resetSceneMemory();pickScene('bigopen');STATE.bigTrade={...bigTradeDefaults(),A:{...bigTradeDefaults().A,...${JSON.stringify(A)}},B:{...bigTradeDefaults().B,...${JSON.stringify(B)}}};redrawAll();const x=STATE.bigTradeResult;return[x.Pw,x.volume,x.countries.A.Pc,x.countries.B.Pc,x.countries.A.budget,x.countries.B.budget,x.worldLoss];`);
+ want.forEach((v,i)=>cmp('Э13 '+tag+' '+['Pw','T','PA','PB','budgetA','budgetB','worldLoss'][i],r[i],v,1e-6));
+}
 
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));

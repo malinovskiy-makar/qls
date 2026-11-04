@@ -31,15 +31,19 @@ function flag(label, cond, detail) {
   console.log((cond ? 'OK   ' : 'FAIL ') + label + (detail ? '  -> ' + detail : ''));
 }
 
-const price = async (type, p) => page.evaluate(`(function(){
+const price = async (type, p) => page.evaluate(`(async function(){
   resetSceneMemory(); pickScene('ceil');
   setType('${type}'); setPReg(${p}); redrawAll();
+  await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });   // «Ответ» собирается на кадр позже табло
   var pc = STATE.pc || {};
   return { Qd: pc.Qd, Qs: pc.Qs, gap: pc.gap, dwl: pc.dwl, Qtrade: pc.Qtrade,
            binding: pc.binding ? 1 : 0, active: STATE.pcActive ? 1 : 0,
            eqQ: (STATE.eq||{}).Q, eqP: (STATE.eq||{}).P,
            ghost: document.querySelectorAll('#chart g.ghost').length,
-           info: ((document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
+           /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 8.1): предупреждение сцены —
+              строка статуса «Ответа» (#ans-status), в блоке табло оно спрятано, чтобы
+              не повторяться. «Панель честно говорит» = видимый текст колонки «Ответ». */
+           info: ((document.getElementById('params-panel')||document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
 })()`);
 
 // --- 1. Потолок 30 — связывает, дефицит 40 -----------------------------
@@ -116,17 +120,20 @@ flag('и возвращает обратно', ghost.on2 > 0, 'ghost=' + ghost.o
 flag('исходное равновесие рисуется пунктиром', ghost.dashed >= 2, 'пунктирных линий: ' + ghost.dashed);
 flag('и приглушённым цветом', ghost.ghostColor >= 2, 'элементов цвета ghost: ' + ghost.ghostColor);
 
-// --- 5. Выбор и настройки живут в ПРАВОЙ панели -------------------------
+// --- 5. Выбор и настройки живут своей карточкой «Условия» ---------------
+// ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): справа теперь только «Ответ»,
+// а вмешательство государства — карточка левой колонки «Условие» (README
+// макета, раздел 6). Строгость прежняя: блок в своём месте и не в чужом.
 const where = await page.evaluate(`(function(){
   resetSceneMemory(); pickScene('ceil');
   var sec = document.getElementById('sec-tax');
-  var inRight = !!(sec && sec.closest('.side-right'));
-  var inLeft  = !!(sec && sec.closest('#tools-panel'));
+  var inRight = !!(sec && sec.closest('#params-panel'));
+  var inLeft  = !!(sec && sec.closest('#tools-panel') && !sec.closest('#sec-input'));
   var leftLeftovers = [].slice.call(document.querySelectorAll('#tools-panel [id^="scn-pane-"]'))
                         .filter(function(e){ return e.offsetParent !== null; }).map(function(e){ return e.id; });
   return { inRight: inRight ? 1 : 0, inLeft: inLeft ? 1 : 0, leftLeftovers: leftLeftovers };
 })()`);
-flag('блок вмешательства — в правой панели', where.inRight === 1 && where.inLeft === 0, JSON.stringify(where));
+flag('блок вмешательства — своей карточкой «Условия», не в «Ответе»', where.inRight === 0 && where.inLeft === 1, JSON.stringify(where));
 flag('в левой панели от «Что изучаем» ничего не осталось',
      where.leftLeftovers.length === 0, where.leftLeftovers.join(', '));
 

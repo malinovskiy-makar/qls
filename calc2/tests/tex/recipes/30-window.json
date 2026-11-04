@@ -1,0 +1,22 @@
+{
+ "_about": "Своё окно: приближение и отдаление колесом, сдвиг листа, снятая галочка «только первая четверть». Действия — теми же функциями, что зовут колесо и протяжка (zoomBy, panByPixels, setFirstQuad). Ключ сцены → вариант → код, который выполняется в странице после открытия модели.",
+ "sd": { "zoomin": "zoomBy(0.5, 300, 300);", "zoomout": "zoomBy(2.4, 300, 300);", "pan": "panByPixels(170, -120);", "panx": "panByPixels(-150, 0);", "pany": "panByPixels(0, 140);", "quad": "setFirstQuad(false);" },
+ "taxes": { "pan": "panByPixels(170, -120);", "zoomin": "zoomBy(0.45, 250, 320);", "quad": "setFirstQuad(false);" },
+ "mono": { "zoomout": "zoomBy(2.2, 300, 300);", "quad": "setFirstQuad(false);", "pan": "panByPixels(-120, 90);" },
+ "labor": { "pan": "panByPixels(150, -100);" },
+ "costs": { "zoomin": "zoomBy(0.5, 300, 300);", "quad": "setFirstQuad(false);" },
+ "prod": { "pan-top": "panByPixels(120, -40, { gesture: 'prod-top' });", "zoom-bottom": "zoomBy(0.6, 300, 480);" },
+ "ppf": { "zoomout": "zoomBy(2.2, 300, 300);", "quad": "setFirstQuad(false);" },
+ "trade": { "pan": "panByPixels(120, -80);" },
+ "tradeprice": { "zoom-1": "zoomBy(0.6, 200, 300);", "pan-2": "panByPixels(60, -40, { gesture: 'trade-2' });" },
+ "consumer": { "zoomin": "zoomBy(0.5, 300, 300);", "pan": "panByPixels(140, -90);" },
+ "adas": { "pan": "panByPixels(140, -90);" },
+ "islm": { "zoomout": "zoomBy(2.2, 300, 300);" },
+ "ineq": { "zoomin": "zoomBy(0.6, 300, 300);" },
+ "mono-d3": { "zoom-1": "zoomBy(0.6, 200, 300);" },
+ "m-graph": { "zoomin": "zoomBy(0.4, 300, 300);", "zoomout": "zoomBy(2.5, 300, 300);", "pan": "panByPixels(200, -150);" },
+ "m-tangent": { "pan-top": "panByPixels(100, -50, 'top');", "zoom": "zoomBy(0.6, 300, 200);" },
+ "m-optimum": { "pan": "panByPixels(150, -100);", "zoomout": "zoomBy(2.2, 300, 300);" },
+ "m-constraint": { "zoomin": "zoomBy(0.5, 300, 300);" },
+ "cons-slutsky": { "pan": "panByPixels(120, -80);" }
+}

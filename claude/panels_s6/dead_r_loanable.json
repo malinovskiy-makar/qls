@@ -1,0 +1,39 @@
+{
+ "model": "loanable",
+ "letter": "r",
+ "hasParam": true,
+ "nodes": 83,
+ "texLen": 3360,
+ "steps": [
+  {
+   "value": "7",
+   "how": "дорожка → STATE 7",
+   "answerSame": true,
+   "nodesDiff": 0,
+   "texSame": true
+  },
+  {
+   "value": "-5",
+   "how": "дорожка → STATE -5",
+   "answerSame": true,
+   "nodesDiff": 0,
+   "texSame": true
+  },
+  {
+   "value": "3.3",
+   "how": "дорожка → STATE 3.3",
+   "answerSame": true,
+   "nodesDiff": 0,
+   "texSame": true
+  },
+  {
+   "value": "0",
+   "how": "дорожка → STATE 0",
+   "answerSame": true,
+   "nodesDiff": 0,
+   "texSame": true
+  }
+ ],
+ "errors": [],
+ "verdict": "МЁРТВ: ничего не меняется"
+}

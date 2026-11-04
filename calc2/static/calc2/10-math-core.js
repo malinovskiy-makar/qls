@@ -39,6 +39,22 @@ function axisScope(q, extra) {
   return c;
 }
 
+/* ОШИБКИ РАЗБОРА — ПО-РУССКИ (24.10, ADR 0157). Math.js отвечает по-английски
+   («Undefined symbol P»), и эта строка доходила до экрана под полем и в «Ответе».
+   Перевод в ОДНОМ месте — в catch у compileFormula, compileFormulaP и compileVar
+   (макро); английского текста ошибки никто из приборов и сцен не сравнивает
+   (grep 24.10). Незнакомое — «Не понял формулу» без английских слов. */
+function mathErrorRu(msg) {
+  const m = String(msg == null ? '' : msg);
+  let r = /Undefined symbol\s+([^\s(]+)/.exec(m);
+  if (r) return 'Не знаю букву ' + r[1];
+  if (/Undefined function\s+/.test(m)) { r = /Undefined function\s+([^\s(]+)/.exec(m); return 'Не знаю функцию ' + r[1]; }
+  if (/Unexpected end of expression/.test(m)) return 'Формула оборвалась';
+  if (/Parenthesis \) expected/.test(m)) return 'Не хватает закрывающей скобки';
+  if (/Unexpected operator|Value expected|Unexpected "/.test(m)) return 'Лишний или пропущенный знак';
+  return 'Не понял формулу';
+}
+
 function compileFormula(expr) {
   try {
     const compiled = math.parse(prepExpr(expr)).compile();
@@ -50,7 +66,7 @@ function compileFormula(expr) {
     compiled.evaluate(ctx);
     return { compiled, error: null };
   } catch (e) {
-    return { compiled: null, error: e.message };
+    return { compiled: null, error: mathErrorRu(e.message) };
   }
 }
 
@@ -100,6 +116,24 @@ function simplifyRecord(expr) {
   if (_simpCache.size > SIMPLIFY_CACHE_MAX) _simpCache.clear();
   _simpCache.set(key, out);
   return out;
+}
+
+/* Запись Q(P) после вмешательства — тоже Q(P) (карточка Notion …8149…, ADR 0157).
+   Кривая, набранная как «Q = 3P − 60», в записи хранит строку от P. Прибавлять к ней
+   ставку как к P(Q) нельзя: выходило «P = 3·P − 36». Вместо этого буква P заменяется
+   подстановкой sub — строкой от временной буквы Q (налог продавцу: «Q − (24)»), — и
+   запись упрощается тем же simplifyRecord, что у P(Q). Сверка simplifyRecord идёт по
+   букве Q (axisScope), поэтому упрощается запись от Q, а P возвращается в конце.
+   Вход src — запись человека от P без Q (так её и распознал curveSrcForm). */
+function qpRecordAfter(src, sub) {
+  if (typeof math === 'undefined') return '';
+  const isP = (n) => n && n.isSymbolNode && (n.name === 'P' || n.name === 'p');
+  try {
+    const subNode = math.parse('(' + sub + ')');
+    const put = math.parse(prepExpr(String(src))).transform(n => (isP(n) ? subNode : n));
+    const simple = simplifyRecord(put.toString());
+    return math.parse(prepExpr(simple)).transform(n => (n && n.isSymbolNode && n.name === 'Q' ? new math.SymbolNode('P') : n)).toString();
+  } catch (e) { return ''; }
 }
 
 /* «Здесь функции нет» — служебный хвост участка. Узел константы со значением
@@ -356,23 +390,20 @@ function refreshLinearForParams() {
 
 // Красивая запись прямой по a и b (для подписи в списке при перетаскивании).
 // varName — имя переменной ('Q' по умолчанию; 'P' для записи Q(P), Фаза 1б).
-/* dec — глубина округления. По умолчанию два знака, как было у всех прежних
-   вызовов. Перетаскивание просит три (решение владельца 19.08) и передаёт их
-   ЯВНО: печатать глубже, чем хранится в curve.linear, нельзя — запись и
-   расчёт разошлись бы в последнем разряде, а это ровно та беда, из-за которой
-   округление в движке вообще появилось. */
-function fmtLinear(a, b, varName, dec) {
+/* Э3: запись коэффициента не отбрасывает точность. Скобки нужны только
+   составному коэффициенту; десятичная и дробная записи сами однозначны. */
+function fmtLinear(a, b, varName) {
   const V = varName || 'Q';
-  const pow = Math.pow(10, (dec === undefined ? 2 : dec));
-  const r = (v) => Math.round(v * pow) / pow; a = r(a); b = r(b);
-  if (a === 0) return `${b}`;
+  const n = v => CalcNumber.expression(v);
+  const coefficient = v => { const s=n(v); return /\s[+−-]\s/.test(s)?'('+s+')':s; };
+  if (a === 0) return n(b);
   if (a < 0) {
-    const aa = Math.abs(a), aPart = aa === 1 ? V : `${aa}*${V}`;
-    return b === 0 ? `-${aPart}` : `${b} - ${aPart}`;
+    const aa = Math.abs(a), aPart = aa === 1 ? V : `${coefficient(aa)}*${V}`;
+    return b === 0 ? `-${aPart}` : `${n(b)} - ${aPart}`;
   }
-  const aPart = a === 1 ? V : `${a}*${V}`;
+  const aPart = a === 1 ? V : `${coefficient(a)}*${V}`;
   if (b === 0) return aPart;
-  return b > 0 ? `${aPart} + ${b}` : `${aPart} - ${Math.abs(b)}`;
+  return b > 0 ? `${aPart} + ${n(b)}` : `${aPart} - ${coefficient(Math.abs(b))}`;
 }
 
 /* --- Фаза 1б. Ввод Q(P): приведение к каноническому виду P = f(Q) ----------
@@ -391,7 +422,7 @@ function compileFormulaP(expr) {
     compiled.evaluate(scopeFor(expr, { P: 1, p: 1, x: 1 }));   // пробный расчёт ловит опечатки
     return { compiled, error: null };
   } catch (e) {
-    return { compiled: null, error: e.message };
+    return { compiled: null, error: mathErrorRu(e.message) };
   }
 }
 
@@ -919,12 +950,18 @@ function traceLevelCurve(f, level, aMax, bMax, steps) {
     box = new Map();
     _levelCache.set(f, box);
   }
-  const out = [];
-  for (let i = 0; i <= N; i++) {
-    const a = aMax * i / N;
-    const b = solveLevelB(f, level, a, bMax);
-    out.push((b == null) ? null : [a, b]);
-  }
+  const samples = Array.from({length: N + 1}, (_, i) => ({a: aMax * i / N}));
+  // Сетка не обязана попасть в пересечение с осью. Находим оба конца
+  // уровня отдельно, иначе кривая через угловой оптимум обрывалась раньше него.
+  [0, bMax].forEach(b => {
+    const a = solveLevelB((y, x) => f(x, y), level, b, aMax);
+    if (a != null) samples.push({a, b});
+  });
+  samples.sort((u, v) => u.a - v.a);
+  const out = samples.map(p => {
+    const b = p.b == null ? solveLevelB(f, level, p.a, bMax) : p.b;
+    return b == null ? null : [p.a, b];
+  });
   if (box.size > 32) box.clear();
   box.set(key, out);
   return out;
@@ -945,7 +982,10 @@ function partialB(f, a, b) {
 // MRS = (∂f/∂a)/(∂f/∂b) — сколько b компенсирует единицу a на том же уровне.
 function mrsAt(f, a, b) {
   const pa = partialA(f, a, b), pb = partialB(f, a, b);
-  return (isFinite(pa) && isFinite(pb) && Math.abs(pb) > 1e-12) ? pa / pb : NaN;
+  if (!isFinite(pa) || !isFinite(pb)) return NaN;
+  const zero = 1e-9 * Math.max(1, Math.abs(pa), Math.abs(pb));
+  if (Math.abs(pb) <= zero) return Math.abs(pa) <= zero ? NaN : Math.sign(pa) * Infinity;
+  return pa / pb;
 }
 
 // Максимум f(a, b) при линейном ограничении priceA·a + priceB·b = income.

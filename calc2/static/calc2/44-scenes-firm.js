@@ -44,6 +44,7 @@ function costsFC() {
 }
 
 function costTC(q)  {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q);
   if (STATE.costsMode === 'curves') {
     const atc = evalPart('ATC', q);
     if (!isNaN(atc)) return atc * q;
@@ -53,19 +54,23 @@ function costTC(q)  {
   return evalTC(q);
 }
 function costVC(q)  {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q) - STATE.firmSupply.fc;
   if (STATE.costsMode === 'curves') { const a = evalPart('AVC', q); return isNaN(a) ? NaN : a * q; }
   const tc = evalTC(q), fc = costsFC();
   return (isNaN(tc) || isNaN(fc)) ? NaN : tc - fc;               // переменные = TC − FC
 }
 function costATC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.tc(q) / q;
   if (STATE.costsMode === 'curves') return evalPart('ATC', q);
   const tc = evalTC(q); return isNaN(tc) ? NaN : tc / q;          // средние общие
 }
 function costAVC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return (STATE.firmSupply.tc(q) - STATE.firmSupply.fc) / q;
   if (STATE.costsMode === 'curves') return evalPart('AVC', q);
   const vc = costVC(q); return isNaN(vc) ? NaN : vc / q;          // средние переменные
 }
 function costAFC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return STATE.firmSupply.fc / q;
   if (STATE.costsMode === 'curves') {
     const atc = evalPart('ATC', q), avc = evalPart('AVC', q);
     return (isNaN(atc) || isNaN(avc)) ? NaN : atc - avc;
@@ -74,6 +79,7 @@ function costAFC(q) {
 }
 // MC = d(TC)/dQ численно (центральная разность) — как mcAt для TC.
 function costMC(q) {
+  if (STATE.firmSupply && !STATE.firmSupply.error) return STATE.firmSupply.mc(q);
   if (STATE.costsMode === 'curves') return evalPart('MC', q);
   const h = Math.max(1e-4, CONFIG.Qmax * 1e-5);
   const a = evalTC(q + h), b = evalTC(q - h);
@@ -81,6 +87,7 @@ function costMC(q) {
 }
 // Есть ли у сцены эта кривая вообще (в режиме «по отдельности» — только заданные).
 function costHas(name) {
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return true;
   if (STATE.costsMode !== 'curves') {
     // Без постоянных затрат нет ни VC, ни AVC, ни AFC.
     if (name === 'VC' || name === 'AVC' || name === 'AFC' || name === 'FC') return !isNaN(costsFC());
@@ -165,7 +172,7 @@ function computeFCfromTC() {
    каждый плюс повторная компиляция (Б32). */
 function costsSignature() {
   return [STATE.costsMode, STATE.costsTC, STATE.costsMCx, STATE.costsATCx, STATE.costsAVCx,
-          costScanTop(), paramsSignature()].join(' ');
+          costScanTop(), paramsSignature(), JSON.stringify(STATE.costsSupply), STATE.costsMCOnly].join(' ');
 }
 // Значения буквенных параметров: от них разбор тоже зависит.
 function paramsSignature() {
@@ -175,6 +182,7 @@ function paramsSignature() {
 
 // Пересчёт издержек: компиляция формул, постоянные затраты, ключевые точки.
 function recomputeCosts() {
+  recomputeFirmSupply();
   const sig = costsSignature();
   if (STATE.costsSig === sig && STATE.costsReady) return;   // входные данные те же
   STATE.costsSig = sig;
@@ -209,7 +217,8 @@ function recomputeCosts() {
     STATE.costsFCInfo = computeFCfromTC();
   }
 
-  const hi = costScanTop();
+  if (STATE.firmSupply && !STATE.firmSupply.error) STATE.costsFCInfo = { val: STATE.firmSupply.fc, kind: STATE.firmSupply.fcKind || 'exact' };
+  const hi = Math.min(costScanTop(), STATE.firmSupply?.K ?? Infinity);
   if (costHas('AVC')) STATE.minAVC = minOf(costAVC, COST_SCAN_LO, hi);   // точка закрытия
   if (costHas('ATC')) STATE.minATC = minOf(costATC, COST_SCAN_LO, hi);   // точка безубыточности
   checkCostsConsistency();
@@ -246,9 +255,27 @@ function checkCostsConsistency() {
    там, где кривая не определена: у средних это выходит само (деление на ноль
    даёт бесконечность и точка отбрасывается), у остальных ничего не теряется. */
 function costPoints(f) {
+  const supply = STATE.firmSupply;
+  if (supply?.exact && supply.pieces.length > 1) {
+    const out = [], lo = Math.max(0, CONFIG.Qmin), hi = Math.min(CONFIG.Qmax, supply.K);
+    for (const piece of supply.pieces) {
+      const a = Math.max(lo, piece.lo), b = Math.min(hi, piece.hi);
+      if (!(b > a)) continue;
+      if (out.length) out.push(null);
+      const n = Math.max(2, Math.ceil(400 * (b-a) / Math.max(1, hi-lo)));
+      for (let i=0; i<=n; i++) {
+        const q=a+(b-a)*i/n, eps=Math.min((b-a)*1e-7,1e-9*Math.max(1,Math.abs(q)));
+        // Односторонний предел: соседний кусок не соединяется через скачок.
+        const at=i===0?q+eps:i===n?q-eps:q, v=f(at);
+        out.push(Number.isFinite(v)&&v>=0&&v<=CONFIG.Pmax*4?[q,v]:null);
+      }
+    }
+    return out;
+  }
   const N = 400, out = [];
   const q0 = Math.max(0, CONFIG.Qmin);
-  const step = (CONFIG.Qmax - q0) / N;
+  const qHi = STATE.firmSupply && !STATE.firmSupply.error ? Math.min(CONFIG.Qmax, STATE.firmSupply.K) : CONFIG.Qmax;
+  const step = (qHi - q0) / N;
   for (let i = 0; i <= N; i++) {
     // Ровно ноль пропускаем: там у средних кривых деление на ноль.
     const q = (i === 0 && q0 === 0) ? step * 1e-3 : q0 + step * i;
@@ -266,6 +293,7 @@ function costPoints(f) {
 function costExprs() {
   const out = { TC: '', VC: '', ATC: '', AVC: '', AFC: '', MC: '', FC: '' };
   if (!STATE.costsReady) return out;
+  if (STATE.firmSupply && !STATE.firmSupply.error && STATE.costsMCOnly && STATE.costsMode === 'curves') return firmCostExpressions(STATE.firmSupply);
   if (STATE.costsMode === 'curves') {
     out.MC = (STATE.costsMCx || '').trim();
     out.ATC = (STATE.costsATCx || '').trim();
@@ -307,9 +335,10 @@ function drawCostCurves() {
     const p = g.append('path').datum(costPoints(f)).attr('fill', 'none')
       .attr('stroke', color).attr('stroke-width', 2.2).attr('d', line);
     if (dash) p.attr('stroke-dasharray', dash);
-    if (expr) markExpr(p, expr, 'Q');
+    if (expr) markExpr(p, expr, 'Q', [0, Math.min(CONFIG.Qmax, STATE.firmSupply?.K ?? Infinity)]);
   };
   const E = costExprs();
+  const limited = f => q => q <= (STATE.firmSupply?.K ?? Infinity) ? f(q) : NaN;
   // Кривой, которой у сцены нет (нет постоянных затрат либо поле пустое),
   // не существует: галочка её не воскрешает.
   // Полные затраты (Б21): TC, VC и FC — тройка, живут вместе.
@@ -323,27 +352,29 @@ function drawCostCurves() {
 
   // Подписи кривых (Фаза 3): у правого края, а если кривая там вне окна —
   // у ближайшего места, где она видна. Раньше подпись просто пропадала.
-  if (STATE.showMC  && costHas('MC'))  labelCurve(g, costMC,  'MC',  COL.costMC);
-  if (STATE.showATC && costHas('ATC')) labelCurve(g, costATC, 'ATC', COL.costATC);
-  if (STATE.showAVC && costHas('AVC')) labelCurve(g, costAVC, 'AVC', COL.costAVC, { below: true });
-  if (STATE.showAFC && costHas('AFC')) labelCurve(g, costAFC, 'AFC', COL.costAFC);
-  if (STATE.showVC  && costHas('VC'))  labelCurve(g, costVC,  'VC',  COL.costVC, { below: true });
-  if (STATE.showTC  && costHas('TC'))  labelCurve(g, costTC,  'TC',  COL.costTC);
+  if (STATE.showMC  && costHas('MC'))  labelCurve(g, limited(costMC),  'MC',  COL.costMC);
+  if (STATE.showATC && costHas('ATC')) labelCurve(g, limited(costATC), 'ATC', COL.costATC);
+  if (STATE.showAVC && costHas('AVC')) labelCurve(g, limited(costAVC), 'AVC', COL.costAVC, { below: true });
+  if (STATE.showAFC && costHas('AFC')) labelCurve(g, limited(costAFC), 'AFC', COL.costAFC);
+  if (STATE.showVC  && costHas('VC'))  labelCurve(g, limited(costVC),  'VC',  COL.costVC, { below: true });
+  if (STATE.showTC  && costHas('TC'))  labelCurve(g, limited(costTC),  'TC',  COL.costTC);
   if (STATE.showFC  && costHas('FC'))  labelCurve(g, () => costsFC(), 'FC', COL.costFC, { below: true });
 
   // Ключевые точки: безубыточность (min ATC) и закрытие (min AVC) — MC проходит
   // через них. Показываем только НАСТОЯЩИЙ внутренний минимум: край отрезка
   // сканирования экономической точкой не является (Б26).
-  const mark = (pt, color, label) => {
-    if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax) return;
+  const mark = (pt, color, label, below = false) => {
+    if (!pt || pt.val > CONFIG.Pmax || pt.Q > CONFIG.Qmax || pt.Q > (STATE.firmSupply?.K ?? Infinity)) return;
     const [px, py] = toPx(pt.Q, pt.val);
     g.append('circle').attr('cx', px).attr('cy', py).attr('r', 4)
       .attr('fill', color).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    g.append('text').attr('x', px).attr('y', py - 9)
+    g.append('text').attr('x', px).attr('y', py + (below ? FS.small + 5 : -9))
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('font-weight', 600).attr('fill', color)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text(label);
   };
-  if (STATE.showATC && costHas('ATC')) mark(realMin(STATE.minATC), COL.costATC, 'безубыточность');
+  // При положительной прибыли её прямоугольник лежит выше min ATC.
+  // Подпись под минимумом остаётся за пределами этой заливки.
+  if (STATE.showATC && costHas('ATC')) mark(realMin(STATE.minATC), COL.costATC, 'безубыточность', true);
   if (STATE.showAVC && costHas('AVC')) mark(realMin(STATE.minAVC), COL.costAVC, 'закрытие');
 }
 
@@ -363,6 +394,7 @@ function noMinNote(m, what, avgName) {
 function updateCostsPanel() {
   const box = document.getElementById('info-costs');
   if (!box) return;
+  if (STATE.firmSupply) { updateFirmSupplyPanel(box); return; }
   if (!STATE.costsReady) {
     box.innerHTML = '<div class="warn">' + (STATE.costsMode === 'curves'
       ? 'Задайте хотя бы одну кривую: MC, ATC или AVC.'
@@ -390,11 +422,8 @@ function updateCostsPanel() {
   else html += noMinNote(STATE.minAVC, 'точки закрытия', 'AVC');
 
   if (STATE.costsWarn) html += `<div class="warn">${STATE.costsWarn}</div>`;
-  // Про пересечение говорим ровно о тех точках, которые на графике есть.
-  if (mATC && mAVC)
-    html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
-  else if (mATC)
-    html += '<div class="hint">В точке безубыточности MC пересекает ATC ровно в её минимуме.</div>';
+  /* «MC пересекает AVC и ATC в их минимумах» убрано (сессия 5, А4): та же мысль — вопрос «Разбора» «Почему MC
+     пересекает ATC ровно в её минимуме?». */
   else if (mAVC)
     html += '<div class="hint">В точке закрытия MC пересекает AVC ровно в её минимуме.</div>';
   html = updateLongRunPanel(html);   // 9в — цена, оптимум P = MC, прибыль/убыток
@@ -403,6 +432,7 @@ function updateCostsPanel() {
 
 // Полная перерисовка режима «Фирма»: три сюжета (Фаза 9).
 function redrawCosts() {
+  if (STATE.sceneKey === 'firmmarket') { redrawFirmMarket(); return; }
   if (STATE.costsSub === 'production') { redrawProduction(); return; }   // 9а
   if (STATE.costsSub === 'isoquant')   { redrawIsoquant();   return; }   // 9б
   if (STATE.costsSub === 'plants')     { redrawPlants();     return; }   // Фаза 10
@@ -419,6 +449,7 @@ function redrawCosts() {
   drawAxes('Q', 'P');
   drawLongRunArea();      // прямоугольник прибыли/убытка — под кривыми
   drawCostCurves();
+  drawFirmSupply();
   if (STATE.lrOn) drawLongRunMarks();
   updateCostsPanel();
 }
@@ -439,6 +470,7 @@ function redrawCosts() {
 // Поэтому ищем корень справа налево, как findRootLast.
 function recomputeLongRun() {
   STATE.lr = null;
+  if (STATE.firmSupply) { recomputeFirmSupplyPrice(); return; }
   if (!STATE.costsReady || !STATE.lrOn || !costHas('MC')) return;
   const P = STATE.lrPrice;
   if (!(P > 0)) return;
@@ -686,8 +718,26 @@ function prodEval(L) {
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
-// Предельный продукт MP = dQ/dL — центральная разность (как везде в движке).
+// Для гладкой формулы берём производную без шума разностей. Численный
+// запасной путь остаётся для формул, которые Math.js не дифференцирует.
+let _prodDerivativeSource = null, _prodDerivatives = [];
+function prodDerivative(L, order) {
+  if (_prodDerivativeSource !== STATE.prodExpr) {
+    _prodDerivativeSource = STATE.prodExpr;
+    const first = derivativeExpr(STATE.prodExpr, 'L');
+    const second = first && derivativeExpr(first, 'L');
+    _prodDerivatives = [first, second].map(expr => expr ? compileFormula(expr).compiled : null);
+  }
+  const compiled = _prodDerivatives[order - 1];
+  if (!compiled) return NaN;
+  try {
+    const value = compiled.evaluate(scopeFor(STATE.prodExpr, { L, x: L, Q: L }));
+    return Number.isFinite(value) ? value : NaN;
+  } catch (e) { return NaN; }
+}
 function prodMP(L) {
+  const exact = prodDerivative(L, 1);
+  if (Number.isFinite(exact)) return exact;
   const h = Math.max(1e-5, L * 1e-5 || 1e-5), lo = Math.max(0, L - h);
   const a = prodEval(L + h), b = prodEval(lo);
   return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((L + h) - lo);
@@ -700,7 +750,7 @@ function prodAP(L) { const q = prodEval(L); return (isNaN(q) || L <= 0) ? NaN : 
    TP при L = 6,57». У TP = L² предельный продукт растёт всюду: максимум MP
    оказывался на правом краю сетки. И то, и другое — край цикла, выданный за
    экономическую величину. */
-function maxOf(f, lo, hi) {
+function maxOf(f, lo, hi, derivative) {
   let bestQ = null, bestV = -Infinity, lowV = Infinity;
   const scan = (a, b, n) => {
     for (let i = 0; i <= n; i++) {
@@ -717,6 +767,13 @@ function maxOf(f, lo, hi) {
   const st = (hi - lo) / 2000;
   const interior = (bestQ > lo + 2 * st) && (bestQ < hi - 2 * st);
   scan(Math.max(lo, bestQ - st), Math.min(hi, bestQ + st), 400);
+  if (interior && derivative) {
+    const a = Math.max(lo, bestQ - st), b = Math.min(hi, bestQ + st);
+    if (derivative(a) > 0 && derivative(b) < 0) {
+      const q = bisect(derivative, a, b), v = q == null ? NaN : f(q);
+      if (Number.isFinite(v) && v >= bestV - 1e-10 * scale) { bestQ = q; bestV = v; }
+    }
+  }
   return { L: bestQ, val: bestV, kind: interior ? 'interior' : 'boundary' };
 }
 // Показывать числом можно только настоящий внутренний максимум.
@@ -733,9 +790,9 @@ function recomputeProduction() {
   let Lmax = CONFIG.Qmax;
   const zero = findRootIn((l) => prodEval(l), CONFIG.Qmax * 0.02, CONFIG.Qmax * 20);
   if (zero != null && zero > 0) Lmax = zero;
-  const maxTP = maxOf(prodEval, 0, Lmax);           // максимум выпуска
-  const maxMP = maxOf(prodMP, 1e-3, Lmax);          // точка перегиба TP — начало убывающей отдачи
-  const maxAP = maxOf(prodAP, 1e-3, Lmax);          // максимум AP: там AP = MP
+  const maxTP = maxOf(prodEval, 0, Lmax, prodMP);   // максимум выпуска
+  const maxMP = maxOf(prodMP, 1e-3, Lmax, L => prodDerivative(L, 2)); // перегиб TP
+  const maxAP = maxOf(prodAP, 1e-3, Lmax, L => (L * prodMP(L) - prodEval(L)) / (L * L)); // AP = MP
   const mpAtMaxAP = maxAP ? prodMP(maxAP.L) : NaN;
   STATE.prod = { Lmax, maxTP, maxMP, maxAP, mpAtMaxAP };
 }
@@ -820,6 +877,8 @@ function redrawProduction() {
   const gBot = panel(t2, yBot0, 'MP и AP');
   curve(gBot, prodMP, t2, COL.prodMP, STATE.showMP, null, 'MP');
   curve(gBot, prodAP, t2, COL.prodAP, STATE.showAP, null, 'AP');
+  if (STATE.showMP) labelCurveMath(gBot, prodMP, lx, t2, 'MP', COL.prodMP);
+  if (STATE.showAP) labelCurveMath(gBot, prodAP, lx, t2, 'AP', COL.prodAP);
   // Ключевые вертикали: перегиб TP (максимум MP) и максимум AP (там AP = MP).
   const vline = (L, color, label, row) => {
     if (L == null) return;
@@ -908,7 +967,9 @@ function redrawIsoquant() {
   addDefs(); drawGrid(); drawAxes('L', 'K');
   const iso = STATE.iso;
   if (!iso) { updateIsoPanel(); return; }
-  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.isoq, 1.6, 0.35));
+  // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
+  // при прозрачности 0,35 контраст к холсту был 1,5 : 1 (инвариант 3 : 1, contrast_probe.mjs).
+  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.isoq, 1.6, 0.95, '5 4'));
   drawBudgetLine({ xInt: iso.Lint, yInt: iso.Kint }, COL.reg, false, 'изокоста');
   drawLevelCurve(iso.f, iso.Q, COL.isoq, 2.6, 1);
   drawChoicePoint(iso.L, iso.K, COL.ink, 'E');
@@ -928,8 +989,7 @@ function updateIsoPanel() {
   html += `<div class="stat"><span>$\\frac{w}{r}$</span><b>${fmt(STATE.isoW / STATE.isoR)}</b></div>`;
   html += `<div class="stat"><span>Потрачено</span><b>${fmt(STATE.isoW * iso.L + STATE.isoR * iso.K)}</b></div>`;
   html += '<div class="hint" style="margin-top:4px;">Условие оптимума то же, что у потребителя, только вместо ' +
-    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>$MRTS = \\frac{w}{r}$</b>. Это буквально один и тот же ' +
-    'численный движок касания уровня.</div>';
+    'полезности стоит выпуск, а вместо цен благ цены факторов: <b>$MRTS = \\frac{w}{r}$</b>.</div>';
   box.innerHTML = html;
 }
 
@@ -939,210 +999,11 @@ function updateIsoPanel() {
    Совокупные издержки — это НЕ поточечная сумма TC₁(Q)+TC₂(Q), а минимум
    суммы по всем способам разделить выпуск:
         TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }.
-   Условие оптимума: MC₁(Q₁) = MC₂(Q₂) = MC(Q). Если предельные издержки
-   заводов различаются, выпуск выгодно перебросить туда, где дешевле
-   следующая единица, — и так до выравнивания.
-   Отсюда совокупная MC строится ГОРИЗОНТАЛЬНЫМ сложением: фиксируем уровень
-   предельных издержек m, у каждого завода берём его Qᵢ(m) = MCᵢ⁻¹(m) и
-   складываем ОБЪЁМЫ (та же логика, что сложение предложений фирм в рыночное).
+   Равенство MC относится к внутреннему решению при выпуклых затратах.
+   Границы, закрытие и вогнутые участки требуют сравнения всех кандидатов.
 
-   Реализация численная и параметрическая ПО УРОВНЮ m: для сетки m считаем
-   Q₁(m), Q₂(m) (бисекция по объёму) и получаем пары (Q₁+Q₂, m) — это и есть
-   готовая кривая совокупной MC. Дальше TC(Q) — интеграл трапециями по этой
-   же таблице; параллельно считается прямая сумма TC₁(Q₁)+TC₂(Q₂) как сверка.
+   Э6: глобальный минимум, мощности и квазипостоянные затраты — 45-plants.js.
    ===================================================================== */
-
-// Предельные издержки завода по его TC (центральная разность).
-function plantMC(compiled, q) {
-  const h = Math.max(1e-5, q * 1e-5 || 1e-5), lo = Math.max(0, q - h);
-  const at = (x) => { try { const v = compiled.evaluate(paramScope({ Q: x, x: x, L: x })); return (typeof v === 'number' && isFinite(v)) ? v : NaN; } catch (e) { return NaN; } };
-  const a = at(q + h), b = at(lo);
-  return (isNaN(a) || isNaN(b)) ? NaN : (a - b) / ((q + h) - lo);
-}
-function plantTC(compiled, q) {
-  try { const v = compiled.evaluate(paramScope(axisScope(q))); return (typeof v === 'number' && isFinite(v)) ? v : NaN; }
-  catch (e) { return NaN; }
-}
-// Объём завода при уровне предельных издержек m: MC(q) = m. MC растёт по q,
-// поэтому чистая бисекция без сканирования — быстро (важно: вызывается сотни раз).
-function plantQatMC(compiled, m, qMax) {
-  if (!(plantMC(compiled, 1e-6) < m)) return 0;      // даже первая единица дороже m — завод стоит
-  if (plantMC(compiled, qMax) <= m) return qMax;     // упёрлись в правый край сетки
-  let lo = 0, hi = qMax;
-  for (let k = 0; k < 60; k++) {
-    const mid = (lo + hi) / 2, v = plantMC(compiled, mid);
-    if (isNaN(v)) { hi = mid; continue; }
-    if (v < m) lo = mid; else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-
-/* До какого выпуска сканируется один завод. Число постоянное и от вида не
-   зависит: 100 — тот же предел, с которым сцена открывалась и раньше. */
-const PLANT_SCAN_Q = 100;
-
-function recomputePlants() {
-  STATE.plants = null; STATE.plErr = null;
-  const r1 = compileFormula(STATE.pl1), r2 = compileFormula(STATE.pl2);
-  if (r1.error || r2.error) { STATE.plErr = r1.error || r2.error; return; }
-  const c1 = r1.compiled, c2 = r2.compiled;
-  /* Предел выпуска ОДНОГО завода. Раньше здесь стоял CONFIG.Qmax — предел
-     брался из текущего окна, а окно потом подгонялось под совокупный выпуск
-     двух заводов, то есть примерно под удвоенный предел. Получалась обратная
-     связь: каждая перерисовка раздвигала окно, окно поднимало предел, предел
-     снова раздвигал окно. Со старым запасом ×1.05 «красивое» округление это
-     почти гасило, с общим запасом ×1.12 (П33) расхождение стало явным: за
-     несколько перерисовок ось уезжала на десятки тысяч, и колесо на сцене
-     переставало что-либо менять. Теперь предел не зависит от вида. */
-  const qMax = PLANT_SCAN_Q;                         // предел выпуска ОДНОГО завода
-  const mMax = Math.max(plantMC(c1, qMax), plantMC(c2, qMax));
-  if (!(mMax > 0)) { STATE.plErr = 'Предельные издержки не растут. Проверьте формулы TC.'; return; }
-  // Таблица горизонтального сложения: по уровню предельных издержек m.
-  const N = 400, table = [];
-  let cum = 0;                                       // ∫ m dQ трапециями по таблице
-  for (let i = 0; i <= N; i++) {
-    const m = mMax * i / N;
-    const q1 = plantQatMC(c1, m, qMax), q2 = plantQatMC(c2, m, qMax);
-    const Q = q1 + q2;
-    if (i > 0) { const p = table[table.length - 1]; cum += (m + p.m) / 2 * (Q - p.Q); }
-    table.push({ m, q1, q2, Q, vc: cum, tcDirect: plantTC(c1, q1) + plantTC(c2, q2) });
-  }
-  STATE.plants = { c1, c2, table, qMax, mMax, Qtot: table[table.length - 1].Q };
-  // Масштаб ползунка совокупного выпуска — под суммарный предел.
-  const sl = document.getElementById('pl-q-slider'), inp = document.getElementById('pl-q-input');
-  const top = Math.max(1, Math.round(STATE.plants.Qtot));
-  if (sl) sl.max = top; if (inp) inp.max = top;
-}
-
-// Линейная интерполяция строки таблицы по совокупному выпуску Q.
-function plantsAt(Q) {
-  const p = STATE.plants; if (!p) return null;
-  const t = p.table;
-  if (Q <= 0) return { Q: 0, q1: 0, q2: 0, m: t[0].m, vc: 0, tcDirect: t[0].tcDirect };
-  for (let i = 0; i < t.length - 1; i++) {
-    const a = t[i], b = t[i + 1];
-    if (Q >= a.Q && Q <= b.Q && b.Q > a.Q) {
-      const k = (Q - a.Q) / (b.Q - a.Q);
-      return { Q, q1: a.q1 + k * (b.q1 - a.q1), q2: a.q2 + k * (b.q2 - a.q2),
-               m: a.m + k * (b.m - a.m), vc: a.vc + k * (b.vc - a.vc),
-               tcDirect: a.tcDirect + k * (b.tcDirect - a.tcDirect) };
-    }
-  }
-  const last = t[t.length - 1];
-  return { Q: last.Q, q1: last.q1, q2: last.q2, m: last.m, vc: last.vc, tcDirect: last.tcDirect };
-}
-
-function redrawPlants() {
-  recomputePlants();
-  const p = STATE.plants;
-  // Масштаб: по совокупной кривой (она самая длинная по Q).
-  if (p) {
-    const yTop = (STATE.plView === 'mc') ? p.mMax : Math.max(p.table[p.table.length - 1].tcDirect, 1);
-    applyAutoRanges(padMax(p.Qtot), padMax(yTop));
-  }
-  makeScales();
-  svg.selectAll('*').remove();
-  addDefs(); drawGrid(); drawAxes('Q', 'P');    // правило 46: символ, а не «Издержки»
-  const errBox = document.getElementById('pl-error');
-  if (errBox) { errBox.style.display = STATE.plErr ? 'block' : 'none'; errBox.textContent = STATE.plErr ? ('Не понял формулу: ' + STATE.plErr) : ''; }
-  if (!p) { updatePlantsPanel(); return; }
-  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
-  const label = (x, y, txt, color) => {
-    if (isNaN(y) || y > CONFIG.Pmax || y < 0) return;
-    // А28: величина набирается с индексом, а не слипшимся текстом.
-    renderLabelText(
-      g.append('text').attr('x', sx(x)).attr('y', sy(y) - 5).attr('font-size', FS.base)
-        .attr('font-weight', 600).attr('fill', color)
-        .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5),
-      txt);
-  };
-  if (STATE.plView === 'mc') {
-    // MC каждого завода по СВОЕМУ объёму + совокупная MC (горизонтальная сумма).
-    const mkMC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantMC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-    // Б4: у заводов формулы затрат ввёл человек, предельные берём символьно.
-    markExpr(g.append('path').datum(mkMC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
-             derivativeExpr(STATE.pl1, 'Q'), 'Q', [0, p.qMax]);
-    markExpr(g.append('path').datum(mkMC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
-             derivativeExpr(STATE.pl2, 'Q'), 'Q', [0, p.qMax]);
-    /* Совокупная кривая строится ЧИСЛЕННО (горизонтальное сложение по уровню
-       предельных затрат), замкнутой формулы у неё в общем случае нет. Говорим
-       об этом в самом файле, а не выдаём таблицу точек за формулу (Б5). */
-    g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2.8).attr('d', line)
-      .attr('data-numeric', 'совокупная MC получена горизонтальным сложением, замкнутой формулы у неё нет');
-    label(p.qMax * 0.5, plantMC(p.c1, p.qMax * 0.5), 'MC₁', COL.tax);
-    label(p.qMax * 0.34, plantMC(p.c2, p.qMax * 0.34), 'MC₂', COL.reg);
-    const mid = plantsAt(p.Qtot * 0.6); if (mid) label(mid.Q, mid.m, 'MC совокупная', COL.MC);
-  } else {
-    // TC каждого завода по своему объёму + совокупная TC(Q) (минимум суммы).
-    const mkTC = (c) => { const o = []; for (let i = 0; i <= 300; i++) { const q = p.qMax * i / 300; const v = plantTC(c, q); o.push(isNaN(v) ? null : [q, v]); } return o; };
-    markExpr(g.append('path').datum(mkTC(p.c1)).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
-             STATE.pl1, 'Q', [0, p.qMax]);
-    markExpr(g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
-             STATE.pl2, 'Q', [0, p.qMax]);
-    g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line)
-      .attr('data-numeric', 'совокупная TC это минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет');
-    label(p.qMax * 0.7, plantTC(p.c1, p.qMax * 0.7), 'TC₁', COL.tax);
-    label(p.qMax * 0.45, plantTC(p.c2, p.qMax * 0.45), 'TC₂', COL.reg);
-    const mid = plantsAt(p.Qtot * 0.7); if (mid) label(mid.Q, mid.tcDirect, 'TC совокупная', COL.D);
-  }
-  // Метка выбранного совокупного выпуска и его разложение на заводы.
-  const cur = plantsAt(STATE.plQ);
-  if (cur && cur.Q > 0) {
-    const og = svg.append('g'), ox = sx(0), oy = sy(0);
-    const yv = (STATE.plView === 'mc') ? cur.m : cur.tcDirect;
-    const [px, py] = toPx(cur.Q, yv);
-    og.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)
-      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-    og.append('line').attr('x1', ox).attr('y1', py).attr('x2', px).attr('y2', py)
-      .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
-    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
-    axisValueX(og, px, oy, fmt(cur.Q), '');
-    axisValueY(og, ox, py, fmt(yv), '');
-    if (STATE.plView === 'mc') {
-      // Показываем ГОРИЗОНТАЛЬНОЕ сложение: на уровне m объёмы заводов складываются.
-      og.append('line').attr('x1', ox).attr('y1', py).attr('x2', sx(cur.Q)).attr('y2', py)
-        .attr('stroke', COL.MC).attr('stroke-width', 1.6).attr('opacity', 0.5);
-      [[cur.q1, COL.tax, 'Q₁'], [cur.q2, COL.reg, 'Q₂']].forEach(([q, c, t]) => {
-        if (!(q > 0)) return;
-        og.append('circle').attr('cx', sx(q)).attr('cy', py).attr('r', 3.5).attr('fill', c).attr('stroke', COL.halo).attr('stroke-width', 1.2);
-        haloText(og, sx(q), py - 10, t + '=' + fmt(q), 'middle', 'auto');
-      });
-    }
-  }
-  updatePlantsPanel();
-}
-
-function updatePlantsPanel() {
-  const box = document.getElementById('info-plants'); if (!box) return;
-  const p = STATE.plants;
-  if (!p) { box.innerHTML = '<div class="warn">' + (STATE.plErr || 'Введите функции затрат обоих заводов.') + '</div>'; return; }
-  const cur = plantsAt(STATE.plQ);
-  let html = '';
-  if (cur) {
-    html += `<div class="stat"><span>Совокупный выпуск Q</span><b>${fmt(cur.Q)}</b></div>`;
-    html += `<div class="stat"><span>Завод 1: Q₁</span><b>${fmt(cur.q1)}</b></div>`;
-    html += `<div class="stat"><span>Завод 2: Q₂</span><b>${fmt(cur.q2)}</b></div>`;
-    html += `<div class="stat"><span>$MC_1 = MC_2 = MC(Q)$</span><b>${fmt(cur.m)}</b></div>`;
-    html += `<div class="stat"><span>$TC(Q) = TC_1 + TC_2$</span><b>${fmt(cur.tcDirect)}</b></div>`;
-    html += `<div class="stat"><span>∫ MC(q)dq (сверка)</span><b>${fmt(cur.vc)}</b></div>`;
-    // Наглядная проверка: неверная «сумма в лоб» TC₁(Q)+TC₂(Q) заметно дороже.
-    const naive = plantTC(p.c1, cur.Q) + plantTC(p.c2, cur.Q);
-    if (!isNaN(naive)) html += `<div class="stat"><span>«Сумма в лоб» TC₁(Q)+TC₂(Q)</span><b>${fmt(naive)}</b></div>`;
-  }
-  html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
-    '<b>Почему сложение ГОРИЗОНТАЛЬНОЕ</b><br>' +
-    'Совокупные издержки это не TC₁(Q)&nbsp;+&nbsp;TC₂(Q) (столько стоило бы выпустить <i>по Q</i> на каждом заводе, ' +
-    'то есть 2Q всего), а минимум суммы при делении выпуска:<br>' +
-    '<code>TC(Q) = min[Q₁+Q₂=Q] { TC₁(Q₁) + TC₂(Q₂) }</code>.<br><br>' +
-    'Пока $MC_1 \\ne MC_2$, единицу выгодно перебросить с дорогого завода на дешёвый, значит в оптимуме ' +
-    '<b>$MC_1 = MC_2 = MC(Q)$</b>. Поэтому совокупную кривую строят так: фиксируют уровень ' +
-    'предельных издержек m, у каждого завода берут его объём Qᵢ(m)&nbsp;=&nbsp;MCᵢ⁻¹(m) и складывают ' +
-    '<b>объёмы</b>, а не высоты, ровно как рыночное предложение из предложений фирм.<br><br>' +
-    'Проверить можно так: на вкладке «Предельные MC» на выбранном уровне видно, что Q₁&nbsp;+&nbsp;Q₂ даёт ' +
-    'точку совокупной кривой, а TC(Q) совпадает с интегралом ∫MC с точностью до постоянных издержек.</div>';
-  box.innerHTML = html;
-}
 
 function setPlantsView(v) {
   STATE.plView = v;
@@ -1197,7 +1058,7 @@ function setCostsSub(sub) {
   const nm = document.getElementById('scene-name');
   if (nm && STATE.mode === 'costs') nm.textContent =
     ({ costs: 'Издержки фирмы', production: 'Производство: TP, MP, AP',
-       isoquant: 'Изокванты и изокосты', plants: 'Два завода' })[sub] || 'Фирма';
+       isoquant: 'Изокванты и изокосты', plants: 'Сложение заводов' })[sub] || 'Фирма';
   // Характерный масштаб под сюжет: издержки — мелкий, два завода — по объёму заводов.
   if (sub === 'costs') setRanges(10, 50);
   if (sub === 'plants') setRanges(30, 100);

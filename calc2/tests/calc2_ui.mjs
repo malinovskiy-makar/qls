@@ -14,12 +14,16 @@
 // KaTeX-предпросмотр, сборка .tex и ответ PDF-эндпоинта, вложенность
 // «Что изучаем», геометрия иконок, ширина ленты-пульта, тексты без длинных тире.
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
@@ -39,6 +43,7 @@ const ready = await page.evaluate(() => typeof redrawAll === 'function' && typeo
 if (!ready) { console.error('SKIP: функции calc2 не загрузились'); await browser.close(); process.exit(3); }
 
 const checks = [];
+checks.push([(await answerShown(page)) ? 'OK' : 'FAIL', 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)', '']);
 const t = async (name, fn) => {
   // Пишем результат сразу: по обрыву прогона видно, на чём он встал.
   let row;
@@ -247,7 +252,8 @@ await page.waitForTimeout(400);
    TC и FC (Б21) — в списке был один VC без своей пары. Ожидание изменено
    вместе с продуктом, а не подогнано: проверяем, что пикер есть у каждой. */
 await t('у семи кривых издержек есть пикеры', async () => {
-  const n = await page.locator('#sec-costs .cpick[data-col^="cost"]').count();
+  /* С 14.10 (ADR 0152) галочки кривых издержек с их пикерами переехали узлами в «Вид графика». */
+  const n = await page.locator('#sec-costs .cpick[data-col^="cost"], #wrench-pop .vg-onchart .cpick[data-col^="cost"]').count();
   return n === 7 || `пикеров ${n}`;
 });
 
@@ -258,17 +264,23 @@ await t('ключи цвета уникальны (MP ≠ MC и т.п.)', () => 
 }));
 
 /* --- П34: шесть предложенных цветов везде, где выбирают цвет ------------ */
-await t('в меню цвета шесть образцов и «Свой цвет»', () => page.evaluate(() => {
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5б; COVERAGE Р23): окно «Цвет кривой»
+   по макету — 12 образцов с именами (шесть цветов ролей и вторая шестёрка
+   палитры групп) и «Свой цвет». Строгость прежняя: число образцов точное, у
+   каждого есть имя, «Свой цвет» на месте, окно в body. */
+await t('в меню цвета двенадцать образцов с именами и «Свой цвет»', () => page.evaluate(() => {
   const btn = document.querySelector('.cpick[data-col="costMC"] .cpick-btn');
   if (!btn) return 'кнопки цвета нет';
   btn.click();
   const menu = document.querySelector('.cpick-menu');
   if (!menu) return 'меню не открылось';
-  const n = menu.querySelectorAll('.cpick-sw').length;
+  const sws = [...menu.querySelectorAll('.cpick-sw')];
+  const n = sws.length;
+  const named = sws.every(x => (x.getAttribute('aria-label') || '').trim());
   const own = !!menu.querySelector('.cpick-own input[type=color]');
   const inBody = menu.parentElement === document.body;   // не обрезается панелью
   closeColorMenu();
-  return (n === 6 && own && inBody) || `образцов ${n}, свой ${own}, в body ${inBody}`;
+  return (n === 12 && named && own && inBody) || `образцов ${n}, с именами ${named}, свой ${own}, в body ${inBody}`;
 }));
 
 await t('светлая и тёмная тема дают разные шесть цветов', () => page.evaluate(() => {
@@ -325,9 +337,11 @@ await t('издержки: min AVC при Q=3 не сломан', () => page.eva
    со всплывающей подсказкой, и он попадает в textContent, поэтому его
    отбрасываем. Собственными текстовыми узлами тоже не обойтись: с А28
    величина разложена на tspan'ы (символ, индекс, остаток), и такой сбор давал
-   пустые строки на месте MC, ATC и AVC. Читаем ту же функцию, что и страница. */
+   пустые строки на месте MC, ATC и AVC. ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: помощник
+   страницы labelPlainText ушёл вместе со старыми сборщиками .tex — то же
+   чтение здесь: разметка data-raw или текст без подсказки <title>. */
 const svgTexts = () => page.evaluate(() => [...document.querySelectorAll('#chart text')]
-  .map(n => (typeof labelPlainText === 'function' ? labelPlainText(n) : n.textContent)));
+  .map(n => n.getAttribute('data-raw') || (k => { k.querySelectorAll('title,desc').forEach(x => x.remove()); return k.textContent; })(n.cloneNode(true))));
 
 await t('подписи MC/ATC/AVC видны при обычном масштабе', async () => {
   const tx = await svgTexts();
@@ -482,7 +496,9 @@ await t('кривая добавляется настоящим щелчком �
     STATE.curves[0].expr === '100 - Q' || JSON.stringify(STATE.curves.map(c => c.expr)));
 });
 
-await t('кнопка открывает клавиатуру из трёх разделов', async () => {
+/* С 14.10 у клавиатуры поля четвёртый раздел «Как писать» (таблица записи из прежней кнопки «Как писать
+   формулы», решение «никаких подсказок», Notion …81eb…; ADR 0151): разделов 4. */
+await t('кнопка открывает клавиатуру из четырёх разделов (+ «Как писать»)', async () => {
   await page.evaluate(() => __FH().click());
   await page.waitForTimeout(250);
   return await page.evaluate(() => {
@@ -491,7 +507,8 @@ await t('кнопка открывает клавиатуру из трёх ра
     const tabs = kb.querySelectorAll('.mkbd-tab').length;
     const active = kb.querySelectorAll('.mkbd-pane.active').length;
     const keys = kb.querySelectorAll('.mk').length;
-    return (tabs === 3 && active === 1 && keys > 60) || `разделов ${tabs}, открыт ${active}, клавиш ${keys}`;
+    const howto = [...kb.querySelectorAll('.mkbd-tab')].some(t => t.textContent.trim() === 'Как писать');
+    return (tabs === 4 && howto && active === 1 && keys > 60) || `разделов ${tabs}, «Как писать» ${howto}, открыт ${active}, клавиш ${keys}`;
   });
 });
 
@@ -502,7 +519,12 @@ await t('клавиша ставит символ в поле, не стирая
     setFieldValue(inp, '');
     const kb = document.querySelector('.mkbd.open');
     const keys = [...kb.querySelectorAll('.mk')];
-    const hit = (t) => { const b = keys.find(x => x.textContent === t); if (b) b.click(); };
+    /* ПЕРЕНАЦЕЛЕНО (10.10, ADR 0144): буквы клавиатуры подписаны формулой
+       KaTeX (static/mathkbd/mathkbd.js, paintLabel), и textContent клавиши «Q»
+       — это «QQQ» (видимая буква плюс невидимая копия для чтеца). Имя клавиши —
+       её aria-label; у цифр и знаков его нет, там подпись — сам текст. */
+    const name = (x) => x.getAttribute('aria-label') || x.textContent;
+    const hit = (t) => { const b = keys.find(x => name(x) === t); if (b) b.click(); };
     hit('1'); hit('0'); hit('0'); hit('−'); hit('Q');
     return inp.value.replace(/\s/g, '') === '100-Q' || `в поле «${inp.value}»`;
   });
@@ -543,17 +565,22 @@ await t('своё имя кривой заменяет родовое D на г�
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
 await page.waitForTimeout(350);
 
-await t('монопольные поля в «Вводе функций», вмешательство — в аналитике', () => page.evaluate(() => {
+await t('монопольные поля в «Функциях», вмешательство — своей карточкой «Условия»', () => page.evaluate(() => {
   /* Обёртка «Что изучаем» убрана (решение владельца 22.08): поля монополии
-     лежат прямо в единой карточке ввода, а блок вмешательства государства
-     переехал в правую панель — он управляется ползунками, а не набирается. */
+     лежат прямо в единой карточке ввода.
+     ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): блок вмешательства государства
+     по макету — отдельная карточка левой колонки «Условие» (README макета,
+     раздел 6), а не правая панель: справа теперь только «Ответ». Строгость
+     прежняя в обе стороны: карточка вмешательства не внутри ввода и не в
+     «Ответе». */
   const inp = document.getElementById('sec-input');
-  const right = document.getElementById('params-panel');
+  const cond = document.getElementById('tools-panel');
+  const ans = document.getElementById('params-panel');
   if (!inp) return 'карточки #sec-input нет';
   const mono = inp.contains(document.getElementById('sec-mono'));
-  const tax = right.contains(document.getElementById('sec-tax'))
-           && !inp.contains(document.getElementById('sec-tax'));
-  return (mono && tax) || ('монополия в вводе: ' + mono + ', вмешательство справа: ' + tax);
+  const taxEl = document.getElementById('sec-tax');
+  const tax = !!taxEl && cond.contains(taxEl) && !inp.contains(taxEl) && !ans.contains(taxEl);
+  return (mono && tax) || ('монополия в вводе: ' + mono + ', вмешательство своей карточкой «Условия»: ' + tax);
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
@@ -566,10 +593,12 @@ await t('заголовок верхнего уровня в панели оди
     if (b) return b.textContent.trim();
     return [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
   };
-  const head = document.querySelector('#sec-input > .fold-btn > span');
+  /* ПЕРЕНАЦЕЛЕНО (фаза 5а): карточки больше не сворачиваются, заголовок
+     секции — h3.sec-head, а не складная кнопка; имя по макету «Функции». */
+  const head = document.querySelector('#sec-input > .sec-head > span');
   const inner = document.querySelectorAll('#sec-input .section-title').length;
-  if (!head) return 'у секции нет складного заголовка';
-  if (own(head) !== 'Ввод функций') return 'заголовок: ' + own(head);
+  if (!head) return 'у секции нет заголовка';
+  if (own(head) !== 'Функции') return 'заголовок: ' + own(head);
   return inner === 0 || 'внутри ещё ' + inner + ' заголовков верхнего уровня';
 }));
 
@@ -612,10 +641,15 @@ await t('окно экспорта открывается по кнопке до
 await t('заголовок подставился из названия сцены', async () =>
   (await page.inputValue('#exp-title')).length > 0 || 'поле пустое');
 
+/* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (новая выгрузка, ADR 0139). Было «\addplot не меньше
+   четырёх»: старый сборщик давал \addplot и на заливки отсчётами. Смысл тот же —
+   в файле есть оси и кривые модели: каждая кривая холста (опись окна «Скачать»)
+   стоит в файле своим \addplot, а их здесь три (D, S, S + t). */
 await t('.tex собирается и содержит кривые', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', 'fig:bread');
   const plots = (tex.match(/\\addplot/g) || []).length;
-  return (plots >= 4 && tex.includes('\\begin{axis}')) || `\\addplot: ${plots}`;
+  const curves = (buildTex._tally || {}).curves || 0;
+  return (curves >= 3 && plots >= curves && tex.includes('\\begin{axis}')) || `\\addplot: ${plots}, кривых: ${curves}`;
 }));
 
 await t('кривая с формулой выгружается формулой, а не точками', () => page.evaluate(() => {
@@ -664,7 +698,11 @@ await t('.tex экранирует опасные символы в подпис
   redrawAll();
   const tex = buildTex('', '');
   STATE.axisXName = ''; redrawAll();
-  return tex.includes('50\\% \\& выше') || 'нет экранирования';
+  /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: имя оси уходит настройкой xlabel, а знаки — внутрь
+     математики («Доля $50\% \&$ выше»). Смысл тот же: каждый % и & текста
+     человека экранирован, ни одного голого. */
+  const m = /xlabel=\{(.*?)\}, xlabel style/.exec(tex);
+  return (m && /50\\%/.test(m[1]) && /\\&/.test(m[1]) && /выше/.test(m[1]) && !/(^|[^\\])[%&]/.test(m[1])) || 'нет экранирования: ' + (m ? m[1] : 'нет xlabel');
 }));
 
 await t('label чистится от посторонних символов', () => page.evaluate(() => {
@@ -679,7 +717,8 @@ await t('пунктирная кривая S+t попала в .tex при на�
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
-    return tex.includes('dashed') || 'нет пунктира';
+    // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: пунктир на экране — пунктир в файле, теперь штрихом холста (dash pattern)
+    return /\\addplot\[[^\]]*dash pattern=on/.test(tex) || 'нет пунктира';
   });
 });
 
@@ -696,7 +735,9 @@ await t('в режиме издержек выгружаются кривые и
   /* Названия кривых уходят в .tex подписями узлов, как и на экране, и с А46
      они набраны МАТЕМАТИКОЙ: было {MC}, стало {$MC$}. Проверка ждала прежнюю
      запись и потому падала на верном поведении. */
-  return (tex.includes('{$MC$}') && tex.includes('{$ATC$}')) || tex.slice(0, 200);
+  /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: пробег заглавных набирается прямым начертанием, как
+     на холсте ($\mathrm{MC}$), а не курсивом ($MC$). */
+  return (tex.includes('$\\mathrm{MC}$') && tex.includes('$\\mathrm{ATC}$')) || tex.slice(0, 200);
 }));
 
 // Раньше .tex собирался из формул рыночной сцены, поэтому во всех остальных
@@ -753,22 +794,27 @@ await t('опасные команды в .tex отклоняются серве
     const res = await fetch(url, { method: 'POST', body: b });
     return res.status;
   }, await page.evaluate(() => CALC2_PDF_URL));
+  /* Отказ 400 здесь — ожидаемый ответ, а браузер пишет его в консоль как
+     «Failed to load resource». Это не ошибка страницы: убираем ровно эту
+     строку, иначе прибор при 158/158 отдавал код 1 (замечено 10.10). */
+  await page.waitForTimeout(100);
+  for (let i = errors.length - 1; i >= 0; i--) {
+    if (/Failed to load resource: the server responded with a status of 400/.test(errors[i])) { errors.splice(i, 1); break; }
+  }
   return [400, 503].includes(r) || `код ${r} (ожидался отказ)`;
 });
 
 // ── Фаза 6: полировка ───────────────────────────────────────────────────
-await t('иконки карточек: три толщины линий, не одиннадцать', () => page.evaluate(() => {
-  const w = new Set();
-  document.querySelectorAll('#scene-picker .scard-spec [stroke-width]')
-    .forEach(n => w.add(n.getAttribute('stroke-width')));
-  const arr = [...w].sort();
-  return arr.length <= 3 || 'толщин ' + arr.length + ': ' + arr.join(',');
-}));
-await t('иконки: один радиус маркеров и один пунктир', () => page.evaluate(() => {
-  const r = new Set(), d = new Set();
-  document.querySelectorAll('#scene-picker .scard-spec circle[r]').forEach(n => r.add(n.getAttribute('r')));
-  document.querySelectorAll('#scene-picker .scard-spec [stroke-dasharray]').forEach(n => d.add(n.getAttribute('stroke-dasharray')));
-  return (r.size <= 1 && d.size <= 1) || `радиусов ${r.size}, пунктиров ${d.size}`;
+/* Ручных схем .scard-spec больше нет (решение 09.10, ADR 0141): две прежние
+   проверки «три толщины, один радиус и один пунктир» стерегли их рисунок.
+   Превью теперь собирается из записи при рисовании; правило о нём — без
+   текста и у каждой рабочей модели (состав сторожит test_calc2_previews). */
+await t('превью карточек: у каждой из 42 рабочих моделей, без текста', () => page.evaluate(() => {
+  const cards = [...document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')];
+  const noPv = cards.filter(c => !c.querySelector('.pk-well svg.pk-pv path'));
+  const txt = document.querySelectorAll('#scene-picker svg.pk-pv text').length;
+  return (cards.length === 42 && !noPv.length && !txt && !document.querySelector('.scard-spec'))
+    || `моделей ${cards.length}, без превью ${noPv.length}, текстов ${txt}`;
 }));
 
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('tax'); closePicker(); });
@@ -802,18 +848,23 @@ await t('панели не перекрывают график', () => page.eval
 
    Спрашиваем то, что правило и обещает: орган управления найден внутри
    `#params-panel` и НЕ остался в левой панели инструментов. */
-await t('регуляторы сцены живут в правой панели', () => page.evaluate(() => {
-  const panel = document.getElementById('params-panel');
-  if (!panel) return 'правой панели нет вовсе';
-  const n = panel.querySelectorAll('.pchip, .field, #tax-field, #pc-field, #quota-field').length;
-  if (!n) return 'в правой панели ни одного органа управления';
-  const tools = document.getElementById('tools-panel');
-  const strayIds = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxside-row'];
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): пульт больше не переносит регуляторы в правую
+   панель — по макету они живут в «Условии», в карточках «Параметры» и
+   «Вмешательство государства», а справа только «Ответ». Строгость прежняя:
+   органы найдены в своём месте, и ни один не остался в чужой колонке. */
+await t('регуляторы сцены живут в «Условии», в «Ответе» их нет', () => page.evaluate(() => {
+  const cond = document.getElementById('tools-panel');
+  const ans = document.getElementById('params-panel');
+  if (!cond || !ans) return 'колонок нет';
+  const n = cond.querySelectorAll('#sec-params .pchip, #sec-params .field, #tax-field, #pc-field, #quota-field').length;
+  if (!n) return 'в «Условии» ни одного регулятора';
+  const strayIds = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxside-row', 'params-body'];
   const stray = strayIds.filter(id => {
     const e = document.getElementById(id);
-    return e && tools && tools.contains(e);
+    return e && ans.contains(e);
   });
-  return !stray.length || 'в «Инструментах» остались: ' + stray.join(', ');
+  const chips = ans.querySelectorAll('.pchip, input[type=range]').length;
+  return (!stray.length && !chips) || ('в «Ответе» остались: ' + stray.join(', ') + (chips ? ' и ползунков ' + chips : ''));
 }));
 
 /* ⚠️ ПРОВЕРКА ПЕРЕСЧИТАНА ПОД КАНОН, А НЕ ОТКЛЮЧЕНА (фаза 6, п. 50).
@@ -824,22 +875,35 @@ await t('регуляторы сцены живут в правой панели
    (аудит, п. 50). Теперь число 13/700 против подписи 12/600: крупнее и
    тяжелее, но в шкале. Требование «плюс три пункта» противоречило бы канону,
    поэтому проверяем то, что канон и обещает. */
-await t('в аналитике число крупнее и тяжелее подписи', () => page.evaluate(() => {
-  const b = document.querySelector('#sb-body .stat b'), s = document.querySelector('#sb-body .stat span');
-  if (!b || !s) return 'нет строк в табло';
+/* ПЕРЕНАЦЕЛЕНО (10.10, решение владельца 09.10, ADR 0144): «Ответ» строками —
+   у ВСЕХ значений колонки один формульный шрифт (KaTeX_Main) и один кегль 16 px,
+   обычного веса, как главные числа и раньше; подпись 13,5 px цветом --text2.
+   Вес 700 у чисел таблиц (канон 1.2.2, DESIGN.md 5.1) для «Ответа» снят:
+   иначе в колонке было бы два начертания значений. Число отличается от
+   подписи кеглем, шрифтом и цветом. */
+/* С 14.10 повторы «Ответа» спрятаны (тихие панели, README пакета calc2_panels_20261014, 5): у сцены бывает, что
+   все строки табло стоят главными числами. Тогда меряем главную строку (подпись и значение). */
+await t('в «Ответе» число крупнее подписи и набрано формульным шрифтом', () => page.evaluate(() => {
+  const row = [...document.querySelectorAll('#sb-body .stat')].find(r => r.getClientRects().length);
+  const cell = [...document.querySelectorAll('#ans-hero .ans-cell')].find(r => r.getClientRects().length);
+  const b = row ? row.querySelector(':scope > b') : (cell && cell.querySelector('.ans-line'));
+  const s = row ? row.querySelector(':scope > span') : (cell && cell.querySelector('.ans-lab'));
+  if (!b || !s) return 'нет видимых строк ни в табло, ни в главных числах';
   const cb = getComputedStyle(b), cs = getComputedStyle(s);
   const bs = parseFloat(cb.fontSize), ss = parseFloat(cs.fontSize);
-  const bw = parseInt(cb.fontWeight, 10), sw = parseInt(cs.fontWeight, 10);
-  if (bw !== 700) return `вес числа ${bw}, канон 1.2.2 требует 700`;
-  return (bs >= ss && bw > sw) || `число ${bs}px/${bw}, подпись ${ss}px/${sw}`;
+  const fam = cb.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+  if (fam !== 'KaTeX_Main') return 'шрифт числа ' + cb.fontFamily;
+  return (bs > ss && cb.color !== cs.color) || `число ${bs}px ${cb.color}, подпись ${ss}px ${cs.color}`;
 }));
 
 await t('панель параметров наполняется и в сцене «Труд»', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('labor'); closePicker(); });
   await page.waitForTimeout(450);
   return await page.evaluate(() => {
-    const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
-    return n > 0 || 'в панели параметров пусто';
+    /* ПЕРЕНАЦЕЛЕНО (фаза 5б): ползунки кривых стоят под их карточками
+       «Функций» (README макета, 6.1), остальные — в «Параметрах». */
+    const n = document.querySelectorAll('#params-body .pchip, #params-body .field, #curve-list .crow-sliders .pchip').length;
+    return n > 0 || 'ползунков сцены нет ни в «Параметрах», ни под карточками';
   });
 });
 
@@ -1113,8 +1177,12 @@ await t('легенда попадает в экспорт вместе с гр�
     /* Подписи легенды тоже набраны математикой (А46): было {Tx} и {DWL},
        стало {$T_x$} и {$DWL$}. Заодно убеждаемся, что вторая легенда, которую
        рисовал сам pgfplots, из файла ушла (А48). */
-    return (tex.includes('{$T_x$}') && tex.includes('{$DWL$}')
-            && !tex.includes('addlegendentry')) || 'подписей нет в .tex';
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: легенда теперь строки легенды pgfplots, как на
+       экране (\addlegendentry{$T_{x}$}), а вторую, собственную легенду
+       pgfplots гасит forget plot у каждого \addplot. */
+    const plots = tex.match(/\\addplot\[[^\n]*/g) || [];
+    return (tex.includes('\\addlegendentry{$T_{x}$}') && tex.includes('\\addlegendentry{$\\mathrm{DWL}$}')
+            && plots.every(l => l.includes('forget plot'))) || 'подписей нет в .tex';
   });
 });
 
@@ -1185,7 +1253,8 @@ await t('раздел букв даёт латиницу и греческие',
     const ab = tabs.find(t => /Букв/.test(t.textContent));
     if (!ab) return 'нет раздела букв';
     ab.click();
-    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.textContent);
+    // ПЕРЕНАЦЕЛЕНО (10.10): буквы подписаны формулой, имя клавиши — aria-label.
+    const labels = [...kb.querySelectorAll('.mkbd-pane.active .mk')].map(b => b.getAttribute('aria-label') || b.textContent);
     const need = ['a', 'z', 'α', 'β', 'π', 'Δ'];
     const miss = need.filter(n => labels.indexOf(n) < 0);
     return !miss.length || 'нет: ' + miss.join(', ');
@@ -1421,12 +1490,20 @@ await page.waitForTimeout(400);
 await page.evaluate(() => setToolsOpen(true));
 await page.waitForTimeout(180);
 
-await t('сцена открывается пустой: ни одной кривой', () => page.evaluate(() =>
-  (STATE.curves.length === 0 && STATE.mode === 'graph') || `кривых ${STATE.curves.length}, режим ${STATE.mode}`));
+/* ПЕРЕНАЦЕЛЕНО (10.10, ADR 0144): «Построение графиков» открывается не пустым,
+   а с функцией x^2-4 (решение владельца 27.09; контрольное число в calc2/CLAUDE.md).
+   Правило списка то же: под последней кривой всегда одна пустая строка. */
+await t('сцена открывается с x^2-4: одна кривая', () => page.evaluate(() =>
+  (STATE.curves.length === 1 && STATE.curves[0].expr === 'x^2-4' && STATE.mode === 'graph')
+  || `кривых ${STATE.curves.length} (${STATE.curves.map(c => c.expr).join(', ')}), режим ${STATE.mode}`));
 
-await t('в списке ровно одна пустая строка', async () =>
-  (await page.locator('#graph-rows .grow').count()) === 1
-  || 'строк: ' + (await page.locator('#graph-rows .grow').count()));
+await t('в списке строка этой кривой и ровно одна пустая', async () => {
+  const r = await page.evaluate(() => [...document.querySelectorAll('#graph-rows .grow .f-slot input')].map(i => i.value));
+  return (r.length === 2 && r[0].replace(/\s/g, '') === 'x^2-4' && r[1] === '') || 'строки: ' + JSON.stringify(r);
+});
+/* Дальше список проверяется с чистого листа, как раньше: кривую убираем. */
+await page.evaluate(() => { STATE.curves = []; curveCounter = 0; renderGraphRows(); redrawAll(); });
+await page.waitForTimeout(300);
 
 await t('начали печатать — строка стала кривой, снизу новая пустая', async () => {
   await page.evaluate(() => {
@@ -1506,7 +1583,8 @@ await t('буква из формулы даёт ползунок', async () => 
 
 await t('удаление строки убирает кривую', async () => {
   const before = await page.evaluate(() => STATE.curves.length);
-  await page.evaluate(() => document.querySelector('#graph-rows .grow .btn-icon').click());
+  // С сессии 6 «тихих панелей» (Г2, ADR 0154) «Убрать функцию» — пункт «⋯» карточки; первая кнопка-значок строки — сама «⋯».
+  await page.evaluate(() => document.querySelector('#graph-rows .grow .btn-icon:not(.crow-gear)').click());
   await page.waitForTimeout(260);
   const after = await page.evaluate(() => STATE.curves.length);
   return after === before - 1 || `${before} → ${after}`;
@@ -1526,51 +1604,67 @@ await t('в других сценах «Аналитика» вернулась'
 /* ── Фаза 4. Правая панель — «Аналитика» ──────────────────────────────
    Ползунки сверху и всегда открыты, ниже два свёрнутых блока: расчёты и
    разбор. Кнопки «включить аналитику» в полосе иконок больше нет. */
-await t('правая панель называется «Аналитика»', () => page.evaluate(() => {
-  const h = document.querySelector('#params-panel .side-head h2');
-  return (h && h.textContent.trim() === 'Аналитика') || 'заголовок: ' + (h ? h.textContent : 'нет');
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): по макету колонки называются «Условие» и «Ответ». */
+await t('колонки называются «Условие» и «Ответ»', () => page.evaluate(() => {
+  const l = document.querySelector('#tools-panel .col-head h2');
+  const h = document.querySelector('#params-panel .col-head h2');
+  const ok = l && l.textContent.trim() === 'Условие' && h && h.textContent.trim() === 'Ответ';
+  return ok || 'заголовки: ' + (l ? l.textContent : 'нет') + ' / ' + (h ? h.textContent : 'нет');
 }));
 
 await t('кнопки аналитики в полосе иконок нет', () => page.evaluate(() =>
   !document.getElementById('dock-score') || 'кнопка ещё есть'));
 
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): сворачивание карточек ушло совсем (README макета,
+   раздел 5). Ползунки по-прежнему открыты и не сворачиваются: блок с ними
+   раскрыт, кнопки сворачивания у него нет. */
 await t('ползунки открыты и не сворачиваются', () => page.evaluate(() => {
   const body = document.getElementById('params-body');
   if (!body) return 'нет #params-body';
-  if (body.closest('.fold-body')) return 'ползунки внутри складного блока';
+  const fold = body.closest('.fold-body');
+  if (fold && !fold.classList.contains('open')) return 'ползунки внутри свёрнутого блока';
+  const sec = body.closest('.section');
+  if (sec && sec.querySelector(':scope > .fold-btn')) return 'у блока ползунков осталась кнопка сворачивания';
   return getComputedStyle(body).display !== 'none' || 'ползунки спрятаны';
 }));
 
-await t('расчёты и разбор свёрнуты по умолчанию', () => page.evaluate(() => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): прежнее правило «расчёты и разбор свёрнуты»
+   заменено правилом макета «карточки не сворачиваются»: оба блока раскрыты,
+   кнопок сворачивания нет. */
+await t('расчёты и разбор раскрыты, кнопок сворачивания нет', () => page.evaluate(() => {
   const bad = [];
   [['sb-btn', 'sb-fold'], ['ex-btn', 'ex-fold']].forEach(([b, f]) => {
     const btn = document.getElementById(b), box = document.getElementById(f);
-    if (!btn || !box) { bad.push(b + ': нет узла'); return; }
-    if (btn.getAttribute('aria-expanded') !== 'false') bad.push(b + ': развёрнут');
-    if (box.classList.contains('open')) bad.push(f + ': открыт');
+    if (!box) { bad.push(f + ': нет узла'); return; }
+    if (btn) bad.push(b + ': кнопка сворачивания осталась');
+    if (!box.classList.contains('open')) bad.push(f + ': свёрнут');
   });
   return !bad.length || bad.join('; ');
 }));
 
-await t('блок «Ключевые значения» раскрывается щелчком', async () => {
-  await clickUI('#sb-btn');
-  await page.waitForTimeout(180);
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а, пункт (д)): кнопки сворачивания расчётов нет —
+   блок раскрыт сразу, без щелчка, и в нём есть содержимое. */
+await t('блок расчётов «Ответа» раскрыт без щелчка и не пуст', async () => {
   const r = await page.evaluate(() => {
     const box = document.getElementById('sb-fold');
     const txt = document.getElementById('sb-body').textContent;
-    return { open: box.classList.contains('open'), len: txt.trim().length };
+    return { open: box.classList.contains('open'), len: txt.trim().length, btn: !!document.getElementById('sb-btn') };
   });
-  await clickUI('#sb-btn');
-  return (r.open && r.len > 0) || JSON.stringify(r);
+  return (r.open && r.len > 0 && !r.btn) || JSON.stringify(r);
 });
 
-await t('панели левая и правая одной ширины', async () => {
-  await page.evaluate(() => { setToolsOpen(true); setParamsOpen(true); });
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): ширины колонок задаёт макет, и они разные:
+   «Условие» 337 px и «Ответ» 349 px от 1400 px окна, 305 и 317 уже
+   (README макета, раздел 3). Допуск прежний, полтора пикселя. */
+await t('колонки «Условие» и «Ответ» по ширинам макета', async () => {
+  await page.evaluate(() => { if (typeof setFocusMode === 'function') setFocusMode(false); });
   await page.waitForTimeout(320);
   return await page.evaluate(() => {
     const l = document.getElementById('tools-panel').getBoundingClientRect().width;
     const r = document.getElementById('params-panel').getBoundingClientRect().width;
-    return Math.abs(l - r) < 1.5 || `слева ${Math.round(l)}, справа ${Math.round(r)}`;
+    const wide = window.innerWidth >= 1400;
+    const wl = wide ? 337 : 305, wr = wide ? 349 : 317;
+    return (Math.abs(l - wl) < 1.5 && Math.abs(r - wr) < 1.5) || `слева ${Math.round(l)} (нужно ${wl}), справа ${Math.round(r)} (нужно ${wr})`;
   });
 });
 
@@ -1590,25 +1684,24 @@ await t('разбор уезжает из расчётов в «Объяснен
 /* ── Фаза 5. Панель ввода — список карточек ───────────────────────────
    Все блоки закрыты, у каждого свой заголовок, раскрытый меняет фон,
    первая видимая карточка выделена. */
-await t('«Ввод функций» раскрыт, «Точки» и «Площади» свёрнуты', async () => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): решение 22.08 «ввод раскрыт, остальные свёрнуты»
+   заменено правилом макета «карточки «Условия» не сворачиваются» (README,
+   раздел 5). Проверка прежней силы: у каждой видимой карточки есть непустой
+   заголовок, её содержимое раскрыто, кнопки сворачивания нет. */
+await t('карточки «Условия» с заголовками и всегда раскрыты', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
-  await page.evaluate(() => setToolsOpen(true));
-  await page.waitForTimeout(200);
   return await page.evaluate(() => {
-    /* Решение владельца 22.08: карточка ввода раскрыта в КАЖДОЙ модели, две
-       остальные свёрнуты. Раньше правило было «все закрыты», и одна модель
-       («Построение графиков») из него выбивалась своим openSection. */
     const bad = [];
-    document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
-      const btn = sec.querySelector(':scope > .fold-btn');
-      if (!btn) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
-      const want = (sec.id === 'sec-input') ? 'true' : 'false';
-      if (btn.getAttribute('aria-expanded') !== want) {
-        bad.push((sec.id || '?') + (want === 'true' ? ': свёрнут, а должен быть раскрыт' : ': раскрыт'));
-      }
-      if (!(btn.querySelector('span') || {}).textContent) bad.push((sec.id || '?') + ': заголовок пуст');
+    const secs = [...document.querySelectorAll('#tools-panel .tools-body > .section')].filter(s => s.offsetParent);
+    if (!secs.length) return 'видимых карточек нет';
+    secs.forEach(sec => {
+      const h = sec.querySelector(':scope > .sec-head');
+      if (!h) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
+      if (!h.textContent.trim()) bad.push((sec.id || '?') + ': заголовок пуст');
+      if (sec.querySelector(':scope > .fold-btn')) bad.push((sec.id || '?') + ': осталась кнопка сворачивания');
+      sec.querySelectorAll(':scope > .fold-body').forEach(f => { if (!f.classList.contains('open')) bad.push((sec.id || '?') + ': свёрнута'); });
     });
     return !bad.length || bad.join('; ');
   });
@@ -1625,76 +1718,77 @@ await t('первая видимая карточка выделена одна'
 /* Карточка теперь одна на весь ввод (#sec-input), и на входе в модель она уже
    раскрыта. Поэтому сначала закрываем её, потом открываем щелчком — иначе
    проба меряла бы «раскрытую» и «раскрытую». */
-await t('раскрытая карточка отличается фоном', async () => {
-  await clickUI('#sec-input > .fold-btn');           // закрыть
-  await page.waitForTimeout(180);
-  const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-input')).backgroundColor);
-  await clickUI('#sec-input > .fold-btn');           // открыть обратно
-  await page.waitForTimeout(180);
+/* ПЕРЕНАЦЕЛЕНО (фаза 5б, пункт (д)): секции не сворачиваются, и «раскрытой
+   карточки» больше нет. Смысл прежней проверки — карточка читается отдельным
+   предметом на фоне колонки: у карточки функции свой фон или рамка
+   (README макета, 6.1). */
+await t('карточка функции отличается от колонки фоном или рамкой', async () => {
   const r = await page.evaluate(() => {
-    const sec = document.getElementById('sec-input');
-    const body = sec.querySelector(':scope > .fold-body');
-    return { open: body.classList.contains('open'), card: sec.classList.contains('open-card'),
-             bg: getComputedStyle(sec).backgroundColor };
+    const card = document.querySelector('#curve-list .fc-card');
+    const col = document.getElementById('tools-panel');
+    if (!card || !col) return { card: !!card };
+    const cs = getComputedStyle(card), ks = getComputedStyle(col);
+    return { card: true, bg: cs.backgroundColor, colBg: ks.backgroundColor, border: cs.borderTopWidth + ' ' + cs.borderTopStyle };
   });
-  return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
+  return (r.card && (r.bg !== r.colBg || /^[1-9].* solid/.test(r.border))) || JSON.stringify(r);
 });
 
-/* ── П2. Первый экран: десять карточек блоков по две в ряд ───────────
-   Щелчок по карточке убирает остальные и показывает модели этого блока. */
-await t('карточки блоков без номеров, ни один блок не раскрыт', async () => {
-  // Первый вход: сцены ещё не выбирали, поэтому видна полная карта блоков.
-  // Возврат ИЗ сюжета ведёт в его блок — это проверяет следующий случай (Н5).
+/* ── П2 · Н5 · ПЕРЕНАЦЕЛЕНО дважды: редизайн 10.2026 (фаза 8) свёл окно в
+   один экран, решение 09.10 (ADR 0141) — во вкладки блоков. Смысл тот же:
+   блоки без номеров и с числом моделей, модель после возврата видна сразу и
+   стоит в «Продолжить · <когда>», каждая рабочая модель достижима. */
+await t('на экране выбора десять вкладок блоков, без номеров, с числом моделей', async () => {
   await page.evaluate(() => { resetSceneMemory(); STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
-    const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
-    if (cards.length !== 10) bad.push('карточек ' + cards.length);
-    cards.forEach(c => {
-      const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
+    const tabs = [...document.querySelectorAll('#picker-tabs .pk-tab')].filter(b => b.offsetParent !== null);
+    if (tabs.length !== 10) bad.push('вкладок на экране ' + tabs.length);
+    tabs.forEach(b => {
+      const nm = (b.querySelector('.pk-tname') || {}).textContent || '';
+      const n = (b.querySelector('.pk-tcount') || {}).textContent || '';
+      if (!nm.trim()) bad.push('вкладка без имени');
       if (/^ *[0-9]+ *·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
+      if (!/^\d+$/.test(n.trim())) bad.push('у «' + nm.trim() + '» нет числа моделей');
     });
-    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
-    if (open) bad.push('раскрыто блоков: ' + open);
     return !bad.length || bad.join('; ');
   });
 });
 
-/* Н5. Из сюжета «назад» ведёт РОВНО на предыдущий экран: в тот блок, где этот
-   сюжет лежит, а не в общий список десяти. Прежнее правило (П2, всегда полная
-   карта) отменено. */
-await t('из сюжета возврат ведёт в его блок (Н5)', async () => {
+await t('из модели «Все модели» ведёт на экран, где она видна и стоит в «Продолжить» (Н5)', async () => {
   return await page.evaluate(() => {
     const bad = [];
-    [['laffer', 'Избранные сюжеты'], ['mono-nat', 'Несовершенная конкуренция'],
-     ['m-tangent', 'Математика']].forEach(([key, want]) => {
+    [['laffer', 'Кривая Лаффера'], ['mono-nat', 'Естественная монополия'],
+     ['m-tangent', 'Функция и её производная наглядно']].forEach(([key, name]) => {
       closePicker(); pickScene(key); openPicker();
-      const g = document.querySelector('#scene-picker .picker-group.open');
-      const got = g ? (g.querySelector('.picker-group-open-name') || {}).textContent : null;
-      if (got !== want) bad.push(key + ': «' + got + '» вместо «' + want + '»');
-      if (!document.getElementById('picker-blocks').classList.contains('hidden')) {
-        bad.push(key + ': список блоков не спрятан');
-      }
+      const row = document.querySelector('#scene-picker .scard[data-scene="' + key + '"]');
+      if (!row || row.offsetParent === null) bad.push(key + ': строки модели не видно');
+      const cont = document.querySelector('#picker-continue .pk-cname');
+      if (!cont || cont.textContent.trim() !== name) bad.push(key + ': в «Продолжить» «' + (cont ? cont.textContent : '—') + '»');
+      // Подпись — ровно «Продолжить · <когда>» (решение 09.10).
+      const when = document.querySelector('#picker-continue .pk-when');
+      if (!when || !/^Продолжить · (только что|\d+ мин назад|\d+ ч назад|вчера|\d+ (день|дня|дней) назад)$/.test(when.textContent))
+        bad.push(key + ': подпись «' + (when ? when.textContent : '—') + '»');
     });
     closePicker();
     return !bad.length || bad.join('; ');
   });
 });
 
-await t('открыт один блок за раз, есть возврат', async () => {
+await t('каждая рабочая модель видна во вкладке своего блока (42 по десяти вкладкам)', async () => {
   await page.evaluate(() => { STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(120);
-  await page.click('#picker-blocks .bcard:nth-child(1)');
-  await page.waitForTimeout(160);
-  await page.evaluate(() => document.getElementById('picker-back').click());
-  await page.waitForTimeout(120);
-  await page.click('#picker-blocks .bcard:nth-child(2)');
-  await page.waitForTimeout(160);
   return await page.evaluate(() => {
-    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
-    const back = document.getElementById('picker-back').classList.contains('shown');
-    return (open === 1 && back) || `открытых блоков: ${open}, возврат ${back}`;
+    const seen = new Set();
+    document.querySelectorAll('#picker-tabs .pk-tab').forEach(tb => {
+      tb.click();
+      document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')
+        .forEach(c => { if (c.offsetParent !== null) seen.add(c.dataset.scene); });
+    });
+    const all = document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])').length;
+    const r = (seen.size === 42 && all === 42) || `моделей ${all}, видно по вкладкам ${seen.size}`;
+    closePicker();
+    return r;
   });
 });
 
@@ -1736,7 +1830,7 @@ await t('у числовых полей калькулятора нет крут
   return look === 'textfield' || 'appearance: ' + look;
 }));
 
-await t('режим «Между точками» взводит набор вершин', async () => {
+await t('режим «По точкам» (бывший «Между точками») взводит набор вершин', async () => {
   await page.evaluate(() => { openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
@@ -1754,7 +1848,8 @@ await t('щелчок по графику ставит вершину', async ()
   await page.waitForTimeout(380);
   await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.62);
   await page.waitForTimeout(380);
-  const n = await page.evaluate(() => (STATE.areaVerts || []).length);
+  // С сессии 7 вершина — точка списка (README пакета calc2_panels_20261014, 9): набор — CANVAS.buildIds.
+  const n = await page.evaluate(() => (CANVAS.buildIds || []).length);
   return n === 2 || 'вершин набрано: ' + n;
 });
 
@@ -1801,7 +1896,9 @@ await t('«производство» спрятано и всплывает п�
   return getComputedStyle(lab).display === 'none' || 'подпись видна сразу';
 }));
 
-await t('регулятор мировой цены собран в правой панели', async () => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): пульт регуляторы не переносит; поле мировой
+   цены живёт в своей карточке «Условия». Собрано по-прежнему в одном месте. */
+await t('регулятор мировой цены собран в одном месте «Условия»', async () => {
   await page.evaluate(() => { setTradeScenario('B'); redrawAll(); });
   await page.waitForTimeout(260);
   return await page.evaluate(() => {
@@ -1809,7 +1906,7 @@ await t('регулятор мировой цены собран в правой
     if (!f) return 'поля цены нет';
     if (!f.querySelector('#tb-price-slider')) return 'ползунка нет в поле';
     if (!f.querySelector('#inp-tb-price')) return 'точного поля нет рядом';
-    return !!f.closest('#params-body') || 'поле не в правой панели';
+    return (!!f.closest('#tools-panel') && !f.closest('#params-panel')) || 'поле не в «Условии»';
   });
 });
 

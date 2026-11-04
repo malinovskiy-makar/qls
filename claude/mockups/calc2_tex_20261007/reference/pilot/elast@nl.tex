@@ -1,0 +1,67 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Эластичность.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c2E9E44}{HTML}{2E9E44}
+\definecolor{cB5791F}{HTML}{B5791F}
+\definecolor{c3C8049}{HTML}{3C8049}
+\definecolor{c936C30}{HTML}{936C30}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{cE0563B}{HTML}{E0563B}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{cD13E21}{HTML}{D13E21}
+\definecolor{c8B3FE0}{HTML}{8B3FE0}
+\definecolor{c00797A}{HTML}{00797A}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель main: x от 0 до 250, y от 0 до 250
+\begin{axis}[name=panelA, at={(46.5pt,33.0pt)}, anchor=south west, width=340.5pt, height=226.5pt, scale only axis, clip=false, xmin=0, xmax=250, ymin=0, ymax=250, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={50,100,150,200}, xticklabels={{},{$100$},{$150$},{$200$}}, ytick={50,100,150,200}, yticklabels={{},{$100$},{$150$},{$200$}}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={250}, extra x tick labels={}, extra y ticks={250}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}, xlabel={$Q$}, xlabel style={at={(current axis.right of origin)}, anchor=west, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, ylabel={$P$}, ylabel style={at={(current axis.above origin)}, anchor=south, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}]
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:250,250);
+\addplot[draw=none, fill=c2E9E44, fill opacity=0.10, domain=0:34.72136, samples=81, forget plot] {2000 / (x + 10) - 10} -- (axis cs:34.72136,0) -- (axis cs:0,0) -- cycle;   % область: от 0 до 34.72, между 0 и 2000/(Q+10) - 10
+\addplot[draw=none, fill=cB5791F, fill opacity=0.10, domain=34.72136:190, samples=41, forget plot] {2000 / (x + 10) - 10} -- (axis cs:190,0) -- (axis cs:34.72136,0) -- cycle;   % область: от 34.72 до 190, между 0 и 2000/(Q+10) - 10
+\node[anchor=base, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c3C8049] at (axis cs:17.36,6.62) {эластичный};
+\node[anchor=base, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c936C30] at (axis cs:112.36,6.62) {неэластичный};
+\addplot[c2F6FED, line width=1.13pt, domain=0:190, samples=321, forget plot] {2000 / (x + 10) - 10};   % D
+\addplot[cE0563B, line width=1.13pt, domain=0:160, samples=41, restrict y to domain*=-75:325, forget plot] {x^2 / 80 + 5};   % S
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2A6CED] at (axis cs:126.64,21.56) {$D$};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=cD13E21] at (axis cs:141.87,233.41) {$S$};
+\end{scope}
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:42.79,27.89) -- (axis cs:42.79,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:42.79,27.89) -- (axis cs:0,27.89);
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, yshift=-6.0pt] at (axis cs:42.79,0) {$42{,}79$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,27.89) {$27{,}89$};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:47.19,34.51) {$E$};
+\draw[c8B3FE0, line width=0.45pt, dash pattern=on 1.8pt off 1.8pt] (axis cs:34.72,34.72) -- (axis cs:34.72,0);
+\fill[c8B3FE0] (axis cs:34.72,34.72) circle[radius=2.4pt];
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c8B3FE0] at (axis cs:38.58,51.28) {$|E_{d}| = 1 \cdot \mathrm{MR} = 0 \cdot \mathrm{TR}$ макс};
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:50,23.33) -- (axis cs:50,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:50,23.33) -- (axis cs:0,23.33);
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, yshift=-15.8pt] at (axis cs:50,0) {$50$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,23.33) {$23{,}33$};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2D2D2D] at (axis cs:54.96,30.78) {$|E_{d}| = 0{,}84$};
+\fill[c2D2D2D] (axis cs:50,23.33) circle[radius=3.0pt];
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:65,57.81) -- (axis cs:65,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:65,57.81) -- (axis cs:0,57.81);
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, yshift=-6.0pt] at (axis cs:65,0) {$65$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,57.81) {$57{,}81$};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=cD13E21] at (axis cs:69.96,66.92) {$|E_{s}| = 0{,}55$};
+\fill[cE0563B] (axis cs:65,57.81) circle[radius=3.0pt];
+\node[anchor=north east, inner sep=0pt, xshift=-4pt, yshift=-4pt, font=\fontsize{8}{9.2}\selectfont, text=c6B6457] at (axis cs:0,0) {$0$};
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

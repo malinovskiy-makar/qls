@@ -25,6 +25,7 @@
    приезжают из другого места.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -39,6 +40,9 @@ const need = (name) => !want.length || want.includes(name);
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 950 } });
 const page = await ctx.newPage();
 const errs = [];
@@ -53,6 +57,7 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
 let bad = 0;
+{ const sh = await answerShown(page); if (!sh) bad++; console.log((sh ? 'OK   ' : 'FAIL ') + 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
 const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
 function show(label, got, wanted, tol) {
   if (wanted == null) { console.log('     ' + label + ' = ' + num(got)); return; }
@@ -95,7 +100,8 @@ function svSetup(dExprs, sExprs) {
 /* Раскрыть ВСЁ, что сцена свернула, и сбросить прокрутку обеих панелей.
    Иначе замер считает только то, что случайно оказалось на экране. */
 function svExpandAll() {
-  document.querySelectorAll('.crow-more').forEach(function (m) { m.classList.add('open'); });
+  // .crow-more карточки — всплывающее меню «…» (.fc-menu), раскрывать нечего (README 6.1).
+  document.querySelectorAll('.crow-more:not(.fc-menu)').forEach(function (m) { m.classList.add('open'); });
   document.querySelectorAll('details').forEach(function (d) { d.open = true; });
   document.querySelectorAll('.sb-card.folded, .card.folded, .pchip-param.folded')
     .forEach(function (e) { e.classList.remove('folded'); });
@@ -179,9 +185,9 @@ function svCurves() {
     var segs = svPathsOf(c.id).map(function (p) { return svSegInfo(p, bg); });
     // Образец цвета в строке левой панели.
     var swatch = null;
-    var rows = [].slice.call(document.querySelectorAll('#curve-list .curve-row'));
-    var idx = STATE.curves.filter(function (x) { return true; }).indexOf(c);
-    var row = rows[idx];
+    /* Строка — по data-cid: с 14.10 (ADR 0152) строки суммарных кривых живут в «Виде графика»,
+       и номер строки в #curve-list больше не номер кривой. */
+    var row = document.querySelector('#curve-list .curve-row[data-cid="' + c.id + '"], #wrench-pop .vg-onchart .curve-row[data-cid="' + c.id + '"]');
     if (row) {
       var sw = row.querySelector('.swatch');
       if (sw) swatch = svHex(svRGB(getComputedStyle(sw).backgroundColor));
