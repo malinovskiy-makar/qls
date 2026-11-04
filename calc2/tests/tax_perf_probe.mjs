@@ -40,8 +40,13 @@ try {
   await page.goto(base+'/calc2/?m=taxes',{waitUntil:'networkidle'});
   await page.evaluate(async name=>{
    await document.fonts.ready;setAnswerHidden(false);
-   if(name==='thirds')updateCurveExpr(STATE.curves.find(c=>c.role==='supply'),'2Q');
-   if(name==='radical')updateCurveExpr(STATE.curves.find(c=>c.role==='supply'),'Q^2/100');
+   const expr={thirds:'2Q',radical:'Q^2/100'}[name];
+   if(expr){
+    const supply=STATE.curves.find(c=>c.role==='supply');
+    updateCurveExpr(supply,expr);renderCurveList();
+    const input=document.querySelector(`#curve-list .fc-card[data-cid="${supply.id}"] .curve-expr-inp`);
+    if(input?.value!==expr)throw new Error(`Visible supply formula differs from ${expr}`);
+   }
    redrawAll();if(name==='vat')setTaxForm('vat');setTax(20);
   },name);
   await page.waitForTimeout(900);
