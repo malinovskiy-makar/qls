@@ -56,6 +56,11 @@ try {
     const opener=page.locator('[data-open-probe]');
     await opener.click();
     assert.ok(await page.locator('#vp-probe-dialog').evaluate(e=>e.open));
+    const dialogBox = await page.locator('#vp-probe-dialog').boundingBox();
+    assert.ok(dialogBox.x >= 16 && Math.abs(dialogBox.x + dialogBox.width / 2 - 195) < 2,
+      'probe dialog must be centered with phone edge spacing');
+    assert.ok(Math.abs(dialogBox.y + dialogBox.height / 2 - 422) < 2,
+      'probe dialog must be vertically centered');
     assert.equal(await page.locator('#vp-probe-out').innerText(),'');
     for (const [raw,expected] of [['37.5','37,5'],['1 200','1200'],['15%','15'],['3,125','3,13'],['-4,5','засчитают'],['37,50','засчитают']]) {
       await Promise.all([page.waitForResponse(r=>r.url().includes('/format/check/') && r.status()===200),page.locator(`[data-probe="${raw}"]`).click()]);
