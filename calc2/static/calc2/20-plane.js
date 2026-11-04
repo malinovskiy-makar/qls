@@ -121,7 +121,7 @@ function fitMargins() {
   m.left = Math.max(_coordMarginLeft, 30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
   if (fixedTaxCoordinateBand()) {
     // Постоянный запас под два слагаемых точной записи с дробями и корнем.
-    // На телефоне оставляем не меньше половины холста графику. Формат числа
+    // На телефоне ограничиваем резерв половиной ширины холста. Формат числа
     // и его точность не меняются. Крупный шрифт пересчитывает запас сразу.
     const reserve = Math.ceil(measureText('−9\u202f999/100 + 9\u202f999√998/100', FS.small * labelScale(), 700)) + 24;
     m.left = Math.max(m.left, Math.min(W / 2, reserve));
