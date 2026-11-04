@@ -11,8 +11,12 @@
   'use strict';
   var select = document.getElementById('vp-format-band');
   if (!select) return;
-  document.getElementById('vp-format-apply').hidden = true;
-  select.addEventListener('change', function () { select.form.requestSubmit(); });
+  document.addEventListener('click', function (event) {
+    if (!select.contains(event.target)) select.open = false;
+  });
+  select.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { select.open = false; select.querySelector('summary').focus(); }
+  });
 })();
 
 (function () {

@@ -54,8 +54,9 @@ class LandingTests(TestCase):
         html = response.content.decode()
         self.assertRegex(html, r'is-number">\s*<span class="vp-format-range">5–18</span>\s*<span class="vp-format-label"><span>Задачи</span><b>70 баллов</b>')
         self.assertEqual(response.context['composition']['label'], '11 класс')
-        self.assertIn('id="vp-probe"', html)
-        self.assertIn('data-probe="37.5"', html)
+        self.assertIn('href="' + reverse('vp:drill') + '"', html)
+        self.assertNotIn('data-open-probe', html)
+        self.assertNotIn('id="vp-probe-dialog"', html)
 
     def test_guest_has_no_my_band(self):
         response = Client().get(reverse('vp:index'))

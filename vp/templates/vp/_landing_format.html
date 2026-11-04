@@ -2,11 +2,12 @@
 <section class="vp-format" aria-label="Формат варианта">
   <form class="vp-format-head" method="get" action="{% url 'vp:index' %}">
     <b>Формат варианта</b>
-    <label class="vp-sr" for="vp-format-band">Класс варианта</label>
-    <span class="vp-format-select"><select name="band" id="vp-format-band">
-      {% for code, label in format_bands %}<option value="{{ code }}"{% if code == selected_band %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
-    <button class="vp-land-btn" type="submit" id="vp-format-apply">Показать</button>
+    <details class="vp-format-select" id="vp-format-band">
+      <summary aria-label="Класс варианта">{% for code, label in format_bands %}{% if code == selected_band %}{{ label }}{% endif %}{% endfor %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
+      <div class="vp-format-options">
+        {% for code, label in format_bands %}<button type="submit" name="band" value="{{ code }}"{% if code == selected_band %} aria-current="true"{% endif %}>{{ label }}{% if code == selected_band %}<span aria-hidden="true">✓</span>{% endif %}</button>{% endfor %}
+      </div>
+    </details>
   </form>
   <div class="vp-format-body">
     <div class="vp-format-facts">

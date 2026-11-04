@@ -204,7 +204,7 @@
     </div>
     {% endif %}
     {% if tour == 2 and composition.number_total %}
-    <a class="vp-land-card vp-probe-open" href="{% url 'vp:drill' %}" data-open-probe>
+    <a class="vp-land-card vp-probe-open" href="{% url 'vp:drill' %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 6h6M9 10h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
       <span>Проверить запись ответа</span>
     </a>
@@ -212,7 +212,6 @@
   </div>
 </div>
 
-{% if tour == 2 and composition.number_total %}{% include 'vp/_probe.html' %}{% endif %}
 {% include 'vp/_rules.html' %}
 {% endblock %}
 
