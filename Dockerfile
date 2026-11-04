@@ -55,9 +55,17 @@ ENV GIT_SHA=$GIT_SHA
 
 # libpq5 — рантайм-часть драйвера PostgreSQL. Без -dev и без компилятора.
 # curl нужен healthcheck-у контейнера.
+# Графики собирают PDF обычным pdflatex: pgfplots/TikZ, T2A и кириллица.
+# Без этих пакетов рабочая кнопка экспорта возвращала 503 на production.
+# XeLaTeX и локальные ML-зависимости сюда не добавляются. Экспорт сохраняет
+# отдельный временный каталог, запрет shell escape и ограничение чтения файлов.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpq5 curl \
+        libpq5 curl texlive-latex-base texlive-latex-extra \
+        texlive-lang-cyrillic texlive-fonts-recommended texlive-pictures cm-super \
     && rm -rf /var/lib/apt/lists/*
+
+COPY deploy/prepare_tex_fonts.py /tmp/prepare_tex_fonts.py
+RUN python /tmp/prepare_tex_fonts.py && rm /tmp/prepare_tex_fonts.py
 
 # ⚠️ ПРИЛОЖЕНИЕ РАБОТАЕТ НЕ ОТ root. Пробой в веб-приложении не должен
 # сразу давать полные права внутри контейнера.

@@ -11,6 +11,7 @@ function redrawAll() {
   syncTaxPairUI();
   const labelsBeforeFit=new Map([..._labelPos].map(([k,v])=>[k,{...v}]));
   _coordMarginLeft=0;
+  _coordMarginBottom=0;
   syncParams();          // формулы могли завести или потерять буквы-параметры
   refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
   /* Естественная область модели считается раз на кадр (см. modelSpanQ). Метку
@@ -41,7 +42,10 @@ function redrawAll() {
   }
   unclipLabels();        // подпись, которую режет её же обрезка, переезжает наружу
   keepAxisNamesInside(); // и название оси зажимается по ФАКТИЧЕСКОМУ кеглю
+  markServiceNodes();    // ручки уже нарисованы и участвуют в размещении подписей
+  spaceAxisLabelsFromHandles();
   spreadLabels();        // и разведение наложившихся — тем же приёмом (А60)
+  syncRenameHits();
   applyLabelInk();       // и читаемые чернила подписей — тем же приёмом (П75)
   /* ⚠️ ОБОЗНАЧЕНИЯ В ПАНЕЛЯХ РАЗМЕЧАЮТСЯ ТУТ ЖЕ, В САМОМ КОНЦЕ, И ПО ТОЙ ЖЕ
      ПРИЧИНЕ. Первый заход стоял внутри refreshAnalyticsPanel, и прозу, которую
@@ -1049,12 +1053,12 @@ function drawLegend() {
      Угол выбирается СВОБОДНЫЙ: считаем, сколько нарисованных кривых попадает
      в коробку в каждом из четырёх углов, и садимся туда, где их меньше всего.
      Подложка не залезает на конец оси — то же правило про отступ, что и в П33. */
-  const SW = 12, GAP = 6, LH = 18, PAD = 8;
+  const SW = 12, GAP = 6, LH = Math.max(18, Math.ceil(FS.base * labelScale() * 1.5)), PAD = 8;
   const fsz = FS.base;
   const labels = seen.map(e => areaShort(e.key));
   // Ширину меряет браузер: оценка «знаков × 0,62 кегля» врала, и подпись
   // выходила за подложку (та же беда, что была у полей холста).
-  const wide = Math.max.apply(null, labels.map(t => measureText(t, fsz, 600)));
+  const wide = Math.max.apply(null, labels.map(t => measureText(t, fsz * labelScale(), 600)));
   const boxW = SW + GAP + wide + 2 * PAD;
   const boxH = seen.length * LH + 2 * PAD;
   const { x, y } = legendCorner(boxW, boxH);

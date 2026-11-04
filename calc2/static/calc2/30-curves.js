@@ -665,6 +665,38 @@ function yieldTicksToCoords(node) {
   });
 }
 
+// Ручки остаются в точках перехвата; число отступает только поперёк оси.
+function spaceAxisLabelsFromHandles() {
+  const node=svg.node();if(!node)return;
+  const handles=[...node.querySelectorAll('circle[data-service="handle"]')]
+    .map(e=>e.getBoundingClientRect()).filter(r=>r.width>0);
+  node.querySelectorAll('text.axis-num,text.coord-num').forEach(t=>{
+    const r=t.getBoundingClientRect();
+    const hits=handles.filter(h=>r.left<h.right+2&&r.right>h.left-2&&r.top<h.bottom+2&&r.bottom>h.top-2);
+    if(!hits.length)return;
+    if(t.getAttribute('text-anchor')==='middle'){
+      const dy=Math.max(...hits.map(h=>h.bottom+3-r.top));
+      t.setAttribute('y',+t.getAttribute('y')+dy);
+    }else{
+      const dx=Math.min(...hits.map(h=>h.left-3-r.right));
+      t.setAttribute('x',+t.getAttribute('x')+dx);
+    }
+  });
+}
+
+// Синхронизируем область двойного щелчка с окончательным положением подписи.
+function syncRenameHits() {
+  svg.node().querySelectorAll('text').forEach(t => {
+    const hit = t.__renameHit;
+    if (!hit) return;
+    const b = t.getBBox(), w = Math.max(RENAME_HIT_PX, b.width + 10), h = Math.max(RENAME_HIT_PX, b.height + 8);
+    if (hit.parentNode !== t.parentNode) t.parentNode.insertBefore(hit, t);
+    hit.setAttribute('x', b.x + (b.width - w) / 2);
+    hit.setAttribute('y', b.y + (b.height - h) / 2);
+    hit.setAttribute('width', w); hit.setAttribute('height', h);
+  });
+}
+
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
@@ -689,10 +721,14 @@ function spreadLabels() {
 
   const items = [], anchored = [];
   node.querySelectorAll('text').forEach(t => {
-    if (t.getAttribute('data-no-spread')) return;
+    if (t.getAttribute('data-no-spread') || t.closest('g.legend')) return;
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
     const rec = { el: t, x: r.left, y: r.top, w: r.width, h: r.height };
+    if(t.hasAttribute('data-label-anchor-x')){
+      const pt=node.createSVGPoint();pt.x=+t.getAttribute('data-label-anchor-x');pt.y=+t.getAttribute('data-label-anchor-y');
+      const anchor=pt.matrixTransform(t.getScreenCTM());rec.anchor={x:anchor.x,y:anchor.y};
+    }
     /* ⚠️ ЧИСЛО НА ОСИ ПРИБИТО К СВОЕМУ МЕСТУ, И ДВИГАТЬ ЕГО НЕЛЬЗЯ.
        Деление шкалы и подпись координаты отвечают на вопрос «где именно», и
        сдвинутое число отвечает на него неправдой. А разведение подписей
@@ -728,8 +764,55 @@ function spreadLabels() {
   const placed = (typeof floatRects === 'function' ? floatRects() : [])
     .map(r => ({ el: null, x: r.left, y: r.top, w: r.w, h: r.h }))
     .concat(anchored);          // числа на осях не двигаются, вокруг них расходятся
+  // Легенда — единый блок: её текст не отрывается от цветных меток.
+  node.querySelectorAll('g.legend,circle[data-service="handle"]').forEach(el=>{
+    const r=el.getBoundingClientRect();if(r.width>.5)placed.push({el:null,x:r.left,y:r.top,w:r.width,h:r.height});
+  });
+  // Кривые calc2 рисуются ломаными M/L. Их отрезки тоже заняты: длинная
+  // подпись экстремума иначе могла встать прямо поперёк своей функции.
+  const ink = [];
+  if (items.some(it => it.anchor)) node.querySelectorAll('path').forEach(path => {
+    const style = getComputedStyle(path), d = path.getAttribute('d') || '';
+    if (style.stroke === 'none' || style.stroke === 'rgba(0, 0, 0, 0)' || +style.opacity === 0
+        || parseFloat(style.strokeWidth) > 6 || /[ACHQVST]/i.test(d)) return;
+    const matrix = path.getScreenCTM();
+    if (!matrix) return;
+    let previous = null;
+    for (const match of d.matchAll(/([ML])\s*([-+.\deE]+)[ ,]+([-+.\deE]+)/gi)) {
+      const point = new DOMPoint(+match[2], +match[3]).matrixTransform(matrix);
+      if (match[1].toUpperCase() === 'L' && previous) ink.push([previous, point]);
+      previous = point;
+    }
+  });
+  const crossesInk = rect => ink.some(([a, b]) => {
+    let lo = 0, hi = 1;
+    for (const [axis, min, max] of [['x', rect.x - 2, rect.x + rect.w + 2], ['y', rect.y - 2, rect.y + rect.h + 2]]) {
+      const delta = b[axis] - a[axis];
+      if (!delta) { if (a[axis] < min || a[axis] > max) return false; }
+      else {
+        const first = (min - a[axis]) / delta, last = (max - a[axis]) / delta;
+        lo = Math.max(lo, Math.min(first, last)); hi = Math.min(hi, Math.max(first, last));
+        if (lo > hi) return false;
+      }
+    }
+    return true;
+  });
   const STEP = 13;               // чуть больше строки: подпись уходит целиком
   items.forEach(it => {
+    if(it.anchor){
+      const box=node.getBoundingClientRect(),a=it.anchor,pad=8;
+      const candidates=[
+        [a.x+pad,a.y-pad-it.h],[a.x-pad-it.w,a.y-pad-it.h],
+        [a.x+pad,a.y+pad],[a.x-pad-it.w,a.y+pad],
+        [a.x-it.w/2,a.y-pad-it.h],[a.x-it.w/2,a.y+pad],
+      ].map(([x,y])=>({x:Math.max(box.left+2,Math.min(box.right-it.w-2,x)),y:Math.max(box.top+2,Math.min(box.bottom-it.h-2,y)),w:it.w,h:it.h}));
+      const score=c=>placed.reduce((s,p)=>s+(hit(c,p)?(p.tick?100:10000):0),0)
+        + (crossesInk(c) ? 1000 : 0) + Math.hypot(c.x-it.x,c.y-it.y);
+      const chosen=candidates.reduce((a,b)=>score(a)<=score(b)?a:b);
+      it.el.setAttribute('x',+it.el.getAttribute('x')+chosen.x-it.x);
+      it.el.setAttribute('y',+it.el.getAttribute('y')+chosen.y-it.y);
+      Object.assign(it,chosen);placed.push(it);return;
+    }
     if (!placed.length) { placed.push(it); return; }
     let dy = 0, dx = 0;
     /* Сначала вверх и вниз с нарастающим шагом, и только потом вбок: подпись
@@ -742,7 +825,8 @@ function spreadLabels() {
        прежним набором попыток из-под неё просто не вылезала и садилась на
        соседнюю подпись. Прежние мелкие шаги идут первыми — подпись обязана
        остаться у своего объекта, а большой сдвиг это последняя мера. */
-    const tries = [
+    const coordStep=Math.ceil(it.h+4);
+    const tries = it.only==='down' ? [[0,coordStep],[0,2*coordStep],[0,3*coordStep]] : [
       [0, -STEP], [0, STEP], [0, -2 * STEP], [0, 2 * STEP], [0, -3 * STEP], [0, 3 * STEP],
       [22, 0], [-22, 0], [26, -STEP], [-26, -STEP],
       [-46, 0], [-46, -STEP], [-46, STEP], [-70, 0], [-70, -STEP],

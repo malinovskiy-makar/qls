@@ -8,6 +8,7 @@ const svg = d3.select('#chart');   // корневой SVG-элемент
 let W = 0, H = 0;                  // размеры области графика в пикселях
 let sx, sy;                       // D3-шкалы: данные -> пиксели
 let _coordMarginLeft = 0;          // измеренное место под точную подпись ключевой координаты
+let _coordMarginBottom = 0;        // второй ряд близких координат остаётся под своей осью
 
 // Размер SVG берём из контейнера (обновляется при изменении окна).
 function computeSize() {
@@ -119,7 +120,7 @@ function fitMargins() {
   m.right = Math.max(32, Math.min(140,
               Math.ceil(AXIS_LABEL_GAP + measureText(xName, FS.large, 600)) + 6));
 
-  m.bottom = BOTTOM_BAND;
+  m.bottom = Math.max(BOTTOM_BAND, _coordMarginBottom);
   /* Сверху: полоса под своё название графика плюс место под НАЗВАНИЕ оси Y,
      которое drawAxes печатает над стрелкой. */
   const yName = STATE.axisYName || STATE.axisYDefault || 'P';
@@ -156,8 +157,21 @@ function fitCoordinateMargin() {
   });
   const limit=Math.max(0,W-Math.min(240,W*.6));
   const need=Math.min(limit,Math.ceil(width)+18);
-  if(need<=CONFIG.margin.left+1)return false;
-  _coordMarginLeft=need;return true;
+  let changed=false;
+  if(need>CONFIG.margin.left+1){_coordMarginLeft=need;changed=true;}
+  const xs=[...node.querySelectorAll('text.coord-num')]
+    .filter(t=>t.getAttribute('text-anchor')==='middle').map(t=>t.getBoundingClientRect());
+  // На узком холсте соседние значения занимают два ряда, без сдвига вдоль оси.
+  // Измеряем реальный шрифт; это также работает для других моделей и крупной «А».
+  const rows=[];
+  xs.sort((a,b)=>a.left-b.left).forEach(b=>{
+    let row=rows.find(r=>r.right+4<=b.left);
+    if(!row){row={right:0,height:0};rows.push(row);}
+    row.right=b.right;row.height=Math.max(row.height,b.height);
+  });
+  const bottom=12+rows.reduce((n,r)=>n+r.height+4,0);
+  if(rows.length>1 && bottom>CONFIG.margin.bottom+1){_coordMarginBottom=bottom;changed=true;}
+  return changed;
 }
 
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние

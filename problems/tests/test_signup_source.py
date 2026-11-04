@@ -499,14 +499,17 @@ class WebvisorTests(TestCase):
 
     def test_vp_my_attempts_list_is_hidden_header_and_tabs_stay(self):
         me = self._login('vp_moi', 'student')
-        variant = self._vp_demo_with_attempts((me, 70, 1300))
+        self._vp_demo_with_attempts((me, 70, 1300))
         html = self.client.get(reverse('vp:my')).content.decode()
         recorded = recorded_text(html)
         # Список с баллами и местами скрыт…
         self.assertIn('в лидерборде · <span class="vp-nowrap">1-е</span>', html)
         self.assertNotIn('в лидерборде', recorded)
-        self.assertIn(variant.title, html)
-        self.assertNotIn(variant.title, recorded)
+        # Название и класс теперь отдельные узлы; оба остаются приватными.
+        self.assertIn('Официальная демоверсия', html)
+        self.assertIn('10 класс', html)
+        self.assertNotIn('Официальная демоверсия', recorded)
+        self.assertNotIn('10 класс', recorded)
         # …а шапка страницы и фильтры остаются в записи.
         self.assertIn('Мои попытки', recorded)
         self.assertIn('Все · 1', html)

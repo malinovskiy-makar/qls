@@ -680,6 +680,7 @@ function mathDot(g, mx, my, x, y, color, label, dy, key) {
   // подписей, вниз по одной строке, пока место не освободится.
   ty = dodgeLabel(tx, ty, my(0), String(shown).length * 6 + 8);
   const t = g.append('text').attr('x', tx).attr('y', ty)
+    .attr('data-label-anchor-x', mx(x)).attr('data-label-anchor-y', my(y))
     .attr('font-size', FS.base).attr('font-weight', 600).attr('fill', color)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.6);
   renderLabelText(t, shown);
@@ -720,7 +721,9 @@ function makeRenamable(t, current, px, py, apply, armName) {
     ev.stopPropagation(); ev.preventDefault();
     // Узел подписи нужен правке: у неё нет своего вида, она берёт кегль, вес и
     // цвет у самой подписи и встаёт ровно на её место.
-    editInlineLabel(current, px, py, apply, t.node());
+    const label = t.node(), wrap = document.getElementById('graph-wrap');
+    const rect = label.getBoundingClientRect(), origin = wrap.getBoundingClientRect();
+    editInlineLabel(current, rect.left - origin.left, rect.bottom - origin.top, apply, label);
   };
   t.on('dblclick', open);
 
@@ -745,6 +748,7 @@ function makeRenamable(t, current, px, py, apply, armName) {
     .attr('data-rename-hit', '1')
     .style('cursor', 'text');
   hit.on('dblclick', open);
+  node.__renameHit = hit.node();
   if (armName) {
     hit.on('click', (ev) => {
       ev.stopPropagation();

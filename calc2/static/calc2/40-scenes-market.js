@@ -1275,6 +1275,7 @@ function pointName(g, px, py, sym, color, opts) {
      2,5 давали 1,25 px, и линия толщиной 2,5 px протыкала букву насквозь —
      ровно то, что видел владелец у точки равновесия. */
   const t = g.append('text').attr('class', 'point-name')
+    .attr('data-label-anchor-x', px).attr('data-label-anchor-y', py)
     .attr('x', px + (o.dx == null ? 8 : o.dx))
     .attr('y', py + (o.dy == null ? -8 : o.dy))
     .attr('font-size', o.size || FS.large).attr('font-weight', o.weight || 600)

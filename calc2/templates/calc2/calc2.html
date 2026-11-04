@@ -81,7 +81,9 @@
      приложение снова занимает окно под шапкой целиком. Пока открыто окно cookie,
      приложение поднимается на его высоту (`--ck-h`, `static/cookie_bar.js`), а окно
      выбора моделей кончается над ним. */
-  .app { height: calc(100vh - 48px - var(--ck-h, 0px)); }
+  @media (min-width: 760px) {
+    .app { height: calc(100dvh - var(--calc2-app-top, 48px) - var(--ck-h, 0px)); }
+  }
   html:has(.ck-bar:not([hidden])) body { padding-bottom: 0; }
   #scene-picker { bottom: var(--ck-h, 0px); }
   </style>

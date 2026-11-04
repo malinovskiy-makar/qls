@@ -1419,7 +1419,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 .graph-wrap input, .graph-wrap textarea, .graph-wrap select { user-select: text; -webkit-user-select: text; }
 #chart { display: block; width: 100%; height: 100%; }
+/* Общая reduced-motion длительность .01ms иначе оживляет у SVG стандартное
+   transition-property:all. Замер видит старые 12px, затем текст растёт до 14px
+   и ломает рассчитанные зазоры. Движением подписей управляет JS, не CSS. */
 #chart text { user-select: none; -webkit-user-select: none; }
+#chart text, #chart tspan, #chart [data-rename-hit] { transition-property: none !important; }
 
 /* ── Левый док: постоянная полоса иконок ── */
 /* Полоса иконок лежит ВЫШЕ боковых панелей: её подсказки вылетают вправо и
@@ -3271,7 +3275,7 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
 
 /* < 760: телефон. Холст сверху, под ним шторка с вкладками. */
 @media (max-width: 759px) {
-  html, body { overflow: auto; }
+  html, body { height: auto; min-height: 100%; overflow: visible; }
   .app { display: flex; flex-direction: column; height: auto; min-height: calc(100vh - 48px); overflow: visible; }
   .mhead { flex: 0 0 auto; height: auto; min-height: 58px; flex-wrap: nowrap; padding: 0 6px; gap: 2px; }
   .mhead .mh-btn > span, .mh-saved, .mh-sep, .mhead > #btn-redo, .mhead > #btn-model-reset, .mh-self > span:last-child { display: none; }
