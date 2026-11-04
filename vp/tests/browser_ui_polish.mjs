@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 
 const base = process.env.VP_POLISH_BASE, out = process.env.VP_POLISH_OUT;
-const browser = await chromium.launch();
+const engine = process.env.VP_POLISH_BROWSER === 'webkit' ? webkit : chromium;
+const browser = await engine.launch();
 const report = {screens:0, themeFrames:[], errors:[]};
 const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[1440,800]];
 try {

@@ -39,7 +39,7 @@ class MetaTests(TestCase):
         html = self.client.get(reverse('vp:variants') + '?band=10').content.decode()
         card = re.search(r'<article class="vp-vcard.*?</article>', html, re.S).group(0)
         self.assertEqual(re.findall(r'<p class="vp-vcard-m">(.*?)</p>', card),
-                         ['2026/27 · 18 заданий · 70 мин'])
+                         ['10 класс · 2026/27 · 18 заданий · 70 мин'])
         self.assertIn('Демоверсия ВШЭ', card)                       # надзаголовок остался
         self.assertNotIn('<span class="vp-vcard-src">', card)        # года в углу нет
         for tail in TAIL:

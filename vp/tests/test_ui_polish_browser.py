@@ -15,7 +15,7 @@ from vp.models import VPAttempt
 from vp.tests.helpers import load_demo
 
 
-@tag('serial', 'browser')  # Один живой HTTP-сервер и Chromium, общий внешний ресурс.
+@tag('serial', 'browser')  # Один живой HTTP-сервер и браузер, общий внешний ресурс.
 class LandingPolishBrowserTests(StaticLiveServerTestCase):
     def test_responsive_actions_class_dialog_and_keyboard(self):
         node = shutil.which('node')
