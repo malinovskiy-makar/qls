@@ -88,13 +88,14 @@ try {
      [STATE.budget??0,(pb-ps)*q]];
     const q0=STATE.eq.Q,aq=actual.Q;
     const welfare=x=>100*x-x*x/2-(name==='radical'?x*x*x/300:b*x*x/2);
-    // c9 integrates with 1000 trapezoids. For S=Q²/100, |f''|=.02:
+    // c9 uses 1000 trapezoids, or 400 per piece for base surplus.
+    // For S=Q²/100, |f''|=.02:
     // the independent error bound is |f''| L³/(12 n²). Keep the old
     // integrator and solver tolerances; don't demand impossible 1e-9 areas.
     // Areas use the already checked equilibrium to avoid counting root error twice.
-    const areaBound=length=>name==='radical'?Math.abs(length)**3/(600*1000**2):0;
+    const areaBound=(length,n=1000)=>name==='radical'?Math.abs(length)**3/(600*n*n):0;
     const areas=[[rate===0?STATE.cs:STATE.csTax,(100-actual.Pb)*aq-aq*aq/2,0],
-     [rate===0?STATE.ps:STATE.psTax,actual.Ps*aq-(name==='radical'?aq**3/300:b*aq*aq/2),areaBound(aq)],
+     [rate===0?STATE.ps:STATE.psTax,actual.Ps*aq-(name==='radical'?aq**3/300:b*aq*aq/2),areaBound(aq,rate===0?400:1000)],
      [STATE.dwl??0,welfare(q0)-welfare(aq),areaBound(q0-aq)]];
     for(const [a,e]of areas)areaRelativeError=Math.max(areaRelativeError,Math.abs(a-e)/Math.max(1,Math.abs(e)));
     comparisons.push(...areas);
