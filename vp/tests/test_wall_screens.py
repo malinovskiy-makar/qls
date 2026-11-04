@@ -84,8 +84,8 @@ class ScreenTableTests(ScreenCase):
     def test_contact_default_is_screen_01(self):
         html = self.page()
         self.assertIn('Подключите Telegram, чтобы начать', html)
-        self.assertIn('Тренажёр бесплатный. Взамен просим подписку на наш канал', html)
-        self.assertIn('Вернитесь сюда – страница обновится сама.', html)
+        self.assertIn('Тренажёр бесплатный по подписке на', html)
+        self.assertIn('Затем вернитесь сюда – страница обновится сама.', html)
         self.assertIn('После «Старт» в боте обновите эту страницу.', html)
         self.assertIn('Мы сохраним ID и ник вашего Telegram', html)
         self.assertIn('Подтвердить почтой', html)
@@ -175,7 +175,7 @@ class ScreenTableTests(ScreenCase):
         self.assertIn('Вход в варианты временно закрыт. Попробуйте через час.', self.page('closed'))
 
     def test_eyebrow(self):
-        self.assertIn('<div class="vp-wall-eyebrow">Официальная демоверсия – 10 класс · 70 минут</div>',
+        self.assertIn('<div class="vp-wall-eyebrow">Официальная демоверсия · 10 класс · 70 минут</div>',
                       self.page())
 
     def test_window_is_rendered_open_only_with_parameter(self):

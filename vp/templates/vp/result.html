@@ -14,7 +14,7 @@
 задание без JS; справа «По блокам», «Что дальше», «Мои попытки». Фильтры, карта, «Раскрыть
 все», `#zN` и «Дорешать / Показать ответ» — `static/vp/js/result.js`.
 {% endcomment %}
-{% block title %}Результат · {{ variant.title }}{% endblock %}
+{% block title %}Результат · {{ variant|variant_title }}{% endblock %}
 {% block content %}
 <div class="vp-wrap vp-res" data-variant="{{ variant.slug }}">
   <nav class="vp-crumbs" aria-label="Путь">

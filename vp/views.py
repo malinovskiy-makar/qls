@@ -45,6 +45,7 @@ from vp import wall
 from vp import drill as drill_rules
 from vp.loader import GAP_MARK
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant, VPWall
+from vp.presentation import variant_title
 from vp.templatetags.vp_extras import grade_label
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,8 @@ def index(request):
         'probe_examples': ('37.5', '1 200', '15%', '3,125', '-4,5', '37,50'),
         'mail_on': email_codes.mail_enabled(),
         'composition': landing.composition(groups, band),
+        'format_bands': config.bands(),
+        'selected_band': band,
         'boards': boards,
         'board_attempts': current_board['attempts'] if current_board else 0,
         'mine': landing.my_block(request, published),
@@ -333,8 +336,7 @@ def variants(request):
     everything = list(everything.prefetch_related('items'))
     bands = []
     for code, label in config.bands():
-        chosen = sorted((v for v in everything if v.grade_band == code),
-                        key=lambda v: (v.order, v.pk))
+        chosen = landing._ordered(v for v in everything if v.grade_band == code)
         if chosen:
             bands.append({'code': code, 'label': label, 'variants': chosen,
                           'count': len(chosen)})
@@ -585,7 +587,7 @@ def intro(request, slug):
         'vp_events': events,
         'wall': wall_ctx,
         'mail_on': email_codes.mail_enabled(),
-        **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year,
+        **seo.vp_variant_meta(variant_title(variant), grade_label(variant.grade_band), variant.year,
                               variant.tour),
     })
 

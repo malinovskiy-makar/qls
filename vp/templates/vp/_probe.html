@@ -1,0 +1,19 @@
+{% load vp_extras %}
+<dialog class="vp-probe-dialog" id="vp-probe-dialog" aria-labelledby="vp-probe-title">
+  <button type="button" class="vp-probe-close" data-close-probe aria-label="Закрыть" autofocus>×</button>
+  <div class="vp-land-probe" id="vp-probe" data-check-url="{% url 'vp:format_check' %}" data-csrf="{{ csrf_token }}">
+    <div class="vp-probe-heading">
+      <h2 id="vp-probe-title">Проверьте запись ответа</h2>
+      <span class="vp-probe-tip">
+        <button type="button" id="vp-probe-help" aria-label="Почему важна запись ответа" aria-describedby="vp-probe-tip" aria-expanded="false">i</button>
+        <span id="vp-probe-tip" role="tooltip" hidden>{{ composition.number_total|points_word }} из {{ composition.total|num }} – за задания с числовым ответом, поэтому важно правильно записывать число. Неверная запись – 0 баллов за задание.</span>
+      </span>
+    </div>
+    <div class="vp-land-probe-row">
+      <label class="vp-sr" for="vp-probe-in">Запись числа</label>
+      <input class="vp-input vp-input--number" id="vp-probe-in" type="text" maxlength="40" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="37,5">
+      <span class="vp-land-probe-out" id="vp-probe-out" role="status" aria-live="polite"></span>
+    </div>
+    <div class="vp-land-probe-ex"><span>Примеры:</span>{% for ex in probe_examples %}<button type="button" data-probe="{{ ex }}">{{ ex }}</button>{% endfor %}</div>
+  </div>
+</dialog>

@@ -63,13 +63,15 @@ class LandingTour2Tests(SectionBase):
     def test_landing_is_about_tour_2(self):
         html = self.guest.get(reverse('vp:index')).content.decode()
         self.assertIn('<title>Высшая проба, 2 тур', html)
-        self.assertIn('Отборочный этап · 2 тур', html)
-        self.assertIn('тренажёр второго тура', html)
+        self.assertIn('Экономика · 2 тур', html)
+        self.assertIn('Тренажёр «Высшей пробы» по экономике', html)
         self.assertIn('16 и 21 ноября 2026', html)
         hero = html.split('aria-label="Формат варианта"', 1)[1].split('class="vp-land-cta"', 1)[0]
         # Сессия R: плитки заменены строкой состава и полосой долей (числа из данных).
-        self.assertIn('10–11 класс: 18 заданий · 70 минут · 100 баллов', hero)
-        self.assertIn('9 класс: 17 заданий, числа по 6 баллов', hero)
+        self.assertIn('<strong>18</strong><span>заданий</span>', hero)
+        self.assertIn('<strong>70</strong><span>минут</span>', hero)
+        self.assertIn('<strong>100</strong><span>баллов</span>', hero)
+        self.assertNotIn('9 класс: 17 заданий, числа по 6 баллов', hero)
         self.assertNotIn(self.tour1.title, html)
         self.assertNotIn('1 тур', body(html))
 
@@ -91,7 +93,7 @@ class LandingTour2Tests(SectionBase):
         html = self.guest.get(reverse('vp:index')).content.decode()
         for band in ('9', '10', '11'):
             self.assertIn(f'data-board-tab="{band}"', html)
-        self.assertIn('data-board-tab="9" aria-selected="true"', html)   # гостю — 9 класс
+        self.assertIn('data-board-tab="11" aria-selected="true"', html)  # неизвестный класс → формат 11
 
     def test_board_tab_of_my_last_attempt_and_separate_tables(self):
         other = Client()
@@ -181,7 +183,7 @@ class VisibilityTests(SectionBase):
 class IntroTour2Tests(SectionBase):
     def test_intro_explains_number_format_and_shares(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-2tur-2026-demo-10'])).content.decode()
-        self.assertIn('Отборочный этап · 2 тур', html)
+        self.assertIn('Экономика · 2 тур', html)
         self.assertNotIn('Ответ-число в неверной записи – 0 баллов, как на туре', html)   # плашка сессии R
         self.assertNotIn(NUMBER_RULE, html)
         self.assertIn('штрафа нет', html)

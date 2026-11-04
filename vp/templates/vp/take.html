@@ -13,7 +13,7 @@
 остаток не растёт.
 ⚠️ Ответов, эталонов и букв связки на странице НЕТ (тест `test_take_hides_answers`).
 {% endcomment %}
-{% block title %}Решаю · {{ variant.title }}{% endblock %}
+{% block title %}Решаю · {{ variant|variant_title }}{% endblock %}
 {% block body_attrs %} class="vp-focus"{% endblock %}
 {% block content %}
 <noscript><div class="vp-banner is-danger">Для прохождения нужен включённый JavaScript: без него не работают таймер и автосохранение.</div></noscript>

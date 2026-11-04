@@ -126,14 +126,18 @@ class VariantsScreenTests(TestCase):
         """
         self.assertNotIn('забег', visible_text(page(Client())).lower())
 
-    def test_11_footer_links_to_the_rules_and_to_my_attempts(self):
+    def test_11_repeated_footer_is_removed_and_links_remain_on_home(self):
         guest = page(Client())
-        self.assertIn('/vp/#rules', guest)
-        self.assertNotIn(reverse('vp:my'), guest)        # гостю своих попыток нет
-
+        self.assertNotIn('/vp/#rules', guest)
+        self.assertNotIn('Ответы сохраняются сами', visible_text(guest))
+        self.assertNotIn(reverse('vp:my'), guest)
         client = Client()
         client.force_login(User.objects.create_user('var_foot', password='p12345'))
-        self.assertIn(reverse('vp:my'), page(client))
+        self.assertNotIn(reverse('vp:my'), page(client))
+        home = client.get(reverse('vp:index')).content.decode()
+        self.assertIn(reverse('vp:my'), home)
+        self.assertIn('data-open-rules', home)
+        self.assertIn('https://olymp.hse.ru/mmo/materials-eco', home)
 
 
 @tour1_screens

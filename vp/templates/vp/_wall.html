@@ -154,13 +154,9 @@
   {# 01: Telegram — главный путь. 02 лежит рядом скрытым: скрипт переключает на него без перезагрузки. #}
   <section class="vp-wall-screen" data-screen="tg"{% if wall.screen == 'waiting' %} hidden{% endif %}>
     <h2 id="vp-wall-h">Подключите Telegram, чтобы начать</h2>
-    <p>Тренажёр бесплатный. Взамен просим подписку на наш канал <a class="vp-link" href="{{ wall.channel_url }}" target="_blank" rel="noopener">@{{ wall.channel }}</a>: там разборы задач и всё про «Высшую пробу».</p>
+    <p>Тренажёр бесплатный по подписке на <a class="vp-link" href="{{ wall.channel_url }}" target="_blank" rel="noopener">@{{ wall.channel }}</a>.</p>
     <div class="vp-wall-how">
-      <ol>
-        <li>Нажмите кнопку – откроется бот Weconomics.</li>
-        <li>Подпишитесь на канал и нажмите в боте «Старт».</li>
-        <li>Вернитесь сюда – страница обновится сама.</li>
-      </ol>
+      <p>Откройте бота, подпишитесь на канал и нажмите «Старт». Затем вернитесь сюда – страница обновится сама.</p>
       <noscript><p class="vp-wall-quiet">После «Старт» в боте обновите эту страницу.</p></noscript>
       {% if wall.tg_often %}<div class="vp-wall-alert" role="alert">Слишком много попыток. Попробуйте через {{ wall.tg_often }} мин.</div>{% endif %}
       <form method="post" action="{{ wall.urls.tg }}" target="_blank" data-tg-open>

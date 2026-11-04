@@ -8,7 +8,7 @@
 `vp.blocks.sections` из заданий в базе; пример штрафа — `vp.scoring.penalty_example`.
 Вбитых чисел в шаблоне нет (тест `test_intro_numbers_come_from_the_database`).
 {% endcomment %}
-{% block title %}{{ variant.title }}{% endblock %}
+{% block title %}{{ variant|variant_title }}{% endblock %}
 {% block content %}
 <div class="vp-wrap vp-intro" data-variant="{{ variant.slug }}">
   {% if wall %}{% include 'vp/_wall.html' %}{% endif %}

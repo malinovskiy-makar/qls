@@ -204,9 +204,13 @@ def composition(groups, band=None):
         groups, key=lambda g: len(g['bands']))
     whole = main['total'] or 1
     rows = [dict(r, percent=round(float(r['total']) / float(whole) * 100, 2)) for r in main['rows']]
+    short_titles = {'multi': 'Утверждения', 'gaptext': 'Пропуски',
+                    'matching': 'Соотнесение', 'number': 'Задачи'}
+    for row in rows:
+        row['short_title'] = short_titles.get(row['block'], row['title'])
     others = []
     for group in groups:
-        if group is main:
+        if group is main or band is not None:
             continue
         text = f'{_bands_short(group["bands"])}: {group["count"]} {_plural(group["count"], "задание", "задания", "заданий")}'
         if group['total'] != main['total']:
@@ -220,7 +224,7 @@ def composition(groups, band=None):
     # Длительность — только если она у всех вариантов группы одна: «70 минут» иначе была бы
     # правдой не про все.
     minutes = main['minutes'] if len(main.get('minutes_all') or {main['minutes']}) == 1 else None
-    return {'label': _bands_short(main['bands']), 'count': main['count'],
+    return {'label': dict(config.bands()).get(band) or _bands_short(main['bands']), 'count': main['count'],
             'minutes': minutes, 'total': main['total'], 'rows': rows, 'others': others,
             'number_total': next((r['total'] for r in rows if r['block'] == 'number'), None)}
 
@@ -392,7 +396,8 @@ def variant_meta(variant, parts=('count', 'minutes'), origin=True):
 
 def wall_eyebrow(variant):
     """Полное название, класс без повтора и длительность; номер варианта сохраняется."""
-    bits = [variant.title.replace(' — ', ' – ')]
+    from vp.presentation import variant_title
+    bits = [variant_title(variant).replace(' — ', ' – ')]
     band = dict(config.bands(variant.tour)).get(variant.grade_band)
     if band and band.lower() not in bits[0].lower():
         bits.append(band)
@@ -437,9 +442,10 @@ def student_band(request):
     1. явный выбор в запросе: `?band=` (экран вариантов) или `?board=` (вкладка таблицы
        без JS) — известный код запоминается в `request.session['vp_band']`;
     2. `request.session['vp_band']` (туда же пишет `views.remember_band` — вкладка с JS);
-    3. класс из анкеты стены 2 тура (`VPWall.grade`);
-    4. класс последней попытки вошедшего в текущем туре;
-    5. `None`.
+    3. класс основного профиля ученика (5–9 → формат 9, 10 → 10, 11 → 11);
+    4. класс из анкеты стены 2 тура (`VPWall.grade`);
+    5. класс последней попытки вошедшего в текущем туре;
+    6. формат 11 для неизвестного класса (не записывается в профиль или сессию).
 
     ⚠️ АНКЕТА ИМЕННО ПОСЛЕ СЕССИИ: выше она навсегда перебила бы выбор вкладкой —
     человек переключил бы класс, а раздел возвращал бы его к ответу из анкеты.
@@ -454,6 +460,13 @@ def student_band(request):
     if remembered in codes:
         return remembered
     if request.user.is_authenticated:
+        profile = getattr(request.user, 'profile', None)
+        if (profile is not None and profile.role == 'student'
+                and request.user.role == 'student'):
+            grade = profile.grade
+            mapped = '9' if grade in ('5', '6', '7', 'le7', '8', '9') else grade
+            if mapped in codes:
+                return mapped
         surveyed = (VPWall.objects.filter(user=request.user)
                     .values_list('grade', flat=True).first())
         if surveyed in codes:
@@ -462,13 +475,14 @@ def student_band(request):
                 .order_by('-started_at', '-id').select_related('variant').first())
         if last is not None and last.variant.grade_band in codes:
             return last.variant.grade_band
-    return None
+    return '11' if config.CURRENT_TOUR == 2 and '11' in codes else None
 
 
 def _ordered(published):
-    """Опубликованные варианты в порядке страницы выбора: по классам, потом `order`."""
+    """По классам: демо, номера Weconomics, затем остальные источники."""
+    from vp.presentation import variant_order
     order = {code: n for n, (code, _) in enumerate(config.bands())}
-    return sorted(published, key=lambda v: (order.get(v.grade_band, len(order)), v.order, v.pk))
+    return sorted(published, key=lambda v: (order.get(v.grade_band, len(order)), variant_order(v)))
 
 
 def my_block(request, published):
