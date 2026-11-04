@@ -12,6 +12,15 @@ from django.test import tag
 # A live HTTP server and browser must run alone, as the other calc2 probes do.
 @tag("calc2", "browser", "serial")
 class TaxPerformanceTest(StaticLiveServerTestCase):
+    def test_number_format_cost(self):
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "Node is required for the number performance probe")
+        result = subprocess.run(
+            [node, "calc2/tests/number_perf_probe.mjs"], cwd=settings.BASE_DIR,
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_tax_frames_and_coordinates(self):
         node = shutil.which("node")
         self.assertIsNotNone(node, "Node is required for the tax regression probe")
