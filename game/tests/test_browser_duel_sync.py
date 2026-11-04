@@ -16,12 +16,16 @@ u"""Синхронный старт дуэли — в двух настоящи�
 Нет node или Playwright — тест ПРОПУСКАЕТСЯ, а не падает.
 """
 import json
+import importlib
 import os
 import shutil
 import subprocess
+import sys
 import unittest
+from functools import partial
 
 from channels.testing import ChannelsLiveServerTestCase
+from daphne.testing import DaphneProcess
 from django.conf import settings
 from django.test import Client, tag
 from django.urls import reverse
@@ -38,12 +42,32 @@ IN_MEMORY_SQLITE = (DB['ENGINE'].endswith('sqlite3')
                     and not (DB.get('TEST') or {}).get('NAME'))
 
 
+def _fresh_live_application(get_application):
+    # Discovery test_duel_ws уже импортирует config.asgi. OriginValidator
+    # запоминает ALLOWED_HOSTS тогда, до добавления localhost живым сервером.
+    # После fork ребёнок наследовал старый валидатор и отвечал 403 обоим
+    # игрокам. Пересобираем штатный стек ТОЛЬКО в дочернем тестовом процессе,
+    # после установки его настроек. Проверки Origin/Auth/согласия сохраняются.
+    module = sys.modules.get(settings.ASGI_APPLICATION.rsplit('.', 1)[0])
+    if module is not None:
+        importlib.reload(module)
+    return get_application()
+
+
+class FreshApplicationDaphneProcess(DaphneProcess):
+    def run(self):
+        self.get_application = partial(_fresh_live_application, self.get_application)
+        super().run()
+
+
 # ⚠️ ПРИЧИНА МЕТКИ `serial`: класс поднимает daphne отдельным процессом и гоняет
 # по нему два Chromium — внешние ресурсы, поделить их между воркерами шага A нельзя.
 @tag('game', 'browser', 'serial')
 @unittest.skipIf(IN_MEMORY_SQLITE, 'daphne отдельным процессом не видит SQLite в памяти: '
                  'тест идёт на PostgreSQL (--settings=config.settings_test_pg)')
 class DuelSyncStartBrowserTest(ChannelsLiveServerTestCase):
+
+    ProtocolServerProcess = FreshApplicationDaphneProcess
 
     def setUp(self):
         blitz = config.MODES['blitz']
