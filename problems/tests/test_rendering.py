@@ -56,6 +56,24 @@ class BoldItalicTests(SimpleTestCase):
 
 
 class ListTests(SimpleTestCase):
+    def test_numbered_answer_keeps_its_source_number(self):
+        out = render_markdown('2) если докажет свою правоту')
+        self.assertIn('<ol start="2">', out)
+        self.assertIn('<li>если докажет свою правоту</li>', out)
+
+    def test_number_with_final_period_is_not_an_empty_list(self):
+        for value in ('980.', '0.', '  123.\n'):
+            with self.subTest(value=value):
+                out = render_markdown(value)
+                self.assertIn(value.strip(), out)
+                self.assertNotIn('<ol', out)
+                self.assertNotIn('<li', out)
+
+    def test_nonempty_numbered_list_still_renders(self):
+        out = render_markdown('3. третий\n4. четвёртый')
+        self.assertIn('<ol start="3">', out)
+        self.assertEqual(out.count('<li>'), 2)
+
     def test_numbered_list(self):
         out = render_markdown('1. первый\n2. второй')
         self.assertIn('<ol>', out)
@@ -277,12 +295,20 @@ class SanitizerAllowListTests(SimpleTestCase):
         self.assertNotIn('onclick', out)
         self.assertIn('текст', out)
 
-    def test_no_attributes_survive_at_all_on_allowed_tags(self):
-        """attributes={} — строго ноль атрибутов, не только on*."""
+    def test_unrelated_attributes_do_not_survive(self):
+        """Номер списка — единственный разрешённый атрибут."""
         out = _sanitize_html('<p class="x" id="y" data-z="1">текст</p>')
         self.assertNotIn('class=', out)
         self.assertNotIn('id=', out)
         self.assertNotIn('data-z', out)
+
+    def test_only_numeric_start_survives_on_ordered_list(self):
+        out = _sanitize_html('<ol start="2" onclick="alert(1)" style="color:red"><li>x</li></ol>')
+        self.assertEqual(out, '<ol start="2"><li>x</li></ol>')
+        for value in ('javascript:alert(1)', '2px', '2 3', '999999999999999'):
+            with self.subTest(value=value):
+                self.assertNotIn('start=', _sanitize_html(f'<ol start="{value}"><li>x</li></ol>'))
+        self.assertNotIn('start=', _sanitize_html('<p start="2">x</p>'))
 
 
 class EndToEndRendererSanitizationTests(SimpleTestCase):

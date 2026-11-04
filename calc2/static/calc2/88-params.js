@@ -137,8 +137,8 @@ function pultRegulatorIds() {
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
   }
-  if (STATE.mode === 'inequality' && STATE.ineqInput === 'formula') {
-    return ['ineq-alpha-field'];
+  if (STATE.mode === 'inequality') {
+    return ineqAlphaActive() ? ['ineq-alpha-field'] : [];
   }
   // Потребитель (Фаза 8): живой регулятор — новая цена Px₁ при разложении Слуцкого.
   if (STATE.mode === 'consumer') {
@@ -153,7 +153,7 @@ function pultRegulatorIds() {
   }
   if (STATE.mode === 'costs') {
     if (STATE.costsSub === 'plants') return ['pl-q-field'];
-    return (STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
+    return (STATE.sceneKey !== 'firmmarket' && STATE.costsSub === 'costs' && STATE.lrOn) ? ['lr-price-field'] : [];
   }
   return [];
 }
@@ -240,10 +240,10 @@ function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
   const u = String(unit || '');
-  const plain = name + ' = ' + fmt(value) + (u ? ' ' + u : '');
+  const plain = name + ' = ' + CalcNumber.format(value,{percent:u==='%'}) + (u && u!=='%' ? ' '+u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katexInto(lab, texifyName(name) + ' = ' + fmt(value) + (u === '%' ? '\\,\\%' : ''));
+    katexInto(lab, texifyName(name) + ' = ' + CalcNumber.format(value,{tex:true,percent:u==='%' }));
   } catch (e) { lab.textContent = plain; }
 }
 
@@ -263,8 +263,16 @@ function texifyName(name) {
      подписаны кривые в сцене сложения, и без этой ветки строка уходила бы в
      \\text{} целиком — на экране стояло бы «D_1» с настоящим подчёркиванием
      вместо индекса (замер 25.08). */
+  // Готовая запись TeX («P_{x_1}», «\Delta G» — строки параметров сессии 6) — как есть.
+  if (/^[A-Za-z]_\{.+\}$/.test(s)
+      || /^\\[A-Za-z]+(\s+[A-Za-z])?$/.test(s)
+      || /^[A-Za-z]_[a-z]\/[A-Za-z]_[a-z]$/.test(s)) return s;
   const idx = s.match(/^([A-Za-z])_([A-Za-z0-9]{1,3})$/);
   if (idx) return idx[1] + '_{' + (/^\d+$/.test(idx[2]) ? idx[2] : '\\text{' + idx[2] + '}') + '}';
+  /* Экономическое сокращение из заглавных (MC, ATC, DWL, MSB…) — одно обозначение
+     прямым шрифтом, как в списке кривых и на холсте (notationTex, 94-answer.js), а
+     не буква с индексом: «Сдвиг MC» набирался «M с индексом C» (карточка …8169…). */
+  if (/^[A-Z]{2,4}$/.test(s)) return '\\mathrm{' + s + '}';
   const m = s.match(/^([A-Za-z])([A-Za-z0-9]{1,4})$/);
   if (m && !/[А-Яа-я]/.test(s)) return m[1] + '_{\\text{' + m[2] + '}}';
   return '\\text{' + s.replace(/([{}\\$&#^_~%])/g, '\\$1') + '}';
@@ -294,7 +302,24 @@ function editEqValue(lab, name, current, apply) {
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
-  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 1) + 'ch'; };
+  /* ch измеряет обычный ноль, а tabular-nums может сделать цифры шире.
+     Измеряем именно видимый шрифт и добавляем padding и место под курсор;
+     иначе длинное число обрезалось даже при «правильной» длине в ch. */
+  const fitWidth = () => {
+    const cs = getComputedStyle(inp), ruler = document.createElement('span');
+    Object.assign(ruler.style, {
+      position: 'absolute', visibility: 'hidden', whiteSpace: 'pre',
+      fontFamily: cs.fontFamily, fontSize: cs.fontSize,
+      fontWeight: cs.fontWeight, fontStyle: cs.fontStyle,
+      fontVariantNumeric: cs.fontVariantNumeric,
+      letterSpacing: cs.letterSpacing,
+    });
+    ruler.textContent = inp.value || '0';
+    document.body.appendChild(ruler);
+    const width = ruler.getBoundingClientRect().width;
+    ruler.remove();
+    inp.style.width = Math.ceil(width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+  };
   fitWidth();
   inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
@@ -473,6 +498,16 @@ function curveShiftBase(c) {
   return c.shiftBase;
 }
 
+/* Половина размаха ползунков сдвига: запоминается при первой сборке после входа
+   в модель (pickScene обнуляет) и держится, пока модель та же. applyModelState
+   ставит её сразу после pickScene — по стартовому окну, ДО окна из состояния. */
+let _pultShiftHalf = null;
+function pultShiftHalf() {
+  if (_pultShiftHalf == null) _pultShiftHalf = Math.max(1, CONFIG.Pmax / 2);
+  return _pultShiftHalf;
+}
+function resetPultShiftHalf() { _pultShiftHalf = null; }
+
 // Построить (пересобрать) слайдеры кривых в контейнере #params-curves.
 function buildPultCurveChips(list) {
   const body = document.getElementById('params-body');
@@ -482,7 +517,9 @@ function buildPultCurveChips(list) {
     box.id = 'params-curves';
     if (body) body.insertBefore(box, body.firstChild);
   }
-  box.innerHTML = '';
+  // Чипы, уехавшие под карточки функций (92-ui-kit.js), убираем вместе с коробкой.
+  clearPultBox('params-curves');
+  let chipIdx = 0;
   // Заголовок группы нужен, только когда рядом есть вторая группа: буквы из формул.
   if (list.length && Object.keys(STATE.params || {}).length) {
     const t = document.createElement('div');
@@ -502,6 +539,7 @@ function buildPultCurveChips(list) {
     const base = curveShiftBase(c);
     const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(c.linear.b - base), c.color);
     chip.dataset.cid = c.id;
+    tagPultChip(chip, 'params-curves', chipIdx++);
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
     chip.setAttribute('data-tip',
@@ -524,13 +562,18 @@ function buildPultCurveChips(list) {
        и сразу видно, что двигать можно в обе стороны. Размах прежний (Pmax),
        просто он теперь отсчитывается от текущего положения кривой, а не от
        нуля оси цен. */
-    const half = Math.max(1, CONFIG.Pmax / 2);
+    /* Размах — от окна, с которым МОДЕЛЬ ОТКРЫЛАСЬ (pultShiftHalf), а не от
+       текущего: после ссылки, «Отменить» и протяжки MC мышью ползунок
+       пересобирается при окне, которое модель успела раздвинуть, и границы
+       −50…50 становились −75…75 (13.10, state_probe, карточка …81ef…). */
+    const half = pultShiftHalf();
     sl.type = 'range'; sl.min = -half; sl.max = half; sl.step = 'any';
     // Ручка встаёт на ФАКТИЧЕСКИЙ сдвиг: у нетронутой кривой это ноль, то есть
     // середина дорожки, а у сдвинутой — её настоящее положение. Жёсткий ноль
     // здесь врал бы после пересборки панели.
     sl.value = c.linear.b - base;
-    sl.style.accentColor = c.color;   // акцент ползунка в цвет кривой
+    /* Цвет дорожки — общий --accent (тихие панели, сессия 6, Д1; README 4): прежний «акцент в цвет кривой» давал
+       на одном экране дорожки пяти цветов. Кривую называет карточка, под которой ползунок стоит. */
     // п. 78. Подсказка идёт через общую плашку, а не через нативный title:
     // тот не появляется ни с клавиатуры, ни на сенсорном экране.
     sl.setAttribute('data-tip', 'Параллельный сдвиг кривой по вертикали');
@@ -558,10 +601,8 @@ function buildPultCurveChips(list) {
 // Обновить ТОЛЬКО значения существующих чипов (после перетаскивания/redraw) — без пересборки.
 // Слайдер, который пользователь держит прямо сейчас, не трогаем (чтобы не спорить с рукой).
 function syncPultCurveValues(list) {
-  const box = document.getElementById('params-curves');
-  if (!box) return;
   list.forEach(c => {
-    const chip = box.querySelector('.pchip[data-cid="' + c.id + '"]');
+    const chip = pultChip('params-curves', '[data-cid="' + c.id + '"]');
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
@@ -617,8 +658,12 @@ function syncPultRegulators(activeIds) {
        (applyIntervCascade), поэтому display здесь не трогаем: иначе лента
        показала бы поле, которое каскад только что спрятал. */
     if (PULT_STAY_HOME.has(id)) { upgradeRegulator(n); return; }
-    if (!body) return;
-    if (n.parentElement !== body) body.appendChild(n);
+    /* ⚠️ РЕДИЗАЙН 10.2026: РЕГУЛЯТОР ОСТАЁТСЯ НА МЕСТЕ (пункт (з)). Пульт больше
+       не переносит его в правую панель: ползунок стоит рядом со своим смыслом
+       в «Условии». Отключён ТОЛЬКО перенос: снять спрятанность и довести
+       регулятор (границы на дорожке, точный ввод, число с запятой) — как
+       раньше, иначе 16 регуляторов потеряли бы доводку (CODE_NOTES 13.1). */
+    void body;
     n.style.display = '';
     upgradeRegulator(n);
   });
@@ -631,6 +676,8 @@ function syncPultRegulators(activeIds) {
    у каждого разная, поэтому не переписываем её, а достраиваем: границы читаются
    и пишутся прямо в атрибуты min/max/step ползунка, то есть остаются ровно тем,
    чем и были. Сама сцена об этом ничего не знает. */
+/* Регуляторы, у которых пределы — свойство модели, а не окна (точное значение за краем прижимается к краю). */
+const REG_CLAMP_IDS = new Set(['quota-price-field']);
 function upgradeRegulator(field) {
   // Узел может быть КОНТЕЙНЕРОМ переносимой группы (см. #math-secant-row):
   // ползунок внутри есть, но он не его, и подпись у него чужая.
@@ -736,8 +783,22 @@ function upgradeRegulator(field) {
     if (num) num.classList.add('reg-num-hidden');
   }
 
-  const paint = () => paintEqLabel(eq, nameOf(), +sl.value, unitOf());
-  const sync = () => { lo.textContent = fmt(+sl.min); hi.textContent = fmt(+sl.max); paint(); };
+  /* Значение строки — значение МОДЕЛИ, если сцена его сообщила (sl._modelValue) и дорожка стоит на нём с
+     точностью до шага: дорожка с шагом 0,005 встаёт на 1,415, а модель держит 1,41421 («КТВ. Две
+     страны-партнёра»: строка 1,42 при «Ответе» 1,41, сессия 6, А3). Сдвинули дорожку — строка пишет её число,
+     пока сцена не пересчитала модель. */
+  const valueOf = () => {
+    const m = sl._modelValue, v = +sl.value;
+    return (typeof m === 'number' && isFinite(m) && Math.abs(m - v) <= (+sl.step || 0) / 2 + 1e-9) ? m : v;
+  };
+  /* Сдвиг под карточкой (сессия 6, Д1): слова «Сдвиг» слева пишет строка параметра, справа — только число. */
+  const valueOnly = () => typeof scValueOnly === 'function' && scValueOnly(field);
+  const paint = () => {
+    if (!valueOnly()) { paintEqLabel(eq, nameOf(), valueOf(), unitOf()); return; }
+    eq.classList.add('param-eq'); eq.dataset.eqName = nameOf();
+    if (!katexInto(eq, fmt(valueOf()))) eq.textContent = fmt(valueOf());
+  };
+  const sync = () => { lo.textContent = boundText(+sl.min); hi.textContent = boundText(+sl.max); paint(); };
   sync();
   /* Границы сцена двигает атрибутами, и наблюдатель их ловит. А вот САМО
      значение сцена присваивает свойством (`sl.value = …` в setTax, в сбросе
@@ -757,9 +818,12 @@ function upgradeRegulator(field) {
 
   eq.addEventListener('click', () => {
     if (editor._close) editor._close();          // Н10: точное значение закрывает интервал
-    editEqValue(eq, nameOf(), +sl.value, (v) => {
+    editEqValue(eq, valueOnly() ? '' : nameOf(), valueOf(), (v) => {
+      /* Пределы — свойство модели (коридор цен квоты, А2 24.10): число за краем прижимается к краю, и строка
+         показывает прижатое; полоса не переезжает. */
+      if (REG_CLAMP_IDS.has(field.id)) v = Math.max(+sl.min, Math.min(+sl.max, v));
       // Случай первый: значение за полосой — полоса переезжает, значение в центре.
-      if (v < +sl.min || v > +sl.max) {
+      else if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
         sl.min = b.min; sl.max = b.max;
         sl.dataset.boundsByHand = '1';   // границы переставил человек — модель их больше не двигает
@@ -795,6 +859,9 @@ const REGULATOR_SHORT = {
      подпись по длине и даёт «Цена внутри…» — многоточие вместо смысла. */
   'quota-price-field': 'Pk',
 };
+/* Подпись предела дорожки: число fmt с настоящим минусом U+2212 (сессия 6, Д1; README 3). Только в подписи
+   предела — fmt (табло, паритет, .tex) не трогаем. */
+function boundText(v) { return String(fmt(v)).replace(/-/g, '−'); }
 function shortRegulatorName(id, raw) {
   /* ⚠️ У СТАВКИ ОБОЗНАЧЕНИЕ ЗАВИСИТ ОТ ФОРМЫ, поэтому в готовом списке его
      нет. У процентных форм это «τ, %», у потоварных — t или s. Стояло здесь
@@ -805,6 +872,8 @@ function shortRegulatorName(id, raw) {
   /* У квоты смысл тоже не постоянный: он задан НАПРАВЛЕНИЕМ ТОРГОВЛИ, а оно
      меняется одним движением мировой цены. Поэтому имени в готовом списке нет
      — его каждый раз спрашивают у модели, как и букву ставки. */
+  // Строка параметра (сессии 5–6): слова слева пишет .sc-pname, здесь только обозначение (SC_PROWS, 92-ui-kit.js).
+  if (typeof scProw === 'function' && scProw(id)) { const v = scProw(id)[1]; return typeof v === 'function' ? v() : v; }
   if (id === 'open-quota-field' && typeof openQuotaName === 'function') return openQuotaName();
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
@@ -821,8 +890,7 @@ function shortRegulatorName(id, raw) {
 // Линейная КПВ из перехватов: Y = maxY − (maxY/maxX)·X (переменная X, как требует compilePpf).
 function ppfLinearFormula(maxX, maxY) {
   maxX = Math.max(1, maxX); maxY = Math.max(0, maxY);
-  const slope = Math.round((maxY / maxX) * 1000) / 1000;
-  return fmt(Math.round(maxY * 100) / 100) + ' - ' + slope + '*X';
+  return fmtLinear(-maxY / maxX, maxY, 'X');
 }
 // Перехваты {maxX,maxY} произвольной формулы КПВ (через существующие хелперы движка).
 function ppfInterceptsOf(formulaStr) {
@@ -838,7 +906,7 @@ function ppfSetSingle(maxX, maxY) {
   const inp = document.getElementById('inp-ppf'); if (inp) inp.value = formula;
   STATE.ppfFormula = formula;
   _wantRangeAnim = true;   // смена формы → плавный переезд осей (с дебаунсом)
-  redrawAll();
+  redrawKeepingWindow();
 }
 // Задать КПВ страны (1/2) в режиме суммы — ТОТ ЖЕ путь, что applyPpfSum.
 function ppfSetSum(which, maxX, maxY) {
@@ -854,7 +922,7 @@ function ppfSetSum(which, maxX, maxY) {
   if (which === 1) STATE.ppf1 = formula; else STATE.ppf2 = formula;
   STATE.ppfSumData = null;   // форс пересчёт суммы (как applyPpfSum)
   _wantRangeAnim = true;     // смена формы страны → плавный переезд осей (с дебаунсом)
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 // Один сцен-слайдер (метка + число сверху, range снизу). onInput(value) применяет состояние.
@@ -890,11 +958,12 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr,
 // Пересобрать сцен-слайдеры под текущую сцену.
 function buildPultExtra(sig) {
   const box = document.getElementById('params-extra'); if (!box) return;
-  box.innerHTML = '';
+  clearPultBox('params-extra');
   /* Две разные вещи, поэтому и две группы: сверху регуляторы самой модели
      (ставка, мировая цена, границы КПВ), ниже буквы, которые пользователь
      завёл своей формулой. В общий список их мешать нельзя. */
-  const names = Object.keys(STATE.params || {}).sort();
+  // Буква — переменная оси модели макро — ползунка не получает (сессия 6, В5; scAxisLetter, 92-ui-kit.js).
+  const names = Object.keys(STATE.params || {}).sort().filter(n => !(typeof scAxisLetter === 'function' && scAxisLetter(n)));
   const addTitle = (text) => {
     const t = document.createElement('div');
     t.className = 'params-group-title'; t.textContent = text;
@@ -903,7 +972,7 @@ function buildPultExtra(sig) {
   const hasModel = /^(ppf1|ppf2|ineqM)$/.test(String(sig).split('|par:')[0]);
   if (names.length) {
     if (hasModel) addTitle('Буквы из формул');
-    names.forEach(n => buildParamChip(box, n));
+    names.forEach((n, i) => { const ch = buildParamChip(box, n); if (ch) tagPultChip(ch, 'params-extra', i); });
     if (hasModel) addTitle('Параметры модели');
   }
   sig = String(sig).split('|par:')[0];
@@ -926,7 +995,7 @@ function ineqParseIncomes(str) {
 function ineqMasterRebase() {        // запомнить текущий профиль как базу (отсчёт 100%)
   STATE.ineqMasterBase = (STATE.ineqInput === 'incomes')
     ? ineqParseIncomes(STATE.ineqIncomes)
-    : STATE.ineqGroups.map(Number);
+    : STATE.ineqGroups.map(ineqNumber);
 }
 function ineqMasterScale(s) {         // применить масштаб s → задать доли/доходы как ручной ввод
   const base = STATE.ineqMasterBase; if (!base || !base.length) return;
@@ -934,11 +1003,14 @@ function ineqMasterScale(s) {         // применить масштаб s →
   if (STATE.ineqInput === 'incomes') {
     const mean = base.reduce((a, b) => a + b, 0) / n;
     const eff = base.map(v => Math.max(0, mean + s * (v - mean)));
-    STATE.ineqIncomes = eff.map(v => fmt(v)).join(', ');
+    STATE.ineqIncomes = eff.map(String).join(', ');
     const inc = document.getElementById('ineq-incomes'); if (inc) inc.value = STATE.ineqIncomes;
   } else {
-    const mean = 100 / n;                            // равное распределение долей
-    let eff = base.map(v => Math.max(0, mean + s * (v - mean)));
+    const pops=ineqDistribution(ineqFirstConfig()).pops;if(!pops)return;
+    let eff;
+    if(STATE.ineqGroupMode==='counts'){const mean=base.reduce((a,v,i)=>a+v*pops[i],0);STATE.ineqGroups=base.map(v=>Math.max(0,mean+s*(v-mean)));renderIneqGroupsTable();redrawAll();return;}
+    const norm=base.reduce((a,b)=>a+b,0);
+    eff=base.map((v,i)=>Math.max(0,100*pops[i]+s*(100*v/norm-100*pops[i])));
     const sum = eff.reduce((a, b) => a + b, 0) || 1;
     eff = eff.map(v => v / sum * 100);               // ренормировка к 100 %
     STATE.ineqGroups = eff;
@@ -950,7 +1022,7 @@ function ineqMasterApply(sliderVal) { // движение мастера (отв
   // Живой readout % — сразу (это сам регулятор). Тяжёлый пересчёт (доли + таблица +
   // перерисовка + Джини/Робин Гуд) — троттлом, чтобы числа и кривая обновлялись
   // СОГЛАСОВАННО и без мигания при живом кручении (Фаза 5).
-  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = Math.round(sliderVal) + '%';
+  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = CalcNumber.format(sliderVal, {percent:true});
   _ineqThrottle(() => {
     const s = sliderVal / 100;
     if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
@@ -966,8 +1038,9 @@ function ineqMasterDetach() {         // ручная правка профил�
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
-  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v),
-               'ineq-master-slider', v => fmt(v) + '%');
+  // Цвет дорожки — общий --accent (сессия 6, Г1: «Сила неравенства» — строка ползунка обычного вида, была синяя).
+  addPultXChip(box, 'Сила неравенства', pct, null, 0, 200, 1, v => ineqMasterApply(v),
+               'ineq-master-slider', v => CalcNumber.format(v,{percent:true}));
   const val = document.getElementById('ineq-master-slider-val');
   // Отвязанный мастер процентов не показывает: профиль правили руками, и доля
   // от прежней базы к нему уже не относится. Щелчок по слову всё равно
@@ -978,11 +1051,11 @@ function buildIneqMasterChip(box) {
 function showPult(on) {
   const panel = document.getElementById('params-panel');
   if (!panel) return;
-  const empty = document.getElementById('params-empty');
+  const empty = null;   // «Ползунков нет» убрано (пункт (л))
   if (!on) {
     syncPultRegulators([]);   // все узлы — домой
-    const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
-    const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
+    clearPultBox('params-curves');
+    clearPultBox('params-extra');
     panel._curveSig = PULT_REBUILD; panel._extraSig = PULT_REBUILD;
   }
   if (empty) empty.style.display = on ? 'none' : '';
@@ -1020,6 +1093,41 @@ function updatePult() {
   // (3) экранные регуляторы сцены → в панель (после контейнеров).
   syncPultRegulators(pultRegulatorIds());
   showPult(true);
+  // Ползунки кривых — под свои карточки «Функций» (92-ui-kit.js).
+  if (typeof placeCurveSliders === 'function') placeCurveSliders();
+  // После новой формулы чипы могут пересобраться уже ПОСЛЕ scSync текущего
+  // кадра. Их подписи и оформление нужны сразу, без следующей перерисовки.
+  if (typeof scPchips === 'function') scPchips();
+}
+
+/* ── ЖИВОЕ ПРИМЕНЕНИЕ ФОРМУЛ (редизайн 10.2026, фаза 4) ──────────────────
+   Двенадцать групп полей применялись только кнопкой «Построить» (CODE_NOTES,
+   раздел 6). Теперь запись уходит в модель при наборе — тем же дребезгом
+   220 мс, что у остальных полей формул (onFormulaInput), — но ТОЛЬКО верная.
+   Неверная или недописанная остаётся черновиком в поле: поле помечено, под
+   ним сказано, что не так, а модель и график держат запись до начала правки.
+   Иначе каждый промежуточный символ («100 −») опустошал бы сцену.
+   Применение — те же функции, что у кнопок: своей математики здесь нет. */
+/* Группа полей применяется одной функцией: только когда верны ВСЕ поля
+   группы (проверка — formulaInputError в 82-input.js, общая для всех полей). */
+function liveFormula(fields, apply) {
+  const list = fields.filter(Boolean);
+  const run = () => {
+    const drafts = [];
+    list.forEach(el => {
+      const err = formulaInputError(el);
+      if (err) {
+        drafts.push({el, value: el.value, err, applying: el._formulaApplying});
+        el._formulaApplying = true; // временная подстановка — не новая запись из истории
+        el.value = el._formulaEditBase ? el._formulaEditBase.value : el._formulaCommitted;
+      }
+    });
+    try { if (list.every(el => !formulaInputError(el))) apply(); }
+    finally { drafts.forEach(({el, value, err, applying}) => {
+      el.value = value; el._formulaApplying = applying; markFormulaField(el, err);
+    }); }
+  };
+  list.forEach(el => onFormulaInput(el, run));
 }
 
 function wireControls() {
@@ -1027,16 +1135,27 @@ function wireControls() {
   const picker = document.getElementById('scene-picker');
   if (picker) picker.addEventListener('click', (e) => {
     const card = e.target.closest('.scard');
-    if (card && card.dataset.scene) pickScene(card.dataset.scene);
+    // Человек выбрал модель: поднимаем и её автосохранение (91-session.js).
+    if (card && card.dataset.scene) (typeof openModelByUser === 'function' ? openModelByUser : pickScene)(card.dataset.scene);
   });
   // Клавиатура в окне выбора: Escape закрывает, Tab «закольцован» по карточкам.
   document.addEventListener('keydown', (e) => {
     const p = document.getElementById('scene-picker');
     if (!p || p.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { e.preventDefault(); closePicker(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // О1: Esc сначала очищает запрос, при пустом — возвращает в модель.
+      const q = document.getElementById('picker-search');
+      if (q && q.value) { q.value = ''; if (typeof pickerFilter === 'function') pickerFilter(''); return; }
+      if (STATE.sceneKey) closePicker();
+      return;
+    }
     if (e.key === 'Tab') {
-      // Карточки «скоро» отключены (disabled) и в кольцо фокуса не входят.
-      const cards = p.querySelectorAll('.scard:not([disabled])');
+      // Кольцо фокуса — по ВИДИМЫМ органам экрана: поиск, «Продолжить»,
+      // выбранная вкладка, карточки открытого блока (карточки других вкладок
+      // скрыты и фокуса не принимают). «Скоро» отключены и в кольцо не входят.
+      const cards = [...p.querySelectorAll('input, button:not([disabled])')]
+        .filter(el => el.offsetParent !== null && el.tabIndex >= 0);
       if (!cards.length) return;
       const first = cards[0], last = cards[cards.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -1077,10 +1196,11 @@ function wireControls() {
      остались — их читают заливки в четырёх местах 40-scenes-market.js, — но
      переключаются вместе: порознь их не включал никто, а излишки монополии
      живут на своих галочках #chk-mono-* и сюда не относятся. */
-  const areasChk = document.getElementById('chk-areas');
-  if (areasChk) areasChk.addEventListener('change', () => {
-    STATE.showCS = areasChk.checked; STATE.showPS = areasChk.checked;
-    redrawAll();
+  /* Редизайн 10.2026 (пункт (е)): общая галочка ушла, излишки включаются
+     порознь — #chk-cs и #chk-ps в «Показать на графике». */
+  [['chk-cs', 'showCS'], ['chk-ps', 'showPS']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
   });
 
   // Галочки областей монополии (Задача 1): CS / VC / PS.
@@ -1119,7 +1239,7 @@ function wireControls() {
   if (qSl) qSl.addEventListener('input', () => setQuota(parseFloat(qSl.value)));
   if (qIn) qIn.addEventListener('change', () => { const v = parseFloat(qIn.value); if (!isNaN(v)) setQuota(v); });
   const qP = document.getElementById('quota-price-slider');
-  if (qP) qP.addEventListener('input', () => setQuotaPos(parseFloat(qP.value) / 100));
+  if (qP) qP.addEventListener('input', () => setQuotaPrice(parseFloat(qP.value)));   // в деньгах, пределы — коридор (А2 24.10)
 
   // Сторона налога (Задача 1): продавец / покупатель.
   const tsbSel = document.getElementById('tsb-seller'), tsbBuy = document.getElementById('tsb-buyer');
@@ -1152,6 +1272,7 @@ function wireControls() {
   const d3btn = document.getElementById('btn-d3-apply');
   if (d3btn) d3btn.addEventListener('click', applyD3);
   [d3a, d3b, d3m].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyD3(); }); });
+  liveFormula([d3a, d3b, d3m], applyD3);
 
   // Ломаный спрос (Задача 6): переключатель ввода + поля + кнопка «Построить».
   const kiI = document.getElementById('ki-indiv'), kiP = document.getElementById('ki-piece');
@@ -1167,6 +1288,7 @@ function wireControls() {
   const kbtn = document.getElementById('btn-kink-apply');
   if (kbtn) kbtn.addEventListener('click', applyKink);
   [ki1, ki2, ki3, kp1, kp2, kmc].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyKink(); }); });
+  liveFormula([ki1, ki2, ki3, kp1, kp2, kmc], applyKink);
 
   // Потолок/пол цены в монополии (Фаза 2) задаются ОБЩИМ блоком «Вмешательство»
   // (сегменты «Потолок»/«Пол» + ползунок pc-slider → setPReg), отдельной галочки больше нет.
@@ -1180,7 +1302,7 @@ function wireControls() {
     if (e) e.addEventListener('change', () => {
       const v = parseFloat(e.value);
       if (isNaN(v)) return;
-      STATE[key] = v; _wantRangeAnim = true; redrawAll();
+      STATE[key] = v; _wantRangeAnim = true; redrawKeepingWindow();
     });
   });
   const consType = document.getElementById('cons-type');
@@ -1188,8 +1310,7 @@ function wireControls() {
   const consCustom = document.getElementById('cons-custom');
   if (consCustom) {
     const applyU = () => { STATE.consCustom = (consCustom.value || '').trim(); redrawAll(); };
-    consCustom.addEventListener('change', applyU);
-    consCustom.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyU(); });
+    onFormulaInput(consCustom, applyU);
   }
   attachFormulaHelp('fh-cons', 'fp-cons', 'cons-custom', 'UTIL');
   const consFan = document.getElementById('chk-cons-fan');
@@ -1202,7 +1323,7 @@ function wireControls() {
     STATE.consPx1 = v;
     if (px1S) px1S.value = v; if (px1I) px1I.value = v;
     const l = document.getElementById('cons-px1-val'); if (l) l.textContent = fmt(v);
-    _wantRangeAnim = true; redrawAll();
+    _wantRangeAnim = true; redrawKeepingWindow();
   };
   if (px1S) px1S.addEventListener('input', () => applyPx1(parseFloat(px1S.value)));
   if (px1I) px1I.addEventListener('change', () => applyPx1(parseFloat(px1I.value)));
@@ -1225,15 +1346,13 @@ function wireControls() {
   if (unWageInput) unWageInput.addEventListener('change', () => { const v = parseFloat(unWageInput.value); if (!isNaN(v)) setUnionWage(v); });
   const labMinChk = document.getElementById('chk-labmin');
   if (labMinChk) labMinChk.addEventListener('change', () => {
-    STATE.laborMinOn = labMinChk.checked;
-    const f = document.getElementById('labmin-field'); if (f) f.style.display = labMinChk.checked ? '' : 'none';
     // При включении ставим линию на уровень текущей зарплаты (пока не связывает) — точка отсчёта.
     if (labMinChk.checked && !(STATE.laborMinW > 0)) {
       const base = (STATE.laborStruct === 'monopsony' && STATE.laborMono) ? STATE.laborMono.Wm
                  : (STATE.laborEq ? STATE.laborEq.P : 0);
       if (base > 0) setLaborMinFields(Math.round(base));
     }
-    if (typeof updatePult === 'function') updatePult();   // ползунок МРОТ в пульт / домой
+    setLaborMinOn(labMinChk.checked);   // состояние, строка регулятора, пульт — один помощник (46-scenes-labor.js)
     redrawAll();
   });
   const labMinSlider = document.getElementById('labmin-slider');
@@ -1252,8 +1371,8 @@ function wireControls() {
   const opwS = document.getElementById('open-pw-slider'), opwI = document.getElementById('open-pw-input');
   if (opwS) opwS.addEventListener('input', () => setOpenPw(parseFloat(opwS.value)));
   if (opwI) opwI.addEventListener('change', () => { const v = parseFloat(opwI.value); if (!isNaN(v)) setOpenPw(v); });
-  [['oi-none', 'none'], ['oi-tariff', 'tariff'], ['oi-quota', 'quota']]
-    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setOpenTool(v)); });
+  [['oi-none', 'none'], ['oi-tariff', 'tax'], ['oi-subsidy','subsidy'], ['oi-quota', 'quota']]
+    .forEach(([id, v]) => { const b = document.getElementById(id); if (b) b.addEventListener('click', () => setTradePolicy('open',{kind:v})); });
   const setOpenNum = (key, sliderId, inputId, valId) => {
     const sl = document.getElementById(sliderId), inp = document.getElementById(inputId), lab = document.getElementById(valId);
     const apply = (v) => {
@@ -1286,7 +1405,19 @@ function wireControls() {
     });
     if (inp) {
       const apply = () => {
+        const prev = STATE[key + 'Expr'];
         STATE[key + 'Expr'] = (inp.value || '').trim();
+        /* ⚠️ ПРАВКА ФОРМУЛЫ СПРЯТАННОЙ КРИВОЙ ВКЛЮЧАЕТ ЕЁ ГЛАЗ (А2 24.10, ADR 0158, карточка …81cc…): вписал в
+           спрятанную MSC «Q + 20» — ответ прежний и на графике ничего, хотя человек ясно хотел эту кривую.
+           Спрятанная кривая в расчёт по-прежнему не входит (ADR 0056); правка — это и есть «покажи». Одно
+           действие — один шаг истории: снимок берётся по затишью после обеих перемен. То же правило — у карточек
+           списка кривых (80-ui.js). ⚠️ Только НОВАЯ запись: syncSocialFields шлёт полю то же событие input с
+           формулой из STATE (умолчание MSB = D), и без сравнения старт включал бы спрятанную MSB сам. */
+        if (!STATE[key + 'On'] && STATE[key + 'Expr'] && STATE[key + 'Expr'] !== prev) {
+          STATE[key + 'On'] = true;
+          if (box) box.checked = true;
+          inp.disabled = false;
+        }
         recompileSocial(); redrawAll();
       };
       onFormulaInput(inp, apply);   // input + change + Enter, см. 82-input.js
@@ -1331,6 +1462,7 @@ function wireControls() {
     applyCosts();
   });
   if (tcInp) tcInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyCosts(); });
+  liveFormula([tcInp], applyCosts);
   // Второй способ ввода: кривые по отдельности.
   const cmcInp = document.getElementById('inp-cmc'), catcInp = document.getElementById('inp-catc'),
         cavcInp = document.getElementById('inp-cavc');
@@ -1354,6 +1486,8 @@ function wireControls() {
   [cmcInp, catcInp, cavcInp].forEach(e => {
     if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyCostParts(); });
   });
+  // Пустое поле здесь — законное «этой кривой нет».
+  liveFormula([cmcInp, catcInp, cavcInp], applyCostParts);
   const cmTc = document.getElementById('cm-tc'), cmCur = document.getElementById('cm-curves');
   if (cmTc) cmTc.addEventListener('click', () => setCostsInputMode('tc'));
   if (cmCur) cmCur.addEventListener('click', () => setCostsInputMode('curves'));
@@ -1370,6 +1504,7 @@ function wireControls() {
   const plBtn = document.getElementById('btn-pl-apply');
   if (plBtn) plBtn.addEventListener('click', applyPl);
   [pl1, pl2].forEach(e => { if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyPl(); }); });
+  liveFormula([pl1, pl2], applyPl);
   [['plv-tc', 'tc'], ['plv-mc', 'mc']].forEach(([id, v]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPlantsView(v));
   });
@@ -1393,6 +1528,7 @@ function wireControls() {
   const prodBtn = document.getElementById('btn-prod-apply');
   if (prodBtn) prodBtn.addEventListener('click', applyProd);
   if (prodInp) prodInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyProd(); });
+  liveFormula([prodInp], applyProd);
   attachFormulaHelp('fh-prod', 'fp-prod', 'inp-prod', 'PROD');
   // 9б: изокванты и изокосты.
   const isoInp = document.getElementById('inp-iso');
@@ -1403,7 +1539,7 @@ function wireControls() {
   attachFormulaHelp('fh-iso', 'fp-iso', 'inp-iso', 'ISO');
   [['iso-w', 'isoW'], ['iso-r', 'isoR'], ['iso-c', 'isoC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
-    if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawAll(); } });
+    if (e) e.addEventListener('change', () => { const v = parseFloat(e.value); if (!isNaN(v) && v > 0) { STATE[key] = v; _wantRangeAnim = true; redrawKeepingWindow(); } });
   });
 
   // Режим КПВ: одна строка на любую форму уравнения (Фаза 11), вторая кривая
@@ -1427,6 +1563,9 @@ function wireControls() {
   if (pApply) pApply.addEventListener('click', applyPpf);
   if (ppfInp) ppfInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
   if (ppfInp2) ppfInp2.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
+  // Вторая КПВ проверяется, только когда сравнение включено: спрятанное поле
+  // не должно держать первую кривую.
+  liveFormula([ppfInp, ppfInp2], applyPpf);
 
   // Вторая КПВ: кнопка показывает второе поле и строит обе кривые (Фаза 12.2).
   const cmp = document.getElementById('btn-ppf-compare');
@@ -1524,18 +1663,19 @@ function wireControls() {
   const tApply = document.getElementById('btn-ppft-apply');
   if (tApply) tApply.addEventListener('click', applyPpfTrade);
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
+  liveFormula([ppftInp], applyPpfTrade);
   // Смена мировой цены полем — анимируем переезд осей (как и ползунком).
-  if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; applyPpfTrade(); });
+  if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; redrawKeepingWindow(applyPpfTrade); });
   // Задача 2: ползунок мировой цены Px/Py — основное управление, синхронен с полем.
   const ppftSlider = document.getElementById('ppft-price-slider');
   if (ppftSlider) ppftSlider.addEventListener('input', () => {
     const v = parseFloat(ppftSlider.value); if (isNaN(v)) return;
     STATE.ppftPrice = v;       // фактическое значение зажмётся в recomputePpfTrade
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей (см. applyTradeRanges)
-    redrawAll();
+    redrawKeepingWindow();
   });
 
-  // ЧК5: две страны (эндогенная мировая цена). Сценарий А/Б задаёт карточка
+  // ЧК5: две страны (пример мировой цены). Сценарий А/Б задаёт карточка
   // сюжета через setTradeScenario, кнопок в разметке нет (Свх-4б).
   const tb1 = document.getElementById('inp-tb1'), tb2 = document.getElementById('inp-tb2');
   function applyTradeB() {
@@ -1546,26 +1686,27 @@ function wireControls() {
   const tbApply = document.getElementById('btn-tb-apply');
   if (tbApply) tbApply.addEventListener('click', applyTradeB);
   [tb1, tb2].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyTradeB(); }); });
-  // Задача 2: своя мировая цена — ползунок + поле + сброс к равновесной (всё синхронно).
+  liveFormula([tb1, tb2], applyTradeB);
+  // Своя мировая цена — ползунок + поле + сброс к примеру цены (всё синхронно).
   const tbPrice = document.getElementById('inp-tb-price');
   if (tbPrice) tbPrice.addEventListener('change', () => {
     const v = parseFloat(tbPrice.value);
     STATE.tbManualPrice = (!isNaN(v) && v > 0) ? v : null;
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей
-    redrawAll();
+    redrawKeepingWindow();
   });
   const tbSlider = document.getElementById('tb-price-slider');
   if (tbSlider) tbSlider.addEventListener('input', () => {
     const v = parseFloat(tbSlider.value); if (isNaN(v)) return;
     STATE.tbManualPrice = v;   // фактическое значение зажмётся в recomputeTradeB
     _wantRangeAnim = true;     // смена Pw → плавный переезд осей
-    redrawAll();
+    redrawKeepingWindow();
   });
   const tbReset = document.getElementById('btn-tb-reset');
   if (tbReset) tbReset.addEventListener('click', () => {
-    STATE.tbManualPrice = null;   // вернуться к равновесной; ползунок/поле обновит syncTbPriceUI
-    _wantRangeAnim = true;        // равновесная Pw тоже меняет масштаб — плавно
-    redrawAll();
+    STATE.tbManualPrice = null;   // вернуться к примеру цены; поле обновит syncTbPriceUI
+    _wantRangeAnim = true;        // начальная Pw тоже меняет масштаб — плавно
+    redrawKeepingWindow();
   });
 
   // Готовые сцены раздаёт окно сценариев (#scene-picker) — второго списка кнопок нет.
@@ -1582,7 +1723,11 @@ function wireControls() {
   [['inp-mathf', 'mathFormula'],
    ['inp-mathfc', 'mathFC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
-    if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
+    // Неверная запись в модель не уходит (82-input.js, formulaInputError).
+    if (e) e.addEventListener('input', () => {
+      const err = formulaInputError(e); markFormulaField(e, err); if (err) return;
+      STATE[key] = e.value; redrawAll();
+    });
   });
 
   // Точка касания: ползунок, числовое поле (её же тянут мышью по кривой).
@@ -1636,6 +1781,7 @@ function wireControls() {
   // Ограничение сменилось — окно подгоняется заново, дальше им распоряжается человек.
   const gcField = document.getElementById('inp-mathgc');
   if (gcField) gcField.addEventListener('input', () => {
+    const err = formulaInputError(gcField); markFormulaField(gcField, err); if (err) return;
     STATE.mathGC = gcField.value;
     constraintFit();
     redrawAll();
@@ -1671,47 +1817,61 @@ function wireControls() {
   const yName = document.getElementById('inp-yname');
   if (yName) yName.addEventListener('input', () => { STATE.axisYName = yName.value; redrawAll(); });
 
-  /* Своя точка (П28): режим взводит тумблер «Указать на графике» в самой
-     строке заготовки, отдельной кнопки над списком больше нет. */
+  /* Своя точка. С 13.10 (ADR 0148) её ставит щелчок в режиме холста «Точки и
+     площади» (canvasMode() === 'pts'), режим после щелчка остаётся; прежняя
+     заготовка «на графике» (armMark) снимается после одной точки, как раньше. */
   const chartEl = document.getElementById('chart');
   if (chartEl) chartEl.addEventListener('click', (ev) => {
-    if (!STATE.markArm) return;
+    const cm = canvasMode();
+    if (cm !== 'mark' && cm !== 'pts') return;
     // Панель решает МЕСТО ЩЕЛЧКА: в многопанельной сцене это не одно и то же.
     const [px, py] = d3.pointer(ev, chartEl);
     const pan = panelAt(px, py);
     const pid = pan ? pan.id : null;
     const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
-    armMark(false);
-    showSnapHint(null);
+    if (cm === 'mark') { armMark(false); showSnapHint(null); }
     /* Рядом с кривой точка садится НА неё, в пустом месте остаётся где щёлкнули.
        Магнит тот же, что у вершин площади (Н41, Н54): в ключевую точку попасть
        должно быть заметно легче, чем мимо, и правило это одно на все три случая
        (своя точка, вершина площади, перетаскивание готовой). */
     const hit = snapVertexAt(px, py);
+    // Щелчок по своей же точке в режиме — не вторая точка поверх (её тянут или правят).
+    if (cm === 'pts' && hit && hit.mark) return;
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     // К пересечению и к особой точке не привязываем: скольжение по одной из
     // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
-    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid);
+    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid, keyOnText(hit));
   });
-  // Набор вершин площади: щелчок ставит вершину и режим не снимается —
-  // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
+  /* Набор «+ По точкам» (сессия 7, В3; README пакета 9): вершина площади — ТОЧКА списка. Щелчок по свободному месту
+     ставит новую точку (прилипание — как у обычной, имя — следующая буква) и берёт её вершиной; щелчок по точке
+     списка берёт её, повторный — снимает (найденный баг: прежний обработчик не смотрел hit.mark и ставил вершину
+     поверх своей точки копией координат); щелчок по ПЕРВОЙ вершине при трёх и больше — площадь готова. Набор —
+     CANVAS.buildIds (вид). Каждая новая точка — шаг истории, площадь — ещё один («Готово»). */
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.vertArm || STATE.markArm) return;
-    // Только что сняли вершину щелчком по ней — этот щелчок уже отработан (П42).
-    if (STATE._vertClickEaten) { STATE._vertClickEaten = false; return; }
     const [px, py] = d3.pointer(ev, chartEl);
     const pan = panelAt(px, py);
     const pid = pan ? pan.id : null;
     const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     const hit = snapVertexAt(px, py);
+    const ids = CANVAS.buildIds || (CANVAS.buildIds = []);
+    if (hit && hit.mark != null) {
+      const i = ids.findIndex(x => String(x) === String(hit.mark));
+      if (i === 0 && ids.length >= 3) { finishPolyBuild(); return; }
+      if (i >= 0) ids.splice(i, 1); else ids.push(hit.mark);
+      syncCanvasMode(); redrawAll();
+      return;
+    }
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    addAreaVert(x, y, hit && hit.key ? hit.name : '', pid);
+    const mk = addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid, keyOnText(hit));
+    if (mk) (CANVAS.buildIds || (CANVAS.buildIds = [])).push(mk.id);
+    syncCanvasMode(); redrawAll();
   });
   // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
   // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.
@@ -1721,13 +1881,13 @@ function wireControls() {
      гасит: так решил владелец. Полосы кривых и кружки точек останавливают
      всплытие, поэтому сюда доходит только настоящее «мимо». */
   if (chartEl) chartEl.addEventListener('click', () => {
-    if (STATE.markArm || STATE.vertArm) return;      // взведённые режимы заняты своим
+    if (canvasArmed()) return;      // взведённые режимы заняты своим
     disarmCurve();
   });
 
   // Подсказка: пока режим взведён, показываем кружком, куда сядет точка.
   if (chartEl) chartEl.addEventListener('mousemove', (ev) => {
-    if (!STATE.markArm && !STATE.vertArm) return;
+    if (!canvasArmed()) return;
     const [px, py] = d3.pointer(ev, chartEl);
     // Н55: подсказка показывает ключевую точку в обоих режимах, а не только при
     // наборе вершин — иначе не видно, куда именно сядет своя точка.
@@ -1737,9 +1897,19 @@ function wireControls() {
   /* Esc снимает ЛЮБОЙ взведённый режим — иначе курсор-перекрестие остаётся
      «залипшим». Раньше Escape знал только про свою точку, и из набора вершин
      выйти с клавиатуры было нечем. То же делает кнопка в полосе режима. */
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && canvasArmed()) leaveCanvasMode(); });
+  /* Режим «Точки и площади» (ADR 0148): Esc — только вне поля ввода и без
+     открытых окон (их Esc закрывает окно или отменяет правку). Слушаем в фазе
+     захвата: обработчики окон закрывают их на том же нажатии, и после них
+     окно выглядело бы уже закрытым. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !canvasArmed()) return;
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('input, textarea, select, math-field, [contenteditable="true"], [contenteditable=""]')) return;
+    if (document.querySelector('.pop.open, .modal.open, .cpick-menu.open, #wrench-pop.open, .hint-pop.open, #pt-rename')) return;
+    leaveCanvasMode();
+  }, true);
   const cvStop = document.getElementById('cv-mode-stop');
-  if (cvStop) cvStop.addEventListener('click', () => leaveCanvasMode());
+  if (cvStop) cvStop.addEventListener('click', () => finishCanvasMode());
   renderMarkList();
   initSceneColorPickers();   // Фаза 2: пикеры у кривых издержек, производства, вееров
   wireFolds();               // сворачивание любых секций со складным заголовком
@@ -1766,11 +1936,13 @@ function wireControls() {
   const ineqIncBtn = document.getElementById('ineq-incomes-apply');
   if (ineqIncBtn) ineqIncBtn.addEventListener('click', applyIneqInc);
   if (ineqInc) ineqInc.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqInc(); });
+  liveFormula([ineqInc], applyIneqInc);
   const ineqFm = document.getElementById('ineq-formula');
-  const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; redrawAll(); };
+  const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; updatePult();redrawAll(); };
   const ineqFmBtn = document.getElementById('ineq-formula-apply');
   if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
   if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });
+  liveFormula([ineqFm], applyIneqFm);
   // Задача 3: ползунок и поле α для семейства L(p)=p^α.
   const ineqAlpha = document.getElementById('ineq-alpha');
   if (ineqAlpha) ineqAlpha.addEventListener('input', () => setIneqAlpha(ineqAlpha.value));
@@ -1813,7 +1985,7 @@ function wireControls() {
       if (isNum && isNaN(v)) return;
       STATE.macro[model][key] = v;
       _wantRangeAnim = true;
-      redrawAll();
+      if (isNum) redrawKeepingWindow(); else redrawAll();
     };
     /* Числовое поле оставляем на `change`: там дребезг только мешал бы —
        набранное «12» на полпути читалось бы как «1». Поле ФОРМУЛЫ слышит
@@ -1845,7 +2017,7 @@ function wireControls() {
       if (isNaN(v) || v < 0) return;
       STATE.macro[model][key] = v;
       if (sl) sl.value = v; if (inp) inp.value = v; if (lab) lab.textContent = fmt(v);
-      _wantRangeAnim = true; redrawAll();
+      _wantRangeAnim = true; redrawKeepingWindow();
     };
     if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));
     if (inp) inp.addEventListener('change', () => apply(parseFloat(inp.value)));

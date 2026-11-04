@@ -19,6 +19,7 @@
    занижать. Каждый признак снимается ДВУМЯ способами: числом и снимком.
 */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import fs from 'node:fs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
@@ -31,6 +32,9 @@ const need = (name) => !want.length || want.includes(name);
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 950 } });
 const page = await ctx.newPage();
 const errs = [];
@@ -45,6 +49,7 @@ await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
 let bad = 0;
+{ const sh = await answerShown(page); if (!sh) bad++; console.log((sh ? 'OK   ' : 'FAIL ') + 'предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
 const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
 function show(label, got, wanted, tol) {
   if (wanted == null) { console.log('     ' + label + ' = ' + num(got)); return; }
@@ -67,7 +72,10 @@ async function shot(name) {
 /* Помощники, живущие в СТРАНИЦЕ. Ставятся один раз на загрузку. */
 const HELP = `
 function ffExpandAll() {
-  document.querySelectorAll('.crow-more').forEach(function (m) { m.classList.add('open'); });
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): .crow-more карточки —
+     всплывающее меню «…» (.fc-menu), а не раскрывающаяся часть строки;
+     раскрывать его нечего, открытое оно ложится поверх соседних строк. */
+  document.querySelectorAll('.crow-more:not(.fc-menu)').forEach(function (m) { m.classList.add('open'); });
   document.querySelectorAll('details').forEach(function (d) { d.open = true; });
   document.querySelectorAll('.sb-card.folded, .card.folded, .pchip-param.folded')
     .forEach(function (e) { e.classList.remove('folded'); });
@@ -326,8 +334,11 @@ if (need('Д2')) {
         winW: window.innerWidth,
       };
     });
-    if (!t) flag('плашка подсказки всплыла', false);
+    /* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, решение «никаких подсказок», Notion …81eb…; ADR 0151): плашки больше
+       нет — наведение её не показывает, запись кривой читается в «Ответе» («Итоговая функция»). */
+    if (!t) flag('плашки подсказки нет (решение 14.10)', true);
     else {
+      flag('плашки подсказки нет (решение 14.10)', false, 'плашка всплыла');
       note('текст плашки: ' + t.text.slice(0, 240));
       note('плашка: ' + t.rect.w + '×' + t.rect.h + ' при окне ' + t.winW);
       flag('нет английского if', t.text.indexOf('if') < 0, t.text.indexOf('if') >= 0 ? 'есть' : '');
@@ -384,8 +395,9 @@ if (need('Д2')) {
         onChart: !!cr && !(r.right <= cr.left || r.left >= cr.right || r.bottom <= cr.top || r.top >= cr.bottom),
       };
     });
-    if (!w) flag('плашка всплыла', false);
+    if (!w) flag('плашки подсказки нет (решение 14.10)', true);
     else {
+      flag('плашки подсказки нет (решение 14.10)', false, 'плашка всплыла');
       note('текст: ' + w.text.slice(0, 220));
       note('плашка ' + w.w + ' px, расширена: ' + w.wide + ', вторая форма: ' + w.stacked);
       flag('нет английского if', w.text.indexOf('if') < 0);
@@ -402,6 +414,8 @@ if (need('Д2')) {
      Берём длинные коэффициенты и смотрим, что плашка расширилась либо запись
      пересобрана второй формой — и в обоих случаях осталась внутри плашки. */
   head('Д2 (третий край) · заведомо широкая запись');
+  /* ПЕРЕНАЦЕЛЕНО 14.10 (тихие панели, ADR 0151): showHintTip больше не показывает плашку ни для какой записи,
+     даже заведомо широкой, — узла #hint-tip нет или он спрятан. Правило ширины плашки вместе с ней ушло. */
   const w3 = await page.evaluate(() => {
     const LONG = '(Q >= 0 and Q < 40) ? 123.456789 - 0.987654*Q : '
                + '((Q >= 40 and Q < 80) ? 987.654321 - 0.123456*Q : '
@@ -409,26 +423,9 @@ if (need('Д2')) {
     const dot = document.querySelector('.crow-auto') || document.body;
     showHintTip(dot, 'Сейчас это ' + tipExpr(LONG));
     const el = document.getElementById('hint-tip');
-    const r = el.getBoundingClientRect();
-    const k = el.querySelector('.katex');
-    const kr = k ? k.getBoundingClientRect() : null;
-    const ann = k ? k.querySelector('annotation[encoding="application/x-tex"]') : null;
-    return {
-      text: ffText(el), wide: el.classList.contains('tip-math'),
-      stacked: /gathered/.test(ann ? ann.textContent : ''),
-      w: Math.round(r.width), over: kr ? Math.round(kr.right - r.right) : null,
-      inWindow: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
-    };
+    return { shown: !!el && el.style.display !== 'none' && !!el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' };
   });
-  note('плашка ' + w3.w + ' px, расширена: ' + w3.wide + ', вторая форма: ' + w3.stacked);
-  note('текст: ' + w3.text.slice(0, 200));
-  flag('широкая запись включила правило ширины', w3.wide || w3.stacked,
-       'расширение ' + w3.wide + ', вторая форма ' + w3.stacked);
-  show('запись выходит за правый край плашки, px', w3.over, null);
-  flag('широкая запись НЕ выходит за правый край плашки', w3.over != null && w3.over <= 1,
-       w3.over + ' px');
-  flag('плашка целиком в окне браузера', w3.inWindow);
-  await shot('d2-tip-wide');
+  flag('широкая запись: плашки подсказки нет (решение 14.10)', !w3.shown, JSON.stringify(w3));
 }
 
 /* ═══════════ Д3. Субсидия покупателю ═══════════════════════════════ */

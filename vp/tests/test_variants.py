@@ -60,17 +60,20 @@ class VariantsScreenTests(TestCase):
         self.assertEqual(len(cards(page(Client(), band='sedmoy'))), 4)
         self.assertEqual(len(cards(page(Client()))), 4)
 
-    def test_04_numbering_of_trial_variants_starts_at_one_inside_the_class(self):
+    def test_04_trial_series_keep_their_title_without_a_second_number(self):
+        VPVariant.objects.filter(pk=self.eleven[1].pk).update(title='Архивный вариант 1')
+        VPVariant.objects.filter(pk=self.eleven[2].pk).update(title='Тренировочный вариант 1')
         html = page(Client(), band='11')
         self.assertIn('Демоверсия ВШЭ', html)
-        for number in (1, 2, 3, 4):
-            self.assertIn(f'Пробный · вариант {number}', html)
-        self.assertNotIn('Пробный · вариант 5', html)
+        self.assertEqual(html.count('Учебная сборка'), 4)
+        self.assertIn('Архивный вариант 1', html)
+        self.assertIn('Тренировочный вариант 1', html)
+        self.assertNotIn('Пробный · вариант', html)
 
     def test_05_guest_sees_the_format_and_no_status(self):
         html = page(Client())
         self.assertIn('44 задания · 30 мин', html)       # строка меты (сессия R)
-        for absent in ('Не решали', 'в таблице', 'Начат ·', 'Продолжить'):
+        for absent in ('Не решали', 'в лидерборде', 'Начат ·', 'Продолжить'):
             self.assertNotIn(absent, html, absent)
         self.assertIn('понадобится короткая бесплатная регистрация', html)
 
@@ -92,7 +95,7 @@ class VariantsScreenTests(TestCase):
         client.post(reverse('vp:finish', args=[attempt.public_code]))
 
         html = page(client, band='9-10')
-        self.assertIn('в таблице', html)
+        self.assertIn('в лидерборде', html)
         self.assertIn('Не решали', html)                 # у остальных трёх карточек
 
     def test_08_draft_is_visible_to_staff_only(self):
@@ -123,14 +126,18 @@ class VariantsScreenTests(TestCase):
         """
         self.assertNotIn('забег', visible_text(page(Client())).lower())
 
-    def test_11_footer_links_to_the_rules_and_to_my_attempts(self):
+    def test_11_repeated_footer_is_removed_and_links_remain_on_home(self):
         guest = page(Client())
-        self.assertIn('/vp/#rules', guest)
-        self.assertNotIn(reverse('vp:my'), guest)        # гостю своих попыток нет
-
+        self.assertNotIn('/vp/#rules', guest)
+        self.assertNotIn('Ответы сохраняются сами', visible_text(guest))
+        self.assertNotIn(reverse('vp:my'), guest)
         client = Client()
         client.force_login(User.objects.create_user('var_foot', password='p12345'))
-        self.assertIn(reverse('vp:my'), page(client))
+        self.assertNotIn(reverse('vp:my'), page(client))
+        home = client.get(reverse('vp:index')).content.decode()
+        self.assertIn(reverse('vp:my'), home)
+        self.assertIn('data-open-rules', home)
+        self.assertIn('https://olymp.hse.ru/mmo/materials-eco', home)
 
 
 @tour1_screens

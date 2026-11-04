@@ -1,0 +1,2396 @@
+{
+  "key": "bigopen",
+  "source": "Новая модель Э13; первый эталон03.11 после независимой проверки45/30, CSA2812.5, PSB1012.5.",
+  "start": {
+    "state": {
+      "D": null,
+      "S": null,
+      "acFrom": null,
+      "acTo": null,
+      "advTau": 0,
+      "ansA": null,
+      "ansB": null,
+      "ansHand": false,
+      "applyPigou": false,
+      "areaCalcList": [],
+      "areaCalcMode": "curve",
+      "areaColor": {},
+      "areaHidden": [],
+      "areaPicked": [],
+      "areaVerts": [],
+      "axisXDefault": "Q",
+      "axisXName": "",
+      "axisYDefault": "P",
+      "axisYName": "",
+      "bigTrade": {
+        "A": {
+          "D": "Q = 120 - P",
+          "S": "Q = P"
+        },
+        "B": {
+          "D": "Q = 60 - P",
+          "S": "Q = P"
+        },
+        "view": "countries"
+      },
+      "bigTradeResult": {
+        "Pw": 45,
+        "base": {
+          "Pw": 45,
+          "countries": {
+            "A": {
+              "Ex": 0,
+              "Im": 30,
+              "Pc": 45,
+              "Pp": 45,
+              "Pw": 45,
+              "Qd": 75,
+              "Qs": 45,
+              "alternatives": [],
+              "budget": 0,
+              "channels": {
+                "domestic": {
+                  "A": 1,
+                  "B": 0
+                },
+                "exports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "imports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "policy": {
+                  "form": "unit",
+                  "kind": "none",
+                  "rate": 0,
+                  "target": "trade"
+                }
+              },
+              "cs": 2812.5,
+              "domestic": 45,
+              "dwlCons": 0,
+              "dwlProd": 0,
+              "free": {
+                "Ex": 0,
+                "Im": 30,
+                "Pc": 45,
+                "Pp": 45,
+                "Qd": 75,
+                "Qs": 45,
+                "budget": 0,
+                "cs": 2812.5,
+                "dwlCons": 0,
+                "dwlProd": 0,
+                "ps": 1012.5,
+                "sw": 3825
+              },
+              "mode": "import",
+              "multiple": false,
+              "ps": 1012.5,
+              "rent": 0,
+              "sw": 3825
+            },
+            "B": {
+              "Ex": 30,
+              "Im": 0,
+              "Pc": 45,
+              "Pp": 45,
+              "Pw": 45,
+              "Qd": 15,
+              "Qs": 45,
+              "alternatives": [],
+              "budget": 0,
+              "channels": {
+                "domestic": {
+                  "A": 1,
+                  "B": 0
+                },
+                "exports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "imports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "policy": {
+                  "form": "unit",
+                  "kind": "none",
+                  "rate": 0,
+                  "target": "trade"
+                }
+              },
+              "cs": 112.5,
+              "domestic": 15,
+              "dwlCons": 0,
+              "dwlProd": 0,
+              "free": {
+                "Ex": 30,
+                "Im": 0,
+                "Pc": 45,
+                "Pp": 45,
+                "Qd": 15,
+                "Qs": 45,
+                "budget": 0,
+                "cs": 112.5,
+                "dwlCons": 0,
+                "dwlProd": 0,
+                "ps": 1012.5,
+                "sw": 1125
+              },
+              "mode": "export",
+              "multiple": false,
+              "ps": 1012.5,
+              "rent": 0,
+              "sw": 1125
+            }
+          },
+          "exporter": "B",
+          "importer": "A",
+          "multiple": false,
+          "noTrade": false,
+          "priceInterval": null,
+          "quotaRent": 0,
+          "shadowPw": 45,
+          "volume": 30,
+          "worldSW": 4950
+        },
+        "countries": {
+          "A": {
+            "Ex": 0,
+            "Im": 30,
+            "Pc": 45,
+            "Pp": 45,
+            "Pw": 45,
+            "Qd": 75,
+            "Qs": 45,
+            "alternatives": [],
+            "budget": 0,
+            "channels": {
+              "domestic": {
+                "A": 1,
+                "B": 0
+              },
+              "exports": {
+                "A": 1,
+                "B": 0
+              },
+              "imports": {
+                "A": 1,
+                "B": 0
+              },
+              "policy": {
+                "form": "unit",
+                "kind": "none",
+                "rate": 0,
+                "target": "trade"
+              }
+            },
+            "cs": 2812.5,
+            "domestic": 45,
+            "dwlCons": 0,
+            "dwlProd": 0,
+            "free": {
+              "Ex": 0,
+              "Im": 30,
+              "Pc": 45,
+              "Pp": 45,
+              "Pw": 45,
+              "Qd": 75,
+              "Qs": 45,
+              "alternatives": [],
+              "budget": 0,
+              "channels": {
+                "domestic": {
+                  "A": 1,
+                  "B": 0
+                },
+                "exports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "imports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "policy": {
+                  "form": "unit",
+                  "kind": "none",
+                  "rate": 0,
+                  "target": "trade"
+                }
+              },
+              "cs": 2812.5,
+              "domestic": 45,
+              "dwlCons": 0,
+              "dwlProd": 0,
+              "free": {
+                "Ex": 0,
+                "Im": 30,
+                "Pc": 45,
+                "Pp": 45,
+                "Qd": 75,
+                "Qs": 45,
+                "budget": 0,
+                "cs": 2812.5,
+                "dwlCons": 0,
+                "dwlProd": 0,
+                "ps": 1012.5,
+                "sw": 3825
+              },
+              "mode": "import",
+              "multiple": false,
+              "ps": 1012.5,
+              "rent": 0,
+              "sw": 3825
+            },
+            "loss": 0,
+            "mode": "import",
+            "multiple": false,
+            "ps": 1012.5,
+            "rent": 0,
+            "sw": 3825,
+            "welfareChange": 0
+          },
+          "B": {
+            "Ex": 30,
+            "Im": 0,
+            "Pc": 45,
+            "Pp": 45,
+            "Pw": 45,
+            "Qd": 15,
+            "Qs": 45,
+            "alternatives": [],
+            "budget": 0,
+            "channels": {
+              "domestic": {
+                "A": 1,
+                "B": 0
+              },
+              "exports": {
+                "A": 1,
+                "B": 0
+              },
+              "imports": {
+                "A": 1,
+                "B": 0
+              },
+              "policy": {
+                "form": "unit",
+                "kind": "none",
+                "rate": 0,
+                "target": "trade"
+              }
+            },
+            "cs": 112.5,
+            "domestic": 15,
+            "dwlCons": 0,
+            "dwlProd": 0,
+            "free": {
+              "Ex": 30,
+              "Im": 0,
+              "Pc": 45,
+              "Pp": 45,
+              "Pw": 45,
+              "Qd": 15,
+              "Qs": 45,
+              "alternatives": [],
+              "budget": 0,
+              "channels": {
+                "domestic": {
+                  "A": 1,
+                  "B": 0
+                },
+                "exports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "imports": {
+                  "A": 1,
+                  "B": 0
+                },
+                "policy": {
+                  "form": "unit",
+                  "kind": "none",
+                  "rate": 0,
+                  "target": "trade"
+                }
+              },
+              "cs": 112.5,
+              "domestic": 15,
+              "dwlCons": 0,
+              "dwlProd": 0,
+              "free": {
+                "Ex": 30,
+                "Im": 0,
+                "Pc": 45,
+                "Pp": 45,
+                "Qd": 15,
+                "Qs": 45,
+                "budget": 0,
+                "cs": 112.5,
+                "dwlCons": 0,
+                "dwlProd": 0,
+                "ps": 1012.5,
+                "sw": 1125
+              },
+              "mode": "export",
+              "multiple": false,
+              "ps": 1012.5,
+              "rent": 0,
+              "sw": 1125
+            },
+            "loss": 0,
+            "mode": "export",
+            "multiple": false,
+            "ps": 1012.5,
+            "rent": 0,
+            "sw": 1125,
+            "welfareChange": 0
+          }
+        },
+        "exporter": "B",
+        "importer": "A",
+        "multiple": false,
+        "noTrade": false,
+        "priceInterval": null,
+        "quotaRent": 0,
+        "shadowPw": 45,
+        "volume": 30,
+        "worldChange": 0,
+        "worldLoss": 0,
+        "worldSW": 4950
+      },
+      "budget": null,
+      "bundleOn": false,
+      "bundleX": null,
+      "bundleY": null,
+      "colorOverride": {},
+      "cons": null,
+      "consA": 0.5,
+      "consB": 0.5,
+      "consCustom": "x^0.5 * y^0.5",
+      "consErr": null,
+      "consFan": true,
+      "consI": 100,
+      "consK": 2,
+      "consPx": 1,
+      "consPx1": 4,
+      "consPy": 2,
+      "consSlutskyOn": false,
+      "consType": "cobb",
+      "costsATCx": "Q^2 - 6*Q + 15 + 18/Q",
+      "costsAVCx": "Q^2 - 6*Q + 15",
+      "costsCompiled": null,
+      "costsFCInfo": null,
+      "costsMCx": "3*Q^2 - 12*Q + 15",
+      "costsMode": "tc",
+      "costsReady": false,
+      "costsSub": "costs",
+      "costsTC": "Q^3 - 6*Q^2 + 15*Q + 18",
+      "costsWarn": null,
+      "crosses": [],
+      "crossesPanel": "big-A",
+      "cs": null,
+      "csTax": null,
+      "curves": [],
+      "d3D1": "100 - Q",
+      "d3D2": "80 - 2*Q",
+      "d3MC": "20",
+      "d3World": false,
+      "discr1": null,
+      "discr3": null,
+      "dwl": null,
+      "elast": null,
+      "elastQ": null,
+      "elastQS": null,
+      "elastS": null,
+      "eq": null,
+      "ext": null,
+      "extSign": "neg",
+      "firstQuad": true,
+      "graphTitle": "",
+      "gridDense": false,
+      "incBuyer": null,
+      "incSeller": null,
+      "ineqAlpha": 2,
+      "ineqFormula": "p^2",
+      "ineqGroupN": 5,
+      "ineqGroups": [
+        8,
+        12,
+        16,
+        24,
+        40
+      ],
+      "ineqIncomes": "10, 20, 30, 40, 100",
+      "ineqInput": "groups",
+      "ineqLorenz": null,
+      "ineqMasterBase": null,
+      "ineqMasterDetached": false,
+      "ineqMasterS": 1,
+      "ineqRedist": null,
+      "ineqRedistOn": false,
+      "ineqRedistTool": "tax",
+      "ineqShareN": 0,
+      "ineqShares": null,
+      "ineqSortNote": false,
+      "ineqStats": null,
+      "ineqTau": 0,
+      "ineqTransfer": 0,
+      "ineqVisited": false,
+      "ineqWarn": null,
+      "intervType": "tax",
+      "iso": null,
+      "isoC": 100,
+      "isoErr": null,
+      "isoExpr": "L^0.5 * K^0.5",
+      "isoFan": true,
+      "isoR": 2,
+      "isoW": 1,
+      "kiD1": "100 - Q",
+      "kiD2": "60 - Q",
+      "kiD3": "",
+      "kinkInput": "individual",
+      "kinkMC": "20",
+      "kinked": null,
+      "kpD1": "100 - Q",
+      "kpD2": "120 - 1.5*Q",
+      "labelSize": 14,
+      "laborBilateral": null,
+      "laborD": null,
+      "laborEq": null,
+      "laborMin": null,
+      "laborMinOn": false,
+      "laborMinW": 0,
+      "laborMono": null,
+      "laborS": null,
+      "laborStruct": "competition",
+      "laborUnion": null,
+      "laborVisited": false,
+      "legendSpot": 0,
+      "lr": null,
+      "lrArea": true,
+      "lrOn": true,
+      "lrPrice": 15,
+      "macro": {
+        "adas": {
+          "ad": "120 - 0.6*Y",
+          "lras": 100,
+          "sras": "10 + 0.5*Y"
+        },
+        "fx": {
+          "d": "100 - 2*e",
+          "fixed": 20,
+          "fixedOn": false,
+          "s": "20 + 3*e"
+        },
+        "islm": {
+          "is": "20 - 0.1*Y",
+          "lm": "0.05*Y - 5"
+        },
+        "laffer": {
+          "d": "100 - Q",
+          "s": "Q",
+          "tmax": 100
+        },
+        "loanable": {
+          "d": "150 - 3*r",
+          "dg": 0,
+          "s": "50 + 2*r"
+        },
+        "money": {
+          "md": "200 - 4*i",
+          "ms": 120
+        },
+        "phillips": {
+          "beta": 0.5,
+          "pe": 5,
+          "ustar": 5
+        }
+      },
+      "macroErr": null,
+      "macroModel": "adas",
+      "macroRes": null,
+      "markArm": false,
+      "market": "comp",
+      "marks": [],
+      "mathConsWantMax": true,
+      "mathConvex": true,
+      "mathDx": 1,
+      "mathFC": "x^0.5 * y^0.5",
+      "mathFormula": "x^2",
+      "mathG2": "4 - x",
+      "mathG3": "",
+      "mathG4": "",
+      "mathGC": "x + y = 10",
+      "mathGmore": [],
+      "mathInflect": true,
+      "mathMinMax": "min",
+      "mathRes": null,
+      "mathSecant": false,
+      "mathSub": "tangent",
+      "mathTrans": "up",
+      "mathX0": 1,
+      "mathXmax": 6,
+      "mathXmin": -6,
+      "mathYmax": 20,
+      "mathYmin": -4,
+      "mmCount": 2,
+      "mmName": "Z",
+      "mode": "market",
+      "mono": null,
+      "monoCeil": null,
+      "monoFloor": null,
+      "monoMode": "simple",
+      "monoQuota": null,
+      "monoTax": null,
+      "msbCompiled": null,
+      "msbExpr": "",
+      "msbOn": false,
+      "mscCompiled": null,
+      "mscExpr": "",
+      "mscOn": false,
+      "natFC": 800,
+      "natural": null,
+      "offEq": null,
+      "open": null,
+      "openPw": 30,
+      "openPwSet": false,
+      "openQuota": 20,
+      "openTariff": 10,
+      "openTool": "none",
+      "pReg": 0,
+      "pRegSet": false,
+      "panelWin": {},
+      "params": {},
+      "pc": null,
+      "pcActive": false,
+      "pcMode": false,
+      "pl1": "Q^2",
+      "pl2": "2*Q^2",
+      "plErr": null,
+      "plQ": 30,
+      "plView": "tc",
+      "plants": null,
+      "pointNames": {},
+      "ppf1": "100 - X",
+      "ppf2": "60 - 3*X",
+      "ppfCompiled": null,
+      "ppfFormula": "100 - X",
+      "ppfReady": false,
+      "ppfSub": "single",
+      "ppfSumColor": "",
+      "ppfSumColors": [],
+      "ppfSumCount": 2,
+      "ppfSumData": null,
+      "ppfSumKinks": null,
+      "ppfSumMore": [],
+      "ppfSumName": "Сумма",
+      "ppfSumNames": [],
+      "ppfSumView": "scale",
+      "ppfTradeData": null,
+      "ppfX": null,
+      "ppftFormula": "100 - X",
+      "ppftPrice": 2,
+      "prod": null,
+      "prodCompiled": null,
+      "prodExpr": "30*L^2 - L^3",
+      "ps": null,
+      "psTax": null,
+      "qt": null,
+      "quadSaved": null,
+      "quota": 0,
+      "quotaActive": false,
+      "quotaMode": false,
+      "quotaPos": 0.5,
+      "quotaSet": false,
+      "scenario": "none",
+      "sceneKey": "bigopen",
+      "shift": 0,
+      "showAFC": true,
+      "showAP": true,
+      "showATC": true,
+      "showAVC": true,
+      "showCS": true,
+      "showElastS": true,
+      "showFC": false,
+      "showGhost": false,
+      "showGrid": true,
+      "showLegend": true,
+      "showMC": true,
+      "showMP": true,
+      "showMonoCS": true,
+      "showMonoPS": true,
+      "showMonoVC": false,
+      "showNatLoss": true,
+      "showNatProfit": true,
+      "showOpenDwl": true,
+      "showOpenMoney": true,
+      "showPS": true,
+      "showTC": false,
+      "showTP": true,
+      "showVC": false,
+      "subKind": "unit",
+      "sw": null,
+      "tax": 0,
+      "taxActive": false,
+      "taxAfterD": null,
+      "taxAfterS": null,
+      "taxCurveOn": false,
+      "taxEq": null,
+      "taxForm": "unit",
+      "taxKind": "unit",
+      "taxNoBase": false,
+      "taxSide": "seller",
+      "tbF1": "100 - X",
+      "tbF2": "100 - 2*X",
+      "tbManualPrice": null,
+      "tbNames": [],
+      "titleColor": null,
+      "tradeBData": null,
+      "tradeScenario": "A",
+      "tx": null,
+      "unionModel": "monopoly",
+      "unionWage": 0,
+      "unionWageVisited": false,
+      "vertArm": false,
+      "viewDirty": false,
+      "xStep": null,
+      "yStep": null,
+      "zoomLock": false
+    },
+    "windows": {
+      "config": {
+        "Qmin": 0,
+        "Qmax": 100,
+        "Pmin": 0,
+        "Pmax": 100
+      },
+      "panels": {
+        "big-A": {
+          "x0": 0,
+          "x1": 150,
+          "y0": 0,
+          "y1": 100,
+          "px": [
+            256,
+            291
+          ]
+        },
+        "big-B": {
+          "x0": 0,
+          "x1": 80,
+          "y0": 0,
+          "y1": 100,
+          "px": [
+            256,
+            291
+          ]
+        }
+      }
+    },
+    "geometry": {
+      "paths": [
+        {
+          "panel": "big-A",
+          "filled": false,
+          "n": 2,
+          "pts": [
+            [
+              0,
+              45
+            ],
+            [
+              150,
+              45
+            ]
+          ]
+        },
+        {
+          "panel": "big-A",
+          "filled": false,
+          "n": 241,
+          "pts": [
+            [
+              0,
+              120
+            ],
+            [
+              10.00019531,
+              110
+            ],
+            [
+              19.99980469,
+              100
+            ],
+            [
+              30,
+              90
+            ],
+            [
+              40.00019531,
+              80
+            ],
+            [
+              49.99980469,
+              70
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              70.00019531,
+              50
+            ],
+            [
+              79.99980469,
+              40
+            ],
+            [
+              90,
+              30
+            ],
+            [
+              100.0001953,
+              20
+            ],
+            [
+              109.9998047,
+              10
+            ],
+            [
+              120,
+              0
+            ]
+          ]
+        },
+        {
+          "panel": "big-A",
+          "filled": false,
+          "n": 301,
+          "pts": [
+            [
+              0,
+              0
+            ],
+            [
+              10.00019531,
+              10
+            ],
+            [
+              19.99980469,
+              20
+            ],
+            [
+              30,
+              30
+            ],
+            [
+              40.00019531,
+              40
+            ],
+            [
+              49.99980469,
+              50
+            ],
+            [
+              60,
+              60
+            ],
+            [
+              70.00019531,
+              70
+            ],
+            [
+              79.99980469,
+              80
+            ],
+            [
+              90,
+              90
+            ],
+            [
+              100.0001953,
+              100
+            ],
+            [
+              109.9998047,
+              110
+            ],
+            [
+              120,
+              120
+            ],
+            [
+              130.0001953,
+              130
+            ],
+            [
+              139.9998047,
+              140
+            ],
+            [
+              150,
+              150
+            ]
+          ]
+        },
+        {
+          "panel": "big-A",
+          "filled": true,
+          "n": 322,
+          "pts": [
+            [
+              0,
+              120
+            ],
+            [
+              9.375,
+              110.6250859
+            ],
+            [
+              18.75,
+              101.2498282
+            ],
+            [
+              28.125,
+              91.87491409
+            ],
+            [
+              37.5,
+              82.5
+            ],
+            [
+              46.875,
+              73.12508591
+            ],
+            [
+              56.25,
+              63.74982818
+            ],
+            [
+              65.625,
+              54.37491409
+            ],
+            [
+              75,
+              45
+            ],
+            [
+              75,
+              45
+            ],
+            [
+              66.09375,
+              45
+            ],
+            [
+              56.71875,
+              45
+            ],
+            [
+              47.34375,
+              45
+            ],
+            [
+              37.96875,
+              45
+            ],
+            [
+              28.59375,
+              45
+            ],
+            [
+              19.21875,
+              45
+            ],
+            [
+              9.84375,
+              45
+            ],
+            [
+              0.46875,
+              45
+            ],
+            [
+              0,
+              45
+            ]
+          ]
+        },
+        {
+          "panel": "big-A",
+          "filled": true,
+          "n": 322,
+          "pts": [
+            [
+              0,
+              45
+            ],
+            [
+              5.625,
+              45
+            ],
+            [
+              11.25,
+              45
+            ],
+            [
+              16.875,
+              45
+            ],
+            [
+              22.5,
+              45
+            ],
+            [
+              28.125,
+              45
+            ],
+            [
+              33.75,
+              45
+            ],
+            [
+              39.375,
+              45
+            ],
+            [
+              45,
+              45
+            ],
+            [
+              45,
+              45
+            ],
+            [
+              39.65625,
+              39.65635739
+            ],
+            [
+              34.03125,
+              34.03127148
+            ],
+            [
+              28.40625,
+              28.40618557
+            ],
+            [
+              22.78125,
+              22.78109966
+            ],
+            [
+              17.15625,
+              17.15635739
+            ],
+            [
+              11.53125,
+              11.53127148
+            ],
+            [
+              5.90625,
+              5.906185567
+            ],
+            [
+              0.28125,
+              0.2810996564
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "panel": "big-B",
+          "filled": false,
+          "n": 2,
+          "pts": [
+            [
+              0,
+              45
+            ],
+            [
+              80,
+              45
+            ]
+          ]
+        },
+        {
+          "panel": "big-B",
+          "filled": false,
+          "n": 226,
+          "pts": [
+            [
+              0,
+              60
+            ],
+            [
+              5.3334375,
+              54.66666667
+            ],
+            [
+              10.6665625,
+              49.33333333
+            ],
+            [
+              16,
+              44
+            ],
+            [
+              21.3334375,
+              38.66666667
+            ],
+            [
+              26.6665625,
+              33.33333333
+            ],
+            [
+              32,
+              28
+            ],
+            [
+              37.3334375,
+              22.66666667
+            ],
+            [
+              42.6665625,
+              17.33333333
+            ],
+            [
+              48,
+              12
+            ],
+            [
+              53.3334375,
+              6.666666667
+            ],
+            [
+              58.6665625,
+              1.333333333
+            ],
+            [
+              60,
+              0
+            ]
+          ]
+        },
+        {
+          "panel": "big-B",
+          "filled": false,
+          "n": 301,
+          "pts": [
+            [
+              0,
+              0
+            ],
+            [
+              5.3334375,
+              5.333333333
+            ],
+            [
+              10.6665625,
+              10.66666667
+            ],
+            [
+              16,
+              16
+            ],
+            [
+              21.3334375,
+              21.33333333
+            ],
+            [
+              26.6665625,
+              26.66666667
+            ],
+            [
+              32,
+              32
+            ],
+            [
+              37.3334375,
+              37.33333333
+            ],
+            [
+              42.6665625,
+              42.66666667
+            ],
+            [
+              48,
+              48
+            ],
+            [
+              53.3334375,
+              53.33333333
+            ],
+            [
+              58.6665625,
+              58.66666667
+            ],
+            [
+              64,
+              64
+            ],
+            [
+              69.3334375,
+              69.33333333
+            ],
+            [
+              74.6665625,
+              74.66666667
+            ],
+            [
+              80,
+              80
+            ]
+          ]
+        },
+        {
+          "panel": "big-B",
+          "filled": true,
+          "n": 322,
+          "pts": [
+            [
+              0,
+              45
+            ],
+            [
+              5.625,
+              45
+            ],
+            [
+              11.25,
+              45
+            ],
+            [
+              16.875,
+              45
+            ],
+            [
+              22.5,
+              45
+            ],
+            [
+              28.125,
+              45
+            ],
+            [
+              33.75,
+              45
+            ],
+            [
+              39.375,
+              45
+            ],
+            [
+              45,
+              45
+            ],
+            [
+              45,
+              45
+            ],
+            [
+              39.65625,
+              39.65635739
+            ],
+            [
+              34.03125,
+              34.03127148
+            ],
+            [
+              28.40625,
+              28.40618557
+            ],
+            [
+              22.78125,
+              22.78109966
+            ],
+            [
+              17.15625,
+              17.15635739
+            ],
+            [
+              11.53125,
+              11.53127148
+            ],
+            [
+              5.90625,
+              5.906185567
+            ],
+            [
+              0.28125,
+              0.2810996564
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "panel": "big-B",
+          "filled": true,
+          "n": 322,
+          "pts": [
+            [
+              0,
+              60
+            ],
+            [
+              1.875,
+              58.12508591
+            ],
+            [
+              3.75,
+              56.24982818
+            ],
+            [
+              5.625,
+              54.37491409
+            ],
+            [
+              7.5,
+              52.5
+            ],
+            [
+              9.375,
+              50.62508591
+            ],
+            [
+              11.25,
+              48.75017182
+            ],
+            [
+              13.125,
+              46.87491409
+            ],
+            [
+              15,
+              45
+            ],
+            [
+              15,
+              45
+            ],
+            [
+              13.21875,
+              45
+            ],
+            [
+              11.34375,
+              45
+            ],
+            [
+              9.46875,
+              45
+            ],
+            [
+              7.59375,
+              45
+            ],
+            [
+              5.71875,
+              45
+            ],
+            [
+              3.84375,
+              45
+            ],
+            [
+              1.96875,
+              45
+            ],
+            [
+              0.09375,
+              45
+            ],
+            [
+              0,
+              45
+            ]
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "panel": "big-A",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            0,
+            100
+          ]
+        },
+        {
+          "panel": "big-A",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            150,
+            0
+          ]
+        },
+        {
+          "panel": "big-A",
+          "a": [
+            160.546875,
+            104.1237113
+          ],
+          "b": [
+            160.546875,
+            -4.12371134
+          ]
+        },
+        {
+          "panel": "big-A",
+          "a": [
+            45,
+            45
+          ],
+          "b": [
+            45,
+            0
+          ]
+        },
+        {
+          "panel": "big-A",
+          "a": [
+            45,
+            45
+          ],
+          "b": [
+            75,
+            45
+          ]
+        },
+        {
+          "panel": "big-A",
+          "a": [
+            75,
+            45
+          ],
+          "b": [
+            75,
+            0
+          ]
+        },
+        {
+          "panel": "big-B",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            0,
+            100
+          ]
+        },
+        {
+          "panel": "big-B",
+          "a": [
+            0,
+            0
+          ],
+          "b": [
+            80,
+            0
+          ]
+        },
+        {
+          "panel": "big-B",
+          "a": [
+            15,
+            45
+          ],
+          "b": [
+            15,
+            0
+          ]
+        },
+        {
+          "panel": "big-B",
+          "a": [
+            15,
+            45
+          ],
+          "b": [
+            45,
+            45
+          ]
+        },
+        {
+          "panel": "big-B",
+          "a": [
+            45,
+            45
+          ],
+          "b": [
+            45,
+            0
+          ]
+        }
+      ],
+      "rects": [],
+      "dots": [
+        {
+          "panel": "big-A",
+          "c": [
+            45,
+            45
+          ],
+          "r": 4
+        },
+        {
+          "panel": "big-A",
+          "c": [
+            75,
+            45
+          ],
+          "r": 4
+        },
+        {
+          "panel": "big-B",
+          "c": [
+            15,
+            45
+          ],
+          "r": 4
+        },
+        {
+          "panel": "big-B",
+          "c": [
+            45,
+            45
+          ],
+          "r": 4
+        }
+      ],
+      "keyPoints": {
+        "big-A": [
+          [
+            0,
+            0,
+            "cross"
+          ],
+          [
+            0,
+            45,
+            "drawn"
+          ],
+          [
+            45,
+            0,
+            "drawn"
+          ],
+          [
+            45,
+            45,
+            "drawn"
+          ],
+          [
+            75,
+            0,
+            "drawn"
+          ],
+          [
+            75,
+            45,
+            "drawn"
+          ]
+        ],
+        "big-B": [
+          [
+            0,
+            0,
+            "cross"
+          ],
+          [
+            0,
+            45,
+            "drawn"
+          ],
+          [
+            15,
+            0,
+            "drawn"
+          ],
+          [
+            15,
+            45,
+            "drawn"
+          ],
+          [
+            45,
+            0,
+            "drawn"
+          ],
+          [
+            45,
+            45,
+            "drawn"
+          ]
+        ]
+      }
+    },
+    "controls": [
+      {
+        "key": "#scene-back",
+        "kind": "button",
+        "label": "Ко всем моделям",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#model-switch",
+        "kind": "button",
+        "label": "Сменить модель, не теряя этой",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-undo",
+        "kind": "button",
+        "label": "Отменить (Ctrl+Z)",
+        "section": "",
+        "props": {
+          "disabled": true
+        }
+      },
+      {
+        "key": "#btn-redo",
+        "kind": "button",
+        "label": "Повторить (Ctrl+Shift+Z)",
+        "section": "",
+        "props": {
+          "disabled": true
+        }
+      },
+      {
+        "key": "#btn-self",
+        "kind": "button",
+        "label": "Спрятать числа ответа и проверить себя",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#btn-model-reset",
+        "kind": "button",
+        "label": "Вернуть стартовые функции и параметры",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#dock-export",
+        "kind": "button",
+        "label": "Скачать график",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-share",
+        "kind": "button",
+        "label": "Ссылка на это состояние модели",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "mf:#big-A-D",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-bigtrade",
+        "props": {
+          "value": "Q = 120 - P"
+        }
+      },
+      {
+        "key": "#fh-auto-big-A-D",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "mf:#big-A-S",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-bigtrade",
+        "props": {
+          "value": "Q = P"
+        }
+      },
+      {
+        "key": "#fh-auto-big-A-S",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn",
+        "kind": "button",
+        "label": "Свободная",
+        "section": "#sec-bigtrade",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Запрет ввоза",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[2]",
+        "kind": "button",
+        "label": "Запрет вывоза",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[3]",
+        "kind": "button",
+        "label": "Нет",
+        "section": "#sec-bigtrade",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[4]",
+        "kind": "button",
+        "label": "Налог",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[5]",
+        "kind": "button",
+        "label": "Субсидия",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigA-policy-controls>button.seg-btn[6]",
+        "kind": "button",
+        "label": "Квота",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "mf:#big-B-D",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-bigtrade",
+        "props": {
+          "value": "Q = 60 - P"
+        }
+      },
+      {
+        "key": "#fh-auto-big-B-D",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "mf:#big-B-S",
+        "kind": "math-field",
+        "label": "Формула",
+        "section": "#sec-bigtrade",
+        "props": {
+          "value": "Q = P"
+        }
+      },
+      {
+        "key": "#fh-auto-big-B-S",
+        "kind": "button",
+        "label": "Клавиатура и примеры формул",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn",
+        "kind": "button",
+        "label": "Свободная",
+        "section": "#sec-bigtrade",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Запрет ввоза",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[2]",
+        "kind": "button",
+        "label": "Запрет вывоза",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[3]",
+        "kind": "button",
+        "label": "Нет",
+        "section": "#sec-bigtrade",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[4]",
+        "kind": "button",
+        "label": "Налог",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[5]",
+        "kind": "button",
+        "label": "Субсидия",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#bigB-policy-controls>button.seg-btn[6]",
+        "kind": "button",
+        "label": "Квота",
+        "section": "#sec-bigtrade",
+        "props": {}
+      },
+      {
+        "key": "#tool-cursor",
+        "kind": "button",
+        "label": "Тянуть ручки и двигать график",
+        "section": "",
+        "props": {
+          "pressed": "true"
+        }
+      },
+      {
+        "key": "#tool-pts",
+        "kind": "button",
+        "label": "Ставить свои точки и считать площади",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#btn-zoomout",
+        "kind": "button",
+        "label": "Отдалить (клавиша «−»)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-zoomin",
+        "kind": "button",
+        "label": "Приблизить (клавиша «+»)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-resetview",
+        "kind": "button",
+        "label": "Вернуться к изначальному масштабу (или двойной клик)",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-view",
+        "kind": "button",
+        "label": "Вид графика: оси, сетка, подписи, заголовок",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#btn-focus",
+        "kind": "button",
+        "label": "Развернуть график",
+        "section": "",
+        "props": {
+          "pressed": "false"
+        }
+      },
+      {
+        "key": "#bigtrade-view>button.seg-btn",
+        "kind": "button",
+        "label": "Мировой рынок",
+        "section": "",
+        "props": {}
+      },
+      {
+        "key": "#bigtrade-view>button.seg-btn[1]",
+        "kind": "button",
+        "label": "Две страны",
+        "section": "",
+        "props": {
+          "active": true
+        }
+      },
+      {
+        "key": "#ans-hide",
+        "kind": "button",
+        "label": "Спрятать «Ответ»",
+        "section": "#params-panel",
+        "props": {}
+      },
+      {
+        "key": "#ex-bar",
+        "kind": "button",
+        "label": "Разбор",
+        "section": "#explain",
+        "props": {}
+      }
+    ],
+    "popups": [],
+    "answer": {
+      "blocks": [
+        {
+          "id": "info-bigtrade",
+          "rows": [
+            {
+              "i": 0,
+              "label": "Мировая цена Pw​",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 1,
+              "label": "Объём торговли",
+              "value": "30",
+              "raw": null
+            },
+            {
+              "i": 2,
+              "label": "Цена потребителей Pc​",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 3,
+              "label": "Цена производителей Pp",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 4,
+              "label": "Потребление Qd​",
+              "value": "75",
+              "raw": null
+            },
+            {
+              "i": 5,
+              "label": "Выпуск Qs​",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 6,
+              "label": "Импорт",
+              "value": "30",
+              "raw": null
+            },
+            {
+              "i": 7,
+              "label": "Излишек потребителей CS",
+              "value": "2 812,5",
+              "raw": null
+            },
+            {
+              "i": 8,
+              "label": "Излишек производителей PS",
+              "value": "1 012,5",
+              "raw": null
+            },
+            {
+              "i": 9,
+              "label": "Доход бюджета",
+              "value": "0",
+              "raw": null
+            },
+            {
+              "i": 10,
+              "label": "Благосостояние SW",
+              "value": "3 825",
+              "raw": null
+            },
+            {
+              "i": 11,
+              "label": "Изменение благосостояния",
+              "value": "0",
+              "raw": null
+            },
+            {
+              "i": 12,
+              "label": "Цена потребителей Pc​",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 13,
+              "label": "Цена производителей Pp",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 14,
+              "label": "Потребление Qd​",
+              "value": "15",
+              "raw": null
+            },
+            {
+              "i": 15,
+              "label": "Выпуск Qs​",
+              "value": "45",
+              "raw": null
+            },
+            {
+              "i": 16,
+              "label": "Экспорт",
+              "value": "30",
+              "raw": null
+            },
+            {
+              "i": 17,
+              "label": "Излишек потребителей CS",
+              "value": "112,5",
+              "raw": null
+            },
+            {
+              "i": 18,
+              "label": "Излишек производителей PS",
+              "value": "1 012,5",
+              "raw": null
+            },
+            {
+              "i": 19,
+              "label": "Доход бюджета",
+              "value": "0",
+              "raw": null
+            },
+            {
+              "i": 20,
+              "label": "Благосостояние SW",
+              "value": "1 125",
+              "raw": null
+            },
+            {
+              "i": 21,
+              "label": "Изменение благосостояния",
+              "value": "0",
+              "raw": null
+            },
+            {
+              "i": 22,
+              "label": "Потери мира",
+              "value": "0",
+              "raw": null
+            }
+          ],
+          "tables": [],
+          "notes": [],
+          "warns": [],
+          "final": []
+        }
+      ],
+      "title": "",
+      "explain": [
+        "Мировая цена уравнивает импорт одной страны с экспортом другой. При свободной торговле страна с более высокой ценой автаркии ввозит товар.",
+        "Пошлина крупной страны меняет и её внутреннюю, и мировую цену. Выигрыш страны от условий торговли может превышать её потери, но мир в целом теряет. Вмешательства обеих стран учитываются одновременно.",
+        "Благосостояние страны — CS + PS + бюджет. Квотная рента показана отдельно, поскольку получатель зависит от лицензий. В итог мира она входит. При прекращении торговли единой мировой цены может не быть; при двух квотах возможен целый диапазон цен."
+      ],
+      "tips": [
+        "Вернуть стартовые функции и параметры",
+        "Вернуться к изначальному масштабу (или двойной клик)",
+        "Вид графика: оси, сетка, подписи, заголовок",
+        "Клавиатура и примеры формул",
+        "Ко всем моделям",
+        "Отдалить (клавиша «−»)",
+        "Отменить (Ctrl+Z)",
+        "Повторить (Ctrl+Shift+Z)",
+        "Приблизить (клавиша «+»)",
+        "Развернуть график",
+        "Скачать график",
+        "Сменить модель, не теряя этой",
+        "Состояние хранится в ссылке и в этом браузере, сохранять вручную ничего не нужно",
+        "Спрятать числа ответа и проверить себя",
+        "Ссылка на это состояние модели",
+        "Ставить свои точки и считать площади",
+        "Тянуть ручки и двигать график"
+      ]
+    },
+    "chartSize": [
+      680,
+      397
+    ]
+  },
+  "controls": [
+    {
+      "key": "#scene-back",
+      "kind": "button",
+      "label": "Ко всем моделям",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#model-switch",
+      "kind": "button",
+      "label": "Сменить модель, не теряя этой",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-undo",
+      "kind": "button",
+      "label": "Отменить (Ctrl+Z)",
+      "section": "",
+      "props": {
+        "disabled": true
+      }
+    },
+    {
+      "key": "#btn-redo",
+      "kind": "button",
+      "label": "Повторить (Ctrl+Shift+Z)",
+      "section": "",
+      "props": {
+        "disabled": true
+      }
+    },
+    {
+      "key": "#btn-self",
+      "kind": "button",
+      "label": "Спрятать числа ответа и проверить себя",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#btn-model-reset",
+      "kind": "button",
+      "label": "Вернуть стартовые функции и параметры",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#dock-export",
+      "kind": "button",
+      "label": "Скачать график",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-share",
+      "kind": "button",
+      "label": "Ссылка на это состояние модели",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "mf:#big-A-D",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-bigtrade",
+      "props": {
+        "value": "Q = 120 - P"
+      }
+    },
+    {
+      "key": "#fh-auto-big-A-D",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "mf:#big-A-S",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-bigtrade",
+      "props": {
+        "value": "Q = P"
+      }
+    },
+    {
+      "key": "#fh-auto-big-A-S",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn",
+      "kind": "button",
+      "label": "Свободная",
+      "section": "#sec-bigtrade",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Запрет ввоза",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[2]",
+      "kind": "button",
+      "label": "Запрет вывоза",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[3]",
+      "kind": "button",
+      "label": "Нет",
+      "section": "#sec-bigtrade",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[4]",
+      "kind": "button",
+      "label": "Налог",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[5]",
+      "kind": "button",
+      "label": "Субсидия",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigA-policy-controls>button.seg-btn[6]",
+      "kind": "button",
+      "label": "Квота",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "mf:#big-B-D",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-bigtrade",
+      "props": {
+        "value": "Q = 60 - P"
+      }
+    },
+    {
+      "key": "#fh-auto-big-B-D",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "mf:#big-B-S",
+      "kind": "math-field",
+      "label": "Формула",
+      "section": "#sec-bigtrade",
+      "props": {
+        "value": "Q = P"
+      }
+    },
+    {
+      "key": "#fh-auto-big-B-S",
+      "kind": "button",
+      "label": "Клавиатура и примеры формул",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn",
+      "kind": "button",
+      "label": "Свободная",
+      "section": "#sec-bigtrade",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Запрет ввоза",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[2]",
+      "kind": "button",
+      "label": "Запрет вывоза",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[3]",
+      "kind": "button",
+      "label": "Нет",
+      "section": "#sec-bigtrade",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[4]",
+      "kind": "button",
+      "label": "Налог",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[5]",
+      "kind": "button",
+      "label": "Субсидия",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#bigB-policy-controls>button.seg-btn[6]",
+      "kind": "button",
+      "label": "Квота",
+      "section": "#sec-bigtrade",
+      "props": {}
+    },
+    {
+      "key": "#tool-cursor",
+      "kind": "button",
+      "label": "Тянуть ручки и двигать график",
+      "section": "",
+      "props": {
+        "pressed": "true"
+      }
+    },
+    {
+      "key": "#tool-pts",
+      "kind": "button",
+      "label": "Ставить свои точки и считать площади",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#btn-zoomout",
+      "kind": "button",
+      "label": "Отдалить (клавиша «−»)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-zoomin",
+      "kind": "button",
+      "label": "Приблизить (клавиша «+»)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-resetview",
+      "kind": "button",
+      "label": "Вернуться к изначальному масштабу (или двойной клик)",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-view",
+      "kind": "button",
+      "label": "Вид графика: оси, сетка, подписи, заголовок",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#btn-focus",
+      "kind": "button",
+      "label": "Развернуть график",
+      "section": "",
+      "props": {
+        "pressed": "false"
+      }
+    },
+    {
+      "key": "#bigtrade-view>button.seg-btn",
+      "kind": "button",
+      "label": "Мировой рынок",
+      "section": "",
+      "props": {}
+    },
+    {
+      "key": "#bigtrade-view>button.seg-btn[1]",
+      "kind": "button",
+      "label": "Две страны",
+      "section": "",
+      "props": {
+        "active": true
+      }
+    },
+    {
+      "key": "#ans-hide",
+      "kind": "button",
+      "label": "Спрятать «Ответ»",
+      "section": "#params-panel",
+      "props": {}
+    },
+    {
+      "key": "#ex-bar",
+      "kind": "button",
+      "label": "Разбор",
+      "section": "#explain",
+      "props": {}
+    }
+  ],
+  "steps": [
+    {
+      "path": [
+        "mf:#big-A-D"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    },
+    {
+      "path": [
+        "mf:#big-A-S"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    },
+    {
+      "path": [
+        "mf:#big-B-D"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    },
+    {
+      "path": [
+        "mf:#big-B-S"
+      ],
+      "kind": "math-field",
+      "effect": "model"
+    }
+  ],
+  "errors": []
+}

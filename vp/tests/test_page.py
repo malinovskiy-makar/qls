@@ -65,7 +65,7 @@ class LayoutTests(PageBase):
         self.assertIn('Задания 1–30 · Змейка', html)
         self.assertIn('>по 2 балла<', html)
         self.assertIn('Задания 31–35 · Пропущенные слова', html)
-        self.assertIn('Задания 36–40 · Все верные утверждения', html)
+        self.assertIn('Задания 36–40 · Выбор утверждений', html)
         self.assertIn('>по 3 балла · за лишние варианты балл уменьшается<', html)
         self.assertIn('Задания 43–44 · Расчётные, один ответ', html)
         self.assertIn('>от 4 до 5 баллов<', html)         # 43 и 44 стоят по-разному

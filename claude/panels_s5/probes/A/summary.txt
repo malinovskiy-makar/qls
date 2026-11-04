@@ -1,0 +1,50 @@
+### calc2/tests/redesign/view_probe.mjs  код 1  590с
+  FAIL [chromium] строк «На графике» проверено 72 {"chk":66,"color":1,"name":2,"eye":2,"tgl":1}: один щелчок — один шаг; одно «Отменить» возвращает состояние, картинку и орган; «Повторить» — обратно  — 4: m-optimum «Выпуклость и вогнутость» (chk): одно «Отменить» не вернуло состояние (mm-f0 {"d":"","v":"x^2"} → {"d":"","v":"x^3 - 3*x"}) | m-optimum «Выпуклость и вогнутость» (chk): «Повторить» не вернула правку | m-optimum «Точки перегиба» (chk): одно «Отменить» не вернуло состояние (mm-f0 {"d":"","v":"x^2"} → {"d":"","v":"x^3 - 3*x"}) | m-optimum «Точки перегиба» (chk): «Повторить» не вернула правку
+ИТОГ view_probe: 17 из 18, провалов 1
+
+### calc2/tests/redesign/answer_panel_probe.mjs  код 0  701с
+ИТОГ answer_panel_probe: 101 из 101, всё сошлось
+
+### calc2/tests/redesign/quiet_probe.mjs  код 0  193с
+ИТОГ quiet_probe: 21 из 21, всё сошлось
+
+### calc2/tests/redesign/state_probe.mjs  код 0  126с
+сошлось 44 из 44
+
+### calc2/tests/redesign/session_probe.mjs  код 0  265с
+проверок не прошло: 0
+
+### calc2/tests/redesign/parity_quick.mjs  код 0  24с
+ПАРИТЕТ ЦЕЛ (1440×760): ключей 44, проверок 1945, расхождений 0, 24.3 с
+
+### calc2/tests/redesign/answer_probe.mjs  код 0  34с
+ВСЁ СОШЛОСЬ: 44 моделей
+
+### calc2/tests/redesign/answer_rows_probe.mjs  код 0  357с
+  OK   паритет главных значений и «было · Δ» с эталоном (фаза −1) — 0 расхождений
+ВСЁ СОШЛОСЬ: 123 проверок
+
+### calc2/tests/control_numbers.mjs  код 0  28с
+ВСЕ 516 КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ
+
+### calc2/tests/calc2_math.mjs  код 0  103с
+✓ Итоговая функция · первым блоком в «Ключевых значениях», не в разборе
+=== calc2 регрессия: 240 прошло, 0 провалено (всего 239: 226 случаев + 13 жестов) ===
+
+### calc2/tests/redesign/layout_probe.mjs  код 0  18с
+РАСКЛАДКА В НОРМЕ
+
+### calc2/tests/tex/ci_quick.mjs  код 0  34с
+ВЫГРУЗКА .tex ЦЕЛА | стартов 44, двух окон 5, превью сверено 42, 33.4 с
+
+### scripts/calc2_nodrag_probe.js  код 0  141с
+сдвинутых кривых: 0
+
+### calc2/tests/check_font_scale.mjs  код 0  0с
+
+### calc2/tests/canon_checks.mjs  код 0  24с
+label_shake: наибольший скачок подписи относительно кривой 52.79 px за шаг
+x label_shake: 1 — m-graph · скачок 52.8 px за шаг относительно кривой при сдвиге плоскости 0.0 px
+{"dark_white_on_accent":{"n":0,"ex":[]},"contrast_text":{"n":0,"ex":[]},"appearance_auto":{"n":0,"ex":[]},"one_main_button":{"n":0,"ex":[]},"disabled_button_explained":{"n":0,"ex":[]},"tabular_nums":{"n":0,"ex":[]},"title_on_interactive":{"n":0,"ex":[]},"no_h_scroll":{"n":0,"ex":[]},"type_scale":{"n":0,"ex":[]},"radius_scale":{"n":0,"ex":[]},"state_plate_tint":{"n":0,"ex":[]},"two_stripes":{"n":0,"ex":[]},"math_line_height":{"n":0,"ex":[]},"shadow_only_pop":{"n":0,"ex":[]},"knum_44":{"n":0,"ex":[]},"accent_fill_count":{"n":0,"ex":[]},"dark_light_widget":{"n":0,"ex":[]},"raw_template":{"n":0,"ex":[]},"label_clipped":{"n":0,"ex":[]},"label_shake":{"n":1,"ex":["m-graph · скачок 52.8 px за шаг относительно кривой при сдвиге плоскости 0.0 px"]},"answer_closed":{"n":0,"ex":[]}}
+
+ГОТОВО

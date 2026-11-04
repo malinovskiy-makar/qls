@@ -4,7 +4,12 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 
+from vp.formatting import inline_text
+from vp.presentation import variant_title
+
 register = template.Library()
+register.filter('vp_inline', inline_text)
+register.filter('variant_title', variant_title)
 
 _MINUS = '−'  # настоящий минус, а не дефис: рядом с цифрами не «прыгает»
 
@@ -152,7 +157,7 @@ def grade_label(value):
 def with_band(variant):
     """Название варианта с классом: «Тестовый вариант · 9–10 классы». Если подпись
     класса уже есть в названии («Демоверсия 2 тура – 10 класс»), класс не повторяется."""
-    title, label = variant.title, grade_label(variant.grade_band)
+    title, label = variant_title(variant), grade_label(variant.grade_band)
     return title if label.lower() in title.lower() else f'{title} · {label}'
 
 

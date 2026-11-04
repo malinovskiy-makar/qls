@@ -1,0 +1,49 @@
+### calc2/tests/redesign/view_probe.mjs  код 0  192с
+ИТОГ view_probe: 13 из 13, всё сошлось
+
+### calc2/tests/redesign/answer_panel_probe.mjs  код 0  611с
+ИТОГ answer_panel_probe: 86 из 86, всё сошлось
+
+### calc2/tests/redesign/quiet_probe.mjs  код 0  163с
+ИТОГ quiet_probe: 19 из 19, всё сошлось
+
+### calc2/tests/redesign/state_probe.mjs  код 0  129с
+сошлось 44 из 44
+
+### calc2/tests/redesign/session_probe.mjs  код 0  263с
+проверок не прошло: 0
+
+### calc2/tests/redesign/parity_quick.mjs  код 0  25с
+ПАРИТЕТ ЦЕЛ (1440×760): ключей 44, проверок 1945, расхождений 0, 24.0 с
+
+### calc2/tests/redesign/answer_probe.mjs  код 0  33с
+ВСЁ СОШЛОСЬ: 44 моделей
+
+### calc2/tests/redesign/answer_rows_probe.mjs  код 0  356с
+  OK   паритет главных значений и «было · Δ» с эталоном (фаза −1) — 0 расхождений
+ВСЁ СОШЛОСЬ: 123 проверок
+
+### calc2/tests/control_numbers.mjs  код 0  29с
+ВСЕ 516 КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ
+
+### calc2/tests/calc2_math.mjs  код 0  105с
+✓ Итоговая функция · первым блоком в «Ключевых значениях», не в разборе
+=== calc2 регрессия: 240 прошло, 0 провалено (всего 239: 226 случаев + 13 жестов) ===
+
+### calc2/tests/redesign/layout_probe.mjs  код 0  18с
+РАСКЛАДКА В НОРМЕ
+
+### calc2/tests/tex/ci_quick.mjs  код 0  34с
+ВЫГРУЗКА .tex ЦЕЛА | стартов 44, двух окон 5, превью сверено 42, 33.8 с
+
+### scripts/calc2_nodrag_probe.js  код 0  142с
+сдвинутых кривых: 0
+
+### calc2/tests/check_font_scale.mjs  код 0  0с
+
+### calc2/tests/canon_checks.mjs  код 0  24с
+label_shake: наибольший скачок подписи относительно кривой 52.79 px за шаг
+x label_shake: 1 — m-graph · скачок 52.8 px за шаг относительно кривой при сдвиге плоскости 0.0 px
+{"dark_white_on_accent":{"n":0,"ex":[]},"contrast_text":{"n":0,"ex":[]},"appearance_auto":{"n":0,"ex":[]},"one_main_button":{"n":0,"ex":[]},"disabled_button_explained":{"n":0,"ex":[]},"tabular_nums":{"n":0,"ex":[]},"title_on_interactive":{"n":0,"ex":[]},"no_h_scroll":{"n":0,"ex":[]},"type_scale":{"n":0,"ex":[]},"radius_scale":{"n":0,"ex":[]},"state_plate_tint":{"n":0,"ex":[]},"two_stripes":{"n":0,"ex":[]},"math_line_height":{"n":0,"ex":[]},"shadow_only_pop":{"n":0,"ex":[]},"knum_44":{"n":0,"ex":[]},"accent_fill_count":{"n":0,"ex":[]},"dark_light_widget":{"n":0,"ex":[]},"raw_template":{"n":0,"ex":[]},"label_clipped":{"n":0,"ex":[]},"label_shake":{"n":1,"ex":["m-graph · скачок 52.8 px за шаг относительно кривой при сдвиге плоскости 0.0 px"]},"answer_closed":{"n":0,"ex":[]}}
+
+ГОТОВО

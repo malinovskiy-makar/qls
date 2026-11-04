@@ -55,7 +55,7 @@ class ResultPageTests(TestCase):
         self.assertNotIn('Общее условие (задача', html.split('id="z17"', 1)[1].split('id="z18"', 1)[0])
         self.assertIn('Задачи 17–18 · общее условие', html)
         self.assertIn('Тренажёр ВП</a>', html)                          # хлебные крошки
-        self.assertIn('первая попытка – в таблице', html)
+        self.assertIn('первая попытка – в лидерборде', html)
         self.assertIn('1-е</b> место', html)
 
     def test_stranger_gets_neither_plaque_nor_table(self):

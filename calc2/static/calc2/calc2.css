@@ -175,7 +175,7 @@
      Холст не тронут: он остаётся своим у калькулятора, под него
      откалиброваны цвета кривых. */
   --bg:          #1d1a16;
-  --input-bg:    #11151d;
+  --input-bg:    #232019;   /* = --surface-2 тёмной темы (тихие панели 14.10, README 3): прежний синий убран */
   --pick: rgba(var(--accent-rgb), .40);
   --shadow-float: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
   /* ⚠️ ЕДИНСТВЕННОЕ ОТЛИЧИЕ ОТ КАНОННОЙ ТЕНИ, И ОНО ИЗМЕРЕНО.
@@ -651,7 +651,7 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Пояснение «как это устроено» прячется под вопросик рядом с полем ввода:
    посреди панели такой абзац отвлекает, а нужен он один раз. */
-.hint-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }
+.hint-row, .lab-row { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; }   /* .lab-row — подпись поля с бывшей «?» (окно «Скачать», 14.10) */
 .hint-btn {
   flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
   border: 1px solid var(--border); border-radius: var(--r-pill);
@@ -1134,13 +1134,13 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Табло результатов (равновесие, площади, налог) */
 .stat { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
-.stat span { color: var(--text2); }
+.stat > span { color: var(--text2); }   /* только подпись: внутренние узлы KaTeX значения не красим (ADR 0144) */
 .stat b { font-variant-numeric: tabular-nums; color: var(--text); }
 /* В табло результатов число — главное, что человек ищет глазами, поэтому оно
    крупнее и тяжелее подписи. В «Инструментах» те же .stat остаются мелкими:
    там они справочные, а не отсчёт прибора. */
 .sb-body .stat { padding: 5px 0; }
-.sb-body .stat span { font-size: 12px; font-weight: 600; }
+.sb-body .stat > span { font-size: 12px; font-weight: 600; }
 .sb-body .stat b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
 .warn { font-size: 12px; color: var(--c-warn); line-height: 1.4; }
 
@@ -1419,7 +1419,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 }
 .graph-wrap input, .graph-wrap textarea, .graph-wrap select { user-select: text; -webkit-user-select: text; }
 #chart { display: block; width: 100%; height: 100%; }
+/* Общая reduced-motion длительность .01ms иначе оживляет у SVG стандартное
+   transition-property:all. Замер видит старые 12px, затем текст растёт до 14px
+   и ломает рассчитанные зазоры. Движением подписей управляет JS, не CSS. */
 #chart text { user-select: none; -webkit-user-select: none; }
+#chart text, #chart tspan, #chart [data-rename-hit] { transition-property: none !important; }
 
 /* ── Левый док: постоянная полоса иконок ── */
 /* Полоса иконок лежит ВЫШЕ боковых панелей: её подсказки вылетают вправо и
@@ -1582,7 +1586,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sb-body .section:last-child { margin-bottom: 0; }
 .sb-body .section-title { margin-top: 8px; }
 .sb-body .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
-.sb-body .stat span { font-size: 12px; }
+.sb-body .stat > span { font-size: 12px; }
 .sb-body .stat b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .sb-empty { font-size: 13px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
 /* Пустое состояние по канону 3.13: заголовок 13/600, текст 13/400, по центру.
@@ -1744,6 +1748,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .ac-range { display: block; margin-top: 6px; font-size: 12px; color: var(--text2);
   font-variant-numeric: tabular-nums; line-height: 1.5; }
 .ac-range:empty { display: none; }
+/* Числа отрезка — вплотную к скобкам и «;»: запасная ширина .edval давала «[0 ;100]». */
+.ac-range .edval { min-width: 0; }
 /* Кнопка расчёта не горит, пока считать нечего. */
 #ac-calc:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -2026,7 +2032,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
      находят проверки: свой тег и общие имена шапки платформы. */
   nav, header, .site-header, #site-nav,
   .dock, .side, .graph-tools, .wrench, .picker, .modal, .toast,
-  #pult, .cv-mode, .side-arrow, .kbd, .mkbd { display: none !important; }
+  #pult, .cv-mode, .side-arrow, .kbd, .mkbd,
+  /* Редизайн 10.2026: шапка модели, панель холста и колонки на лист не идут. */
+  .mhead, .cv-bar, .cv-back, .col-cond, .col-answer { display: none !important; }
+  .cv-col, .cv-card { display: block !important; padding: 0 !important; border: none !important; background: #fff !important; height: auto !important; }
   .app { display: block !important; height: auto !important; }
   .stage, .graph-wrap {
     display: block !important; width: 100% !important; height: auto !important;
@@ -2061,7 +2070,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   opacity: 0; pointer-events: none;
   transition: opacity .2s var(--ease), transform .2s var(--ease);
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+/* Кнопка действия в тосте («Вернуть» после «Сбросить», 91-session.js). */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-act {
+  border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600;
+  text-decoration: underline; cursor: pointer; padding: 6px 2px; min-height: 36px;
+}
+.toast-act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* ── Модальное окно (экспорт, Фаза 5) ────────────────────────────────── */
 .modal {
@@ -2350,3 +2366,2036 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border: none; border-bottom: 1px dashed var(--border); border-radius: 0;
 }
 .title-edit input[type="text"]:focus { outline: none; border-bottom-color: var(--accent); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · КАРКАС (фаза 5а; README, разделы 3, 5, 7)
+   Шапка модели 56 сверху на всю ширину, под ней три колонки: «Условие»,
+   холст, «Ответ». Колонки не сворачиваются: вместо этого «Развернуть
+   график» (пункт (в) закрытого списка). Узлы сцен и их id переехали в
+   колонки как есть; вид компонентов меняют следующие фазы.
+   Размеры: окно ≥ 1400 — колонки 336 и 348 (плюс граница 1), 1240–1399 —
+   304 и 316; холст забирает остаток. SVG = колонка − 22 по ширине и
+   колонка − 22 − 44 (панель холста) по высоте: при 1440×760 это 732×590.
+   ═══════════════════════════════════════════════════════════════════ */
+.app {
+  display: grid;
+  grid-template-columns: 337px minmax(0, 1fr) 349px;
+  grid-template-rows: 56px minmax(0, 1fr);
+  height: calc(100vh - var(--calc2-app-top, 48px)); overflow: hidden; background: var(--bg);
+}
+@media (max-width: 1399px) { .app { grid-template-columns: 305px minmax(0, 1fr) 317px; } }
+body.cv-focus .app { grid-template-columns: 0 minmax(0, 1fr) 0; }
+body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
+
+/* Шапка модели */
+.mhead {
+  grid-column: 1 / -1; grid-row: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px; padding: 0 14px 0 10px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  position: relative; z-index: var(--z-float);
+}
+.mh-gap { flex: 1 1 auto; }
+.mh-sep { width: 1px; height: 26px; background: var(--border); flex: 0 0 1px; }
+.mh-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px;
+  border-radius: var(--r); border: 1px solid transparent; background: transparent; color: var(--text);
+  font: inherit; font-size: 14.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
+}
+.mh-btn svg, .mh-icon svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.mh-quiet:hover { background: var(--chip-bg); }
+.mh-outline { background: var(--surface); border-color: var(--border-strong); }
+.mh-outline:hover { background: var(--chip-bg); }
+.mh-main { background: var(--btn-bg); color: var(--on-btn); font-weight: 600; }
+.mh-main:hover { filter: brightness(1.08); }
+.mh-icon {
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r);
+  border: 0; background: transparent; color: var(--text2); cursor: pointer;
+}
+.mh-icon:hover:not(:disabled) { background: var(--chip-bg); color: var(--text); }
+.mh-icon:disabled { opacity: .35; cursor: default; }
+.mh-switch {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;
+  padding: 4px 8px; border: 0; border-radius: var(--r); background: transparent; color: var(--text);
+  font: inherit; cursor: pointer; text-align: left;
+}
+.mh-switch:hover, .mh-switch[aria-expanded="true"] { background: var(--chip-bg); }
+.mh-block { font-size: 12px; font-weight: 500; color: var(--text3); line-height: 1.2; }
+/* Имя модели не обрезается (решение штаба 13.08, проверка «Заголовок» в
+   calc2_math): самое длинное имя помещается в шапку и при 1280. */
+.mh-name { display: inline-flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 600; line-height: 1.25; }
+.mh-name .side-scene { font: inherit; color: inherit; white-space: nowrap; padding: 0; }
+.mh-name svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text2); }
+.mh-saved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text3); white-space: nowrap; }
+.mh-saved svg { width: 14px; height: 14px; color: var(--accent); }
+.mhead button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Колонки «Условие» и «Ответ» */
+.app > .side { width: auto; min-width: 0; flex: none; transition: none; }
+#tools-panel { grid-column: 1; grid-row: 2; }
+#params-panel { grid-column: 3; grid-row: 2; }
+.col-head { padding: 12px 10px 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+.col-head h2 { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.col-sub { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.sec-head { margin: 0; padding: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.sec-head span { display: inline-flex; align-items: center; gap: 8px; }
+.sec-head .sec-ico { width: 18px; height: 18px; color: var(--text2); }
+.app .fold-body { display: block; }
+
+/* Колонка холста: поля 10 на фоне страницы, карточка с рамкой и радиусом 12,
+   сверху панель 44. */
+.cv-col { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; padding: 10px; display: flex; background: var(--bg); }
+.cv-card {
+  position: relative; flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--canvas); border: 1px solid var(--border); border-radius: 12px;
+}
+.cv-bar {
+  flex: 0 0 44px; height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 8px;
+  background: var(--surface); border-bottom: 1px solid var(--border-soft); position: relative; z-index: var(--z-float);
+}
+.cv-gap { flex: 1 1 auto; }
+.cv-zoom { font-size: 13px; font-weight: 500; color: var(--text2); min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.cv-bar .gt-btn {
+  position: static; width: auto; min-width: 32px; height: 32px; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2); box-shadow: none; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 500;
+}
+.cv-bar .gt-btn:hover { background: var(--chip-bg); color: var(--text); }
+.cv-bar .gt-btn[aria-expanded="true"], .cv-bar .gt-btn[aria-pressed="true"] { background: var(--chip-bg); color: var(--text); }
+.cv-bar .gt-btn svg { width: 18px; height: 18px; }
+.cv-bar .gt-btn.is-off { visibility: visible; opacity: 1; }
+.cv-card > .graph-wrap { flex: 1 1 auto; min-width: 0; min-height: 0; border-radius: 0; }
+/* «Вид графика» — окно у своей кнопки, над холстом (вне #graph-wrap). */
+.cv-card > .wrench { top: 48px; right: 8px; }
+/* «← Вернуться к задаче» (вход из задачи, ADR 0145): тонкая строка над панелью
+   холста, вне #graph-wrap. Пока она открыта, окно «Вид графика» ниже на её высоту. */
+.cv-back {
+  flex: 0 0 30px; height: 30px; display: flex; align-items: center; padding: 0 12px;
+  font-size: 13px; font-weight: 500; color: var(--accent-ink); text-decoration: none;
+  background: var(--surface); border-bottom: 1px solid var(--border-soft);
+}
+.cv-back[hidden] { display: none; }
+.cv-back:hover { text-decoration: underline; }
+.cv-back:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cv-card:has(> .cv-back:not([hidden])) > .wrench { top: 78px; }
+.col-head h2 { flex: 1 1 auto; text-align: left; }
+/* «Параметры» без единого ползунка не показываются: нечего показать — секции нет. */
+#sec-params:not(:has(#params-body input, #params-body button)) { display: none; }
+.sec-head b { font-weight: inherit; }   /* иначе <b> в заголовке 600 даёт 900 (вне шкалы канона) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · «УСЛОВИЕ» (фаза 5б; README макета, разделы 6, 10, 13)
+   Секции плоские, через тонкий разделитель; функция — карточка: цвет,
+   обозначение, имя, глаз, «…», поле формулы с приставкой и клавиатурой,
+   под ней её ползунки. Окна (меню «…», «Цвет кривой», «Как писать
+   формулы», «Поделиться») — одним видом: --surface, рамка, радиус 12,
+   тень только у всплывающего.
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --border-strong: rgba(45, 45, 45, .26);   /* поля, контурные кнопки, выбранное (на сайте нет) */
+  --scrim: rgba(29, 26, 22, .34);           /* подложка модального окна (на сайте нет) */
+}
+[data-theme="dark"] {
+  --border-strong: rgba(255, 255, 255, .24);
+  --scrim: rgba(0, 0, 0, .5);
+}
+
+/* Шапка колонки: «Условие» и тихая «Как писать формулы». */
+.col-quiet {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2);
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.col-quiet svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.col-quiet:hover, .col-quiet[aria-expanded="true"] { background: var(--chip-bg); color: var(--text); }
+.col-quiet:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.col-cond .col-head { border-bottom: 1px solid var(--border-soft); }
+
+/* Секции «Условия»: поля 14 16 16, сверху разделитель, заголовок 15/600. */
+#tools-panel .tools-body > .section.card,
+#tools-panel .tools-body > .section.card.open-card,
+#tools-panel .tools-body > .section.card.first-card {
+  margin: 0; padding: 14px 16px 16px; background: transparent;
+  border: 0; border-top: 1px solid var(--border-soft); border-radius: 0; box-shadow: none;
+}
+#tools-panel .tools-body > .section.card:first-child { border-top: 0; }
+#tools-panel .tools-body > .section.card > .fold-body { padding: 0; }
+#tools-panel .side-scroll, #tools-panel .side-part, #tools-panel .tools-body { padding: 0; margin: 0; }
+.col-cond .sec-head { padding: 0 0 12px; }
+.col-cond .sec-head .sec-ico { display: none; }
+
+/* ── Карточка функции (6.1) ───────────────────────────────────────── */
+#curve-list { display: flex; flex-direction: column; gap: 8px; }
+.curve-row.fc-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 10px 10px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card);
+}
+.curve-row.fc-card:last-child { border-bottom: 1px solid var(--border); }
+.curve-row.fc-card.is-hot { border-color: var(--border-strong); }
+.fc-card > .crow-top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.fc-card .cpick-btn {
+  width: 20px; height: 20px; border-radius: 50%; border: 0; box-shadow: none;
+  outline: 1px solid var(--border-strong); outline-offset: 2px; margin: 0 2px 0 4px;
+}
+.fc-card .cpick-btn:hover { transform: none; outline-color: var(--accent); }
+.fc-card .cpick-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fc-notation {
+  flex: 0 0 auto; font-family: inherit; font-size: 18px; line-height: 1; color: var(--text);
+  overflow: visible; white-space: nowrap; max-width: 40%;
+}
+.fc-notation .katex { font-size: 1em; }
+.fc-name {
+  flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fc-card.is-hidden .fc-notation, .fc-card.is-hidden .fc-name { opacity: .5; }
+.fc-ico {
+  flex: 0 0 30px; width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2); cursor: pointer;
+}
+.fc-ico svg { width: 18px; height: 18px; display: block; }
+.fc-ico:hover, .fc-ico[aria-expanded="true"] { background: var(--chip-bg); color: var(--text); }
+.fc-ico:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.crow-gear.fc-ico svg { transform: none; }
+.fc-card .form-badge { font-size: 12px; color: var(--chip-text); background: var(--chip-bg); }
+
+/* Поле формулы: 40, фон --surface-2, рамка, радиус 6; приставка «P =»;
+   кнопка клавиатуры в правом конце поля. */
+.fc-card > .crow-formula {
+  display: flex; flex-wrap: wrap; align-items: center; margin: 0;
+  min-height: 40px; padding: 0 4px 0 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.fc-card > .crow-formula:has(.is-bad) { border-color: var(--error); }
+.fc-card > .crow-formula:focus-within { border-color: var(--accent); }
+.fc-prefix { flex: 0 0 auto; margin-right: 8px; font-size: 17px; color: var(--text2); line-height: 1; }
+.fc-prefix .katex { font-size: 1em; }
+.fc-card > .crow-formula > .f-wrap { flex: 1 1 0; min-width: 0; display: contents; }
+.fc-card > .crow-formula .f-row { flex: 1 1 0; min-width: 0; width: auto; gap: 2px; align-items: center; }
+.fc-card > .crow-formula math-field,
+.fc-card > .crow-formula .f-typeset,
+.fc-card > .crow-formula .f-slot > input {
+  border: 0; background: transparent; padding: 6px 2px; font-size: 18px; min-height: 38px;
+}
+.fc-card > .crow-formula math-field:focus,
+.fc-card > .crow-formula math-field:focus-within { outline: none; }
+.fc-card > .crow-formula .f-kbd {
+  flex: 0 0 30px; width: 30px; height: 30px; border: 0; border-radius: var(--r);
+  background: transparent; color: var(--text3);
+}
+.fc-card > .crow-formula .f-kbd[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
+.fc-card > .crow-formula .f-kbd:hover { color: var(--text); background: var(--chip-bg); }
+/* Ошибка, клавиатура и примеры — под полем, на всю ширину карточки. */
+.fc-card > .crow-formula > .f-why,
+.fc-card > .crow-formula > .mkbd,
+.fc-card > .crow-formula > .f-pop { flex: 1 0 100%; margin-left: -10px; margin-right: -4px; }
+.fc-card .f-why { font-size: 13px; line-height: 1.55; min-height: 0; }
+.fc-card .f-why.is-bad { color: var(--error-ink); padding: 6px 10px 8px; }
+.fc-card .f-why:not(.is-bad) { display: none; }
+.fc-card > .crow-formula > .mkbd.open { margin-top: 6px; margin-bottom: 4px; }
+.fc-card > .crow-auto { margin: 0; font-size: 13px; }
+
+/* Ползунки под карточкой: сдвиг и буквы своей формулы. */
+.crow-sliders:empty { display: none; }
+.crow-sliders { display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 0; }
+.crow-sliders .pchip-dot { display: none; }
+.param-track input[type="range"] { accent-color: var(--accent) !important; height: 22px; }
+
+/* Меню «…» (раздел 10): 270, подпись на графике, пункты по 34. */
+.fc-menu {
+  display: none; position: fixed; z-index: var(--z-pop); width: 270px;
+  padding: 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+}
+.fc-menu.open { display: block; }
+.fc-menu-lab { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 6px; }
+.fc-menu .curve-label-inp {
+  width: 100%; height: 34px; padding: 0 10px; font-size: 17px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.fc-menu-note { margin-top: 6px; font-size: 12px; color: var(--text3); line-height: 1.45; }
+.fc-menu-items { margin: 10px -12px 0; padding: 6px 6px 0; border-top: 1px solid var(--border-soft); }
+.fc-menu-items:empty { display: none; }
+.fc-menu .fc-mi {
+  display: block; width: 100%; height: 34px; padding: 0 10px; text-align: left;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text);
+  font: inherit; font-size: 14.5px; font-weight: 400; cursor: pointer; line-height: 34px;
+}
+.fc-menu .fc-mi:hover { background: var(--chip-bg); color: var(--text); }
+.fc-menu .fc-mi.fc-danger { color: var(--error-ink); }
+.fc-menu .fc-mi.fc-danger:hover { background: var(--error-tint); color: var(--error-ink); }
+.fc-menu-role { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.fc-menu > .btn-icon.fc-mi { margin-top: 6px; }
+.fc-menu .sel-btn { height: 34px; font-size: 14.5px; font-weight: 400; }
+
+/* «Добавить функцию»: во всю ширину, 38, пунктир, радиус 10, «+». */
+#btn-add-curve, #btn-add-curve.fc-add {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; height: 38px; margin-top: 8px; padding: 0 12px;
+  background: transparent; color: var(--text2); border: 1px dashed var(--border-strong);
+  border-radius: var(--r-card); font: inherit; font-size: 14.5px; font-weight: 500; box-shadow: none;
+}
+#btn-add-curve::before { content: '+'; font-size: 18px; font-weight: 400; line-height: 1; }
+#btn-add-curve:hover { background: var(--chip-bg); color: var(--text); }
+
+/* Сегмент (один вид везде, 6.3): подложка --surface-2, радиус 10. */
+.seg {
+  display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-card);
+}
+.seg-btn {
+  padding: 6px 10px; border: 1px solid transparent; border-radius: var(--r);
+  background: transparent; color: var(--text2); font-size: 13.5px; font-weight: 500;
+}
+.seg-btn.active, .seg-btn[aria-pressed="true"] {
+  background: var(--surface); color: var(--text); border-color: var(--border-strong); font-weight: 600;
+}
+.seg-btn.active:hover { color: var(--text); }
+
+/* Галочка (COVERAGE, раздел 5): своя и без заливки. */
+.chk input[type=checkbox], .col-cond input[type=checkbox], .pop input[type=checkbox] {
+  -webkit-appearance: none; appearance: none; flex: 0 0 18px;
+  width: 18px; height: 18px; margin: 0; position: relative; cursor: pointer;
+  background: var(--surface); border: 1.5px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.chk input[type=checkbox]:checked, .col-cond input[type=checkbox]:checked, .pop input[type=checkbox]:checked {
+  background: var(--surface); border-color: var(--accent);
+}
+.chk input[type=checkbox]:checked::after, .col-cond input[type=checkbox]:checked::after, .pop input[type=checkbox]:checked::after {
+  content: ''; position: absolute; left: 5px; top: 1.5px; width: 4.5px; height: 9px;
+  border: solid var(--accent); border-width: 0 2px 2px 0; transform: rotate(42deg); background: none;
+}
+.chk input[type=checkbox]:hover, .col-cond input[type=checkbox]:hover { border-color: var(--accent); }
+.chk input[type=checkbox]:focus-visible, .col-cond input[type=checkbox]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ── Окна (раздел 10) ─────────────────────────────────────────────── */
+.pop {
+  display: none; position: fixed; z-index: var(--z-pop);
+  padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop); color: var(--text);
+}
+.pop.open { display: block; }
+.pop-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.pop-text { margin: 0 0 12px; font-size: 14px; font-weight: 400; line-height: 1.45; color: var(--text2); }
+.howto-pop { width: 372px; max-height: calc(100vh - 140px); overflow-y: auto; }
+.howto-rows { display: flex; flex-direction: column; }
+.howto-row { display: grid; grid-template-columns: 124px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border-soft); }
+.howto-row:first-child { border-top: 0; }
+.howto-ex { font-size: 15px; font-weight: 500; color: var(--text); overflow-x: auto; font-variant-numeric: tabular-nums; }
+.howto-note { font-size: 13px; color: var(--text2); line-height: 1.55; }
+.howto-sub { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text2); }
+.howto-foot { margin-top: 10px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+.share-pop { width: 440px; }
+.share-row { display: flex; gap: 8px; }
+.share-row input {
+  flex: 1 1 auto; width: auto; min-width: 0; height: 38px; padding: 0 10px; font-size: 13px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.share-row .btn { height: 38px; flex: 0 0 auto; width: auto; margin: 0; padding: 0 16px; }
+.share-self { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 14px; color: var(--text); }
+.share-self small { display: block; font-size: 13px; color: var(--text3); }
+#btn-share.is-open { background: var(--chip-bg); color: var(--text); border-color: var(--border-strong); }
+
+/* «Цвет кривой» (244): 12 кружков по 6 в ряд, «Свой цвет», «Цвет по умолчанию». */
+.cpick-menu { width: 244px; padding: 12px; border-radius: var(--r-panel); }
+.cpick-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 10px; }
+.cpick-menu .cpick-grid { grid-template-columns: repeat(6, 28px); gap: 8px 8px; justify-content: space-between; }
+.cpick-menu .cpick-sw { width: 28px; height: 28px; border-radius: 50%; border: 0; }
+.cpick-menu .cpick-sw:hover { transform: none; outline: 1px solid var(--border-strong); outline-offset: 2px; }
+.cpick-menu .cpick-sw[aria-checked="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+.cpick-menu .cpick-sw[aria-checked="true"]::after { display: none; }
+.cpick-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
+.cpick-menu .cpick-own { width: 100%; margin: 0; padding: 4px 8px; background: transparent; font-size: 13px; white-space: nowrap; }
+.cpick-menu .cpick-own input[type="color"] { width: 44px; height: 28px; border-radius: var(--r); }
+.cpick-dflt {
+  border: 0; background: transparent; padding: 4px 2px; color: var(--accent-ink);
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Тосты (раздел 10): снизу по центру, графитовые, 14,5 px, радиус 10. */
+.toast {
+  left: 50%; right: auto; bottom: calc(18px + var(--ck-h, 0px)); transform: translateX(-50%);
+  max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
+  background: var(--btn-bg); color: var(--on-btn); font-size: 14.5px; font-weight: 500;
+  display: none; align-items: center; gap: 12px;
+}
+.toast.show { display: flex; }
+.toast .toast-act {
+  border: 1px solid currentColor; background: transparent; color: inherit; border-radius: var(--r);
+  padding: 4px 10px; font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pop.open, .fc-menu.open { animation: fpop .14s var(--ease); }
+}
+
+/* «Показать на графике»: строка от 28, галочка, образец 14×14 цветом
+   заливки, имя 14,5, обозначение справа (README макета, 6.4). */
+#show-list { display: flex; flex-direction: column; gap: 4px; }
+#show-list #mono-areas-chk { display: flex; flex-direction: column; gap: 4px; margin: 0 !important; }
+#show-list #mono-areas-chk[style*="none"] { display: none !important; }
+.show-row { display: flex !important; align-items: center; gap: 10px; min-height: 28px; margin: 0; font-size: 14.5px; color: var(--text); }
+.show-row[hidden] { display: none !important; }
+.show-sw { flex: 0 0 14px; width: 14px; height: 14px; border-radius: var(--r-sm); background: var(--chip-bg); border: 1px solid var(--border-soft); }
+.show-name { flex: 1 1 auto; min-width: 0; }
+.show-not { flex: 0 0 auto; font-size: 15px; font-weight: 400; color: var(--text2); font-family: 'KaTeX_Main', 'Times New Roman', serif; }
+/* «Точки» и «Площади» с 13.10 живут в панели режима (#pts-panel, ADR 0148),
+   у каждой свой заголовок — прежнее слияние в одну секцию «Условия» снято. */
+
+/* ── Окно «Кусочная функция» (README макета, 6.6 и раздел 10) ─────────
+   640, с клавиатурой 992; высота до «окно − 32», тело прокручивается. */
+#pw-modal { background: var(--scrim); }
+#pw-modal .modal-card.pw-card {
+  width: min(640px, 94vw); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+  padding: 0; border-radius: var(--r-panel); overflow: hidden;
+}
+#pw-modal.kbd-open .modal-card.pw-card { width: min(992px, 96vw); }
+.pw-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 14px 0 20px; }
+.pw-head .modal-title { flex: 1 1 auto; margin: 0; font-size: 19px; font-weight: 600; }
+.pw-name { color: var(--text2); font-weight: 600; }
+.pw-x { flex: 0 0 32px; width: 32px; height: 32px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 22px; line-height: 1; cursor: pointer; }
+.pw-x:hover { background: var(--chip-bg); color: var(--text); }
+#pw-modal .modal-sub { margin: 6px 20px 0; font-size: 14px; color: var(--text2); line-height: 1.45; }
+.pw-body { display: flex; gap: 16px; padding: 14px 20px 16px; overflow-y: auto; min-height: 0; }
+.pw-main { flex: 1 1 auto; min-width: 0; }
+#pw-kbd { display: none; flex: 0 0 330px; align-self: flex-start; margin: 0; }
+#pw-kbd.open { display: block; }
+.pw-count-field { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
+.pw-count-field label { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 4px 0 0; }
+.pw-step { width: 34px; height: 34px; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.pw-step:hover { background: var(--chip-bg); }
+.pw-step.is-edge { opacity: .35; }
+.pw-count-field input#pw-count { width: 44px; height: 34px; text-align: center; font-size: 15px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0; }
+.pw-range { font-size: 13px; color: var(--text3); }
+.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
+.pw-cols span:nth-child(2), .pw-cols span:nth-child(3) { text-align: center; }
+.pw-cols i { font-family: 'KaTeX_Math', 'Times New Roman', serif; font-size: 15px; }
+.pw-brace { display: flex; gap: 6px; align-items: stretch; margin: 0 0 10px; }
+.pw-prefix { flex: 0 0 auto; align-self: center; font-size: 20px; color: var(--text2); min-width: 32px; }
+.pw-brace-mark { flex: 0 0 10px; align-self: stretch; color: var(--text2); min-height: 40px; }
+.pw-rows { flex: 1 1 auto; display: grid; gap: 6px; min-width: 0; }
+.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px 30px; gap: 8px; align-items: center; }
+.pw-row .f-slot { min-width: 0; }
+.pw-row math-field, .pw-row .f-slot > input { min-height: 40px; font-size: 18px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 4px 10px; }
+.pw-row .f-slot.is-bad math-field, .pw-row .f-slot.is-bad > input { border-color: var(--error); }
+.pw-row input.pw-bound { width: 100%; height: 40px; text-align: center; font-size: 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0 4px; }
+.pw-row input.pw-bound.is-bad { border-color: var(--error); color: var(--error-ink); }
+.pw-del { width: 30px; height: 30px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 18px; line-height: 1; cursor: pointer; }
+.pw-del:hover { background: var(--chip-bg); color: var(--text); }
+.pw-add { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; margin: 0 0 12px 50px; border: 1px dashed var(--border-strong); border-radius: var(--r); background: transparent; color: var(--text2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.pw-add::before { content: '+'; font-size: 17px; line-height: 1; }
+.pw-add:hover { background: var(--chip-bg); color: var(--text); }
+.pw-add[hidden] { display: none; }
+.pw-error { margin: 0 0 10px; font-size: 13.5px; color: var(--error-ink); line-height: 1.55; }
+.pw-notes { margin: 0 0 10px; font-size: 13.5px; color: var(--amber-ink); line-height: 1.55; }
+.pw-error[hidden], .pw-notes[hidden], .pw-preview[hidden] { display: none; }
+.pw-preview { padding: 12px 14px 14px; background: var(--surface-2); border-radius: var(--r-card); }
+.pw-preview-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 6px; }
+.pw-preview .f-preview.has { padding: 0; background: transparent; border: 0; font-size: 18px; }
+.pw-foot { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 20px 16px; border-top: 1px solid var(--border-soft); }
+.pw-gap { flex: 1 1 auto; }
+.pw-foot .btn-sm, .pw-foot .btn { height: 40px; padding: 0 16px; font-size: 14.5px; width: auto; margin: 0; }
+.pw-kbd-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.pw-kbd-toggle svg { width: 18px; height: 18px; }
+.pw-kbd-toggle[aria-expanded="true"] { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
+#pw-apply { font-weight: 600; }
+#pw-apply.is-off { opacity: .45; }
+
+/* Поля формул сцен (TC, КПВ, U(x, y), L(p), «Математика»…) — тем же видом,
+   что поле карточки функции: 40, фон --surface-2, клавиатура в правом конце
+   (COVERAGE, раздел 1: «поле формулы → карточка в «Функциях»»). */
+.col-cond .f-row:not(.fc-card .f-row) {
+  align-items: center; gap: 2px; min-height: 40px; padding: 0 4px 0 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.col-cond .f-row:not(.fc-card .f-row):focus-within { border-color: var(--accent); }
+.col-cond .f-row:not(.fc-card .f-row):has(.is-bad) { border-color: var(--error); }
+.col-cond .f-row:not(.fc-card .f-row) math-field,
+.col-cond .f-row:not(.fc-card .f-row) .f-slot > input,
+.col-cond .f-row:not(.fc-card .f-row) .f-typeset {
+  border: 0; background: transparent; font-size: 17px; min-height: 38px; padding: 5px 4px;
+}
+.col-cond .f-row:not(.fc-card .f-row) math-field:focus,
+.col-cond .f-row:not(.fc-card .f-row) math-field:focus-within { outline: none; }
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd {
+  flex: 0 0 30px; width: 30px; height: 30px; border: 0; background: transparent; color: var(--text3); border-radius: var(--r);
+}
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd:hover { background: var(--chip-bg); color: var(--text); }
+.col-cond .f-why.is-bad { font-size: 13px; color: var(--error-ink); line-height: 1.55; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · «ОТВЕТ» (фаза 6; README макета, раздел 8)
+   Тело: поля 0 16 20, промежуток 18. Статус словами (канон 2.5: серая
+   плашка, цветная полоса слева и значок, без заливки -tint), главные числа
+   2×2, бремя, таблицы групп, итоговая функция, «Разбор» аккордеоном.
+   ═══════════════════════════════════════════════════════════════════ */
+.col-answer .col-head { border-bottom: 0; }
+.col-note { font-size: 13px; font-weight: 500; color: var(--text3); white-space: nowrap; }
+/* Снизу запас под круглую кнопку чата (.tg-fab: 53 px, 16 px от края, _feedback.html):
+   прокрученная до низа колонка не прячет под ней последнюю строку (13.10). */
+#params-panel .side-scroll { padding: 0 16px 16px; margin-bottom: 76px; }
+#params-panel .side-part, #params-panel .side-part.open-card {
+  margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+/* ⚠️ Карточка выше оставляет блоку overflow: hidden, а поле «Сначала сам» и кнопка
+   «Проверить» стоят вплотную к его краям: кольцо фокуса (2 px + отступ 2 px) срезалось
+   слева и справа, в Safari — вместе с рамкой поля (13.10). Запас 6 px внутрь отступа
+   колонки: обрезка отодвинута, содержимое стоит на прежнем месте. */
+#params-panel .side-part { margin-left: -6px; margin-right: -6px; padding-left: 6px; padding-right: 6px; }
+#params-panel #sb-fold { display: flex; flex-direction: column; gap: 18px; padding: 0; }
+#params-panel #explain { margin-top: 18px; }
+
+/* Статус */
+.ans-status-box { display: flex; flex-direction: column; gap: 8px; }
+.ans-status-box[hidden] { display: none; }
+.ans-status {
+  position: relative; padding: 10px 12px 10px 36px; font-size: 14px; line-height: 1.55; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-left: 3px solid var(--amber);
+  border-radius: var(--r);
+}
+.ans-status::before {
+  content: '!'; position: absolute; left: 11px; top: 10px; width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; line-height: 1;
+  color: var(--amber-ink); border: 1.5px solid var(--amber-ink);
+}
+#sb-body .warn { display: none; }   /* источник статуса: строка выше показывает его словами */
+
+/* Главные величины — строками по группам (ADR 0144); вид строк — в конце файла,
+   раздел «ОТВЕТ СТРОКАМИ». */
+#sb-body .stat.is-hero { display: none; }   /* главное число в таблице не повторяется */
+
+/* Бремя */
+.ans-burden[hidden] { display: none; }
+.ans-burden .col-sub { margin: 0 0 10px; }
+.burden-bar { height: 10px; border-radius: var(--r-pill); background: var(--border-strong); overflow: hidden; }
+.burden-b { display: block; height: 100%; background: var(--btn-bg); }
+.burden-cols { display: flex; justify-content: space-between; margin-top: 8px; }
+.burden-col.is-seller { text-align: right; }
+.burden-name { font-size: 13px; font-weight: 500; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; }
+.burden-name::before { content: ''; width: 9px; height: 9px; border-radius: 2px; background: var(--btn-bg); }
+.is-seller .burden-name::before { background: var(--border-strong); }
+.burden-val { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.burden-note { margin-top: 8px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+
+/* Таблицы групп: заголовок 15/600, строка 14 px, подпись слева, число 600 справа. */
+#sb-body { display: flex; flex-direction: column; gap: 18px; }
+#sb-body > [id^="info-"]:empty, #sb-body > #sec-eq:empty { display: none; }
+#sb-body .section-title, #sec-eq .section-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-transform: none; letter-spacing: 0; }
+.sb-body .stat, .sb-body .stat.stat-eq {
+  display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 6px 0; border-bottom: 1px solid var(--border-soft); line-height: 1.55; font-size: 14px;
+}
+.sb-body .stat > span, .sb-body .stat.stat-eq > span { font-size: 14px; font-weight: 400; color: var(--text); flex: 1 1 auto; }
+.sb-body .stat > b, .sb-body .stat.stat-eq > b { font-size: 14px; font-weight: 700; color: var(--text); text-align: right; flex: 0 0 auto; max-width: 55%; }
+.sb-body .stat .stat-sign { display: none; }
+.sb-body .hint, .sb-body .muted { font-size: 13px; color: var(--text3); line-height: 1.55; margin-top: 6px; }
+.tx-table { font-size: 14px; margin-top: 6px; }
+.tx-table th { font-size: 13px; font-weight: 500; color: var(--text3); border-bottom: 1px solid var(--border); }
+.tx-table td { padding: 6px 0 6px 6px; border-bottom: 1px solid var(--border-soft); line-height: 1.55; }
+.tx-table td:last-child, .tx-table td:nth-child(2) { color: var(--text2); }
+.tx-table td:nth-child(3) { font-weight: 600; color: var(--text); }
+/* Заголовки групп, у которых своего заголовка в табло нет (94-answer.js, ANSWER_GROUP). */
+#info-areas:not(:empty)::before { content: 'Излишки'; }
+#info-tax:not(:empty)::before { content: 'Вмешательство'; }
+#info-mono:not(:empty)::before { content: 'Монополия'; }
+#info-costs:not(:empty)::before { content: 'Издержки'; }
+#info-labor:not(:empty)::before { content: 'Рынок труда'; }
+#info-macro:not(:empty)::before { content: 'Равновесие'; }
+#info-areas::before, #info-tax::before, #info-mono::before, #info-costs::before, #info-labor::before, #info-macro::before {
+  display: block; margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text);
+}
+/* Остаток блока, чьи главные строки — последняя группа «Ответа», идёт её продолжением
+   без второго такого же заголовка (buildAnswer, 94-answer.js; 13.10). */
+#sb-body > .ans-cont::before { display: none; }
+
+/* Итоговая функция — карточка (8.7). */
+#info-final .ff { padding: 12px 14px; border: 1px solid var(--border); border-left: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
+#info-final .ff-name { font-size: 13px; font-weight: 500; color: var(--text2); }
+
+/* «Разбор» аккордеоном (8.8). */
+#explain .col-sub { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+#ex-body .sb-note { padding: 0; background: transparent; border: 0; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+#ex-body .sb-note p { margin: 0; }
+#ex-body .sb-note p.ex-q { border-bottom: 1px solid var(--border-soft); padding: 0 0 10px; margin: 0 0 10px; }
+#ex-body .sb-note p.ex-q > b {
+  display: block; position: relative; margin: 0; padding: 4px 26px 4px 0;
+  font-size: 14.5px; font-weight: 600; color: var(--text); cursor: pointer;
+}
+#ex-body .sb-note p.ex-q > b::after {
+  content: ''; position: absolute; right: 4px; top: 9px; width: 8px; height: 8px;
+  border: solid var(--text2); border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); transition: transform .18s var(--ease);
+}
+#ex-body .sb-note p.ex-q.ex-open > b::after { transform: rotate(225deg); top: 13px; }
+#ex-body .sb-note p.ex-q > b:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#ex-body .sb-note p.ex-q > .ex-a { display: none; padding-top: 6px; }
+#ex-body .sb-note p.ex-q.ex-open > .ex-a { display: block; }
+#ex-body .sb-note p.ex-out { margin: 4px 0 0; padding: 12px 14px; background: var(--surface-2); border-radius: var(--r-card); }
+#ex-body .sb-note p.ex-out > b { display: inline; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { #ex-body .sb-note p.ex-q > b::after { transition: none; } }
+#ex-body .sb-note b, #ex-body .sb-note p.ex-q > b, #ex-body .sb-note p.ex-out > b { text-transform: none; letter-spacing: 0; font-size: 14.5px; }
+#sec-eq > .section-title { display: none; }   /* показан заголовком группы главных величин (.ans-ghead) */
+#info-final .ff-eyebrow { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: none; letter-spacing: 0; }
+#info-final .ff-name { font-size: 13px; font-weight: 500; color: var(--text); margin-top: 2px; }
+#info-final .ff-copy, #info-final .ff-expand {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r);
+  background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; text-decoration: none; text-transform: none;
+}
+#info-final .ff-copy::first-letter, #info-final .ff-expand::first-letter { text-transform: uppercase; }
+#info-final .ff-copy:hover, #info-final .ff-expand:hover { background: var(--chip-bg); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · ХОЛСТ (фаза 7; README макета, раздел 13)
+   Холст берёт цвет сайта: в светлой теме --canvas = --surface, в тёмной
+   --canvas = --bg. Остальные токены холста — тёплая семья макета. Два
+   цвета кривых стали темнее ради контраста 3 : 1 («было» и FC), TC и VC
+   светлеют на тёмном холсте, два тона слагаемых «Сложения» — тоже (04.10).
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --canvas: var(--surface);
+  --halo: var(--surface);
+  --ink: #2d2d2d;
+  --ink-soft: #6b6457;
+  --grid: rgba(92, 83, 70, .13);
+  --grid-strong: rgba(92, 83, 70, .17);
+  --curve-ghost: #948C7E;
+  --cost-fc: #838C9C;
+}
+[data-theme="dark"] {
+  --canvas: var(--bg);
+  --halo: var(--bg);
+  --ink: #efe8d6;
+  --ink-soft: #b5ab99;
+  --grid: rgba(242, 236, 217, .07);
+  --grid-strong: rgba(242, 236, 217, .13);
+  --cost-tc: #e8e2d2;
+  --cost-vc: #a8a295;
+  --sum-g1: #9048E1;
+  --sum-g5: #C03899;
+}
+/* Инструмент холста (7.1): сегмент слева на панели холста. */
+.cv-tools { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r); }
+.cv-tool {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--text2);
+  font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.cv-tool svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.cv-tool:hover { color: var(--text); }
+.cv-tool[aria-pressed="true"] { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 600; }
+.cv-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Плашка режима (7.6): --surface, рамка --border-strong, радиус 10; кнопка
+   «Готово» контурная — графитовая кнопка на экране одна («Поделиться»). */
+.cv-mode { left: 56px; top: 54px; padding: 6px 6px 6px 12px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-card); font-size: 13.5px; }
+.cv-mode__stop { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r); height: 30px; padding: 0 12px; font-weight: 600; }
+.cv-mode__stop:hover { background: var(--chip-bg); }
+
+/* Белый лист выгрузки (README макета, раздел 13): токен, а не число в коде. */
+:root { --paper: #ffffff; --paper-ink: #2d2d2d; --paper-ink-2: #6b6457; --paper-line: rgba(45, 45, 45, .14); }   /* белый лист «Скачать» в обеих темах */
+
+/* Ручка (7.4): кружок фоном холста с обводкой --ink. */
+#chart circle[data-service="handle"] { fill: var(--canvas); stroke: var(--ink); stroke-width: 2px; }
+
+/* ── Окно «Скачать график» (раздел 10): 860×548, слева белый лист ── */
+#export-modal { background: var(--scrim); }
+#export-modal .modal-card.exp-card {
+  width: min(860px, 96vw); max-height: calc(100vh - 32px); padding: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) 312px; border-radius: var(--r-panel); overflow: hidden;
+}
+.exp-left { padding: 20px; background: var(--surface-2); overflow-y: auto; }
+.exp-sheet { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; color: var(--paper-ink); }
+.exp-sheet-title { text-align: center; font-size: 15px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
+[data-theme="dark"] .exp-sheet-title, [data-theme="dark"] .exp-sheet-nums { color: var(--paper-ink); }
+.exp-sheet-img { display: block; width: 100%; height: auto; }
+.exp-sheet-cap { text-align: center; font-size: 13px; color: var(--paper-ink-2); margin-top: 8px; }
+.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper-line); color: var(--paper-ink); font-variant-numeric: tabular-nums; }
+.exp-sheet-title[hidden], .exp-sheet-cap[hidden], .exp-sheet-nums[hidden] { display: none; }
+.exp-what { margin-top: 12px; }
+.exp-what-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 4px; }
+.exp-right { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px 16px; overflow-y: auto; }
+.exp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.exp-head .modal-title { margin: 0; font-size: 19px; font-weight: 600; }
+.exp-right .field { margin: 0; }
+.exp-right .field > label, .exp-right .hint-lead { font-size: 13px; font-weight: 500; color: var(--text2); }
+#exp-caption { width: 100%; height: 34px; padding: 0 10px; font-size: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); color: var(--text); }
+.exp-nums-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.exp-fmt { margin-top: 4px; }
+.exp-fmt .seg-btn { flex: 1 1 0; }
+.exp-fmt .seg-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.exp-fmt-note { margin-top: 6px; font-size: 13px; color: var(--text2); line-height: 1.55; }
+.exp-fmt-off { margin-top: 4px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+.exp-label-field[hidden] { display: none; }
+.exp-foot { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding: 0; border: 0; }
+.exp-foot .btn, .exp-foot .btn-sm { height: 40px; padding: 0 16px; width: auto; margin: 0; font-size: 14.5px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЭКРАН ВЫБОРА: ВКЛАДКИ БЛОКОВ И СЕТКА КАРТОЧЕК (решение 09.10, ADR 0141)
+   Макет claude/mockups/calc2_picker_20261009/ (тёмная тема); светлая — те
+   же размеры на светлых токенах. Кегли и скругления макета сведены к
+   канону /calc2/ (DESIGN.md 1.2, 1.5 и «Редизайн 10.2026»): 30/700 → 32/600,
+   18/600 → 17/600, 15,5/600 → 16/600, 12,5 → 13; радиусы 14 → 12 (--r-panel).
+   Колодец превью — цвет холста (--canvas): контраст кривой к нему тот же,
+   что на настоящем графике (≥ 3 : 1 в обеих темах).
+   ═══════════════════════════════════════════════════════════════════ */
+.pk-screen .picker-inner { max-width: 1440px; padding: 32px 56px 48px; }
+.pk-screen .picker-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 0 24px; }
+.pk-screen .picker-title { font-size: 32px; font-weight: 600; letter-spacing: 0; margin: 0; }
+.pk-search { position: relative; flex: 0 1 460px; max-width: 100%; display: flex; align-items: center; }
+.pk-search svg { position: absolute; left: 14px; width: 18px; height: 18px; color: var(--text3); pointer-events: none; }
+.pk-search input {
+  width: 100%; height: 46px; padding: 0 44px 0 42px; font: inherit; font-size: 16px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-panel);
+}
+.pk-search input:focus { outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--accent); }
+.pk-search input::-webkit-search-cancel-button { display: none; }
+.pk-clear { position: absolute; right: 7px; width: 32px; height: 32px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 20px; cursor: pointer; }
+.pk-clear:hover { background: var(--chip-bg); }
+.pk-clear[hidden] { display: none; }
+
+/* Ряд «Продолжить» и недавних: одна сетка 2 : 1 : 1 : 1. */
+.pk-cont { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; margin: 0 0 28px; }
+.pk-cont[hidden] { display: none; }
+.pk-recents { display: contents; }
+.pk-ccard {
+  display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 104px; padding: 12px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel);
+  cursor: pointer; font: inherit; color: var(--text);
+}
+.pk-ccard:hover { border-color: var(--border-strong); }
+.pk-ccard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pk-continue { background: linear-gradient(var(--accent-tint), var(--accent-tint)), var(--surface); border-color: var(--accent); }
+.pk-continue:hover { border-color: var(--accent); background: linear-gradient(var(--accent-tint), var(--accent-tint)), linear-gradient(var(--accent-tint), var(--accent-tint)), var(--surface); }
+.pk-thumb {
+  flex: 0 0 auto; display: flex; width: 120px; height: 80px; padding: 6px 8px;
+  background: var(--canvas); border: 1px solid var(--border-soft); border-radius: var(--r-card); overflow: hidden;
+}
+.pk-continue .pk-thumb { width: 150px; height: 84px; }
+.pk-thumb svg, .pk-well svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pk-ctext { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pk-when { font-size: 13px; font-weight: 400; color: var(--text3); }
+.pk-continue .pk-when { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.pk-cname { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: normal; }
+/* Длинное слово названия («Дискриминация», «Производственная») переносится по слогам
+   (lang="ru" у страницы), а не режется краем карточки (13.10, карточка Notion …81ec…):
+   ряд недавних, «Продолжить», сетка блока, переключатель модели. */
+/* overflow-wrap: break-word — рядом с переносом по слогам: без словаря переносов (язык без
+   него, браузер без словаря) длинное слово иначе резалось краем карточки (14.10, …81ec…). */
+.pk-cname, .pk-screen .scard-name, .sw-row > span { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
+.pk-recent { gap: 12px; padding: 10px; }
+/* Недавние в ряду 2 : 1 : 1 : 1 узкие: при 1280 миниатюра 120 px оставляла тексту 71 px.
+   Миниатюра меньше, кегль 14 — как у недавних на узких экранах ниже. */
+.pk-recent .pk-thumb { width: 84px; height: 56px; }
+.pk-recent .pk-cname { font-size: 14px; }
+/* «Продолжить» в том же ряду до 1440 px: кнопка «Продолжить →» и миниатюра 150 px
+   оставляли названию 106 px — «Функция и её производная наглядно» шла в 4 строки. */
+@media (max-width: 1439px) { .pk-continue .pk-thumb { width: 112px; height: 70px; } }
+.pk-continue .pk-cname { font-size: 17px; }
+.pk-go {
+  flex: 0 0 auto; display: inline-flex; align-items: center; height: 40px; padding: 0 14px;
+  border-radius: var(--r); background: var(--accent); color: var(--act-ink-solid); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+
+/* Вкладки блоков: «пилюли» с переносом; выбранная залита акцентом (2.14,
+   выбор из равноправных). Число — рабочие модели блока. */
+.pk-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 24px; }
+.pk-tabs[hidden] { display: none; }
+.pk-tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 16px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: transparent;
+  font: inherit; font-size: 15px; font-weight: 500; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.pk-tab:hover { background: var(--chip-bg); }
+.pk-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pk-tcount { font-size: 13px; font-weight: 400; color: var(--text3); }
+.pk-tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); font-weight: 600; }
+.pk-tab[aria-selected="true"] .pk-tcount { color: var(--act-ink-solid); }
+
+.pk-found { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; font-size: 14px; color: var(--text2); }
+.pk-found[hidden], .pk-none[hidden], .pk-panels[hidden] { display: none; }
+.pk-enter { padding: 3px 10px; border-radius: var(--r-pill); background: var(--chip-bg); font-size: 13px; font-weight: 500; color: var(--text); }
+.pk-none { padding: 24px 0; }
+.pk-none-title { font-size: 19px; font-weight: 600; color: var(--text); }
+.pk-none p { margin: 6px 0 0; font-size: 14px; color: var(--text2); max-width: 60ch; line-height: 1.55; }
+
+/* Сетка карточек выбранного блока: 4 / 3 / 2 колонки. Видим только
+   открытый блок (.open); во время поиска блоки и их сетки растворяются
+   (display: contents), и находки встают одной сеткой. */
+.pk-screen .picker-group.pk-block { display: none; }
+.pk-screen .picker-group.pk-block.open { display: block; }
+.pk-screen .picker-grid.pk-cards,
+.pk-panels.pk-searching { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 0; }
+.pk-panels.pk-searching .picker-group.pk-block,
+.pk-panels.pk-searching .picker-grid.pk-cards { display: contents; }
+.pk-screen .scard.pk-miss { display: none; }
+.pk-screen .scard {
+  display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 8px 8px 11px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel);
+  transition: border-color .16s var(--ease);
+}
+.pk-screen .scard:hover { transform: none; box-shadow: none; border-color: var(--accent); }
+.pk-screen .scard:focus-visible { transform: none; }
+.pk-screen .scard:active { transform: none; }
+.pk-well {
+  display: flex; height: 178px; padding: 12px 14px;
+  background: var(--canvas); border: 1px solid var(--border-soft); border-radius: var(--r-card); overflow: hidden;
+}
+.pk-cblock { display: none; margin: 10px 4px 0; font-size: 12px; font-weight: 400; color: var(--text3); }
+.pk-panels.pk-searching .pk-cblock { display: block; }
+.pk-screen .scard-head { display: block; }
+.pk-screen .scard-name { display: block; margin: 10px 4px 0; font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: 0; color: var(--text); }
+.pk-panels.pk-searching .scard-name { margin-top: 2px; }
+.pk-screen .scard-desc {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  margin: 4px 4px 0; font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--text2);
+}
+.pk-screen .scard.pk-first { border-color: var(--accent); }
+.pk-mark { background: transparent; color: var(--accent-ink); font-weight: 600; }
+/* «Скоро»: та же карточка, приглушённая; вместо превью пунктир и пилюля. */
+.pk-screen .scard.soon { opacity: .5; background: var(--surface); border-style: solid; cursor: default; }
+.pk-screen .scard.soon:hover { border-color: var(--border); }
+.pk-screen .scard.soon .scard-soon { display: none; }
+.pk-screen .scard.soon .scard-name, .pk-screen .scard.soon .scard-desc { color: var(--text2); }
+.pk-well-soon { align-items: center; justify-content: center; background: transparent; border: 1px dashed var(--border-strong); }
+.pk-pill { display: inline-block; padding: 0 8px; border-radius: var(--r-pill); background: var(--chip-bg); font-size: 12px; font-weight: 400; color: var(--text2); }
+.pk-well-soon .pk-pill { padding: 2px 12px; border: 1px solid var(--border-strong); background: transparent; font-size: 13px; }
+/* Строка «скоро» в переключателе модели (buildSwitcher) — прежняя. */
+.pk-soon { margin: 4px 0 0; padding: 0 0 0 0; font-size: 13px; color: var(--text3); line-height: 1.55; }
+.pk-soon[hidden] { display: none; }
+
+@media (max-width: 1199px) {
+  .pk-screen .picker-inner { padding: 24px 24px 40px; }
+  .pk-screen .picker-grid.pk-cards, .pk-panels.pk-searching { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pk-cont { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pk-continue { grid-column: 1 / -1; }
+  .pk-recent .pk-thumb { width: 96px; height: 64px; }
+  .pk-recent .pk-cname { font-size: 14px; }
+}
+@media (max-width: 759px) {
+  .pk-screen .picker-inner { padding: 20px 16px 40px; }
+  .pk-screen .picker-head { flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 18px; }
+  .pk-search { flex: 1 1 auto; width: 100%; }
+  .pk-screen .picker-grid.pk-cards, .pk-panels.pk-searching { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  /* «Продолжить» сверху во всю ширину, недавние — лентой с прокруткой вбок. */
+  .pk-cont { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .pk-continue { flex-wrap: wrap; gap: 12px; }
+  .pk-continue .pk-ctext { flex: 1 1 0; }
+  .pk-continue .pk-thumb { width: 120px; height: 72px; }
+  .pk-continue .pk-go { flex: 1 1 100%; justify-content: center; height: 44px; }
+  .pk-recents { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scroll-snap-type: x proximity; }
+  .pk-recent { flex: 0 0 248px; min-height: 92px; scroll-snap-align: start; }
+  .pk-recent .pk-thumb { width: 96px; height: 64px; }
+  /* Вкладки — одной строкой с прокруткой вбок. */
+  .pk-tabs { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 18px; padding: 0 16px 4px; scrollbar-width: none; }
+  .pk-tabs::-webkit-scrollbar { display: none; }
+  .pk-tab { min-height: 44px; flex: 0 0 auto; }
+  .pk-well { height: 112px; padding: 8px; }
+  .pk-screen .scard { padding: 6px 6px 10px; }
+  .pk-screen .scard-name { font-size: 15px; margin-top: 8px; }
+}
+
+/* ── Переключатель модели (раздел 10): 660, поиск и блоки в две колонки ── */
+.switch-pop { width: 660px; max-height: calc(100vh - 120px); display: none; flex-direction: column; padding: 14px 16px 12px; }
+.switch-pop.open { display: flex; }
+.sw-search { flex: 0 0 auto; margin: 0 0 12px; }
+.sw-search input { height: 42px; }
+.sw-cols { flex: 1 1 auto; overflow-y: auto; columns: 2; column-gap: 24px; }
+.sw-block { break-inside: avoid; margin: 0 0 14px; }
+.sw-bname { font-size: 13px; font-weight: 600; color: var(--text2); margin: 0 0 4px; }
+.sw-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: var(--r); background: transparent; font: inherit; font-size: 14px; color: var(--text); text-align: left; cursor: pointer; }
+.sw-row:hover, .sw-row.sw-first { background: var(--accent-tint); }
+.sw-row.is-current { font-weight: 600; background: var(--accent-tint); }
+.sw-row.is-current::after { content: ''; width: 8px; height: 12px; margin-right: 4px; border: solid var(--accent); border-width: 0 2px 2px 0; transform: rotate(42deg); }
+.sw-dot { display: inline-block; flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.sw-foot { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.sw-saved { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.sw-all { border: 0; background: transparent; color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · «СНАЧАЛА САМ» (фаза 9; README макета, разделы 5.6, 9)
+   ═══════════════════════════════════════════════════════════════════ */
+.mh-self { display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px 0 10px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface); color: var(--text); font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.mh-self-track { position: relative; width: 28px; height: 16px; border-radius: var(--r-pill); background: var(--border-strong); flex: 0 0 28px; }
+.mh-self-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); transition: transform .12s var(--ease); }
+.mh-self[aria-pressed="true"] { background: var(--accent-tint); border-color: var(--accent); }
+.mh-self[aria-pressed="true"] .mh-self-track { background: var(--accent); }
+.mh-self[aria-pressed="true"] .mh-self-track::after { transform: translateX(12px); }
+.mh-self:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .mh-self-track::after { transition: none; } }
+.self-note { font-size: 13px; color: var(--text2); line-height: 1.55; }
+.self-note[hidden], .self-gate[hidden], #self-showall[hidden] { display: none; }
+.col-answer .col-note[hidden] { display: none; }
+#self-showall { height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.self-on .ans-cell.self-hidden .ans-val, .self-on .ans-cell.self-hidden .ans-was { display: none; }
+.self-box { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.self-detail { display: grid; font-size: 13px; line-height: 1.55; color: var(--text2); overflow-wrap: anywhere; }
+.self-detail > span { grid-area: 1 / 1; }
+.self-detail-reserve { visibility: hidden; }
+.self-inp { width: 100%; height: 34px; text-align: center; font-size: 19px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--r); color: var(--text); }
+.self-inp.is-ok { border-color: var(--green-border); }
+.self-inp.is-bad { border-color: var(--error); }
+.self-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.self-check { height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.self-show { border: 0; background: transparent; padding: 0; color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.self-pill { font-size: 13px; font-weight: 600; border-radius: var(--r-pill); padding: 0 8px; }
+.self-pill:empty { display: none; }
+.self-pill.is-ok { color: var(--green-ink); background: var(--green-tint); border: 1px solid var(--green-border); }
+.self-pill.is-bad { color: var(--error-ink); background: var(--error-tint); border: 1px solid var(--error-border); }
+.self-gate { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px dashed var(--border-strong); border-radius: var(--r-card); background: transparent; color: var(--text2); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; text-align: center; }
+.self-gate:hover { background: var(--chip-bg); color: var(--text); }
+body.self-on:not(.self-all) #ans-burden,
+body.self-on:not(.self-all) #sb-body,
+body.self-on:not(.self-all) #explain { display: none !important; }
+body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · УЗКИЕ ЭКРАНЫ И ТЕЛЕФОН (фаза 10; README макета,
+   раздел 3; COVERAGE, раздел 8). Ширина ничего не отнимает: те же узлы с
+   теми же id, переложенные стилями; колонки прячутся классом, не hidden.
+   ═══════════════════════════════════════════════════════════════════ */
+.cv-bar .cv-answer-btn, .ph-tabs, .ans-strip { display: none; }
+
+/* 760–1239: «Условие» и холст, «Ответ» выезжает панелью справа. */
+@media (max-width: 1239px) and (min-width: 760px) {
+  .app { grid-template-columns: 305px minmax(0, 1fr); }
+  .cv-bar .cv-answer-btn { display: inline-flex; }
+  #params-panel.col-answer {
+    position: fixed; top: 104px; right: 0; bottom: 0; width: 349px; z-index: var(--z-drawer);
+    transform: translateX(100%); visibility: hidden; transition: transform .2s var(--ease), visibility .2s;
+    box-shadow: var(--shadow-pop); border-left: 1px solid var(--border);
+  }
+  body.ans-open #params-panel.col-answer { transform: none; visibility: visible; }
+  .ans-strip { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; padding: 6px 12px; font-size: 13px; color: var(--text2); border-bottom: 1px solid var(--border-soft); background: var(--surface); }
+  .ans-strip b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .mh-saved { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { #params-panel.col-answer { transition: none; } }
+
+/* < 760: телефон. Холст сверху, под ним шторка с вкладками. */
+@media (max-width: 759px) {
+  html, body { height: auto; min-height: 100%; overflow: visible; }
+  .app { display: flex; flex-direction: column; height: auto; min-height: calc(100vh - 48px); overflow: visible; }
+  .mhead { flex: 0 0 auto; height: auto; min-height: 58px; flex-wrap: nowrap; padding: 0 6px; gap: 2px; }
+  .mhead .mh-btn > span, .mh-saved, .mh-sep, .mhead > #btn-redo, .mhead > #btn-model-reset, .mh-self > span:last-child { display: none; }
+  .mhead .mh-btn, .mhead .mh-icon, .mh-self { min-width: 44px; height: 44px; padding: 0 10px; justify-content: center; }
+  .mh-switch { flex: 1 1 auto; min-width: 0; }
+  .mh-name .side-scene { overflow: hidden; text-overflow: ellipsis; max-width: 52vw; display: inline-block; }
+  .cv-col { order: 1; flex: 0 0 auto; height: 354px; padding: 8px 8px 0; }   /* SVG 372×300 (README макета, 3) */
+  /* Строка «← Вернуться к задаче» — цель касания 44; колонка выше на столько же, SVG прежний. */
+  .cv-back { flex-basis: 44px; height: 44px; }
+  .cv-col:has(.cv-back:not([hidden])) { height: 398px; }
+  .cv-bar { overflow-x: auto; }
+  .cv-tool > span, .cv-zoom, .cv-bar > #btn-zoomin, .cv-bar > #btn-zoomout, #btn-focus { display: none; }
+  .ph-tabs { order: 2; display: flex; gap: 4px; padding: 8px 8px 0; background: var(--bg); position: sticky; top: 0; z-index: var(--z-float); }
+  .ph-tab { flex: 1 1 0; min-height: 44px; border: 1px solid var(--border); border-bottom: 0; border-radius: 14px 14px 0 0; background: var(--surface-2); color: var(--text2); font: inherit; font-size: 15px; font-weight: 500; cursor: pointer; }
+  .ph-tab[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: 600; }
+  #tools-panel.col-cond, #params-panel.col-answer { order: 3; width: auto; height: auto; border: 0; }
+  #tools-panel .side-scroll, #params-panel .side-scroll { overflow: visible; max-height: none; }
+  body:not(.ph-cond) #tools-panel.col-cond { display: none; }
+  body:not(.ph-ans):not(.ph-ex) #params-panel.col-answer { display: none; }
+  body.ph-ans #explain { display: none; }
+  body.ph-ex #scoreboard { display: none; }
+  body.ph-ex #params-panel .col-head h2 { font-size: 0; }
+  body.ph-ex #params-panel .col-head h2::after { content: 'Разбор'; font-size: 19px; }
+  /* Цели касания не меньше 44×44 (README макета, 3). */
+  .fc-ico, .fc-card .cpick-btn + *, .pw-step, .pw-del, .pk-clear, .self-check, .cv-mode__stop { min-width: 44px; min-height: 44px; }
+  .fc-card .cpick { width: 44px; height: 44px; display: inline-grid; place-items: center; }
+  .seg-btn, .cv-tool, .chk, .show-row, .fc-mi, .sw-row { min-height: 44px; }
+  .fc-card > .crow-formula { min-height: 46px; }
+  .chk input[type=checkbox], .col-cond input[type=checkbox] { width: 22px; height: 22px; flex-basis: 22px; }
+  .chk input[type=checkbox]:checked::after, .col-cond input[type=checkbox]:checked::after { left: 7px; top: 2.5px; width: 5px; height: 11px; }
+  .param-track input[type="range"] { height: 44px; }
+  /* Окна — листами: короткие снизу, с полями — на весь экран. */
+  .fc-menu, .cpick-menu, .pop { left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important; max-height: 80vh; border-radius: 16px 16px 0 0; overflow-y: auto; }
+  #pw-modal .modal-card.pw-card, #export-modal .modal-card.exp-card { width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; }
+  #export-modal .modal-card.exp-card { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .pw-cols { display: none; }
+  .pw-row { grid-template-columns: minmax(0, 1fr) 64px 64px 44px; }
+  .toast { bottom: 16px; max-width: calc(100vw - 24px); }
+}
+/* О2: фокус в поиске при открытии без кольца, пока человек не нажал Tab. */
+#picker-search.no-init-ring:focus { outline: none; border-color: var(--border-strong); }
+
+/* Кусочная функция в карточке (README макета, 6.6): запись скобкой с
+   карандашом вместо поля; поле остаётся источником записи, но не видно. */
+.fc-card.is-pw > .crow-formula { display: none; }
+.fc-pwrec {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 8px 6px 10px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-size: 16px; color: var(--text);
+}
+.fc-pwrec:hover { border-color: var(--border-strong); }
+.fc-pwrec:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fc-pwrec-math { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
+.fc-pwrec-math .katex { font-size: 1em; }
+.fc-pwrec-pen { flex: 0 0 15px; width: 15px; height: 15px; color: var(--text2); }
+.fc-pwrec-pen svg { width: 15px; height: 15px; display: block; }
+/* Q(P): чип, «в расчётах», канон записи (README макета, 6.1). */
+.fc-qp { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 13px; color: var(--text2); line-height: 1.55; }
+.fc-qp .form-badge { font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: var(--r-sm); background: var(--chip-bg); color: var(--chip-text); }
+.fc-qp-math { font-size: 16px; color: var(--text); }
+.fc-qp-math .katex { font-size: 1em; }
+/* Телефон: «Вид графика» листом снизу (COVERAGE, раздел 8). */
+@media (max-width: 759px) {
+  .cv-card > .wrench, #wrench-pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important; max-height: 85vh; overflow-y: auto; border-radius: 16px 16px 0 0; z-index: var(--z-pop); }
+}
+
+/* 760–959: шапка модели и панель холста не помещаются с подписями —
+   кнопки остаются значками с подсказками, как на телефоне (прибор
+   layout_probe: на 760 ничто не едет вбок). Имя у кнопок — aria-label. */
+@media (max-width: 1239px) { .cv-bar { overflow-x: auto; } }
+@media (max-width: 959px) and (min-width: 760px) {
+  .mhead .mh-btn > span, .cv-tool > span, .cv-zoom { display: none; }
+  .mhead .mh-btn { min-width: 40px; justify-content: center; }
+}
+/* Телефон: зона касания каждого органа не меньше 44×44 (README макета, 3).
+   Мелкие органы (образец цвета, «?», переключатель, границы ползунка)
+   получают прозрачную рамку-поле и такой же отрицательный отступ: рисунок
+   и раскладка прежние, а пальцу есть куда попасть. Кольцо, где было, —
+   контуром внутрь. Крупные кнопки просто вырастают до 44 по высоте. */
+@media (max-width: 759px) {
+  #btn-howto, .fc-add, .sel-btn, #ac-calc, #ac-clear, .btn-mark-add, .cv-bar .gt-btn, .cv-tool { min-height: 44px; }
+  .cv-tool, .cv-bar .gt-btn { min-width: 44px; }
+  .cpick-btn, .hint-btn, .f-help, .tgl-sw, .param-bound {
+    /* !important у обрезки: цвет образца задан встроенным `background`,
+       а сокращённая запись сбрасывает обрезку фона на рамку. */
+    box-sizing: content-box; background-clip: padding-box !important; border-style: solid; border-color: transparent !important; box-shadow: none;
+  }
+  .cpick-btn { border-width: 15px; margin: -15px; outline: 1px solid var(--border-soft); outline-offset: -16px; }
+  .cpick-btn:hover { transform: none; }
+  .fc-card > .crow-formula .f-kbd { flex-basis: 44px; width: 44px; height: 44px; border-width: 0; margin: 0; outline: none; }
+  .fc-card .cpick-btn { width: 20px; height: 20px; border-style: solid; border-width: 12px; margin: -12px -10px -12px -8px; outline: 1px solid var(--border-strong); outline-offset: -10px; }
+  .hint-btn { width: 20px; height: 20px; border-width: 12px; margin: -12px; outline: 1px solid var(--border); outline-offset: -13px; }
+  .f-help { width: 30px; height: 30px; border-width: 7px; margin: -7px; outline: 1px solid var(--border); outline-offset: -8px; }
+  .hint-btn:hover, .hint-btn[aria-expanded="true"], .f-help:hover, .f-help[aria-expanded="true"] { outline-color: var(--accent); }
+  .tgl-sw { width: 32px; height: 16px; border-width: 14px; margin: -14px; outline: 1px solid var(--border); outline-offset: -15px; }
+  .tgl.is-right .tgl-sw { outline-color: var(--accent); }
+  .param-bound { border-width: 14px 4px; margin: -14px -4px; text-decoration: underline dashed var(--text3); text-underline-offset: 3px; }
+}
+
+/* Телефон: лист «Действия» за «⋯» (93-shell.js, phMoreLayout). Строки от 48,
+   подложка — тенью листа. На большом экране кнопки «⋯» нет. */
+.ph-more-btn, .ph-lab { display: none; }
+.ph-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.ph-more-head .pop-title { margin: 0; }
+.ph-more-head .btn-icon { min-width: 44px; min-height: 44px; }
+.ph-more.open { box-shadow: 0 0 0 100vmax var(--scrim); }
+.ph-more-list { display: flex; flex-direction: column; }
+#ph-more-list > button {
+  display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-width: 0; min-height: 48px; height: auto;
+  padding: 0 12px; border: 0; border-radius: var(--r); background: transparent; box-shadow: none; color: var(--text);
+  font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer;
+}
+#ph-more-list > button:hover { background: var(--chip-bg); }
+#ph-more-list > button:disabled { color: var(--text3); cursor: default; background: transparent; }
+.ph-more-list > button svg { width: 20px; height: 20px; flex: 0 0 20px; }
+.ph-more-list .ph-lab { display: inline; }
+@media (max-width: 759px) { .mhead .ph-more-btn { display: inline-flex; align-items: center; } }
+
+
+/* «Построение графиков»: строка функции — той же карточкой, что карточка
+   функции (README макета, 6.1; COVERAGE, раздел 1): цвет кружком, поле 40 с
+   клавиатурой, «Подпись на графике» мелко под полем. */
+#sec-graph .grow {
+  padding: 10px 10px 10px 12px; margin: 0 0 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card); row-gap: 6px;
+}
+#sec-graph .grow > .cpick .cpick-btn {
+  width: 20px; height: 20px; border-radius: 50%; border: 0; box-shadow: none;
+  outline: 1px solid var(--border-strong); outline-offset: 2px;
+}
+#sec-graph .grow > .edval, #sec-graph .grow > .grow-name, #sec-graph .grow > .edval-text { font-size: 13px; color: var(--text2); }
+
+/* Дорожки ползунков встают вровень (проверка calc2_blocks (ж)): подписи границ
+   слева и справа — колонками постоянной ширины, а не по своему тексту. */
+.param-track { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; align-items: center; column-gap: 6px; }
+.param-track > .param-bound { min-width: 0; }
+.param-track > .param-bound:first-child { justify-self: start; }
+.param-track > .param-bound:last-child { justify-self: end; }
+
+/* Старое правило «уже 820 px правая панель сворачивается сама» (А-серия,
+   выше) к колонке «Ответ» не относится: сворачивания колонок больше нет
+   (пункт (д)), «Ответ» на узком экране — выезжающая панель или вкладка
+   телефона. Без отмены в моделях сложения вкладка «Ответ» была пустой. */
+@media (max-width: 820px) {
+  #params-panel.col-answer .side-inner { display: flex; }
+  #params-panel.col-answer .side-spine { display: none; }
+}
+/* Телефон: граница ползунка в колонке постоянной ширины — зона касания
+   всё равно 44 (36 + прозрачная рамка 4 + 4). */
+@media (max-width: 759px) {
+  .param-track > .param-bound { min-width: 36px; }
+}
+
+/* Крестик «Закрыть «Ответ»» — только у выезжающей панели (760–1239). */
+.ans-x { display: none; }
+@media (max-width: 1239px) and (min-width: 760px) {
+  #params-panel .col-head .ans-x { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; min-width: 32px; min-height: 32px; }
+  #params-panel .col-head .ans-x svg { width: 18px; height: 18px; }
+}
+/* Телефон: «Скопировать запись» итоговой функции и вопросы «Разбора» —
+   тоже цели касания от 44 по высоте. */
+@media (max-width: 759px) {
+  .ff-copy, .ff-expand { min-height: 44px; }
+  #ex-body .sb-note p.ex-q > b { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+}
+
+/* «Сначала сам» (README макета, 9): свои точки без координат, площади «?».
+   Текст прячется цветом, на его месте — «?»; правка точки по-прежнему возможна. */
+body.self-on:not(.self-all) .mark-xy .edval,
+body.self-on:not(.self-all) #info-areacalc .stat > b { color: transparent !important; position: relative; }
+body.self-on:not(.self-all) .mark-xy .edval .katex,
+body.self-on:not(.self-all) #info-areacalc .stat > b .katex { visibility: hidden; }
+body.self-on:not(.self-all) .mark-xy .edval::after,
+body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; position: absolute; right: 0; top: 0; color: var(--text2); }
+
+/* «Вид графика» по README макета, раздел 10: окно 330, заголовок 15/600,
+   поля 2×2 по 34 px с подписью 13/500, внизу «Вид по умолчанию». */
+.cv-card > .wrench, .wrench { width: 330px; }
+.wrench-head { font-size: 15px; font-weight: 600; color: var(--text); padding: 10px 0 2px; }
+.wrench .seg-btn { font-size: 13px; font-weight: 500; }
+.wrench .chk + .chk { margin-top: 8px; }
+.wrench-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; padding: 10px 0 4px; border-top: 1px solid var(--border-soft); }
+.wrench-more .wrench-grid { border-top: 0; padding-top: 0; }
+.wrench-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wrench-field > span:first-child { font-size: 13px; font-weight: 500; color: var(--text2); }
+.wrench-field input[type="number"], .wrench-field input[type="text"] {
+  height: 34px; min-width: 0; width: 100%; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums;
+}
+.wrench-field input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.wrench-title-field { padding: 4px 0 0; }
+.wrench-title-field .wrench-row { display: flex; align-items: center; gap: 8px; }
+.wrench-title-field .wrench-row input[type="text"] { flex: 1; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface-2); font-size: 14px; }
+.wrench-defaults { width: 100%; margin-top: 12px; }
+
+/* Отрезок «Наибольшего и наименьшего»: «от [ ] до [ ]» одной строкой. */
+.opt-range-row { display: flex; align-items: center; gap: 8px; }
+.opt-range-row > span { font-size: 14px; color: var(--text2); }
+/* «Вернуть по формуле» у отрезка ответа: текстовая ссылка (вид поправит сессия 3). */
+.ans-seg-auto { margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.ans-seg-auto[hidden] { display: none; }
+#ans-seg-row .seg-lab-row { display: flex; align-items: center; gap: 7px; margin: 0 0 2px; }
+#ans-seg-row .seg-lab-row label { margin: 0; }
+.opt-range-row input { width: 0; flex: 1 1 0; height: 34px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums; }
+
+/* Телефон: имя модели не вылезает на кнопки шапки — многоточие; «Сначала сам»
+   в шапке «Ответа» подписан словами (там места хватает). */
+@media (max-width: 759px) {
+  .mh-switch { overflow: hidden; }
+  .mh-switch .mh-block, .mh-switch .mh-name { display: flex; min-width: 0; white-space: nowrap; }
+  .mh-switch .mh-block { overflow: hidden; text-overflow: ellipsis; display: block; }
+  .mh-name .side-scene { max-width: none; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mh-name > svg { flex: 0 0 auto; }
+  .mh-switch > * { max-width: 100%; }
+  #params-panel .col-head h2 { white-space: nowrap; }
+  body.ph-ans #params-panel .col-head .col-note { display: none; }
+  #params-panel .col-head .mh-self { margin-left: auto; height: 44px; padding: 0 12px; }
+  #params-panel .col-head .mh-self > span:last-child { display: inline; }
+  #ph-more-list > #dock-export > span { display: inline; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ОТВЕТ СТРОКАМИ (сессия 3, 10.2026; решение владельца 09.10, ADR 0144)
+   Все модели: группы с заголовком, в группе одна величина на строку —
+   подпись слева, значение справа, тонкая линия между строками, высота от
+   44 px. Крупных плиток нет. Пары кегля из шкалы канона (COVERAGE, раздел 5):
+   подпись 13,5/400 (проверка шкалы считает 14/400), значение 16/400 одним
+   формульным шрифтом KaTeX_Main с цифрами одной ширины, заголовок группы
+   15/600, «было · Δ» 13/400. Те же строки и кегли — у остальных строк табло.
+   Не влезает значение рядом с подписью — строка в два этажа: подпись
+   сверху, значение под ней по правому краю (перенос гибкой строки, подпись
+   не уже 11em). Значение посередине не рвётся: число и точка — целым
+   куском, длинный список — только между значениями (.ans-item).
+   ═══════════════════════════════════════════════════════════════════ */
+.ans-hero { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.ans-hero[hidden] { display: none; }
+.ans-group { display: flex; flex-direction: column; min-width: 0; }
+.ans-ghead {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: .28em; margin: 0; padding: 0 0 8px;
+  border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 600; line-height: 1.55; color: var(--text);
+}
+.ans-gdot { flex: 0 0 10px; width: 10px; height: 10px; margin-right: .35em; border-radius: 50%; background: var(--text2); }
+.ans-gform { font-weight: 400; }
+.ans-gform .katex { font-size: 1.1em; }
+.ans-cell, #params-panel .sb-body .stat, #params-panel .sb-body .stat.stat-eq, #params-panel .sb-body .stat.stat-stack {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-start; column-gap: 12px; row-gap: 2px;
+  min-width: 0; min-height: 44px; padding: 10px 0; box-sizing: border-box; border-bottom: 1px solid var(--border-soft);
+  line-height: 1.55;   /* текст с формулой — не теснее 1,55 (канон, math_line_height) */
+}
+.ans-lab, #params-panel .sb-body .stat > span, #params-panel .sb-body .stat.stat-eq > span {
+  flex: 1 1 11em; min-width: 0; font-size: 13.5px; font-weight: 400; line-height: 1.55; color: var(--text2);
+  text-align: left; overflow-wrap: break-word; hyphens: none;
+}
+.ans-lab .katex, #params-panel .sb-body .stat > span .katex { font-size: 1.1em; }
+.ans-line, #params-panel .sb-body .stat > b, #params-panel .sb-body .stat.stat-eq > b {
+  flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; text-align: right; white-space: nowrap;
+  font-family: 'KaTeX_Main', var(--font-ui); font-size: 16px; font-weight: 400; line-height: 1.55; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.ans-line { display: flex; align-items: baseline; justify-content: flex-end; gap: .3em; }
+.ans-not, .ans-eq, .ans-val { font-size: 1em; color: var(--text); }
+.ans-not .katex, .ans-val .katex, #params-panel .sb-body .stat > b .katex { font-size: 1em; }
+.ans-val { min-width: 0; white-space: nowrap; }
+.ans-val.ans-val--list { white-space: normal; }   /* список точек: перенос между ними (answerValueInto) */
+.ans-item { display: inline-block; white-space: nowrap; }
+.ans-sep { margin-right: .3em; }
+.ans-val--none { color: var(--text3); }
+/* Э1: характеристика — обычный переносимый текст. Числа и отдельные формулы
+   сохраняют свой набор; длинная фраза не выдавливает край колонки. */
+#params-panel .sb-body .stat.stat-phrase > b {
+  white-space: normal; overflow-wrap: anywhere; text-align: left;
+  font-family: var(--font-ui); font-size: 14px;
+}
+.ans-was { flex: 1 0 100%; text-align: right; font-size: 13px; line-height: 1.55; color: var(--text3); font-variant-numeric: tabular-nums; }
+#params-panel .sb-body .stat .stat-line { display: block; }
+#params-panel .tx-table td:not(:first-child) { font-family: 'KaTeX_Main', var(--font-ui); }
+.ans-drained { display: none !important; }
+.ans-seg-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text3); }
+.ans-seg-note[hidden] { display: none; }
+/* Строка, ушедшая в «Ответ», и источник заголовка группы в табло не
+   повторяются. ⚠️ Правило стоит ПОСЛЕ вида строк выше: та же специфичность
+   иначе возвращала им display: flex, и величина показывалась дважды. */
+#params-panel #sb-body .stat.is-hero, #params-panel #sb-body .stat[data-ans-head], #params-panel #sb-body .stat.ans-dup { display: none; }
+
+/* «Сначала сам» в столбик (сессия 3, ADR 0144): подпись строкой во всю ширину,
+   под ней поле на всю ширину и «Проверить» справа одной строкой; ниже вердикт
+   слева («✓ верно» / «✗ не сходится» цветом, без заливки) и «Показать» справа.
+   Строка вердикта держит своё место и пустой: высота строки до и после
+   проверки одна. Поле 16/400 (шкала), кнопка 13/600. */
+.ans-cell.self-hidden .ans-lab { flex-basis: 100%; }
+/* ⚠️ У поля ввода своя «естественная» ширина (~20 знаков): с основой auto строка
+   «поле + Проверить» выходила на 11 px шире колонки, и колонка уезжала вбок при
+   фокусе. Основа поля нулевая, коробка может сжиматься (min-width: 0). */
+.ans-cell .self-box { flex: 1 0 100%; min-width: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.self-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.self-row .self-inp {
+  flex: 1 1 0; width: 0; min-width: 0; height: 36px; padding: 0 12px; text-align: left;
+  font: inherit; font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums;
+}
+.self-row .self-check { flex: 0 0 auto; height: 36px; padding: 0 14px; }
+.ans-cell .self-acts { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 20px; flex-wrap: nowrap; }
+.ans-cell .self-pill, .ans-cell .self-pill:empty { display: inline; padding: 0; border: 0; background: none; font-size: 13px; font-weight: 600; line-height: 20px; }
+.ans-cell .self-pill.is-ok { color: var(--green-ink); }
+.ans-cell .self-pill.is-bad { color: var(--error-ink); }
+.ans-cell .self-show { margin-left: auto; line-height: 20px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЛЕВАЯ КОЛОНКА: ОТРЕЗОК ОТВЕТА, СЕГМЕНТ ПЛОЩАДИ, КНОПКИ КРИВЫХ
+   (сессия 3, 10.2026; решение владельца 09.10, ADR 0144)
+   ═══════════════════════════════════════════════════════════════════ */
+/* «Ответ ищем на отрезке»: карточка, как карточка функции; строка
+   «x от [ ] до [ ]» — буква оси в начале, поля в рамке; «Вернуть по
+   формуле» — ссылкой отдельной строкой, только при ручном отрезке. */
+#ans-seg-row {
+  padding: 10px 12px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card);
+}
+#ans-seg-row .seg-lab-row label { font-size: 13.5px; font-weight: 400; color: var(--text2); }
+#ans-seg-row .opt-range-row { margin-top: 8px; gap: 8px; }
+#ans-seg-row .opt-range-row > span { flex: 0 0 auto; font-size: 14px; color: var(--text2); }
+#ans-seg-row .opt-range-row > .ans-seg-var { color: var(--text); }
+#ans-seg-row .opt-range-row > .ans-seg-var .katex { font-size: 1.1em; }
+#ans-seg-row .opt-range-row input[type="text"] {
+  flex: 1 1 0; width: 0; min-width: 0; max-width: 88px; height: 36px; padding: 0 10px; text-align: center;
+  font: inherit; font-size: 15px; font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+#ans-seg-row .opt-range-row input[type="text"]:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+#ans-seg-row .ans-seg-auto { display: block; margin-top: 8px; text-decoration: none; color: var(--accent-ink); }
+#ans-seg-row .ans-seg-auto:hover { text-decoration: underline; }
+#ans-seg-row .ans-seg-auto[hidden] { display: none; }
+
+/* «Под кривой | Между точками»: две половины поровну, выбранная подсвечена —
+   тот же сегмент, что формат в окне «Скачать». */
+.seg.ac-mode { margin: 4px 0 10px; }
+.seg.ac-mode .seg-btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; white-space: nowrap; }   /* на 1280 «Между точками» иначе рвалось в две строки */
+
+/* Кнопки кривых: точка цвета кривой и имя; выбранная — подложка акцента и
+   рамка акцентом (сплошной акцент держим за главной кнопкой экрана). Не
+   влезают в строку — переносятся. */
+.ac-pick-row { display: block; }
+.ac-cbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-cbtn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px 0 12px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--surface);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.ac-cbtn:hover { background: var(--chip-bg); }
+.ac-cbtn[aria-checked="true"] { background: var(--accent-tint); border-color: var(--accent); }
+.ac-cbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ac-cdot { flex: 0 0 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--text2); }
+.ac-cname .katex { font-size: 1.1em; }
+#ac-calc .ac-cname { margin-left: .25em; }
+@media (max-width: 759px) { .ac-cbtn, .seg.ac-mode .seg-btn, #ans-seg-row .opt-range-row input[type="text"] { min-height: 44px; } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕЖИМ «ТОЧКИ И ПЛОЩАДИ» (13.10.2026, ADR 0148; 93-shell.js)
+   Над холстом два инструмента. В режиме на месте «Условия» стоит панель
+   #pts-panel; «Условие» прячется КЛАССОМ (body.pts-on), не hidden. Признаки
+   режима: рамка карточки холста акцентом 2 px (граница 1 + тень 1 — без
+   сдвига раскладки, холст не перерисовывается), нажатая кнопка, подпись
+   «Esc: выйти из режима».
+   ═══════════════════════════════════════════════════════════════════ */
+#pts-panel { grid-column: 1; grid-row: 2; display: none; }
+body.pts-on #pts-panel { display: flex; }
+body.pts-on #tools-panel { display: none; }
+body.cv-focus #pts-panel { display: none; }
+body.pts-on .cv-card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cv-esc { display: none; margin-left: 8px; font-size: 12.5px; color: var(--text2); white-space: nowrap; }
+body.pts-on .cv-esc { display: inline; }
+@media (max-width: 1239px) { body.pts-on .cv-esc { display: none; } }   /* узкая панель холста; Esc — клавиатурное */
+
+.pts-head { gap: 8px; border-bottom: 1px solid var(--border-soft); }
+.pts-head .pts-back { margin-left: -8px; color: var(--accent-ink); font-size: 14px; }
+.pts-done {
+  height: 32px; padding: 0 14px; border: 0; border-radius: var(--r); cursor: pointer;
+  background: var(--btn-bg); color: var(--on-btn); font: inherit; font-size: 14px; font-weight: 600;
+}
+.pts-done:hover { filter: brightness(1.08); }
+.pts-done:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#pts-panel .side-scroll { padding: 0; }
+.pts-body { padding: 14px 16px 20px; }
+.pts-title { margin: 0 0 10px; font-size: 19px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.pts-hint {
+  margin: 0 0 6px; padding: 10px 12px; border-radius: var(--r); background: var(--accent-tint);
+  font-size: 13.5px; line-height: 1.5; color: var(--text);
+}
+#pts-panel .section { margin: 0; padding: 14px 0 12px; border: 0; border-top: 1px solid var(--border-soft); background: transparent; box-shadow: none; }
+#pts-panel .pts-hint + .section { border-top: 0; }
+#pts-panel .pts-sec-head { padding: 0 0 8px; }
+#pts-panel .fold-body { padding: 0; }
+.pts-clear { width: 100%; margin-top: 8px; }
+.mark-on { margin: -2px 0 4px; font-size: 13px; color: var(--text2); }
+
+/* Построение площади: пока его нет, видны только «+ Под кривой» и «+ Между
+   точками»; кнопка не выглядит выбранной (выбор — у открытого построения). */
+#sec-areascalc:not(.ac-open) #ac-pane-curve,
+#sec-areascalc:not(.ac-open) #ac-pane-poly,
+#sec-areascalc:not(.ac-open) #ac-calc { display: none !important; }
+#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { background: transparent; border-color: transparent; box-shadow: none; color: var(--text); font-weight: 500; }
+#sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn:hover { background: var(--surface); color: var(--text); }
+/* Набор вершин заканчивают «Готово» в строке над холстом и щелчок по первой
+   вершине: «Посчитать площадь» в панели на это время не нужна. */
+#sec-areascalc.ac-open:has(#ac-pane-poly:not([style*="none"])) #ac-calc { display: none; }
+
+@media (max-width: 759px) {
+  #pts-panel.col-cond { order: 3; width: auto; height: auto; border: 0; }
+  #pts-panel .side-scroll { overflow: visible; max-height: none; }
+  body.pts-on #tools-panel.col-cond, body.pts-on #params-panel.col-answer, body.pts-on .ph-tabs { display: none; }
+  .pts-done, .pts-head .pts-back, .pts-clear { min-height: 44px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   «ОТВЕТ» ПРЯЧЕТСЯ В ПОЛОСКУ (13.10.2026, ADR 0148; 93-shell.js)
+   Только от 1240 px, где «Ответ» — колонка. Спрятанный оставляет справа
+   полоску 44 px (#ans-rail: «Ответ» вертикально и «‹»), холст занимает
+   место. Это вид: класс body.ans-hidden; на 760–1239 и на телефоне ни
+   «Спрятать», ни полоски нет. «Развернуть график» (cv-focus) сильнее.
+   ═══════════════════════════════════════════════════════════════════ */
+.ans-hide, .ans-rail { display: none; }
+.ans-rail {
+  flex: 1 1 auto; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 16px 0;
+  border: 0; background: var(--surface); color: var(--text2); cursor: pointer; font: inherit;
+}
+.ans-rail:hover { background: var(--chip-bg); color: var(--text); }
+.ans-rail:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+.ans-rail-lab { writing-mode: vertical-rl; font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: var(--text); }
+.ans-rail-arr { font-size: 18px; line-height: 1; }
+@media (min-width: 1240px) {
+  .ans-hide { display: inline-flex; flex: 0 0 auto; margin-left: 6px; }
+  /* Заголовок «Ответ» не сжимается и не переносится по буквам рядом с «Спрятать ›». */
+  #params-panel .col-head h2 { flex: 0 0 auto; white-space: nowrap; }
+  #params-panel .col-head .col-note { flex: 1 1 auto; min-width: 0; text-align: right; white-space: nowrap; }
+  body.ans-hidden:not(.cv-focus) .app { grid-template-columns: 337px minmax(0, 1fr) 44px; }
+  body.ans-hidden #params-panel > .side-inner { display: none; }
+  body.ans-hidden #params-panel > .ans-rail { display: flex; }
+}
+@media (min-width: 1240px) and (max-width: 1399px) {
+  body.ans-hidden:not(.cv-focus) .app { grid-template-columns: 305px minmax(0, 1fr) 44px; }
+  /* Колонка 317: «пересчитывается сразу» рядом с «Спрятать ›» не помещается. */
+  #params-panel .col-head .col-note { visibility: hidden; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ТИХИЕ ПАНЕЛИ 14.10 (пакет claude/mockups/calc2_panels_20261014, README 3–5)
+   Этап А: «Ответ» и «Разбор» закрыты по умолчанию; стрелка на левом краю
+   колонки (решение владельца 14.10, Notion …81de…, ADR 0150).
+   ⚠️ Правила «спрятать» (.is-hero, .ans-dup, .ans-drained, .sb-note-src,
+   .scoped-off, [hidden]) стоят раньше: свой display здесь — с повтором их.
+   ═══════════════════════════════════════════════════════════════════ */
+/* Стрелка — ОДИН узел, прямой ребёнок #params-panel вне .side-inner: круг 40,
+   центр на границе с холстом, 12 px от верха колонки (README 4). Базовое
+   «.ans-hide { display: none }» стоит раньше — показ повторён ниже. */
+#params-panel > .ans-hide {
+  position: absolute; left: -20px; top: 12px; z-index: 3;
+  width: 40px; height: 40px; padding: 0; margin: 0; border-radius: 50%;
+  align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); cursor: pointer;
+}
+#params-panel > .ans-hide svg { width: 22px; height: 22px; }
+body.ans-hidden #params-panel > .ans-hide svg { transform: rotate(180deg); }
+#params-panel > .ans-hide:hover { background: var(--chip-bg); }
+#params-panel > .ans-hide:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Полоска закрытого «Ответа»: только вертикальное «Ответ» 13 / 600 сверху
+   (64 px), нажимается вся; своей «‹» нет — её заменяет стрелка. */
+.ans-rail { justify-content: flex-start; padding: 64px 0 16px; }
+.ans-rail-lab { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: .02em; }
+.ans-rail:hover .ans-rail-lab { color: var(--text); }
+@media (min-width: 1240px) {
+  #params-panel > .ans-hide { display: inline-flex; }
+  /* Место под стрелку в шапке колонки — только от 1240. */
+  #params-panel .col-head { padding-left: 34px; }
+  /* Стрелка заходит на холст на 20 px: панели холста справа запас 24 px, иначе
+     она ложится на «Развернуть график» (замер: правый край кнопки на 19 px
+     левее колонки). */
+  .cv-bar { padding-right: 32px; }
+}
+
+/* «Разбор» — последняя строка «Ответа»: полоса 56 px, черта сверху, «Разбор»
+   14 / 600, число вопросов 12 / 500, шеврон 20 справа (README 4). Свёрнут
+   классом body (вид, не модель); на телефоне полосы нет, содержимое раскрыто. */
+#params-panel #explain { margin-top: 0; border-top: 1px solid var(--border-soft); }
+#explain .col-sub.ex-head, #explain #ex-title { margin: 0; font-size: 14px; }
+.ex-bar {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; padding: 0;
+  border: 0; background: transparent; color: var(--text); cursor: pointer; font: inherit; text-align: left;
+}
+.ex-bar-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.ex-bar-count { font-size: 12px; font-weight: 500; color: var(--text3); }
+.ex-bar-count:empty { display: none; }
+.ex-bar-chev { width: 20px; height: 20px; margin-left: auto; color: var(--text2); transition: transform .18s var(--ease); }
+body.ex-shown .ex-bar-chev { transform: rotate(180deg); }
+.ex-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .ex-bar-chev { transition: none; } }
+@media (min-width: 760px) {
+  body:not(.ex-shown) #ex-fold { display: none; }
+}
+@media (max-width: 759px) {
+  #ex-title { display: none; }
+  #params-panel #explain { border-top: 0; }
+}
+/* Жирное слово ВНУТРИ фразы «Разбора» — строчное: правило заголовка врезки
+   (.sb-note b — блок 11 px заглавными) разрывало абзац («S» и «сдвигается»
+   отдельными строками у taxes, mono, tradeprice, mono-kink). */
+#ex-body .sb-note p b, #ex-body .sb-note li b, #ex-body .sb-note b.ex-inline {
+  display: inline; margin: 0; font-size: inherit; text-transform: none; letter-spacing: 0;
+}
+#ex-body .sb-note p.ex-q > b { display: block; }
+
+/* ── Этап Б: «Ответ» — вид (README пакета 3–5; лесенка A, решение …81d6…) ───────
+   Токены: --seg-on (нажатый сегмент), --track (дорожка, полоса бремени). */
+:root { --seg-on: #fffef7; --track: rgba(45, 45, 45, .16); }
+[data-theme="dark"] { --seg-on: #3a3631; --track: rgba(255, 255, 255, .17); }
+
+/* Шапка колонки: 64 px, черта снизу, «Ответ» 18 / 600; колонка 18 px по бокам. */
+#params-panel .col-head { min-height: 64px; height: 64px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--border-soft); }
+#params-panel .col-head h2 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+@media (min-width: 1240px) { #params-panel .col-head { padding-left: 34px; } }
+#params-panel .side-scroll { padding: 0 18px 16px; }
+#params-panel #sb-fold { padding-top: 18px; }
+@media (max-width: 759px) {
+  body.ph-ex #params-panel .col-head h2::after { font-size: 18px; }
+}
+
+/* Разделы: заголовок 14 / 600, 18 px сверху и снизу, черта между разделами, без
+   рамок-карточек. Первый видимый раздел черты не несёт (.ans-sec-first, buildAnswer). */
+#ans-hero > .ans-group, #params-panel #ans-burden, #params-panel #sb-body > [id], #params-panel #explain {
+  border-top: 1px solid var(--border-soft); padding-top: 18px;
+}
+#ans-hero > .ans-group.ans-sec-first, #params-panel #ans-burden.ans-sec-first,
+#params-panel #sb-body > [id].ans-sec-first, #params-panel #explain.ans-sec-first,
+#params-panel #sb-body > [id].ans-sec-joined { border-top: 0; padding-top: 0; }
+#params-panel #explain { margin-top: 18px; padding-top: 0; }
+#params-panel .ans-ghead, #params-panel .ans-burden .col-sub, #params-panel #sb-body .section-title,
+#params-panel #sec-eq .section-title, #params-panel #sb-body > [id]::before {
+  margin: 0 0 10px; padding: 0; border: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text);
+  text-transform: none; letter-spacing: 0;
+}
+#params-panel #info-tax[data-head]:not(:empty)::before { content: attr(data-head); }
+/* «Излишки» по состоянию (А2 24.10, ADR 0158): «Излишки при автаркии» в «Малой открытой экономике» (areasHead). */
+#params-panel #info-areas[data-head]:not(:empty)::before { content: attr(data-head); }
+
+/* Главные числа: строки на подложке --surface-2 (радиус 10, поля 0 14), строка 11 px
+   сверху и снизу, черта --border-soft между строками; подпись 14 / 500 --text2,
+   значение KaTeX 20 px, изменение «50 − 10» 12 / 500 --text3. */
+.ans-rows { background: var(--surface-2); border-radius: 10px; padding: 0 14px; min-width: 0; }
+#ans-hero .ans-rows > .ans-cell { min-height: 0; padding: 11px 0; border-bottom: 1px solid var(--border-soft); }
+#ans-hero .ans-rows > .ans-cell:last-child { border-bottom: 0; }
+#params-panel .ans-lab, #params-panel .sb-body .stat > span, #params-panel .sb-body .stat.stat-eq > span {
+  font-size: 14px; font-weight: 500; color: var(--text2);
+}
+#ans-hero .ans-line { font-size: 20px; }
+#ans-hero .ans-was { font-size: 12px; font-weight: 500; color: var(--text3); }
+
+/* «Кто несёт налог»: полоса 8 px (--track, заполнение --text2), имена 12 / 500
+   --text3 с образцом 10 px, значения 14 / 600. */
+#params-panel .burden-bar { height: 8px; background: var(--track); border-radius: var(--r-pill); }
+#params-panel .burden-b { background: var(--text2); }
+#params-panel .burden-cols { margin-top: 10px; }
+#params-panel .burden-name { font-size: 12px; font-weight: 500; color: var(--text3); gap: 6px; }
+#params-panel .burden-name::before { width: 10px; height: 10px; border-radius: 3px; background: var(--text2); }
+#params-panel .is-seller .burden-name::before { background: var(--track); }
+#params-panel .burden-val { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+/* «Итоговая функция»: заголовок раздела и тихая «Копировать» (30 px, рамка, 13 / 600)
+   в строку; подпись 14 / 500; запись 22 px (подгонка FF_MAX_PX = 22, ADR 0048). */
+#info-final .ff { padding: 0; border: 0; border-radius: 0; background: transparent; }
+#info-final .ff-top { align-items: center; }
+#info-final .ff-eyebrow { font-size: 14px; font-weight: 600; color: var(--text); }
+#info-final .ff-copy, #info-final .ff-expand {
+  height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; font-size: 13px; font-weight: 600; color: var(--text); line-height: 28px;
+}
+#info-final .ff-name { margin-top: 10px; font-size: 14px; font-weight: 500; color: var(--text2); }
+#info-final .ff-math { margin-top: 6px; font-size: 22px; }
+
+/* Таблицы «До / После»: справа «до», «после» 12 / 500 --text3; строки 14 / 500;
+   числа без жирного (до --text2, после --text); столбец «Δ» не виден. Подпись строки
+   словами — ::before с data-word, исходный текст ячейки font-size: 0 (decorateTables). */
+#params-panel .tx-table { width: 100%; margin-top: 0; border-collapse: collapse; }
+#params-panel .tx-table th { font-size: 12px; font-weight: 500; color: var(--text3); text-transform: lowercase; text-align: right; border: 0; padding: 0 0 6px 10px; }
+#params-panel .tx-table td { font-size: 14px; font-weight: 500; border: 0; padding: 8px 0 8px 10px; line-height: 1.55; }
+#params-panel .tx-table td:first-child { padding-left: 0; color: var(--text2); text-align: left; }
+#params-panel .tx-table td:not(:first-child) { text-align: right; font-weight: 400; color: var(--text2); white-space: nowrap; }
+#params-panel .tx-table td:nth-child(3) { font-weight: 400; color: var(--text); }
+#params-panel .tx-table .tx-delta { display: none; }
+#params-panel .tx-table td[data-word] { font-size: 0; }
+#params-panel .tx-table td[data-word]::before { content: attr(data-word); font-size: 14px; font-weight: 500; color: var(--text2); }
+/* Повторы — один раз (hideEchoes, 94-answer.js; README 5). Правила «спрятать» —
+   после вида строк и таблиц выше. */
+#params-panel #sb-body tr.ans-trdup, #params-panel #sb-body .stat.ans-echo, #params-panel #sb-body .ans-intable { display: none !important; }
+/* Пояснения «Ответа» — в «Разборе» (answerNotesToExplain, 86-workspace.js): в табло
+   источники остаются, но не видны. Остаются: .warn (строка статуса), «Ищем на
+   отрезке…», вердикты «Сначала сам», #self-gate. */
+#params-panel #sb-body .hint, #params-panel #sb-body .muted, #params-panel #sb-body .scope-note { display: none !important; }
+/* «до», «после» — в строке заголовка раздела «До и после …» (макет 09): строка
+   заголовков таблицы поднята на высоту заголовка, её левая ячейка пустая. Только если
+   таблица идёт сразу за заголовком (класс tx-lift, liftTableHead; правка А2 сессии 5),
+   иначе подписи — своей строкой прямо над таблицей. */
+#params-panel #info-tax[data-head].tx-lift .tx-table { margin-top: -30px; }
+/* «Сначала сам» на подложке: строка уже на поля подложки (14 + 14), «Проверить» ужата
+   по бокам, чтобы поле осталось не уже 60 % строки (self_probe). */
+#ans-hero .ans-rows .self-row .self-check { padding: 0 10px; }
+
+/* ── Этап В: тишина (решение «никаких подсказок», Notion …81eb…; README 6; ADR 0151) ──
+   Кнопок «?», их плашек, «Как писать формулы» в шапке и поясняющих строк «Условия»,
+   окон и панели точек на экране нет. Тексты: экономика — в «Разборе»
+   (conditionNotesToExplain), синтаксис — в окне клавиатуры поля («Как писать»),
+   инструкции интерфейса — убраны по закрытому списку (README 10). */
+.hint-btn, .hint-pop, .hint-pop.open, .help-dot, #btn-howto, .hint-row:has(> .hint-lead),
+#tools-panel .hint, #tools-panel .hint.hint-keep, .fc-menu-note, .crow-auto, .wrench-note, .pts-hint,
+.cv-esc, body.pts-on .cv-esc, .f-pal-lead, .howto-foot, .side-reset__why { display: none !important; }
+#hint-tip { display: none !important; }
+/* Живой коридор квоты — часть значения регулятора, а не подсказка. */
+#tools-panel #quota-price-range.hint-keep { display: block !important; font-size: 12px; font-weight: 500; }
+/* «Как писать» в окне клавиатуры: пример — моноширинным (образец набора), пояснение 12 / 500. */
+.mkbd-howto .howto-rows { display: flex; flex-direction: column; gap: 6px; }
+.mkbd-howto .howto-row { display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.mkbd-howto .howto-ex { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.mkbd-howto .howto-note { font-size: 12px; font-weight: 500; color: var(--text2); line-height: 1.45; }
+.mkbd-howto .mkbd-lab { margin-top: 12px; }
+
+/* ── Этап В: лесенка A слева и в окнах (решение «шрифт панелей — вариант A», Notion …81d6…;
+   README 3–4; ADR 0151). Montserrat, шесть ступеней: 18 / 600 заголовок колонки, 14 / 600
+   разделы, 14 / 500 подписи и имена, 14 / 400 абзацы, 13 / 600 кнопки и сегменты, 12 / 500
+   мелочь. ⚠️ Кегль и вес здесь с !important: в «Условии» за годы накопились правила
+   разной силы (сегменты .active, карточки, «Вид графика»), и иначе лесенку пришлось бы
+   перебивать по одному. KaTeX и MathLive не трогаем (у них em от своего кегля), окно
+   клавиатуры — образец набора, оно своё. Только вид: разметка «Условия» прежняя
+   (карточки — сессии 5–6). ── */
+#tools-panel, #pts-panel, #wrench-pop, .fc-menu { font-family: var(--font-ui); }
+#tools-panel .col-head h2, #pts-panel .pts-title, #wrench-pop .wrench-head {
+  font-size: 18px !important; font-weight: 600 !important; letter-spacing: -.01em;
+}
+#tools-panel .sec-head, #tools-panel .sec-head b, #tools-panel .sec-head span, #pts-panel .pts-sec-head,
+#wrench-pop .wrench-title, #tools-panel .curve-group-title, #tools-panel .vsub {
+  font-size: 14px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--text);
+}
+#tools-panel label, #tools-panel .field > label, #tools-panel label.chk, #tools-panel .fc-name, #tools-panel .curve-name:not(.fc-notation),
+#tools-panel .show-name, #tools-panel .show-name .nowrap, #tools-panel .edval-text, #tools-panel .pchip-label,
+#tools-panel #ext-pigou-label, #tools-panel .field span:not(.katex *):not(.katex):not(.tex):not(.f-ex-note):not(.fc-notation):not(.fc-prefix):not(.sc-letter),
+#wrench-pop label, #wrench-pop label.chk, #wrench-pop .wrench-field span, #pts-panel .area-row span, #pts-panel .area-name-fixed,
+#pts-panel .mark-on, .fc-menu .fc-mi {
+  font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
+}
+#tools-panel .fc-add { font-size: 14px !important; font-weight: 500 !important; color: var(--text2); }
+#tools-panel .seg-btn, #pts-panel .seg-btn, #wrench-pop .seg-btn, #tools-panel .tgl-lab,
+#tools-panel .btn, #tools-panel .btn-quiet, #pts-panel .btn, #pts-panel .btn-quiet, #pts-panel .pts-done,
+#wrench-pop .btn, #wrench-pop .btn-quiet, #tools-panel .sel-btn:not(.sc-ucard .sel-btn), #pts-panel .sel-btn, #pts-panel .ac-cbtn, #tools-panel .ac-cbtn {
+  font-size: 13px !important; font-weight: 600 !important;
+}
+#tools-panel .param-bound, #tools-panel .param-kill, #pts-panel .param-bound {
+  font-size: 12px !important; font-weight: 500 !important; color: var(--text3);
+}
+#tools-panel .pchip-val:not(:has(.katex)), #pts-panel .area-row b { font-size: 14px !important; font-weight: 600 !important; }
+/* Подпись → поле: зазор не меньше 6 px (скрины владельца «Суммарная кривая / Имя на графике», КПВ 1 / КПВ 2). */
+#tools-panel .field > label, #tools-panel .grow > label { display: block; margin-bottom: 6px; }
+/* «Группа N» в таблице долей неравенства (подпись задана стилем узла 12 px, 56-scenes-inequality.js). */
+#tools-panel #ineq-groups-table span { font-size: 14px !important; font-weight: 500 !important; }
+
+/* ── Этап Г: «На графике» в «Виде графика» (решение …8142…; README 4, 7; ADR 0152) ──
+   Строка: галочка, образец (кнопка цвета у закраски), имя словами, обозначение справа 16 px.
+   Подзаголовки «Кривые» и «Закраски» 12 / 500 --text3. Секции «Показать на графике» в «Условии» нет. */
+#sec-show { display: none !important; }
+#wrench-pop .vg-onchart[hidden] { display: none; }
+#wrench-pop .vg-sub { margin: 10px 0 4px; font-size: 12px !important; font-weight: 500 !important; color: var(--text3); }
+#wrench-pop .vg-sub[hidden] { display: none; }
+#wrench-pop .vg-list { display: flex; flex-direction: column; gap: 2px; }
+#wrench-pop .vg-row[hidden] { display: none !important; }
+#wrench-pop .vg-row > label.chk, #wrench-pop .vg-row > label { display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0; }
+#wrench-pop .vg-row .show-name { flex: 1 1 auto; min-width: 0; color: var(--text); }
+#wrench-pop .vg-row .show-not { flex: 0 0 auto; margin-left: auto; color: var(--text2); }
+#wrench-pop .vg-row .show-not .katex { font-size: 16px; }
+#wrench-pop .vg-row .vg-old-sw { display: none !important; }
+#wrench-pop .vg-pick .cpick-btn { width: 14px; height: 14px; min-width: 14px; border-radius: 3px; padding: 0; }
+#wrench-pop .vg-row .field { margin: 6px 0 0; }
+#wrench-pop .vg-row .fc-card { margin: 4px 0; }
+#wrench-pop .vg-row .tgl { margin: 4px 0; }
+/* Лесенка A и для строк, переехавших в «Вид» (правила этапа В писались для #tools-panel): имена карточек
+   рыночных D и S — не моноширинным, тумблер заводов — как кнопки, обозначение без KaTeX («Tx», «Коридор»)
+   — подписью. */
+#wrench-pop .vg-row .curve-name, #wrench-pop .vg-row .fc-name, #wrench-pop .vg-row .show-name,
+#wrench-pop .vg-row .show-not:not(:has(.katex)) {
+  font-size: 14px !important; font-weight: 500 !important; font-family: var(--font-ui) !important;
+}
+#wrench-pop .vg-row .tgl-lab { font-size: 13px !important; font-weight: 600 !important; }
+
+/* ── Тихие панели, сессия 5 (14.10.2026; README пакета 4, 8, 12) ───────────────────
+   А3: заголовок группы «Условия» без видимых органов под ним не показывается
+   (hideEmptyGroupTitles, 92-ui-kit.js). */
+#tools-panel .grp-empty { display: none; }
+/* А3: строки «На графике» — имя словами слева, обозначение справа KaTeX 16 px (как в «Налогах», макет
+   08_view_costs). Карточки рыночных D и S «Сложения спросов» в «Виде» — тоже строкой, без рамки и обрезки
+   имени; порядок — раскладкой (узлы карточки собирает renderCurveList, их не переписываем). */
+#wrench-pop .vg-deriv .fc-card { padding: 0; border: 0; background: transparent; gap: 0; }
+#wrench-pop .vg-deriv .fc-card > .crow-top { gap: 10px; }
+#wrench-pop .vg-deriv .fc-name { order: 1; white-space: normal; overflow: visible; text-overflow: clip; color: var(--text); }
+#wrench-pop .vg-deriv .fc-name::first-letter { text-transform: uppercase; }
+#wrench-pop .vg-deriv .fc-notation { order: 2; margin-left: auto; font-size: 16px; color: var(--text2); }
+#wrench-pop .vg-deriv .fc-ico { order: 3; }
+/* А4: перенесённые в «Разбор» абзацы «Условия», «Ответа» и вмешательства — каждый отдельным абзацем с отступом
+   (были сплошной стеной строк). */
+#ex-body .ex-from-cond > p, #ex-body .ex-from-answer > p { margin: 0 0 10px; }
+#ex-body .ex-from-cond > p:last-child, #ex-body .ex-from-answer > p:last-child { margin-bottom: 0; }
+
+/* Б0: карточка функции для полей сцен (wrapFieldInCard, 92-ui-kit.js) — тот же вид, что карточка списка кривых:
+   рамка 1 px --border, радиус 10, поля 8 8 10 12, фон --surface; верхний ряд мин. 30 px, зазор 8; точка 16 px с
+   кольцом; обозначение KaTeX 19 px; имя 14 / 500 --text2, переносится (не обрезается); поле формулы 42 px. */
+#tools-panel .sc-card {
+  display: flex; flex-direction: column; gap: 8px; margin: 0 0 8px;
+  padding: 8px 8px 10px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+#tools-panel .fc-card > .crow-top { min-height: 30px; gap: 8px; }
+#tools-panel .fc-card .fc-notation { font-size: 19px; }
+#tools-panel .fc-card .fc-notation .katex { font-size: 1em; }
+#tools-panel .fc-card .fc-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+#tools-panel .fc-card .fc-dot {
+  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%; margin: 0 2px 0 4px;
+  /* Кольцо — обводкой, как у кнопки цвета карточки (.fc-card .cpick-btn): тень канон разрешает только окнам. */
+  outline: 1px solid var(--border-strong); outline-offset: 2px;
+}
+#tools-panel .fc-card .sc-dot-slot { display: inline-flex; flex: 0 0 auto; }
+#tools-panel .fc-card .sc-dot-slot:empty { display: none; }
+#tools-panel .fc-card .crow-gear { margin-left: auto; }
+#tools-panel .fc-card .fc-eye + .crow-gear { margin-left: 0; }
+#tools-panel .sc-card > .crow-formula { min-height: 42px; }
+#tools-panel .sc-card > .crow-formula { flex-wrap: nowrap; }
+#tools-panel .sc-card > .crow-formula > .f-row { flex: 1 1 0; min-width: 0; width: auto; }
+#tools-panel .sc-card > label.sc-old-label { display: none; }
+
+/* Строка параметра (README 4): подпись слева 14 / 500 --text2, «имя = значение» справа KaTeX 17 px, ниже
+   дорожка во всю ширину, под ней пределы 12 / 500 --text3 (меню границ по щелчку — как было). */
+#tools-panel .sc-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; row-gap: 6px; }
+#tools-panel .sc-prow > .sc-pname { grid-row: 1; grid-column: 1; font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel .sc-prow > .reg-eq { grid-row: 1; grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .sc-prow > :not(.sc-pname):not(.reg-eq):not(.sc-pval) { grid-column: 1 / -1; }
+#tools-panel .sc-prow .param-track { display: grid; grid-template-columns: 1fr 1fr; row-gap: 4px; flex: 1 1 auto; }
+#tools-panel .sc-prow .param-track > input[type=range] { grid-column: 1 / -1; grid-row: 1; width: 100%; margin: 0; }
+#tools-panel .sc-prow .param-track > .param-bound { grid-row: 2; font-size: 12px; font-weight: 500; color: var(--text3); }
+#tools-panel .sc-prow .param-track > .param-bound:first-child { justify-self: start; }
+#tools-panel .sc-prow .param-track > .param-bound:last-child { justify-self: end; }
+/* Число (README 4): подпись слева, поле 76 × 36 справа. */
+#tools-panel .sc-nrows { display: block; }
+#tools-panel .sc-nrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+#tools-panel .sc-nrow > label { margin: 0; }
+#tools-panel .sc-nrow > input { flex: 0 0 76px; width: 76px; height: 36px; }
+/* Раздел «Параметры» внутри панели модели — заголовок 14 / 600 с чертой сверху, как «Вмешательство государства». */
+#tools-panel .sc-sec { margin: 18px 0 10px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 14px; font-weight: 600; color: var(--text); }
+#tools-panel .sc-sec.grp-empty { display: none; }
+/* Сегменты вместо пары подписей с тумблером (README 4). Полоса-источник (.seg с кнопками и их id) прятана
+   тумблером инлайновым display: none — её и показываем (стиль сильнее инлайнового только с !important; сам
+   инлайновый стиль не трогаем: он в форме модели и в старых ссылках), тумблер прячем классом обёртки. */
+#tools-panel .seg.sc-seg { display: flex !important; }
+#tools-panel .tgl.sc-tgl-off { display: none; }
+/* Степпер «Сколько КПВ»: «−», число, «+»; кнопки 32 × 32 с рамкой. Поле числа — прежнее (хранитель значения). */
+#tools-panel .sc-stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+#tools-panel .sc-step { width: 32px; height: 32px; border: 0; background: transparent; color: var(--text2); font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; }
+#tools-panel .sc-step:hover { color: var(--text); }
+#tools-panel .sc-stepper > input { width: 32px; height: 32px; border: 0; background: transparent; text-align: center; padding: 0; font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 17px; -moz-appearance: textfield; }
+#tools-panel .sc-stepper > input::-webkit-inner-spin-button, #tools-panel .sc-stepper > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#tools-panel .sc-step-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+/* «Добавить …» пунктиром (README 4): 40 px, рамка 1 px пунктиром --border-strong, радиус 10, 14 / 500 --text2, «+». */
+#tools-panel #btn-ppf-compare {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin: 0 0 8px;
+  border: 1px dashed var(--border-strong); border-radius: 10px; background: transparent; font-size: 14px; font-weight: 500; color: var(--text2);
+}
+#tools-panel #btn-ppf-compare::before { content: '+'; font-size: 16px; line-height: 1; }
+#tools-panel #btn-ppf-compare[data-on="1"]::before { content: '−'; }
+/* Блок «Рыночная цена» «Издержек» несёт свою черту инлайновым стилем шаблона: черту даёт заголовок «Параметры». */
+#costs-pane-costs > .sc-sec + div { margin-top: 0 !important; padding-top: 0 !important; border-top: 0 !important; }
+
+/* ── Тихие панели, сессия 6 (14.10.2026; README пакета 4, 8, 12; ADR 0154) ──────────────────────────────────
+   А1: один вид карточки. Запись — база 18 px у всех карточек (как у D и S); запись, которая не помещается, ужимает
+   fitFormulaField до 16 px (82-input.js, ветка для некусочных записей в .fc-card), прежнего «16 px для карточек
+   сцен» нет. Точка цвета — видимый круг 16 px с кольцом (README 4) у значка и у кнопки цвета; у кнопки размер
+   нажатия 26 px — невидимая подкладка ::after (щелчок по ней — щелчок по кнопке). На телефоне — рамкой, как было,
+   цель касания 44 px. */
+@media (min-width: 760px) {
+  #tools-panel .fc-card .cpick-btn { position: relative; width: 16px; height: 16px; }
+  #tools-panel .fc-card .cpick-btn::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+}
+@media (max-width: 759px) {
+  #tools-panel .fc-card .cpick-btn { width: 16px; height: 16px; border-width: 14px; margin: -14px -12px -14px -10px; outline-offset: -12px; }
+}
+/* Запись не помещается и в 16 px — приставка уходит (fitFormulaField, класс fc-pre-off на строке поля). */
+#tools-panel .fc-card > .crow-formula.fc-pre-off > .fc-prefix { display: none; }
+/* А2: числа — плашкой (макет 05_left_Consumer): поле 76 × 36, фон --surface-2 (обе темы), рамка 1 px --border,
+   радиус 6, цифры по правому краю шрифтом формул; кольцо фокуса как у полей; пунктирной черты нет. id, значения и
+   обработчики прежние — меняется только вид. .sc-num — числа сессии 6 вне строки .sc-nrow (a и b в карточке U). */
+#tools-panel .sc-nrow > input, #tools-panel input.sc-num {
+  box-sizing: border-box; flex: 0 0 76px; width: 76px; height: 36px; padding: 0 10px; margin: 0;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  text-align: right; color: var(--text); font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 16px;
+}
+#tools-panel .sc-nrow > input:hover, #tools-panel input.sc-num:hover { color: var(--text); border-color: var(--border-strong); }
+#tools-panel .sc-nrow > input:focus, #tools-panel input.sc-num:focus { border-color: var(--accent); }
+#tools-panel .sc-nrow > input:focus-visible, #tools-panel input.sc-num:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* А5: раздел внутри блока табло («С МРОТ» на рынке труда) — заголовок раздела «Ответа» 14 / 600 с чертой сверху. */
+#params-panel #sb-body .sb-subsec { margin: 18px 0 10px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); }
+
+/* ── Б1–Б2: карточка U «Полезность» (scConsumerCard, 92-ui-kit.js; макет 05_left_Consumer). Список вида — в виде
+   поля (README 4: список на 4+ вариантов остаётся списком, без синевы; лесенка «кнопки 13 / 600» сужена исключением
+   для него), под ним формула вида KaTeX, ниже a и b (k) буквой и числом плашкой; своя формула — строка поля. ── */
+#tools-panel .sc-ucard > .sc-utype { margin: 0; }
+#tools-panel .sc-ucard > .sc-utype > label.sc-old-label,
+#tools-panel .sc-ucard > #cons-custom-row > label.sc-old-label,
+#tools-panel .sc-ucard .sc-lrow > label.sc-old-label { display: none; }
+#tools-panel .sc-ucard .sel-btn {
+  width: 100%; height: 40px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+  font-size: 14px; font-weight: 500;
+}
+#tools-panel .sc-ucard > .sc-ufml { padding: 2px 2px 0; font-size: 17px; line-height: 1.4; color: var(--text); }
+#tools-panel .sc-ucard > .sc-ufml .katex { font-size: 1em; }
+#tools-panel .sc-ucard > .sc-ufml.sc-off { display: none; }
+#tools-panel .sc-ucard > #cons-ab-row { gap: 12px; margin: 0; }
+#tools-panel .sc-ucard .sc-lrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; min-width: 0; }
+#tools-panel .sc-ucard > #cons-k-row.sc-lrow { justify-content: flex-start; gap: 18px; }
+#tools-panel .sc-letter { padding-left: 2px; font-size: 17px; color: var(--text2); }
+#tools-panel .sc-ucard .sel-caret { font-size: 16px; color: var(--text2); }
+#tools-panel .sc-letter .katex, #tools-panel .sc-pname .katex, #tools-panel .sc-nrow > label .katex { font-size: 1.05em; }
+#tools-panel .sc-ucard > #cons-custom-row { margin: 0; }
+
+/* ── В: макро (README 8; макет 05_left_Adas). Карточка с полем ЧИСЛА (LRAS «Потенциальный выпуск»): строка поля того
+   же вида, что у формулы (высота 42, фон, рамка), само поле числа — без рамки и без кнопки клавиатуры. ── */
+#tools-panel .fc-card > .crow-formula > input.sc-numfield {
+  flex: 1 1 0; min-width: 0; height: 38px; padding: 6px 2px; margin: 0;
+  border: 0; border-radius: 0; background: transparent; color: var(--text);
+  font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 18px;
+}
+#tools-panel .fc-card > .crow-formula > input.sc-numfield:hover { color: var(--text); }
+
+/* ── Г1: неравенство (scIneqSetup, 92-ui-kit.js). «Число групп» — подпись слева, сегмент справа; кнопка-список
+   прежнего списка спрятана классом (источник правды — сам select). Группы — подпись слева, число плашкой справа.
+   Ползунки τ и T — строка параметра (слова слева, значение KaTeX справа). ── */
+#tools-panel .sc-segrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+#tools-panel .sc-segrow > label { margin: 0; }
+#tools-panel .sc-segrow > .sel-btn.sc-gone { display: none; }
+#tools-panel .sc-nseg { display: inline-flex; margin: 0; }
+#tools-panel #ineq-groups-table > .sc-grow { justify-content: space-between; margin-bottom: 8px !important; }
+#tools-panel .sc-prow > label.sc-old-label { display: none; }
+#tools-panel .sc-prow > .sc-pval { grid-row: 1; grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .sc-prow > .sc-pval .katex { font-size: 1em; }
+#tools-panel .sc-prow-own > input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; }
+
+/* ── Г2: «Построение графиков» (scGraphRows, 92-ui-kit.js). Строка .grow сама — карточка; пустая — пунктиром
+   («Новая функция»), точка — простой значок, «⋯» нет. Приставка «y =» — только у записи без «=». ── */
+#tools-panel .sc-gcard { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 8px 10px 12px; border-radius: 10px; }
+#tools-panel .sc-gcard > .crow-top { justify-content: flex-start; }
+/* «Ответ ищем на отрезке» — строкой раздела «Параметры» (README 8), без рамки-коробки: подпись, «x от … до …» (поля
+   как есть), тихая «Вернуть по формуле». Узел один, его переносит syncAnsSegUI — заголовок раздела рисуется самой
+   строкой (::before), отдельного узла нет. */
+#tools-panel #ans-seg-row { padding: 18px 0 0; margin: 18px 0 8px; background: transparent; border: 0; border-top: 1px solid var(--border-soft); border-radius: 0; }
+#tools-panel #ans-seg-row::before { content: 'Параметры'; display: block; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+#tools-panel #ans-seg-row .ans-seg-auto { margin-top: 8px; padding: 0; border: 0; background: transparent; font-size: 13px; font-weight: 600; color: var(--text2); }
+#tools-panel #ans-seg-row .ans-seg-auto:hover { color: var(--text); text-decoration: none; }
+#tools-panel .sc-gcard.sc-gnew { border-style: dashed; border-color: var(--border-strong); background: transparent; }
+#tools-panel .sc-gcard .sc-gone { display: none; }
+#tools-panel .sc-gcard > .crow-formula > .f-slot { display: contents; }
+#tools-panel .sc-gcard .fc-menu > .grow-name { width: 100%; }
+
+/* ── Г3: «Математика» (scMathSetup, 92-ui-kit.js). Кнопка цвета f у «Касательной» — точка карточки; группа «Цвета
+   кривых» без органов — не видна. Раздел ползунков продолжает «Параметры» карточки ввода (scParamsCont). ── */
+#tools-panel .fc-card .sc-gone, #tools-panel .sc-mcolors.sc-gone, #tools-panel label.sc-gone { display: none; }
+#tools-panel #sec-params.sc-cont { border-top: 0; padding-top: 0; }
+#tools-panel #sec-params.sc-cont > h3.sec-head { display: none; }
+
+/* ── Г4: «Функции min и max» (scMmRows, scMinmaxSetup). Строка .grow внутри карточки пуста — не видна; поле — в строке
+   карточки (.f-slot раскладкой). Цвет итоговой кривой — в строке Z «Вида». ── */
+#tools-panel .sc-mmcard > label.sc-old-label, #tools-panel .sc-mmcard > .grow.sc-gone, #tools-panel .field.sc-gone { display: none; }
+#tools-panel .sc-mmcard > .crow-formula > .f-slot { display: contents; }
+#wrench-pop .vg-row > .sc-zpick { flex: 0 0 auto; margin-right: 8px; }
+
+/* ── Д1: ползунки сдвига под карточками (scPchips, 92-ui-kit.js; макет 05_left_Mono). Строка: «Сдвиг» слева
+   14 / 500 --text2, число справа KaTeX 17 px, ниже дорожка во всю ширину, под ней пределы 12 / 500 --text3 (без
+   пунктира; щелчок — меню границ, как было). Дорожка — системная с accent-color --accent, как строки параметров
+   сессии 5. Ползункам без меню границ — подписи пределов простым текстом (.sc-bounds). ── */
+#tools-panel .pchip.sc-pchip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 10px; row-gap: 6px; }
+#tools-panel .pchip.sc-pchip > .pchip-top { display: contents; }
+#tools-panel .pchip.sc-pchip .pchip-dot { display: none; }
+#tools-panel .pchip.sc-pchip .sc-pname { grid-column: 1; font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel .pchip.sc-pchip .reg-eq { grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .pchip.sc-pchip .reg-eq .katex { font-size: 1em; }
+#tools-panel .pchip.sc-pchip > .param-track, #tools-panel .pchip.sc-pchip > .param-editor { grid-column: 1 / -1; }
+#tools-panel .sc-pchip .param-track, #tools-panel .sc-prow .param-track { display: grid; grid-template-columns: 1fr 1fr; row-gap: 4px; }
+#tools-panel .sc-pchip .param-track > input[type=range] { grid-column: 1 / -1; grid-row: 1; width: 100%; margin: 0; }
+#tools-panel .sc-pchip .param-track > .param-bound { grid-row: 2; }
+#tools-panel .sc-pchip .param-track > .param-bound:first-child { justify-self: start; }
+#tools-panel .sc-pchip .param-track > .param-bound:last-child { justify-self: end; }
+#tools-panel .sc-pchip .param-bound, #tools-panel .sc-prow .param-bound { border-bottom-color: transparent; }
+#tools-panel .sc-pchip .param-bound:hover, #tools-panel .sc-prow .param-bound:hover { color: var(--text); }
+#tools-panel .sc-pchip input[type=range], #tools-panel .sc-prow input[type=range], #tools-panel #ineq-master-slider { accent-color: var(--accent); }
+#tools-panel .sc-bounds { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--text3); }
+#tools-panel .sc-bounds > small { font-size: 12px; font-weight: 500; }
+#tools-panel .sc-prow-own > .sc-bounds { grid-column: 1 / -1; }
+
+/* ── Д2: буквы формул (.pchip-param, scPchips): «Параметр» слева, «a = 1» справа, крестик — тихая кнопка 26 px. ── */
+#tools-panel .pchip.sc-pchip .param-eq:not(.reg-eq) { grid-column: 2; justify-self: end; font-size: 17px; }
+#tools-panel .pchip.sc-pchip .param-eq .katex { font-size: 1em; }
+#tools-panel .pchip.sc-pchip .param-kill {
+  grid-column: 3; align-self: center; width: 26px; height: 26px; min-width: 26px; padding: 0; margin: 0 -4px 0 0;
+  display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text3); line-height: 1;
+}
+#tools-panel .pchip.sc-pchip .param-kill:hover { color: var(--text); background: var(--chip-bg); }
+
+/* Ползунки раздела «Параметры» — по левому краю колонки, как строки «Условия» (у #params-body был свой отступ 14 px). */
+#tools-panel #params-body { padding-left: 0; padding-right: 0; }
+
+/* ── Д3: вмешательство государства (scIntervSync). Полоса из пяти видимых — 3 + 2, из одной — не показывается.
+   Подписи каскада «Вид налога:», «Налог платит:» — вне потока и невидимы (их инлайновые display и кегль — в форме
+   модели, не трогаем). Ряд стороны: слово слева, сегмент справа. ── */
+#tools-panel #sec-tax .seg[data-n="5"] { display: grid; grid-template-columns: repeat(6, 1fr); }
+#tools-panel #sec-tax .seg[data-n="5"] > .seg-btn:nth-child(-n+3) { grid-column: span 2; }
+#tools-panel #sec-tax .seg[data-n="5"] > .seg-btn:nth-child(n+4) { grid-column: span 3; }
+#tools-panel #sec-tax .seg[data-n="1"] { display: none; }
+#tools-panel .sc-vh { position: absolute; visibility: hidden; pointer-events: none; width: 1px; height: 1px; overflow: hidden; }
+#tools-panel #taxside-row.sc-siderow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#tools-panel #taxside-row > .sc-sidelab { font-size: 14px; font-weight: 500; color: var(--text2); }
+#tools-panel #taxside-row > .seg.sc-seg { margin: 0; }
+
+/* ── Д5: «Сложение» — степперы групп (scStepper); имя карточки группы («спрос первой группы») с заглавной ТОЛЬКО
+   видом: строка имени лежит в STATE (c.label = sumGroupName), печатается в «Ответе» и по ней sumShortTag отличает
+   своё имя человека — менять её нельзя. ── */
+#tools-panel #curve-list .fc-card .fc-name::first-letter { text-transform: uppercase; }
+
+/* ── Д6: MSB и MSC карточками (scExtCards). Строка-контейнер — карточка: столбцом; поле — в строке формулы. ── */
+#tools-panel .sc-extcard { flex-direction: column; align-items: stretch; margin-bottom: 8px; }
+#tools-panel .sc-extcard > .crow-formula > .f-wrap { flex: 1 1 0; min-width: 0; display: flex; }
+
+/* ── Д8: ни одного тумблера. Последний — «Суммарные TC | Предельные MC» двух заводов — живёт в «Виде» (#wrench-pop):
+   видна полоса-источник с id, тумблер спрятан (разрешённое исключение по !important — полоса показана поверх
+   инлайнового display: none от segToToggle, как .seg.sc-seg в «Условии»; сам инлайновый стиль — в форме модели). ── */
+#wrench-pop .seg.sc-seg { display: flex !important; }
+#wrench-pop .tgl.sc-tgl-off { display: none; }
+
+
+/* ── Тихие панели, сессия 7: «Точки и площади» (README пакета 9; макет 04_screen_points) ──
+   Б1. Шапка панели режима — заголовок колонки «Точки и площади» 18 / 600 слева (h2.pts-title переехал в шапку,
+   кегль даёт лесенка A выше) и «Готово» справа. «← Условие» и строка-подсказка ушли (закрытый список, 10.5). ── */
+#pts-panel .pts-head .pts-title { margin: 0; flex: 1 1 auto; line-height: 1.3; }
+#pts-panel .pts-body > .section:first-child { border-top: 0; padding-top: 4px; }
+/* Б3. Меню «⋯» точки — всплывающее окно в body (.pop: не модель). Пункты 14 / 500, разделитель --border-soft
+   (README 4, «Меню «⋯»»). */
+.pts-menu {
+  display: none; position: fixed; z-index: var(--z-pop); min-width: 240px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+  font-family: var(--font-ui);
+}
+.pts-menu.open { display: block; }
+.pts-menu .pts-mi {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 10px; text-align: left;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text); cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 500;
+}
+.pts-menu button.pts-mi:hover, .pts-menu label.pts-mi:hover { background: var(--chip-bg); }
+.pts-menu button.pts-mi:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.pts-menu .pts-mi-color { justify-content: space-between; cursor: default; }
+.pts-menu .pts-mi-chk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.pts-menu .pts-mi-sep { height: 1px; margin: 6px 4px; background: var(--border-soft); }
+.pts-menu .pts-mi-danger { color: var(--error-ink); }
+/* Б2. Раздел «Точки»: заголовок слева, тихая «+ По координатам» справа; строка точки — галочка, имя KaTeX 19 px,
+   координаты KaTeX 16 px, «на D» 12 / 500 --text3 справа, «⋯». Не помещается — «на …» уходит второй строкой. */
+#pts-panel #sec-view .pts-sec-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 6px; }
+#pts-panel #sec-view .pts-sec-row .pts-sec-head { padding: 0; }
+#pts-panel .pts-sec-row .btn-mark-add {
+  margin: 0; padding: 0 6px; min-height: 28px; border: 0; background: transparent; color: var(--text2);
+  font-size: 13px; font-weight: 600; cursor: pointer; border-radius: var(--r);
+}
+#pts-panel .pts-sec-row .btn-mark-add:hover { background: var(--chip-bg); color: var(--text); }
+#pts-panel .mark-row:not(.mark-draft):not(:has(.mark-xy-edit)) {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: 8px; row-gap: 0; padding: 6px 0; min-height: 44px;
+  border-bottom: 1px solid var(--border-soft);
+}
+#pts-panel .mark-row .mark-pick { display: inline-flex; align-items: center; margin: 0; flex: 0 0 auto; }
+#pts-panel .mark-row .mark-pick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+#pts-panel .mark-row > .mark-name { flex: 0 0 auto; font-size: 19px; font-weight: 400; color: var(--text); }
+#pts-panel .mark-row > .mark-name .katex { font-size: 1em; }
+#pts-panel .mark-row > .mark-xy:not(.mark-xy-edit) { flex: 0 0 auto; margin: 0; font-size: 16px; color: var(--text2); }
+#pts-panel .mark-row > .mark-xy .katex { font-size: 1em; }
+#pts-panel .mark-row > .mark-on {
+  flex: 1 1 auto; margin: 0; text-align: right; font-size: 12px !important; font-weight: 500 !important; color: var(--text3);
+}
+#pts-panel .mark-row > .mark-on .katex { font-size: 1.15em; }
+#pts-panel .mark-row > .mark-more { flex: 0 0 auto; width: 28px; height: 28px; margin-left: auto; color: var(--text3); }
+#pts-panel .mark-row > .mark-more svg { width: 18px; height: 18px; }
+#pts-panel .mark-row:has(.mark-xy-edit) { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+#pts-panel .mark-row:has(.mark-xy-edit) > .mark-name { font-size: 19px; }
+#pts-panel .mark-xy-edit { margin: 0; align-items: center; }
+/* В2. Плашка выбора: «Выбрано N» и «Площадь по точкам» (макет 04_screen_points). */
+#pts-panel .pts-selbar:not([hidden]) {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 2px; padding: 8px 8px 8px 14px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card);
+}
+#pts-panel .pts-selbar-n { font-size: 14px; font-weight: 600; color: var(--text); }
+#pts-panel .pts-selbar-go {
+  height: 36px; padding: 0 14px; border: 0; border-radius: var(--r); cursor: pointer;
+  background: var(--btn-bg); color: var(--on-btn); font: inherit; font-size: 13px; font-weight: 600;
+}
+#pts-panel .pts-selbar-go:hover { filter: brightness(1.08); }
+/* В5. «Убрать все точки и площади» — тихая кнопка-строка внизу панели (макет: без рамки, по левому краю). */
+#pts-panel .pts-clear {
+  width: auto; margin: 14px 0 0; padding: 0 2px; min-height: 32px; border: 0; background: transparent;
+  color: var(--text2); text-align: left; font-size: 13px; font-weight: 600;
+}
+#pts-panel .pts-clear:hover { color: var(--text); background: transparent; text-decoration: underline; }
+/* В6. Строки своих площадей: образец 14 px, имя S₁ KaTeX, вершины «ABC» (--text2), число справа, «⋯». */
+#pts-panel .area-list { display: flex; flex-direction: column; }
+#pts-panel .area-line {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: 10px; min-height: 44px; padding: 4px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+#pts-panel .area-line .area-sw .cpick-btn { width: 14px; height: 14px; min-width: 14px; border-radius: 3px; padding: 0; }
+#pts-panel .area-line > .area-name { flex: 0 0 auto; font-size: 19px; color: var(--text); }
+#pts-panel .area-line > .area-name .katex { font-size: 1em; }
+#pts-panel .area-line > .area-verts { flex: 1 1 auto; font-size: 16px !important; font-weight: 400 !important; color: var(--text2); }
+#pts-panel .area-line > .area-verts .katex { font-size: 1em; }
+#pts-panel .area-line > .area-val { flex: 0 0 auto; margin-left: auto; font-size: 16px !important; font-weight: 400 !important; color: var(--text); font-variant-numeric: tabular-nums; }
+#pts-panel .area-line > .area-more { flex: 0 0 auto; width: 28px; height: 28px; color: var(--text3); }
+#pts-panel .area-line > .area-more svg { width: 18px; height: 18px; }
+#pts-panel .area-line > .area-note { flex: 1 0 100%; font-size: 12px; color: var(--text3); }
+/* Кнопки раздела «Площади» — две тихие кнопки в рамке рядом (макет), нажатая — открытое построение. */
+#pts-panel .seg.ac-mode { background: transparent; border: 0; padding: 0; gap: 8px; }
+#pts-panel .seg.ac-mode .seg-btn { border: 1px solid var(--border); border-radius: var(--r); background: transparent; min-height: 36px; }
+#pts-panel #sec-areascalc:not(.ac-open) .seg.ac-mode .seg-btn.active { border-color: var(--border); }
+/* Г2. «Сначала сам»: координаты своих точек в строках и числа своих площадей спрятаны, на их месте «?» (прежнее
+   правило целилось в старые узлы .mark-xy .edval и #info-areacalc .stat > b). «Показать всё» (body.self-all) — видно. */
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit),
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val { position: relative; color: transparent; }
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit) .katex { visibility: hidden; }
+body.self-on:not(.self-all) #pts-panel .mark-row > .mark-xy:not(.mark-xy-edit)::after,
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { content: '?'; position: absolute; left: 0; top: 0; color: var(--text2); }
+body.self-on:not(.self-all) #pts-panel .area-line > .area-val::after { left: auto; right: 0; }
+
+/* Монополия, ADR 0157 (24.10): вторая строка вердикта «Выгоднее не производить» /
+   «безразлично» — пояснение под главной фразой статуса «Ответа». */
+.mono-verdict-sub { font-weight: 400; margin-top: 2px; }
+/* Своя левая часть в поле («Q = 100 − 2P», ADR 0157) — приставка уходит, иначе «Q = Q = …». */
+#tools-panel .fc-card > .crow-formula.fc-pre-own > .fc-prefix { display: none; }
+
+/* Э4: второй инструмент повторяет принятый каскад первого. */
+#tax-pair-controls { margin-top: 16px; }
+.tax-second { border-top: 1px solid var(--border); padding-top: 16px; }
+.tax-second-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; font-size:14px; }
+.tax-second-forms, .tax-second [data-tax2-side], .tax-second-rate { margin-top:12px; }
+.tax-second-value { display:flex; align-items:center; gap:6px; justify-content:space-between; }
+.tax-second-equation { display:inline-flex; align-items:center; gap:4px; }
+#tools-panel .tax-second [data-tax2-side] { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#tools-panel .tax-second [data-tax2-side] > .seg { margin:0; }
+#tax-remove-second { width:auto; flex:none; }
+#tax-pair-controls [hidden], #tax-pair-controls[hidden] { display:none !important; }
+
+/* Э6: мощности и постоянные затраты используют те же карточки функций. */
+.plant-options { margin-top: 10px; display: grid; gap: 8px; }
+.plant-options > label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+#plant-rows .plant-options input { box-sizing: border-box; min-width: 0; width: 100%; background: transparent; color: var(--text); border: 0; border-bottom: 1px dashed var(--border-strong); border-radius: 0; padding: 3px 2px; font-family: 'KaTeX_Main', 'Times New Roman', serif; font-size: 17px; text-align: right; }
+#plant-rows .plant-options input::placeholder { font-family: var(--font-ui, sans-serif); font-size: 14px; }
+.plant-options .seg { display: flex; flex-wrap: wrap; }
+.plant-options .seg-btn { min-width: 0; flex: 1; font-size: 14px; white-space: normal; }
+.plant-options .plant-remove { justify-self: end; font-size: 14px; }
+
+#plant-rows .plant-options .seg { width: 100%; min-width: 0; }
+#plant-rows .plant-options .seg-btn { flex: 1 1 0; white-space: normal; overflow-wrap: anywhere; padding: 6px; min-width: 0; }
+#plant-rows .plant-options > label { display: grid; grid-template-columns: auto minmax(0,1fr); }
+
+/* Неравные группы и веса стран: те же числовые поля, две колонки в карточке. */
+.ineq-grow { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:9px 10px;margin:6px 0;border:1px solid var(--border);border-radius:8px; }
+.ineq-grow .ineq-group-title { font-size:12px;color:var(--text2); }
+.ineq-grow .ineq-remove { justify-self:end;padding:0 4px;line-height:16px; }
+.ineq-grow label,.ineq-weights label { display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;color:var(--text2); }
+.ineq-grow input,.ineq-weights input { width:100%;min-width:0;box-sizing:border-box;border:0;border-bottom:1px dashed var(--border);border-radius:0;background:transparent;color:var(--text);padding:4px 1px;font:inherit;font-size:14px; }
+.ineq-group-mode { margin:8px 0; }
+.ineq-group-mode .seg-btn { white-space:normal; }
+.ineq-weights { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:8px 0; }
+.ineq-country { border-top:1px solid var(--border);padding-top:10px;margin-top:12px; }
+.ineq-country-head { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+#ineq-add-country,#ineq-add-group,#ineq-b-add-group { margin:8px 0; }
+#ineq-incomes { border:1px solid var(--border);border-radius:6px;padding:7px;box-sizing:border-box;width:100%; }
+
+.ineq-country-head > b { white-space:nowrap;flex:0 0 auto; }
+.ineq-country-head .btn { width:auto;min-width:0;padding:5px 8px;font-size:12px; }
+
+/* Параметры IS–LM и шок используют обычные поля условия. */
+.islm-grid { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 12px; }
+.islm-grid .field { min-width:0; }
+.islm-grid .field > label { white-space:normal;line-height:1.35;min-height:32px; }
+.islm-shock-head { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0; }
+#islm-shock { border-top:1px solid var(--border);margin-top:10px; }
+#islm-hold-rate { flex:0 0 auto; }
+
+/* Э9: те же сегменты и поля в существующей карточке макромодели. */
+.adas-seg { margin:10px 0 7px; }
+.adas-seg .seg-btn { min-width:0;white-space:normal; }
+.adas-auto { font-size:13px;color:var(--muted);line-height:1.45;margin:10px 0; }
+
+/* Э10: те же сегменты и числовые поля, с переносом внутри узкой панели. */
+.firm-seg { flex-wrap: wrap; margin: 8px 0; }
+.firm-seg .seg-btn { flex: 1 1 auto; white-space: normal; }
+.firm-tax-card { margin: 12px 0; padding-top: 8px; border-top: 1px solid var(--border); }
+#firm-supply-controls .sc-nrow input { width: 92px; min-width: 0; }
+
+.firm-fixed-label { margin-top: 10px; font-size: 12px; color: var(--text2); }
+
+/* Цена фирмы — результат рынка, а не ещё один регулятор. */
+.firm-market-price { margin: 8px 0 12px; font-size: 14px; color: var(--text2); }
+.firm-market-price-mask { display: none; }
+body.self-on:not(.self-all) #firm-market-price-value { display: none; }
+body.self-on:not(.self-all) .firm-market-price-mask { display: inline; }
+
+.trade-policy-controls { margin-top: 10px; }
+.trade-policy-controls .seg { flex-wrap: wrap; margin: 7px 0; }
+.trade-policy-controls .seg-btn { flex: 1 1 auto; white-space: normal; }
+.trade-control-label { display: block; margin-top: 10px; color: var(--text2); font-size: 12px; }
+.trade-policy-controls .field { display: flex; align-items: center; gap: 8px; }
+.trade-policy-controls .field label { flex: 1; }
+.trade-policy-controls .field input { width: 92px; min-width: 0; }
+.trade-direction { margin: 6px 0; }
+.bigtrade-view { align-self: center; flex: 0 0 auto; margin: 4px 12px; max-width: calc(100% - 24px); }
+#sec-bigtrade > .sc-sec { margin-top: 16px; }
+@media (max-width: 759px) {
+  .trade-policy-controls .field input { min-height: 44px; }
+}

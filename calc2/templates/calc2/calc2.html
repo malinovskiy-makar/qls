@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  {% with seo_title='Графический калькулятор по экономике – онлайн | Weconomics.ai' seo_description='Бесплатный графический калькулятор по экономике: кривые спроса и предложения, эластичность, монополия и другие модели – стройте графики онлайн на Weconomics.ai.' %}
+  {% comment %}
+     Заголовок и описание SEO даёт представление (Calc2View, из catalog/seo.py):
+     в шаблоне их литералы несли длинное тире, а сканер типографики берёт любой
+     .html под calc2/. Строки при этом дословно те, что требует
+     catalog/tests/test_seo.py.
+  {% endcomment %}
   <title>{{ seo_title }}</title>
   {% include '_seo_meta.html' %}
-  {% endwith %}
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).
@@ -77,7 +81,9 @@
      приложение снова занимает окно под шапкой целиком. Пока открыто окно cookie,
      приложение поднимается на его высоту (`--ck-h`, `static/cookie_bar.js`), а окно
      выбора моделей кончается над ним. */
-  .app { height: calc(100vh - 48px - var(--ck-h, 0px)); }
+  @media (min-width: 760px) {
+    .app { height: calc(100dvh - var(--calc2-app-top, 48px) - var(--ck-h, 0px)); }
+  }
   html:has(.ck-bar:not([hidden])) body { padding-bottom: 0; }
   #scene-picker { bottom: var(--ck-h, 0px); }
   </style>
@@ -88,18 +94,15 @@
 
 <!-- ── ЭКРАН 1 · ОКНО ВЫБОРА СЦЕНАРИЯ ──────────────────────────────────
      Карточки вызывают уже существующие пресеты движка (loadScene/setMode/
-     setPpfSub). Мини-графики нарисованы цветами кривых через var(--curve-*),
-     поэтому подхватывают тему. -->
-<div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+     setPpfSub). Превью моделей — настоящие графики стандартного старта
+     (previews.json, ADR 0141), их вставляет 95-picker-screen.js встроенным
+     SVG цветами токенов темы; ручных схем в разметке больше нет. -->
+<div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" data-previews="{% calc2_static 'calc2/previews.json' %}">
   <div class="picker-inner">
     <header class="picker-head">
-      <h1 class="picker-title" id="picker-title">Это графики.</h1>
+      <h1 class="picker-title" id="picker-title">Графики</h1>
       <!-- п. 66. Слов ровно два и они не меняются нигде: БЛОК — это группа
-           моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. «Раздел»,
-           «сценарий» и «сцена» из интерфейса убраны: четыре слова на две
-           сущности заставляли догадываться, одно это и то же или разное. -->
-      <p class="picker-sub">Откройте блок и выберите модель. Исследуйте возможности,
-        решайте привычные задачи графически и прокачивайтесь в экономике!</p>
+           моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. -->
     </header>
 
     <!-- ── БЛОК 1 · МАТЕМАТИКА ────────────────────────────────────────
@@ -109,59 +112,26 @@
       <div class="picker-group-label">Математика</div>
       <div class="picker-grid">
         <button class="scard" data-scene="m-graph">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 24 Q60 78 96 34 T144 22" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 58 L144 30" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="106" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Построение графиков</span>
           <span class="scard-desc">Любое число кривых, свои точки, подписи и масштаб. Без экономики.</span>
         </button>
         <button class="scard" data-scene="m-transform">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M40 14 Q84 92 128 14" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 14 Q66 92 110 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Деформации графика</span>
           <span class="scard-desc">Сдвиги, растяжения, отражения и модули; один ползунок и обе кривые сразу.</span>
         </button>
         <button class="scard" data-scene="m-optimum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 50 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 74 C 52 6, 68 82, 84 50 C 100 18, 116 84, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="46" cy="24" r="3.6" fill="var(--curve-s)" stroke="none"/>
-            <circle cx="66" cy="70" r="3.6" fill="var(--curve-mc)" stroke="none"/>
-            <circle cx="84" cy="50" r="3.6" fill="var(--curve-mr)" stroke="none"/></g></svg></span>
           <span class="scard-name">Максимумы и минимумы</span>
           <span class="scard-desc">Экстремумы, точки перегиба, выпуклые и вогнутые участки разным цветом.</span>
         </button>
         <button class="scard" data-scene="m-tangent">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 16 Q84 96 142 16" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M84 62 L146 34" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M110 48 H130 V39" stroke="var(--curve-reg)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <circle cx="110" cy="48" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Функция и её производная наглядно</span>
           <span class="scard-desc">Точка на кривой, треугольник Δx и Δy, график производной снизу.</span>
         </button>
         <button class="scard" data-scene="m-minmax">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 70 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 70 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 20 L142 66" stroke="var(--curve-d)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M24 64 L142 18" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M24 64 L83 42 L142 66" stroke="var(--curve-mc)" stroke-width="2.6" stroke-linejoin="round"/>
-            <circle cx="83" cy="42" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
           <span class="scard-name">Функции min и max</span>
           <span class="scard-desc">Нижняя или верхняя огибающая нескольких функций; излом в точке смены ветви.</span>
         </button>
         <button class="scard" data-scene="m-constraint">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 20 L136 74" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M34 66 Q56 34 96 26" stroke="var(--curve-d)" stroke-width="1.5" stroke-opacity=".4"/>
-            <path d="M44 74 Q72 44 116 36" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="74" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Оптимум при ограничении</span>
           <span class="scard-desc">Максимум или минимум цели при заданном ограничении: касание линий уровня.</span>
         </button>
@@ -173,39 +143,20 @@
       <div class="picker-group-label">КПВ и КТВ</div>
       <div class="picker-grid">
         <button class="scard" data-scene="ppf">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 16 Q132 22 140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="92" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Построение КПВ</span>
           <span class="scard-desc">Граница производства, альтернативные издержки, выпуклость.</span>
         </button>
         <button class="scard" data-scene="ppfsum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 24 L92 40 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
-            <path d="M26 24 L92 40" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Сложение КПВ</span>
           <span class="scard-desc">Совместная граница с изломом: сравнительное преимущество каждой стороны.</span>
         </button>
         <button class="scard" data-scene="trade">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 22 Q120 30 132 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 34 L140 70" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="78" cy="46" r="3.6" fill="var(--curve-s)" stroke="none"/></g></svg></span>
           <span class="scard-name">КТВ. Одна страна</span>
           <span class="scard-desc">Точка производства на КПВ и выигрыш от торговли при известной мировой цене.</span>
         </button>
         <button class="scard" data-scene="tradeprice">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L96 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 46 L128 74" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/></g></svg></span>
           <span class="scard-name">КТВ. Две страны-партнёра</span>
-          <span class="scard-desc">Мировая цена не задана, а найдена: точка внутри промежутка автарктических цен.</span>
+          <span class="scard-desc">Две линейные КПВ, допустимый интервал мировой цены и предел обмена между странами.</span>
         </button>
       </div>
     </section>
@@ -215,20 +166,10 @@
       <div class="picker-group-label">Совершенная конкуренция</div>
       <div class="picker-grid">
         <button class="scard" data-scene="sd">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Спрос и предложение</span>
           <span class="scard-desc">Равновесие, излишки CS и PS, общественное благосостояние.</span>
         </button>
         <button class="scard" data-scene="sdsum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L74 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 34 L96 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 20 L48 47 L144 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/></g></svg></span>
           <span class="scard-name">Сложение спросов и предложений</span>
           <span class="scard-desc">Горизонтальное сложение по количеству: рыночная кривая с изломами.</span>
         </button>
@@ -236,66 +177,27 @@
              выбирается внутри сюжета, в правой панели. Ключи 'tax' и
              'tax-adv' остались рабочими синонимами этой же сцены. -->
         <button class="scard" data-scene="taxes">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".5"/></g></svg></span>
           <span class="scard-name">Налоги и субсидии</span>
           <span class="scard-desc">Потоварный налог, НДС, акциз и субсидии: клин между ценами, сбор бюджета, потери DWL.</span>
         </button>
         <button class="scard" data-scene="ceil">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 56 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Пол и потолок цены</span>
           <span class="scard-desc">Фиксированная цена, дефицит или избыток, объём торговли по короткой стороне.</span>
         </button>
         <button class="scard" data-scene="quota">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="30" width="46" height="26" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M64 78 V12" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Квоты</span>
           <span class="scard-desc">Прямое ограничение объёма: цена не определена однозначно, а лежит в коридоре.</span>
         </button>
         <button class="scard" data-scene="elast">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="12" width="52" height="66" fill="var(--curve-tax)" opacity=".16"/>
-            <rect x="70" y="12" width="66" height="66" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 16 L136 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 45 H70" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <path d="M70 45 V78" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <circle cx="70" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Эластичность</span>
           <span class="scard-desc">Точечная |Ed| и |Es|, единичная точка, связь с выручкой.</span>
         </button>
         <button class="scard" data-scene="ext">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M63 41 L88 55 L88 27 Z" fill="var(--curve-dwl)" opacity=".16" stroke="none"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 56 L140 6" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Внешние эффекты</span>
           <span class="scard-desc">MSC или MSB против частных, потери DWL, налог или субсидия Пигу.</span>
         </button>
-        <button class="scard soon" data-scene="firmmarket" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 18 L68 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 70 L68 18" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M90 44 H148" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M96 34 Q116 74 142 22" stroke="var(--cost-atc)" stroke-width="2.2"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Рынок и фирма в СК</span><span class="scard-soon">Скоро</span></span>
+        <button class="scard" data-scene="firmmarket">
+          <span class="scard-name">Рынок и фирма в СК</span>
           <span class="scard-desc">Два графика рядом: цена рынка и она же горизонтальный спрос для фирмы.</span>
         </button>
       </div>
@@ -306,38 +208,18 @@
       <div class="picker-group-label">Теория фирмы</div>
       <div class="picker-grid">
         <button class="scard" data-scene="prod">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 C 56 66, 74 22, 116 18 T 146 26" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 70 Q66 26 146 62" stroke="var(--cost-mc)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="74" cy="41" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Производственная функция</span>
           <span class="scard-desc">TP, MP и AP от труда: точка перегиба и убывающая предельная отдача.</span>
         </button>
         <button class="scard" data-scene="costs">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 40 Q60 78 96 50 T150 20" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <path d="M26 70 Q70 64 150 16" stroke="var(--cost-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Издержки фирмы</span>
           <span class="scard-desc">MC, ATC, AVC, AFC; точки закрытия и безубыточности, прибыль при цене P.</span>
         </button>
         <button class="scard" data-scene="plants">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 L78 16" stroke="var(--curve-mc)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 74 L54 16" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 74 L142 24" stroke="var(--cost-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Сложение заводов</span>
           <span class="scard-desc">Горизонтальная сумма предельных издержек, условие MC₁ = MC₂.</span>
         </button>
         <button class="scard" data-scene="isoquant">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L128 74" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-mc)" stroke-width="2.6"/>
-            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-mc)" stroke-width="1.5" opacity=".4"/>
-            <circle cx="63" cy="41" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Изокванта и изокоста</span>
           <span class="scard-desc">Один выпуск разными наборами L и K, касание в точке MRTS = w / r.</span>
         </button>
@@ -349,59 +231,26 @@
       <div class="picker-group-label">Несовершенная конкуренция</div>
       <div class="picker-grid">
         <button class="scard" data-scene="mono">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L88 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Стандартная монополия</span>
           <span class="scard-desc">MR = MC, монопольная цена, потери общества против конкуренции.</span>
         </button>
         <button class="scard" data-scene="mono-nat">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 16 Q56 62 146 66" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <path d="M18 70 H150" stroke="var(--curve-mc)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Естественная монополия</span>
           <span class="scard-desc">Большие постоянные издержки, убывающая ATC, ориентиры P = MC и P = ATC.</span>
         </button>
         <button class="scard" data-scene="mono-d1">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L118 52 L22 52 Z" fill="var(--curve-s)" opacity=".16" stroke="none"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Дискриминация 1-й степени</span>
-          <span class="scard-desc">Каждая единица по своей цене спроса: нулевой излишек покупателя, нулевые потери.</span>
+          <span class="scard-desc">Каждая единица по своей цене спроса: нулевой излишек потребителя, нулевые потери.</span>
         </button>
         <button class="scard" data-scene="mono-d3">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 18 L68 66" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 18 L43 66" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 30 L144 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M94 30 L119 70" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Дискриминация 3-й степени</span>
           <span class="scard-desc">Два сегмента рынка, общие издержки: MR1 = MR2 = MC, цены разные.</span>
         </button>
         <button class="scard soon" data-scene="monopcomp" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L128 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 26 Q72 74 146 30" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <circle cx="70" cy="44" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Монополистическая конкуренция</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Долгий период: касание спроса и ATC, нулевая экономическая прибыль.</span>
         </button>
         <button class="scard" data-scene="mono-kink">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 16 L74 44 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
-            <path d="M22 16 L48 44" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M74 44 L107 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="74" cy="44" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Составной спрос</span>
           <span class="scard-desc">Спрос из двух сегментов, излом кривой и разрыв предельной выручки.</span>
         </button>
@@ -413,11 +262,6 @@
       <div class="picker-group-label">Рынок труда</div>
       <div class="picker-grid">
         <button class="scard" data-scene="labor">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="46" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <!-- п. 67. Имя карточки и заголовок модели — одна строка. Прежде
                карточка звалась так же, как ЦЕЛЫЙ блок каталога («Совершенная
                конкуренция»), а открывалась моделью с другим именем. -->
@@ -425,30 +269,14 @@
           <span class="scard-desc">Спрос на труд как MRPL и предложение труда: оси L и W.</span>
         </button>
         <button class="scard" data-scene="labor-mono">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 74 L96 22" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="63" cy="62" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Монопсония</span>
           <span class="scard-desc">Один наниматель: предельные издержки труда выше предложения, занятость ниже.</span>
         </button>
         <button class="scard" data-scene="labor-union">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 32 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Вмешательство профсоюза</span>
           <span class="scard-desc">Профсоюз как монополист труда или заданный пол зарплаты; занятость ниже.</span>
         </button>
         <button class="scard" data-scene="labor-bilat">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="30" width="132" height="30" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Двусторонняя монополия</span>
           <span class="scard-desc">Наниматель против профсоюза: диапазон зарплат вместо единственной точки.</span>
         </button>
@@ -466,38 +294,16 @@
              Обещание «Скоро» стоило внимания ученика каждый раз, когда он сюда
              заходил, и не отдавало ничего. -->
         <button class="scard" data-scene="smallopen">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 60 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <rect x="52" y="57" width="56" height="6" fill="var(--curve-dwl)" opacity=".4"/></g></svg></span>
           <span class="scard-name">Малая открытая экономика</span>
           <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, потери общества.</span>
         </button>
-        <button class="scard soon" data-scene="bigopen" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M12 78 H58" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M12 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M16 20 L54 66" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M16 68 L54 24" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M68 78 H104" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M68 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M70 24 L102 62" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M70 64 L102 28" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M116 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M116 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M118 22 L148 64" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M118 66 L148 26" stroke="var(--curve-s)" stroke-width="2.2"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Большие открытые экономики</span><span class="scard-soon">Скоро</span></span>
-          <span class="scard-desc">Три графика: два внутренних рынка и мировой, встреча экспорта и импорта.</span>
+        <button class="scard" data-scene="bigopen">
+          <span class="scard-name">Большие открытые экономики</span>
+          <span class="scard-desc">Две страны определяют мировую цену. Вмешательства, торговля и благосостояние.</span>
         </button>
         <button class="scard" data-scene="monoexport">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L100 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L61 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополист и внешний рынок</span>
-          <span class="scard-desc">Дома своя цена, за рубежом мировая: MR внутри = Pw = MC на общем выпуске.</span>
+          <span class="scard-desc">Дома своя цена, за рубежом мировая. Сравниваем прибыль при продажах на одном или двух рынках.</span>
         </button>
       </div>
     </section>
@@ -507,101 +313,38 @@
       <div class="picker-group-label">Выбор потребителя</div>
       <div class="picker-grid">
         <button class="scard" data-scene="consumer">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L128 74" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-d)" stroke-width="1.5" opacity=".4"/>
-            <circle cx="63" cy="41" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривые безразличия</span>
           <span class="scard-desc">Бюджетная линия, веер кривых безразличия, оптимум и MRS в нём.</span>
         </button>
         <button class="scard soon" data-scene="cons-demand" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 20 L68 70" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 66 Q36 38 62 32" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <circle cx="42" cy="44" r="3.6" fill="var(--ink)" stroke="none"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 20 L144 70" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Оптимальное потребление и спрос</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Оптимумы при разных ценах и собранная по ним маршаллианская кривая спроса.</span>
         </button>
         <button class="scard" data-scene="cons-slutsky">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 24 L138 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 16 L82 74" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 44 L62 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <circle cx="72" cy="46" r="3.6" fill="var(--curve-d)" stroke="none"/>
-            <circle cx="47" cy="42" r="3.6" fill="var(--curve-s)" stroke="none"/>
-            <circle cx="38" cy="62" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
           <span class="scard-name">Декомпозиция по Слуцкому</span>
           <span class="scard-desc">Три бюджетные линии: эффект замещения и эффект дохода по отдельности.</span>
         </button>
         <button class="scard soon" data-scene="cons-hicks" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 24 L138 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 44 L62 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M28 70 Q48 36 104 28" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="72" cy="46" r="3.6" fill="var(--curve-d)" stroke="none"/>
-            <circle cx="42" cy="52" r="3.6" fill="var(--curve-s)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Декомпозиция по Хиксу</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Компенсация до прежней полезности, а не до прежнего набора: точка на той же кривой.</span>
         </button>
         <button class="scard soon" data-scene="cons-risk" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 70 Q70 24 140 18" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M32 62 L128 22" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="32" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="128" cy="22" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="80" cy="42" r="3.6" fill="var(--curve-reg)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Выбор в условиях неопределённости и риск</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Вогнутая полезность денег: надёжный доход против лотереи с тем же средним.</span>
         </button>
         <button class="scard soon" data-scene="cons-icc" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 52 L70 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 36 L104 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L138 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M34 64 Q62 46 104 30" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="38" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="66" cy="44" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая доход-потребление</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Рост дохода при прежних ценах, линия оптимумов ICC.</span>
         </button>
         <button class="scard soon" data-scene="cons-pcc" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L62 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L98 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L140 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M38 56 Q72 44 116 52" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="40" cy="55" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="78" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая цена-потребление</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Поворот бюджетной линии при смене цены, линия оптимумов PCC.</span>
         </button>
         <button class="scard soon" data-scene="cons-engel" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 72 Q78 60 138 18" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="60" cy="65" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="106" cy="43" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая Энгеля</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Количество блага при разном доходе: нормальное благо и товар низшей категории.</span>
         </button>
         <button class="scard soon" data-scene="cons-marshall" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 44 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 44 V8" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 12 L74 42" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M26 40 Q42 22 68 18" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M18 84 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 84 V50" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 52 L140 80" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M48 30 V78" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связь кривых и маршаллианского спроса</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Два графика друг под другом: точка PCC сверху и точка спроса снизу.</span>
         </button>
@@ -613,85 +356,38 @@
       <div class="picker-group-label">Макроэкономика</div>
       <div class="picker-grid">
         <button class="scard" data-scene="adas">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 70 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M96 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">AD–AS</span>
           <span class="scard-desc">Совокупный спрос и предложение, потенциал LRAS, разрыв выпуска.</span>
         </button>
         <button class="scard" data-scene="islm">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="46" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">IS–LM</span>
           <span class="scard-desc">Товарный и денежный рынок вместе: пара (Y, r), равновесная для обоих.</span>
         </button>
         <button class="scard" data-scene="phillips">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 18 L140 66" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M84 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/>
-            <circle cx="84" cy="42" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Филлипса</span>
           <span class="scard-desc">Размен инфляции и безработицы в коротком периоде и его исчезновение в долгом.</span>
         </button>
         <button class="scard" data-scene="money">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M88 78 V12" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="88" cy="48" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Денежный рынок</span>
           <span class="scard-desc">Спрос на деньги, фиксированное предложение ЦБ, равновесная ставка.</span>
         </button>
         <button class="scard" data-scene="loanable">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L120 72" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M46 22 L144 72" stroke="var(--curve-reg)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Рынок заёмных средств</span>
           <span class="scard-desc">Дефицит бюджета, рост ставки, вытеснение частных инвестиций.</span>
         </button>
         <button class="scard soon" data-scene="cycle" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 66 L142 22" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 66 C 46 34, 62 74, 82 44 C 102 14, 118 52, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Деловой цикл</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Колебания выпуска вокруг тренда: подъём, пик, спад, дно и фазы между ними.</span>
         </button>
         <button class="scard soon" data-scene="cycle-adas" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 44 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 44 V8" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 36 C 32 14, 44 44, 68 16" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V42" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 46 L146 74" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M94 76 L146 46" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M40 22 L108 58" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связь делового цикла с AD–AS</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Фаза цикла сверху и соответствующее ей положение AD и AS снизу.</span>
         </button>
         <button class="scard soon" data-scene="macrolink" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <rect x="14" y="10" width="58" height="30" rx="4" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <rect x="88" y="10" width="58" height="30" rx="4" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <rect x="14" y="52" width="58" height="30" rx="4" stroke="var(--curve-mc)" stroke-width="2.2"/>
-            <rect x="88" y="52" width="58" height="30" rx="4" stroke="var(--curve-mr)" stroke-width="2.2"/>
-            <path d="M72 25 H88 M72 67 H88 M43 40 V52 M117 40 V52" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связка четырёх моделей</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Цикл, IS–LM–BP, денежный рынок и AD–AS на одном экране: один шок во всех.</span>
         </button>
         <button class="scard" data-scene="fx">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 58 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Валютный рынок</span>
           <span class="scard-desc">Плавающий и фиксированный курс; интервенции при разрыве.</span>
         </button>
@@ -703,31 +399,14 @@
       <div class="picker-group-label">Избранные сюжеты</div>
       <div class="picker-grid">
         <button class="scard" data-scene="ineq">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 L140 14" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <path d="M22 74 Q108 70 140 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Неравенство доходов</span>
           <span class="scard-desc">Кривая Лоренца, коэффициент Джини, коэффициент фондов, перераспределение.</span>
         </button>
         <button class="scard" data-scene="laffer">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.6"/>
-            <!-- А71: точка стоит НА вершине кривой (максимум поступлений), а не
-                 висит над ней ни к чему не привязанной. Вершина квадратичной
-                 кривой Безье при t=0.5 это (84; 41), а не (84; 24). -->
-            <circle cx="84" cy="41" r="3.6" fill="var(--curve-tax)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Лаффера</span>
           <span class="scard-desc">Поступления бюджета как функция ставки; строится прогоном самой модели налога.</span>
         </button>
         <button class="scard soon" data-scene="exchange" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <rect x="20" y="14" width="120" height="62" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 68 Q52 34 88 26" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M72 64 Q108 56 134 22" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M20 76 Q74 58 140 14" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <circle cx="76" cy="49" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Экономика обмена</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Коробка Эджворта: два участника, кривая контрактов, область взаимной выгоды.</span>
         </button>
@@ -751,32 +430,46 @@
        второе по ценности во всей полосе. Появится сохранение — вернётся и
        кнопка. ⚠️ Прежнюю подпись не цитируем даже в комментарии: проверки
        читают файл целиком и ловят собственное объяснение. -->
-  <nav class="dock" aria-label="Действия с моделью">
-    <button class="dock-btn" id="scene-back" type="button" data-tip="Ко всем моделям" aria-label="Ко всем моделям">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l-6 7 6 7"/><path d="M7 12h11"/></svg>
+  <!-- ── ШАПКА МОДЕЛИ (редизайн 10.2026, README раздел 5) ─────────────
+       Не <header> и не <nav>: раннер канона исключает их содержимое из
+       проверок целиком (canon_checks.mjs, inNav), а шапка модели — часть
+       экрана калькулятора и обязана проверяться. -->
+  <div class="mhead" id="model-head" role="toolbar" aria-label="Модель">
+    <button class="mh-btn mh-quiet" id="scene-back" type="button" data-tip="Ко всем моделям" aria-label="Все модели">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span>Все модели</span>
     </button>
-    <button class="dock-btn" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать график">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
+    <span class="mh-sep" aria-hidden="true"></span>
+    <button class="mh-switch" id="model-switch" type="button" data-tip="Сменить модель, не теряя этой" aria-haspopup="dialog">
+      <span class="mh-block" id="model-block"></span>
+      <span class="mh-name"><span class="side-scene" id="scene-name">Спрос и предложение</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
     </button>
-  </nav>
+    <span class="mh-saved" id="save-status" role="status" data-tip="Состояние хранится в ссылке и в этом браузере, сохранять вручную ничего не нужно"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg><span id="save-status-text">Сохранено</span></span>
+    <span class="mh-gap"></span>
+    <button class="mh-icon" id="btn-undo" type="button" data-tip="Отменить (Ctrl+Z)" aria-label="Отменить" disabled><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button class="mh-icon" id="btn-redo" type="button" data-tip="Повторить (Ctrl+Shift+Z)" aria-label="Повторить" disabled><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    <!-- Телефон: «Ещё действия» (README макета, раздел 3; COVERAGE, раздел 8). На
+         узком экране «Повторить», «Сбросить» и кнопки масштаба переезжают в лист
+         #ph-more-pop (93-shell.js); на большом кнопки «⋯» нет. -->
+    <button class="mh-icon ph-more-btn" id="btn-ph-more" type="button" aria-label="Ещё действия" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+    <span class="mh-sep" aria-hidden="true"></span>
+    <!-- «Сначала сам» (фаза 9; README макета, 5.6 и 9): пилюля с переключателем. -->
+    <button class="mh-self" id="btn-self" type="button" aria-pressed="false" aria-label="Сначала сам" data-tip="Спрятать числа ответа и проверить себя"><span class="mh-self-track" aria-hidden="true"></span><span>Сначала сам</span></button>
+    <button class="mh-btn mh-quiet" id="btn-model-reset" type="button" data-tip="Вернуть стартовые функции и параметры">Сбросить</button>
+    <button class="mh-btn mh-outline" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg><span>Скачать</span></button>
+    <button class="mh-btn mh-main" id="btn-share" type="button" data-tip="Ссылка на это состояние модели" aria-label="Поделиться" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><span>Поделиться</span></button>
+  </div>
 
   <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ ────────────────────────────────── -->
-  <aside class="side side-left" id="tools-panel" aria-label="Ввод функций">
-    <button class="side-arrow" id="tools-toggle" type="button" data-tip="Закрыть меню"
-            aria-label="Свернуть или развернуть панель ввода" aria-expanded="true">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
-    </button>
-    <!-- п. 77. Свёрнутая панель называет себя. Полоса в 26 пикселей со
-         стрелкой и больше ничем — это загадка: на узком экране правая панель
-         сворачивается САМА, и человек видит непонятный корешок у края. Имя
-         читается вдоль полосы и исчезает, как только панель раскрыта. -->
-    <span class="side-spine" aria-hidden="true">Ввод функций</span>
+  <aside class="side side-left col-cond" id="tools-panel" aria-label="Условие">
     <div class="side-inner">
       <!-- П5: крошки глобального блока над названием модели больше нет.
            П8: серой подписи «Ввод функций» тоже — название модели и есть
            заголовок этой панели, и оно крупное. -->
-      <div class="side-head">
-        <span class="side-scene" id="scene-name">Спрос и предложение</span>
+      <div class="side-head col-head">
+        <h2>Условие</h2>
+        <!-- Редизайн 10.2026, фаза 5б: тихая «Как писать формулы» → окно
+             с примерами (README макета, раздел 10; 92-ui-kit.js). -->
+        <button class="col-quiet" id="btn-howto" type="button" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17h.01"/></svg><span>Как писать формулы</span></button>
       </div>
       <!-- П9. Вернуть модель к исходному виду. По канону 2.8 у необратимого
            действия три слоя: объяснение последствия ДО действия, обычная
@@ -785,9 +478,6 @@
            выглядит чужим на странице. Раньше сброса не было вовсе — модель
            помнит правки между заходами, и единственным способом вернуть
            исходный вид была перезагрузка страницы. -->
-      <div class="side-reset">
-        <button class="btn btn-plain btn-sm" id="btn-scene-reset" type="button">Вернуть исходный вид</button>
-      </div>
       <div class="side-scroll">
 
         <section class="side-part">
@@ -805,7 +495,18 @@
          Раньше карточек было от трёх до пяти, и имя «Ввод функций» доставалось
          первой видимой из реестра INPUT_CARDS. -->
     <div class="section" id="sec-input">
-      <div class="section-title">Ввод функций</div>
+      <div class="section-title">Функции</div>
+    <div class="section" id="sec-bigtrade" style="display:none;">
+      <div class="sc-sec">Страна A</div>
+      <div class="field"><label for="big-A-D">Спрос A</label><input id="big-A-D" type="text" value="Q = 120 - P"></div>
+      <div class="field"><label for="big-A-S">Предложение A</label><input id="big-A-S" type="text" value="Q = P"></div>
+      <div class="trade-policy-controls" id="bigA-policy-controls"></div>
+      <div class="sc-sec">Страна B</div>
+      <div class="field"><label for="big-B-D">Спрос B</label><input id="big-B-D" type="text" value="Q = 60 - P"></div>
+      <div class="field"><label for="big-B-S">Предложение B</label><input id="big-B-S" type="text" value="Q = P"></div>
+      <div class="trade-policy-controls" id="bigB-policy-controls"></div>
+      <div id="info-bigtrade"></div>
+    </div>
     <div class="section" id="sec-curves">
       <!-- Своего заголовка у блока нет: его называет карточка «Ввод функций».
 
@@ -866,7 +567,7 @@
         </div>
         <div class="error" id="social-error" style="display:none;"></div>
       </div>
-      <button class="btn" id="btn-add-curve">Добавить кривую</button>
+      <button class="fc-add" id="btn-add-curve" type="button">Добавить функцию</button>
     </div>
 
     <!-- Построение графиков: чистый список функций, экономики здесь нет.
@@ -883,7 +584,7 @@
           со своим цветом; строк можно завести сколько угодно.</p>
         <p>Незнакомая буква в формуле («a*x + b») превращается в ползунок: двигая его, видно,
           как буква меняет график. Нули функции, её вершины и точки пересечения кривых
-          считаются сами и показаны в «Ключевых значениях» справа.</p>
+          считаются сами и показаны в «Ответе».</p>
       </div>
       <div id="graph-rows"></div>
       <div class="error" id="graph-error"></div>
@@ -922,7 +623,7 @@
       <div id="scn-pane-elast" style="display:none;margin-top:8px;">
         <label class="chk"><input type="checkbox" id="chk-elast-s" checked>
           <span class="swatch" style="background:var(--curve-s)"></span> Точка на предложении (Es)</label>
-        <div class="hint">Перетаскивайте точки вдоль кривых. Точечная эластичность
+        <div class="hint">Точечная эластичность
           E&nbsp;=&nbsp;(dQ/dP)·(P/Q)&nbsp;=&nbsp;P/(Q·dP/dQ). Единичная точка спроса (|Ed|=1) стоит там,
           где MR&nbsp;=&nbsp;0 и выручка TR&nbsp;=&nbsp;P·Q максимальна. Левее спрос эластичный,
           правее неэластичный.</div>
@@ -940,8 +641,7 @@
           <span class="swatch" style="background:var(--curve-tax)"></span>
           <span id="ext-pigou-label">Применить корректирующий налог или субсидию</span></label>
         <div class="hint" id="ext-hint">Спрос это предельная выгода частного лица, предложение это его
-          предельные издержки. Пока MSB и MSC выключены, общественные кривые совпадают с частными:
-          оптимум там же, где рынок.</div>
+          предельные издержки.</div>
         <div id="info-ext" style="margin-top:6px;"></div>
       </div>
       <!-- Малая открытая экономика (Фаза 4в). Обычные D(Q) и S(Q) ПО ЦЕНЕ (это
@@ -958,9 +658,11 @@
         </div>
         <div class="seg" style="margin-top:8px;">
           <button class="seg-btn active" id="oi-none">Без вмешательства</button>
-          <button class="seg-btn" id="oi-tariff">Тариф</button>
+          <button class="seg-btn" id="oi-tariff">Налог</button>
+          <button class="seg-btn" id="oi-subsidy">Субсидия</button>
           <button class="seg-btn" id="oi-quota">Квота</button>
         </div>
+        <div id="open-policy-controls" class="trade-policy-controls"></div>
         <div class="field" id="open-tariff-field" style="display:none;margin-top:8px;">
           <label>Тариф t = <b id="open-tariff-val">10</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
@@ -985,8 +687,8 @@
           <span class="swatch" style="background:var(--curve-tax)"></span> Доход бюджета / рента квоты</label>
         <label class="chk"><input type="checkbox" id="chk-open-dwl" checked>
           <span class="swatch" style="background:var(--curve-dwl)"></span> Потери общества</label>
-        <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw идёт горизонтальной линией
-          (её можно тянуть мышью). Если при Pw объём спроса больше объёма предложения, страна
+        <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw идёт горизонтальной линией.
+          Если при Pw объём спроса больше объёма предложения, страна
           <b>импортирует</b>, если меньше, <b>экспортирует</b>. Тариф поднимает внутреннюю цену до
           Pw&nbsp;+&nbsp;t, но не выше автаркической: как только ввоз стал невыгоден, страна
           закрывается сама. Квота ограничивает объём напрямую и идёт за направлением торговли
@@ -1008,9 +710,8 @@
              четырёх монопольных сюжетов (дискриминация 3°, составной спрос,
              естественная монополия, внешний рынок) жили внутри этого же
              блока и остались на месте — убран только сам переключатель. -->
-        <div class="hint" id="mono-hint" style="display:none;">Монополист выпускает там, где <b>MR&nbsp;=&nbsp;MC</b>,
-          и берёт цену с кривой спроса (выше предельных издержек). Нужны: спрос (роль D) и предельные издержки
-          (роль MC, либо TC, либо S как MC). Серым закрашены потери общества (DWL) против конкуренции.</div>
+        <div class="hint" id="mono-hint" style="display:none;">Гладкое внутреннее решение монополиста ищут из <b>MR&nbsp;=&nbsp;MC</b>, проверяя максимум прибыли и границы.
+          Цена определяется по кривой спроса. Серым закрашены потери общества (DWL) против конкуренции.</div>
         <!-- Под-режимы монополии: обычная / дискриминация 1° / дискриминация 3° /
              составной спрос / естественная монополия. Виден только в режиме монополии;
              при выборе сцены «Монополия» переносится в пульт-ленту (Фаза 3а). -->
@@ -1029,8 +730,8 @@
         <div id="mono-d1-pane" style="display:none;margin-top:8px;">
           <div class="hint">Совершенная (1-й степени) дискриминация: монополист продаёт каждую единицу
             по её цене спроса до точки, где спрос&nbsp;=&nbsp;MC. Весь излишек достаётся фирме:
-            <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.
-            Нужны: спрос (роль D) и предельные издержки (роль MC / S / TC) в списке кривых.</div>
+            <b>CS&nbsp;=&nbsp;0</b>, <b>DWL&nbsp;=&nbsp;0</b>, выпуск&nbsp;=&nbsp;конкурентному.</div>
+          <div class="hint">Чтобы учесть постоянные издержки, у кривой затрат выберите роль TC в меню «⋯» и введите общие затраты. На графике появится их производная MC.</div>
         </div>
         <!-- Панель дискриминации 3-й степени (Задача 5): два рынка + общий MC. -->
         <div id="mono-d3-pane" style="display:none;margin-top:8px;">
@@ -1039,10 +740,10 @@
           <div class="field"><label>Спрос рынка&nbsp;2: P&nbsp;=&nbsp;f₂(Q)</label>
             <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
           <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
-            <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
-          <button class="btn" id="btn-d3-apply">Построить</button>
-          <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
-            На менее эластичном рынке цена выше. Два мини-графика рынков стоят бок о бок.</div>
+            <input type="text" id="inp-d3-mc" value="20" autocomplete="off">
+            <div class="hint">Можно задать MC или общие затраты: например, TC = 30Q + 200. Q – общий выпуск для двух групп.</div></div>
+          <div class="hint d3-world-hint">Два мини-графика рынков стоят бок о бок.</div>
+          <div id="mono-policy-controls" class="trade-policy-controls" style="display:none;"></div>
           <div class="error" id="d3-error" style="display:none;"></div>
           <div id="info-d3" style="margin-top:8px;"></div>
         </div>
@@ -1078,9 +779,8 @@
           </div>
           <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
             <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
-          <button class="btn" id="btn-kink-apply">Построить</button>
-          <div class="hint">MR на каждом куске своя прямая (вдвое круче спроса), в изломах MR
-            разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
+          <div class="hint">Для линейного куска MR вдвое круче спроса. В изломе возможен скачок MR
+            вверх или вниз в зависимости от смены наклона. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
             (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
           <div class="error" id="kink-error" style="display:none;"></div>
           <div id="info-kink" style="margin-top:8px;"></div>
@@ -1106,21 +806,18 @@
         </div>
         <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
         <div id="mono-areas-chk" style="display:none;margin-top:8px;">
-          <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
-            <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
-          <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
-            <span class="swatch" style="background:var(--curve-dwl)"></span> Показывать VC</label>
-          <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
-            <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS
-            <span class="nowrap">(TR&nbsp;−&nbsp;VC)</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-cs" checked>
+            <span class="show-sw" data-area="CS"></span><span class="show-name">Излишек потребителя</span><span class="show-not">CS</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-ps" checked>
+            <span class="show-sw" data-area="PS"></span><span class="show-name">Излишек производителя <span class="nowrap">(TR&nbsp;−&nbsp;VC)</span></span><span class="show-not">PS</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-vc" checked>
+            <span class="show-sw" data-area="VC"></span><span class="show-name">Переменные издержки</span><span class="show-not">VC</span></label>
         </div>
         <!-- Вмешательство государства в монополии (Фаза 2) задаётся ОБЩИМ блоком
              «Вмешательство государства» вверху панели — здесь только подсказка. -->
         <div id="mono-interv-hint" class="hint" style="display:none;margin-top:10px;">
-          Вмешательство государства (налог, субсидия, потолок, пол) задаётся ниже,
-          в карточке «Вмешательство государства»; оно работает и в монополии. Налог/субсидия
-          сдвигают MC (оптимум MR&nbsp;=&nbsp;MC&nbsp;±&nbsp;ставка); грамотный потолок может увеличить выпуск;
-          пол связывает, только если он выше монопольной цены. Линию цены можно тянуть мышью.
+          Налог и субсидия сдвигают MC (оптимум MR&nbsp;=&nbsp;MC&nbsp;±&nbsp;ставка); грамотный потолок может
+          увеличить выпуск; пол связывает, только если он выше монопольной цены.
         </div>
         <div id="info-mono" style="margin-top:8px;"></div>
       </div>
@@ -1136,9 +833,14 @@
         <button class="seg-btn active" id="cs-costs">Издержки</button>
         <button class="seg-btn" id="cs-prod">Производство</button>
         <button class="seg-btn" id="cs-iso">Изокванты</button>
-        <button class="seg-btn" id="cs-plants">Два завода</button>
+        <button class="seg-btn" id="cs-plants">Сложение заводов</button>
       </div>
       <div id="costs-pane-costs">
+      <div id="firm-market-inputs" style="display:none;">
+        <div class="field"><label>Спрос рынка</label><input id="firm-market-demand" type="text" value="Q = 100 - 4*P" autocomplete="off"></div>
+        <div class="field sc-nrow" id="firm-market-n-row"><label>Число фирм n</label><input id="firm-market-n" type="text" data-plain="1" value="10"></div>
+        <div class="firm-market-price">Цена задана рынком: <span id="firm-market-price-value">15</span><span class="firm-market-price-mask">?</span></div>
+      </div>
       <!-- Б24. Способ ввода спрашиваем сразу, при входе в сцену. Отдельного
            поля «постоянные издержки FC» больше нет: в режиме «задаю TC» они
            равны TC(0) по определению, а второй хозяин у того же числа молча
@@ -1157,11 +859,8 @@
           </div>
           <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
         </div>
-        <button class="btn" id="btn-costs-apply">Построить</button>
         <button class="btn-sm" id="btn-costs-preset" style="margin-top:6px;width:100%;">Стандартные издержки</button>
-        <div class="hint">Постоянные затраты не вводятся отдельно: FC&nbsp;=&nbsp;TC(0). Дальше
-          VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC, ATC&nbsp;=&nbsp;TC/Q, AVC&nbsp;=&nbsp;VC/Q,
-          AFC&nbsp;=&nbsp;FC/Q, MC&nbsp;=&nbsp;dTC/dQ. MC проходит через минимумы ATC и AVC.</div>
+        <div class="hint">Постоянные затраты FC&nbsp;=&nbsp;TC(0), переменные VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC.</div>
       </div>
       <div id="costs-input-curves" style="display:none;">
         <div class="field"><label>Предельные затраты MC(Q)</label>
@@ -1170,34 +869,31 @@
           <input type="text" id="inp-catc" value="Q^2 - 6*Q + 15 + 18/Q" autocomplete="off"></div>
         <div class="field"><label>Средние переменные AVC(Q)</label>
           <input type="text" id="inp-cavc" value="Q^2 - 6*Q + 15" autocomplete="off"></div>
-        <button class="btn" id="btn-cparts-apply">Построить</button>
-        <div class="hint">Для олимпиадных условий, где сразу даны MC и ATC, а функция TC не дана.
-          Пустое поле значит, что кривой нет: здесь ничего не выводится одно из другого. Если заданы
-          и ATC, и AVC, постоянные затраты берутся как (ATC&nbsp;−&nbsp;AVC)·Q. Несогласованные
-          кривые не запрещаются, но об этом будет сказано.</div>
+        <div class="hint">Если известны и ATC, и AVC, постоянные затраты равны (ATC&nbsp;−&nbsp;AVC)·Q.</div>
       </div>
       <div class="error" id="costs-error"></div>
+      <div id="firm-supply-controls"></div>
       <!-- Б21, Б22. Названия кривых полные: «MC (предельные)» обрывалось на
            полуслове, а слово «затраты» и есть то, чего в них не хватало.
            Полные суммарные величины (TC, VC, FC) стоят вместе, отдельной
            группой: раньше в списке был один VC без своей пары. -->
       <div class="curve-group" style="margin-top:10px;">
         <div class="curve-group-title">Средние и предельные затраты</div>
-        <label class="chk"><input type="checkbox" id="chk-mc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costMC" data-tip="Цвет $MC$"> MC, предельные затраты</label>
-        <label class="chk"><input type="checkbox" id="chk-atc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costATC" data-tip="Цвет $ATC$"> ATC, средние общие затраты</label>
-        <label class="chk"><input type="checkbox" id="chk-avc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAVC" data-tip="Цвет $AVC$"> AVC, средние переменные затраты</label>
-        <label class="chk"><input type="checkbox" id="chk-afc" checked>
-          <input type="color" class="swatch swatch-pick" data-col="costAFC" data-tip="Цвет $AFC$"> AFC, средние постоянные затраты</label>
+        <label class="chk show-row"><input type="checkbox" id="chk-mc" checked>
+          <input type="color" class="swatch swatch-pick" data-col="costMC" data-tip="Цвет $MC$"><span class="show-name">Предельные затраты</span><span class="show-not">MC</span></label>
+        <label class="chk show-row"><input type="checkbox" id="chk-atc" checked>
+          <input type="color" class="swatch swatch-pick" data-col="costATC" data-tip="Цвет $ATC$"><span class="show-name">Средние общие затраты</span><span class="show-not">ATC</span></label>
+        <label class="chk show-row"><input type="checkbox" id="chk-avc" checked>
+          <input type="color" class="swatch swatch-pick" data-col="costAVC" data-tip="Цвет $AVC$"><span class="show-name">Средние переменные затраты</span><span class="show-not">AVC</span></label>
+        <label class="chk show-row"><input type="checkbox" id="chk-afc" checked>
+          <input type="color" class="swatch swatch-pick" data-col="costAFC" data-tip="Цвет $AFC$"><span class="show-name">Средние постоянные затраты</span><span class="show-not">AFC</span></label>
         <div class="curve-group-title" style="margin-top:8px;">Полные затраты</div>
-        <label class="chk"><input type="checkbox" id="chk-tc">
-          <input type="color" class="swatch swatch-pick" data-col="costTC" data-tip="Цвет $TC$"> TC, общие затраты</label>
-        <label class="chk"><input type="checkbox" id="chk-vc">
-          <input type="color" class="swatch swatch-pick" data-col="costVC" data-tip="Цвет $VC$"> VC, переменные затраты</label>
-        <label class="chk"><input type="checkbox" id="chk-fc">
-          <input type="color" class="swatch swatch-pick" data-col="costFC" data-tip="Цвет $FC$"> FC, постоянные затраты</label>
+        <label class="chk show-row"><input type="checkbox" id="chk-tc">
+          <input type="color" class="swatch swatch-pick" data-col="costTC" data-tip="Цвет $TC$"><span class="show-name">Общие затраты</span><span class="show-not">TC</span></label>
+        <label class="chk show-row"><input type="checkbox" id="chk-vc">
+          <input type="color" class="swatch swatch-pick" data-col="costVC" data-tip="Цвет $VC$"><span class="show-name">Переменные затраты</span><span class="show-not">VC</span></label>
+        <label class="chk show-row"><input type="checkbox" id="chk-fc">
+          <input type="color" class="swatch swatch-pick" data-col="costFC" data-tip="Цвет $FC$"><span class="show-name">Постоянные затраты</span><span class="show-not">FC</span></label>
       </div>
       <!-- 9в: долгосрочное равновесие конкурентной фирмы. -->
       <div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border);">
@@ -1213,7 +909,7 @@
         </div>
         <label class="chk"><input type="checkbox" id="chk-lr-area" checked>
           <span class="swatch" style="background:var(--curve-tax)"></span> Прямоугольник прибыли / убытка</label>
-        <div class="hint">Фирма выбирает Q, где P&nbsp;=&nbsp;MC (на возрастающей ветке). Прибыль
+        <div class="hint">Прибыль
           (P&nbsp;−&nbsp;ATC)·Q закрашивается зелёным, убыток красным. Долгосрочная точка входа
           и выхода стоит там, где P&nbsp;=&nbsp;min&nbsp;ATC: экономическая прибыль ноль.</div>
       </div>
@@ -1230,19 +926,16 @@
           </div>
           <div class="f-pop" id="fp-prod" role="region" aria-label="Примеры производственных функций"></div>
         </div>
-        <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
-          <label class="chk"><input type="checkbox" id="chk-tp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodTP" data-tip="Цвет $TP$"> TP (общий продукт)</label>
-          <label class="chk"><input type="checkbox" id="chk-mp" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodMP" data-tip="Цвет $MP$"> MP (предельный продукт)</label>
-          <label class="chk"><input type="checkbox" id="chk-ap" checked>
-            <input type="color" class="swatch swatch-pick" data-col="prodAP" data-tip="Цвет $AP$"> AP (средний продукт)</label>
+          <label class="chk show-row"><input type="checkbox" id="chk-tp" checked>
+            <input type="color" class="swatch swatch-pick" data-col="prodTP" data-tip="Цвет $TP$"><span class="show-name">Общий продукт</span><span class="show-not">TP</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mp" checked>
+            <input type="color" class="swatch swatch-pick" data-col="prodMP" data-tip="Цвет $MP$"><span class="show-name">Предельный продукт</span><span class="show-not">MP</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-ap" checked>
+            <input type="color" class="swatch swatch-pick" data-col="prodAP" data-tip="Цвет $AP$"><span class="show-name">Средний продукт</span><span class="show-not">AP</span></label>
         </div>
         <div class="hint">На верхней панели общий продукт TP, на нижней предельный MP&nbsp;=&nbsp;dQ/dL и
-          средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).
-          Точка перегиба TP стоит там, где MP максимален: с неё начинается убывающая предельная отдача.
-          Максимум AP там, где AP&nbsp;=&nbsp;MP.</div>
+          средний AP&nbsp;=&nbsp;Q/L (у них свой масштаб, иначе на фоне TP их не видно).</div>
         <div class="error" id="prod-error" style="display:none;"></div>
         <div id="info-prod" style="margin-top:8px;"></div>
       </div>
@@ -1264,9 +957,8 @@
         <div class="field"><label>Бюджет C</label><input type="number" id="iso-c" min="1" step="1" value="100"></div>
         <label class="chk"><input type="checkbox" id="chk-iso-fan" checked>
           <input type="color" class="swatch swatch-pick" data-col="isoq" data-tip="Цвет изоквант"> Веер изоквант</label>
-        <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C; оптимум это касание изокванты и изокосты,
-          там MRTS&nbsp;=&nbsp;w/r. Считает ТОТ ЖЕ движок, что кривые безразличия потребителя:
-          при Q&nbsp;=&nbsp;L^0.5·K^0.5, w=1, r=2, C=100 получаются те же 50 и 25.</div>
+        <div class="hint">Изокоста w·L&nbsp;+&nbsp;r·K&nbsp;=&nbsp;C задаёт бюджет. В гладком внутреннем
+          оптимуме изокванта касается изокосты и MRTS&nbsp;=&nbsp;w/r; угловые решения проверяют отдельно.</div>
         <div class="error" id="iso-error" style="display:none;"></div>
         <div id="info-iso" style="margin-top:8px;"></div>
       </div>
@@ -1274,11 +966,13 @@
       <!-- Фаза 10. Два завода: совокупные издержки — это НЕ сумма TC1(Q)+TC2(Q),
            а минимум суммы при делении выпуска. Отсюда горизонтальное сложение MC. -->
       <div id="costs-pane-plants" style="display:none;">
+        <div id="plant-rows">
         <div class="field"><label>Затраты завода 1: TC₁(Q₁)</label>
           <input type="text" id="inp-pl1" value="Q^2" autocomplete="off"></div>
         <div class="field"><label>Затраты завода 2: TC₂(Q₂)</label>
           <input type="text" id="inp-pl2" value="2*Q^2" autocomplete="off"></div>
-        <button class="btn" id="btn-pl-apply">Построить</button>
+        </div>
+        <button type="button" class="btn btn-ghost" id="plant-add" onclick="addPlant()">+ Завод</button>
         <div class="seg" style="margin-top:8px;">
           <button class="seg-btn active" id="plv-tc">Издержки TC</button>
           <button class="seg-btn" id="plv-mc">Предельные MC</button>
@@ -1304,11 +998,7 @@
         <button class="hint-btn" type="button" data-pop="hp-labor" aria-label="Как этим пользоваться">?</button>
       </div>
       <div class="hint-pop" id="hp-labor">
-        <p>Стороны здесь поменялись местами: труд покупают фирмы, продают работники.
-          По горизонтали идёт занятость, по вертикали ставка зарплаты.</p>
-        <p>Переключатель сверху задаёт устройство рынка: конкуренция, единственный наниматель,
-          профсоюз или двусторонняя монополия. От него зависит, какие кривые появятся на поле
-          и по какому правилу считается занятость.</p>
+        <p data-explain="1">По горизонтали идёт занятость, по вертикали ставка зарплаты.</p>
       </div>
       <div id="labor-seg">
         <div class="seg">
@@ -1320,8 +1010,6 @@
           <button class="seg-btn" id="lab-bilat">Двусторонняя монополия</button>
         </div>
       </div>
-      <div class="hint">Спрос на труд (роль <b>D</b>) и есть MRPL; предложение труда (роль <b>S</b>).
-        Оси: L (труд) и W (зарплата). Формулы можно писать через L: <code>100 - L</code>, <code>L</code>.</div>
       <!-- Профсоюз (ЧК4): монополист труда. Под-модели — монополист / диктат зарплаты.
            Виден только при структуре «Профсоюз». -->
       <div id="union-pane" style="display:none;margin-top:10px;">
@@ -1329,10 +1017,9 @@
           <button class="seg-btn active" id="un-monopoly">Монополист</button>
           <button class="seg-btn" id="un-wagefloor">Диктат зарплаты</button>
         </div>
-        <div class="hint" id="un-hint-mono">Профсоюз продаёт труд монопольно: его предельный
-          доход MRL лежит ниже спроса D, предельные издержки задаёт кривая предложения S.
-          Занятость Lп там, где MRL&nbsp;=&nbsp;S; зарплата Wп берётся с кривой спроса (выше
-          конкурентной). Зеркало монопсонии.</div>
+        <div class="hint" id="un-hint-mono">Профсоюз максимизирует фонд оплаты: занятость Lп
+          там, где MRL&nbsp;=&nbsp;0, но не больше, чем при конкуренции; зарплата Wп берётся с
+          кривой спроса.</div>
         <div class="field" id="union-wage-field" style="display:none;margin-top:8px;">
           <label>Зарплата профсоюза W = <b id="union-wage-val">0</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
@@ -1341,8 +1028,7 @@
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
           <div class="hint">Профсоюз диктует зарплату выше конкурентной: занятость падает по кривой
-            СПРОСА (Lп, где D&nbsp;=&nbsp;W), возникает безработица (желающие по предложению минус занятые).
-            Это ценовой пол на рынке труда. Линию можно тянуть мышью.</div>
+            спроса (Lп, где D&nbsp;=&nbsp;W), возникает безработица (желающие по предложению минус занятые).</div>
         </div>
       </div>
       <!-- Минимальная зарплата (МРОТ) — горизонтальная линия, тянется мышью (Задача 3). -->
@@ -1356,9 +1042,8 @@
             <input type="number" id="labmin-input" min="0" max="100" step="0.1" value="0"
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
-          <div class="hint">В монопсонии правильный МРОТ может УВЕЛИЧИТЬ занятость (парадокс): он делает
-            предельные издержки труда горизонтальными (= W_min) до встречи с предложением. В конкуренции
-            МРОТ выше равновесия даёт безработицу. Линию можно тянуть мышью.</div>
+          <div class="hint">В монопсонии правильный МРОТ может увеличить занятость (парадокс): он делает
+            предельные издержки труда горизонтальными (= $W_{\min}$) до встречи с предложением.</div>
         </div>
       </div>
       <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-lab-ghost" checked>
@@ -1378,29 +1063,26 @@
       <!-- Способ «доли по группам»: N групп равного населения, доля дохода каждой (%) -->
       <div id="ineq-pane-groups" style="margin-top:8px;">
         <div class="field">
-          <label>Число групп</label>
+          <label>Равные группы</label>
           <select id="ineq-ngroups">
             <option value="5" selected>5 (квинтили)</option>
             <option value="10">10 (децили)</option>
           </select>
         </div>
+        <div id="ineq-group-mode" class="seg ineq-group-mode"></div>
         <div id="ineq-groups-table"></div>
+        <button type="button" id="ineq-add-group" class="btn-sm" onclick="ineqAddGroup(false)">+ группа</button>
         <div id="ineq-note-groups" class="hint" style="display:none;color:#b45309;">
           Группы переставлены по возрастанию дохода: кривая Лоренца всегда идёт от бедных к богатым.</div>
-        <div class="hint">Доля дохода каждой группы, в %. Сумма нормируется до 100%.
-          Узлы кривой можно тянуть мышью.</div>
       </div>
       <!-- Способ «доходы»: список чисел (доходы людей) -->
       <div id="ineq-pane-incomes" style="display:none;margin-top:8px;">
         <div class="field">
           <label>Доходы (через запятую)</label>
-          <input type="text" id="ineq-incomes" value="10, 20, 30, 40, 100" autocomplete="off">
+          <input type="text" id="ineq-incomes" data-plain="1" value="10, 20, 30, 40, 100" autocomplete="off">
         </div>
-        <button class="btn" id="ineq-incomes-apply">Построить</button>
         <div id="ineq-note-incomes" class="hint" style="display:none;color:#b45309;">
           Доходы переставлены по возрастанию: кривая Лоренца всегда идёт от бедных к богатым.</div>
-        <div class="hint">Каждое число это доход одного человека. Сортируются по возрастанию,
-          строятся накопленные доли. Узлы кривой можно тянуть мышью.</div>
       </div>
       <!-- Способ «формула»: функция Лоренца L(p), p — доля населения 0..1 -->
       <div id="ineq-pane-formula" style="display:none;margin-top:8px;">
@@ -1408,19 +1090,18 @@
           <label>Функция Лоренца L(p), p∈[0,1]</label>
           <input type="text" id="ineq-formula" value="p^2" autocomplete="off">
         </div>
-        <button class="btn" id="ineq-formula-apply">Построить</button>
+        <!-- Отдельного поля «α (точное значение)» здесь больше нет (решение
+             владельца 01.09): значение уже показано у самого ползунка, а
+             точное вводится щелчком по нему, как у всех регуляторов сцены. -->
+        <div class="hint">Функция Лоренца: L(0)&nbsp;=&nbsp;0, L(1)&nbsp;=&nbsp;1, неубывающая и выпуклая.</div>
+      </div>
         <!-- Задача 3: ползунок параметра α для семейства L(p)=p^α. -->
         <div class="field" id="ineq-alpha-field" style="margin-top:8px;">
           <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
           <input type="range" id="ineq-alpha" min="1" max="6" step="0.1" value="2">
         </div>
-        <!-- Отдельного поля «α (точное значение)» здесь больше нет (решение
-             владельца 01.09): значение уже показано у самого ползунка, а
-             точное вводится щелчком по нему, как у всех регуляторов сцены. -->
-        <div class="hint">Должно быть L(0)=0, L(1)=1, неубывающая и выпуклая.
-          Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>. Ползунок α задаёт
-          именно семейство <code>p^α</code>; любую другую формулу можно вписать вручную в поле выше.</div>
-      </div>
+      <div id="ineq-countries"></div>
+      <button type="button" id="ineq-add-country" class="btn-sm" onclick="ineqAddCountry()">+ страна</button>
       <!-- Галочки «Исходное состояние (было → стало)» здесь больше нет (решение
            владельца 01.09): в этой модели сравнивать не с чем. Сравнение «до и
            после» даёт «Перераспределение» ниже, и оно про настоящее действие. -->
@@ -1442,9 +1123,8 @@
             <label>Трансферт T = <b id="ineq-transfer-val">0</b>% дохода</label>
             <input type="range" id="ineq-transfer" min="0" max="50" step="1" value="0">
           </div>
-          <div class="hint">Налог: доля каждой группы подтягивается к равной (1/N):
-            новая&nbsp;=&nbsp;(1−τ)·старая&nbsp;+&nbsp;τ·(1/N), при τ=1 получается полное равенство.
-            Трансферт: T% общего дохода забирается у богатейшей группы и делится поровну между всеми.</div>
+          <div class="hint">Налог: доход каждой группы подтягивается к её доле населения. При τ=1 получается полное равенство.
+            Трансферт: T% общего дохода забирается у группы с наибольшим доходом на человека и распределяется пропорционально численности.</div>
         </div>
       </div>
       <div id="info-inequality" style="margin-top:8px;"></div>
@@ -1462,11 +1142,11 @@
       <div class="field">
         <label>Тип предпочтений</label>
         <select id="cons-type">
-          <option value="cobb" selected>Кобб-Дуглас: U = x^a · y^b</option>
-          <option value="subs">Совершенные субституты: U = a·x + b·y</option>
-          <option value="compl">Совершенные комплементы: U = min(x/a, y/b)</option>
-          <option value="quasi">Квазилинейные: U = x + k·√y</option>
-          <option value="custom">Своя формула U(x, y)</option>
+          <option value="cobb" selected>Кобб-Дуглас</option>
+          <option value="subs">Совершенные субституты</option>
+          <option value="compl">Совершенные комплементы</option>
+          <option value="quasi">Квазилинейные</option>
+          <option value="custom">Своя формула</option>
         </select>
       </div>
       <div class="row" id="cons-ab-row">
@@ -1496,9 +1176,7 @@
         </div>
       </div>
       <div class="hint">Оптимум это точка касания бюджетной линии и кривой безразличия: там
-        MRS&nbsp;=&nbsp;Px/Py. Ищется численно (тройной поиск вдоль бюджетной линии), одинаково
-        для всех типов предпочтений, включая свою формулу. Концы бюджетной линии можно тянуть
-        мышью: это меняет соответствующую цену.</div>
+        MRS&nbsp;=&nbsp;Px/Py.</div>
       <div class="error" id="cons-error" style="display:none;"></div>
       <div id="info-consumer" style="margin-top:8px;"></div>
     </div>
@@ -1541,11 +1219,7 @@
           </div>
         </div>
 
-        <button class="btn" id="btn-ppf-apply" style="margin-top:8px;width:100%;">Построить</button>
-        <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль).
-          Строка принимает уравнение целиком в любой из трёх форм: $y = 100 - x$,
-          $x = 50 - 0.5y$ и неявную вроде $x^2 + y^2 = 25$. Буква в формуле
-          становится ползунком в «Основных параметрах».</div>
+        <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль).</div>
         <div class="error" id="ppf-error"></div>
 
         <!-- П4: кривая комплектов. Поля пустые, без кнопки ничего
@@ -1554,9 +1228,9 @@
         <div class="error bundle-error" id="bundle-error" style="display:none;"></div>
         <div class="row bundle-row" id="bundle-row" style="display:none;">
           <div class="field"><label for="inp-bundle-x">Единиц X</label>
-            <input type="number" id="inp-bundle-x" min="0.1" step="0.1" placeholder="Например: 3"></div>
+            <input type="number" id="inp-bundle-x" min="0.1" step="0.1" placeholder="3"></div>
           <div class="field"><label for="inp-bundle-y">Единиц Y</label>
-            <input type="number" id="inp-bundle-y" min="0.1" step="0.1" placeholder="Например: 1"></div>
+            <input type="number" id="inp-bundle-y" min="0.1" step="0.1" placeholder="1"></div>
         </div>
 
         <!-- Области (Фаза 11.5) -->
@@ -1572,7 +1246,7 @@
       <!-- Под-режим «Сложение КПВ». Сколько кривых складываем — числом (Фаза 13). -->
       <div id="ppf-pane-sum" style="display:none;">
         <div class="field pw-count-field">
-          <label for="inp-ppfsum-n">Сколько кривых</label>
+          <label for="inp-ppfsum-n">Сколько КПВ</label>
           <input type="number" id="inp-ppfsum-n" min="2" max="5" step="1" value="2">
         </div>
         <div id="ppfsum-rows"></div>
@@ -1580,28 +1254,27 @@
           <label>Суммарная кривая <span class="swatch-slot" id="ppfsum-color"></span></label>
           <input type="text" id="inp-ppfsum-name" placeholder="Имя на графике, напр. Сумма" autocomplete="off">
         </div>
-        <button class="btn" id="btn-ppfsum-apply" style="width:100%;">Построить сумму</button>
         <div class="hint">Совместная КПВ: при каждом суммарном выпуске X производство делится
           так, чтобы общий Y был максимален. X наращивает тот, у кого альтернативные издержки X
-          меньше. Это НЕ вертикальная сумма кривых.</div>
+          меньше. Это не вертикальная сумма кривых.</div>
         <div class="error" id="ppfsum-error"></div>
 
         <label class="chk bundle-chk"><input type="checkbox" id="chk-bundle-2"> Кривая комплектов</label>
 
         <div class="row bundle-row" id="bundle-row2" style="display:none;">
           <div class="field"><label for="inp-bundle-x2">Единиц X</label>
-            <input type="number" id="inp-bundle-x2" min="0.1" step="0.1" placeholder="Например: 3"></div>
+            <input type="number" id="inp-bundle-x2" min="0.1" step="0.1" placeholder="3"></div>
           <div class="field"><label for="inp-bundle-y2">Единиц Y</label>
-            <input type="number" id="inp-bundle-y2" min="0.1" step="0.1" placeholder="Например: 1"></div>
+            <input type="number" id="inp-bundle-y2" min="0.1" step="0.1" placeholder="1"></div>
         </div>
 
         <div id="info-ppfsum" style="margin-top:8px;"></div>
       </div>
 
       <!-- Под-режим «КТВ / торговля». Сценарий А — мировая цена задана извне (исходный);
-           сценарий Б (ЧК5) — две страны сами определяют равновесную мировую цену. -->
+           сценарий Б (ЧК5) — две страны и пример мировой цены. -->
       <div id="ppf-pane-trade" style="display:none;">
-        <!-- Переключателя сценариев здесь нет: «цена задана» и «цена эндогенна» —
+        <!-- Переключателя сценариев здесь нет: «цена задана» и «две страны» —
              это две разные карточки окна сценариев, и выбор делается там. -->
         <!-- Сценарий А — одна страна, мировая цена Px/Py вводится. -->
         <div id="trade-pane-a">
@@ -1615,15 +1288,14 @@
             <input type="range" id="ppft-price-slider" min="0.1" max="4" step="0.01" value="2">
             <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
-          <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
           <!-- П4: кривая комплектов есть во всех моделях блока КПВ и КТВ.
                Здесь она обязана пересечь и КПВ, и КТВ. -->
           <label class="chk bundle-chk"><input type="checkbox" id="chk-bundle-t"> Кривая комплектов</label>
           <div class="row bundle-row" id="bundle-rowt" style="display:none;">
             <div class="field"><label for="inp-bundle-xt">Единиц X</label>
-              <input type="number" id="inp-bundle-xt" min="0.1" step="0.1" placeholder="Например: 3"></div>
+              <input type="number" id="inp-bundle-xt" min="0.1" step="0.1" placeholder="3"></div>
             <div class="field"><label for="inp-bundle-yt">Единиц Y</label>
-              <input type="number" id="inp-bundle-yt" min="0.1" step="0.1" placeholder="Например: 1"></div>
+              <input type="number" id="inp-bundle-yt" min="0.1" step="0.1" placeholder="1"></div>
           </div>
           <div class="hint">КТВ это граница потребления при торговле по мировой цене.
             Линейная КПВ → полная специализация (угол). Нелинейная → точка касания, где
@@ -1641,18 +1313,18 @@
             <label>КПВ страны&nbsp;2: Y&nbsp;=&nbsp;f₂(X)</label>
             <input type="text" id="inp-tb2" value="100 - 2*X" autocomplete="off">
           </div>
-          <button class="btn" id="btn-tb-apply">Построить торговлю</button>
-          <!-- Задача 2: своя мировая цена — ползунок + синхронное поле + сброс к равновесной. -->
+          <!-- Своя мировая цена — ползунок + синхронное поле + сброс к примеру цены. -->
           <div class="field" id="tb-price-field" style="margin-top:8px;">
             <label for="inp-tb-price">Мировая цена Pw = <b id="tb-price-val">Не найдена</b></label>
             <input type="range" id="tb-price-slider" min="0.1" max="4" step="0.01" value="1.41">
-            <input type="number" id="inp-tb-price" min="0.1" step="0.05" placeholder="Равновесная (авто)">
-            <button class="btn-sm" id="btn-tb-reset">Сбросить к равновесной</button>
+            <input type="number" id="inp-tb-price" min="0.1" step="0.05" placeholder="Пример цены (авто)">
+            <button class="btn-sm" id="btn-tb-reset">Вернуть пример цены</button>
           </div>
-          <div class="hint">Линейные КПВ. Автарктическая цена X каждой страны равна наклону её КПВ.
-            Мировая цена Pw устанавливается МЕЖДУ автарктическими (эндогенно). Страна с меньшими
+          <div class="hint">Линейные КПВ. Альтернативные издержки X каждой страны равны модулю наклона её КПВ.
+            Начальная Pw служит примером внутри интервала альтернативных издержек, а не результатом расчёта равновесия. Страна с меньшими
             альт. издержками X специализируется на X и экспортирует его, другая на Y. Линии
-            торговых возможностей обеих стран лежат вне их КПВ (выигрыш от торговли).</div>
+            торговых возможностей расширяют доступные наборы при цене строго внутри интервала.
+            На границе одна страна безразлична между специализациями.</div>
           <div class="error" id="tb-error" style="display:none;"></div>
           <div id="info-tb" style="margin-top:8px;"></div>
         </div>
@@ -1679,28 +1351,29 @@
       </div>
 
       <div id="macro-pane-adas" style="margin-top:10px;">
-        <div class="field"><label>Потенциальный выпуск Y* (LRAS, вертикаль)</label>
-          <input type="number" id="ma-lras" step="1" value="100"></div>
-        <div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div>
-        <div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div>
-        <div class="hint">Оси подписаны Y (реальный ВВП) и P (уровень цен), а не Q/P, чтобы не путать
-          с обычным рынком. Разрыв выпуска отмечается на оси Y: рецессионный, если фактический
-          выпуск ниже потенциального, инфляционный, если выше.</div>
+        <div id="adas-ad-mode"></div>
+        <div id="adas-ad-formula"><div class="field"><label>AD: P = f(Y)</label><input type="text" id="ma-ad" value="120 - 0.6*Y"></div></div>
+        <div id="adas-mv" class="islm-grid"></div>
+        <div id="adas-sras-mode"></div>
+        <div id="adas-sras-formula"><div class="field"><label>SRAS: P = f(Y)</label><input type="text" id="ma-sras" value="10 + 0.5*Y"></div></div>
+        <div id="adas-labor"></div>
+        <div id="adas-lras-mode"></div>
+        <div id="adas-lras-number"><div class="field"><label>Потенциальный выпуск Y* (LRAS, вертикаль)</label><input type="number" id="ma-lras" step="1" value="100"></div></div>
+        <div id="adas-lras-auto" class="adas-auto">LRAS определяется равновесием рынка труда.</div>
+        <button type="button" class="btn-sm" id="adas-add-shock">+ шок</button>
+        <div id="adas-shock"></div>
       </div>
       <div id="macro-pane-phillips" style="display:none;margin-top:10px;">
         <div class="row">
-          <div class="field"><label>Ожидания πe</label><input type="number" id="ma-pe" step="0.1" value="5"></div>
+          <div class="field"><label>Ожидания $\pi^{e}$</label><input type="number" id="ma-pe" step="0.1" value="5"></div>
           <div class="field"><label>Естественный u*</label><input type="number" id="ma-ustar" step="0.1" value="5"></div>
         </div>
         <div class="field"><label>Наклон β</label><input type="number" id="ma-beta" step="0.05" value="0.5"></div>
-        <div class="hint">Краткосрочная: π&nbsp;=&nbsp;πe&nbsp;−&nbsp;β(u&nbsp;−&nbsp;u*). Долгосрочная идёт
-          вертикалью при u&nbsp;=&nbsp;u*.</div>
+        <div class="hint">Краткосрочная: $\pi = \pi^{e} - \beta(u - u^{*})$.</div>
       </div>
       <div id="macro-pane-money" style="display:none;margin-top:10px;">
         <div class="field"><label>Спрос на деньги: M = f(i)</label><input type="text" id="ma-md" value="200 - 4*i"></div>
         <div class="field"><label>Предложение Ms (ЦБ, вертикаль)</label><input type="number" id="ma-ms" step="1" value="120"></div>
-        <div class="hint">Спрос записывается как объём от ставки: так его и задают в задачах,
-          калькулятор сам приводит к виду «ставка от объёма».</div>
       </div>
       <div id="macro-pane-loanable" style="display:none;margin-top:10px;">
         <div class="field"><label>Сбережения: S = f(r)</label><input type="text" id="ma-ls" value="50 + 2*r"></div>
@@ -1712,7 +1385,7 @@
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
         </div>
-        <div class="hint">Дефицит сдвигает ОБЩИЙ спрос вправо на ΔG. Вытеснение считается по
+        <div class="hint">Дефицит сдвигает <b>общий</b> спрос вправо на ΔG. Вытеснение считается по
           <b>исходной</b> кривой частного спроса при новой ставке. Это разные кривые, не путайте их.</div>
       </div>
       <div id="macro-pane-fx" style="display:none;margin-top:10px;">
@@ -1728,20 +1401,21 @@
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
         </div>
-        <div class="hint">Фиксированный курс это ровно потолок или пол цены, только оси переименованы:
-          торгуется короткая сторона, разрыв покрывают интервенции ЦБ.</div>
+        <div class="hint">Q измеряет количество иностранной валюты, e её цену в национальной валюте.
+          При фиксированном курсе ЦБ продаёт иностранную валюту при её дефиците и покупает при избытке.</div>
       </div>
       <div id="macro-pane-laffer" style="display:none;margin-top:10px;">
         <div class="field"><label>Спрос: P = f(Q)</label><input type="text" id="ma-lafd" value="100 - Q"></div>
         <div class="field"><label>Предложение: P = f(Q)</label><input type="text" id="ma-lafs" value="Q"></div>
         <div class="field"><label>Максимальная ставка на оси</label><input type="number" id="ma-lafmax" step="5" value="100"></div>
-        <div class="hint">Кривая строится прогоном штатного расчёта «равновесие с потоварным налогом»
-          по сетке ставок. Отдельной формулы нет, поэтому она согласована с остальным движком.</div>
       </div>
       <div id="macro-pane-islm" style="display:none;margin-top:10px;">
-        <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
-        <div class="field"><label>LM: r = f(Y)</label><input type="text" id="ma-lm" value="0.05*Y - 5"></div>
-        <div class="hint">Пересечение даёт пару (Y, r), при которой равновесны и товарный, и денежный рынок.</div>
+        <div class="seg" id="islm-input-mode"><button type="button" class="seg-btn active" data-input="curves" onclick="setIslmInput('curves')">Две кривые</button><button type="button" class="seg-btn" data-input="params" onclick="setIslmInput('params')">Из параметров</button></div>
+        <div id="islm-curves">
+          <div class="field"><label>IS: r = f(Y)</label><input type="text" id="ma-is" value="20 - 0.1*Y"></div>
+          <div class="field"><label>LM: r = f(Y)</label><input type="text" id="ma-lm" value="0.05*Y - 5"></div>
+        </div>
+        <div id="islm-parameters" style="display:none;"></div>
       </div>
       <div class="error" id="macro-error" style="display:none;"></div>
       <div id="info-macro" style="margin-top:8px;"></div>
@@ -1776,6 +1450,28 @@
         <div class="f-pop" id="fp-mathf" role="region" aria-label="Примеры функций"></div>
       </div>
       <div class="error" id="math-error" style="display:none;"></div>
+      <!-- Отрезок ответа (ADR 0143): на нём, а не в окне, считаются корни,
+           экстремумы и пересечения. Узел один: syncAnsSegUI (70-scenes-math.js)
+           переносит его под поля функций текущего сюжета, в том числе в
+           «Построение графиков». У «С ограничением» строки нет. -->
+      <div class="field opt-range" id="ans-seg-row">
+        <div class="seg-lab-row">
+          <label for="ans-a">Ответ ищем на отрезке</label>
+          <button class="hint-btn" type="button" data-pop="hp-ans-seg" aria-label="Что это за отрезок">?</button>
+        </div>
+        <!-- Плашки «?» с 14.10 не показываются (ADR 0151): абзацы с data-explain (экономика
+             и математика модели) копирует в «Разбор» conditionNotesToExplain (86-workspace.js),
+             прочее — как пользоваться интерфейсом — уходит по закрытому списку README 10. -->
+        <div class="hint-pop" id="hp-ans-seg">
+          <p data-explain="1">Корни, вершины и пересечения считаются на этом отрезке.</p>
+          <p>Масштаб графика на ответ не влияет.</p>
+        </div>
+        <div class="opt-range-row">
+          <span class="ans-seg-var" aria-hidden="true">x</span><span>от</span><input type="text" inputmode="decimal" id="ans-a" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: от">
+          <span>до</span><input type="text" inputmode="decimal" id="ans-b" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: до">
+        </div>
+        <button type="button" class="ans-seg-auto" id="ans-seg-auto" hidden>Вернуть по формуле</button>
+      </div>
 
       <!-- 7а. Производная и касательная -->
       <div id="math-pane-tangent">
@@ -1798,15 +1494,14 @@
           <div class="field" id="mathdx-field" style="display:none;">
             <label>Шаг Δx = <b id="mathdx-val">1</b></label>
             <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
-            <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
+            <div class="hint">При Δx&nbsp;→&nbsp;0 секущая ложится на касательную.</div>
           </div>
         </div>
         <div class="field">
           <label>Цвета кривых</label>
           <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanF" data-tip="Цвет функции">
             f(x), сама функция</label>
-          <label class="chk"><input type="color" class="swatch swatch-pick" data-col="tanD" data-tip="Цвет производной">
-            f′(x), производная</label>
+          <label class="chk show-row"><input type="color" class="swatch swatch-pick" data-col="tanD" data-tip="Цвет производной"><span class="show-name">Производная</span><span class="show-not">f′(x)</span></label>
         </div>
         <div class="hint-row">
           <button class="hint-btn" type="button" data-pop="hp-tangent" aria-label="Как этим пользоваться">?</button>
@@ -1822,6 +1517,8 @@
 
       <!-- 7б. Оптимизация -->
       <div id="math-pane-optimum" style="display:none;">
+        <!-- Отрезок наибольшего и наименьшего — общий отрезок ответа
+             (#ans-seg-row выше, ADR 0143); с окном он больше не связан. -->
         <label class="chk"><input type="checkbox" id="chk-convex" checked>
           <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
         <label class="chk"><input type="checkbox" id="chk-inflect" checked>
@@ -1832,8 +1529,8 @@
         </div>
         <div class="hint-pop" id="hp-optimum">
           <p>Пишите функцию от x в поле выше: x^2, x^3 - 3*x, sqrt(x), 1/x.
-            Отрезок задают границы окна в настройках плоскости.</p>
-          <p>Подписи на графике читаются так: x* это точка на оси x, y* это
+            Отрезок задаётся строкой «Ответ ищем на отрезке» выше.</p>
+          <p data-explain="1">Подписи на графике читаются так: x* это точка на оси x, y* это
             значение функции в ней.</p>
         </div>
       </div>
@@ -1841,7 +1538,7 @@
       <!-- 7в. Деформации графика -->
       <div id="math-pane-transform" style="display:none;">
         <div class="field">
-          <label for="math-trans">Что делаем с графиком</label>
+          <label for="math-trans">Преобразование</label>
           <select id="math-trans">
             <option value="up">f(x) + a: сдвиг по вертикали</option>
             <option value="left">f(x + a): сдвиг по горизонтали</option>
@@ -1892,7 +1589,7 @@
         <div class="hint-pop" id="hp-minmax">
           <p>Каждую функцию пишите от x: 4 - x, x^2, 2. Исходные кривые идут
             пунктиром и подписаны f₁, f₂, f₃, итог рисуется жирной линией.</p>
-          <p>Кружками отмечены точки, где кривые меняются местами: слева главной
+          <p data-explain="1">Кружками отмечены точки, где кривые меняются местами: слева главной
             была одна, справа другая.</p>
         </div>
       </div>
@@ -1946,298 +1643,21 @@
     </div>
     </div><!-- /#sec-input -->
 
-    <!-- Свои точки и площади. Оформление плоскости (название, оси, сетка,
-         границы, легенда) переехало в меню гаечного ключа над графиком. -->
-    <div class="section" id="sec-view">
-      <button class="fold-btn" id="marks-btn" type="button" aria-expanded="true" aria-controls="marks-body">
-        <span>Точки на графике</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
-           renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
-      <div class="fold-body open" id="marks-body">
-        <div class="hint-row">
-          <span class="hint-lead">Зачем ставить точки</span>
-          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
-        </div>
-        <div class="hint-pop" id="hp-marks">
-          <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
-            или щелчком по плоскости; рядом с кривой прилипает к ней.</p>
-          <p>Галочки решают, что видно: координаты, пунктир к осям, подпись. У каждой точки свой цвет.</p>
-          <!-- п. 33. Возможности холста названы здесь, а не в подсказке браузера:
-               на сенсорном экране её нет вовсе, а плашка поверх самой фигуры
-               перехватывает указатель и мешает по ней попасть. -->
-          <p>Пересечения, изломы и вершины машина находит сама: по наведению у них появляется
-            значок, кладущий точку в список. Подписи переименовываются двойным щелчком.</p>
-        </div>
-        <div id="mark-list"></div>
-      </div>
-    </div>
-
-    <!-- Раздел «Цвета областей» удалён (Н59): области сцены переехали строками в
-         таблицу площадей, где у них есть и число, и тот же выбор цвета. -->
-
-    <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
-    <div class="section" id="sec-areascalc">
-      <button class="fold-btn" id="areascalc-btn" type="button" aria-expanded="false" aria-controls="areascalc-body">
-        <span>Площади</span>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="fold-body" id="areascalc-body">
-        <div class="hint-row">
-          <span class="hint-lead">Что здесь считается</span>
-          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
-        </div>
-        <div class="hint-pop" id="hp-areascalc">
-          <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
-          <p>Второй способ считает площадь многоугольника по отмеченным вершинам: так берут излишки, сбор бюджета и потери общества, когда фигуру ограничивают не одна кривая, а отрезки.</p>
-          <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
-        </div>
-
-        <div class="seg" id="ac-mode">
-          <button class="seg-btn active" id="ac-curve">Под кривой</button>
-          <button class="seg-btn" id="ac-poly">Между точками</button>
-        </div>
-
-        <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
-             Границы первой четверти подставляются сами, поля «от/до» больше
-             не нужны: их прежний смысл целиком в этой подписи. -->
-        <!-- Б16. Подпись отрезка стоит ОТДЕЛЬНОЙ СТРОКОЙ под списком. В одной
-             строке со списком места ей не оставалось, и «на отрезке [0; 100]»
-             переносилось по одному знаку в полосу шириной в два десятка
-             пикселей, а хвост обрезался краем панели. -->
-        <div id="ac-pane-curve">
-          <div class="ac-pick-row">
-            <select id="ac-pick"></select>
-          </div>
-          <div class="ac-range" id="ac-range"></div>
-        </div>
-
-        <!-- п. 27. Пустое состояние по канону 3.13 называет первый шаг, а не
-             ставит человека перед выключенной кнопкой. п. 28: «Убрать все
-             вершины» стоит ПОД списком — разрушающее действие не может
-             опережать то, что оно разрушает. -->
-        <div id="ac-pane-poly" style="display:none;">
-          <div class="k-empty" id="ac-verts-empty">
-            <b>Ещё ни одной вершины</b>
-            <p>Нажимайте на график: каждый щелчок ставит вершину, а рядом с
-               особой точкой она садится точно в неё. Нужно хотя бы три.</p>
-          </div>
-          <div id="ac-verts"></div>
-          <!-- п. 25. Набор вершин можно начать заново: без этой кнопки выход из
-               режима был бы дорогой в один конец. Пока вершины отмечаются, её
-               здесь нет: закончить набор предлагает полоса режима над холстом,
-               и двух одинаковых кнопок в двух местах не нужно. -->
-          <button class="btn btn-quiet" id="ac-vert-arm" type="button" style="margin-top:6px;width:100%;">Отмечать вершины</button>
-          <div class="vert-btns" id="ac-vert-btns" style="display:none;">
-            <button class="btn btn-quiet" id="ac-vert-clear" type="button" style="margin-top:6px;width:100%;">Убрать все вершины</button>
-          </div>
-        </div>
-
-        <button class="btn" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
-        <div class="error" id="ac-error"></div>
-        <div id="info-areacalc" style="margin-top:8px;"></div>
-        <!-- Н57: «Убрать всё» стоит ПОД таблицей, к которой относится. Над ней
-             она читалась как продолжение кнопки расчёта.
-             Б17: главная и второстепенная кнопки одного семейства — один
-             размер и одна геометрия, разная только заливка. Б18: «всё». -->
-        <button class="btn btn-quiet" id="ac-clear" type="button" style="margin-top:6px;width:100%;">Убрать всё</button>
-      </div>
-    </div>
-
-          </div><!-- /tools-body -->
-        </section>
-
-      </div><!-- /side-scroll -->
-    </div><!-- /side-inner -->
-  </aside>
-
-  <!-- ── ГРАФИК ────────────────────────────────────────────────────── -->
-  <div class="graph-wrap" id="graph-wrap">
-    <!-- А58. Печатная шапка и подвал: на экране их нет, на листе они несут
-         название модели и ключевые значения. Заполняются перед печатью. -->
-    <div class="print-only" id="print-title"></div>
-    <svg id="chart"></svg>
-    <div class="print-only" id="print-stats"></div>
-
-    <!-- п. 25. Полоса режима холста: пока взведён набор точек или вершин,
-         человек видит словами, что сейчас делает щелчок и чем это кончить.
-         В обычном состоянии «смотрю» полосы нет: сообщать нечего. -->
-    <div class="cv-mode" id="cv-mode" hidden role="status">
-      <span class="cv-mode__what" id="cv-mode-what"></span>
-      <button class="cv-mode__stop" id="cv-mode-stop" type="button">Готово</button>
-    </div>
-
-    <!-- п. 80. Плавающей кнопки «Площадь по N точкам» здесь больше нет.
-         Она появлялась внизу по центру холста, в шестистах пикселях от
-         кнопки расчёта в панели, и читалась как подсказка к ней, а не как
-         второе такое же действие. Сколько вершин набрано, говорит полоса
-         режима над холстом; считает площадь одна кнопка — та, под которой
-         появляется результат. -->
-
-    <!-- Кнопки над графиком: настройки плоскости и возврат масштаба. -->
-    <div class="graph-tools">
-      <button class="gt-btn is-off" id="btn-resetview" type="button" disabled aria-hidden="true" tabindex="-1"
-              data-tip="Вернуться к изначальному масштабу (или двойной клик)" aria-label="Вернуться к изначальному масштабу, то же делает двойной щелчок по графику">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 1 1 .6 5"/><path d="M4 4v5h5"/></svg>
-      </button>
-      <button class="gt-btn" id="btn-wrench" type="button" aria-expanded="false" aria-controls="wrench-pop"
-              data-tip="Настройки координатной плоскости" aria-label="Настройки координатной плоскости">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 6.6a5 5 0 0 1-6.2 6.2L7 20a2.1 2.1 0 0 1-3-3l7.2-7.2a5 5 0 0 1 6.2-6.2l-3 3 .9 3.1 3.1.9z"/></svg>
-      </button>
-      <!-- П53: приблизить и отдалить — вертикальной стопкой под ключом, как
-           у Desmos и как в первом калькуляторе. -->
-      <button class="gt-btn" id="btn-zoomin" type="button"
-              data-tip="Приблизить (клавиша «+»)" aria-label="Приблизить">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
-      <button class="gt-btn" id="btn-zoomout" type="button"
-              data-tip="Отдалить (клавиша «−»)" aria-label="Отдалить">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
-      </button>
-    </div>
-
-    <!-- ── МЕНЮ НАСТРОЕК КООРДИНАТНОЙ ПЛОСКОСТИ (Фаза 2) ──────────────
-         Сюда переехали бывшие секции «Все настройки» и «Сетка», а из
-         «Инструментов» — всё, что относится к оформлению плоскости,
-         а не к модели. -->
-    <div class="wrench" id="wrench-pop" role="dialog" aria-label="Настройки координатной плоскости">
-
-      <div class="wrench-group">
-        <div class="wrench-title">Ось X</div>
-        <div class="wrench-row">
-          <label for="inp-qmin">От</label>
-          <input type="number" id="inp-qmin" step="any" value="0">
-          <label for="inp-qmax">До</label>
-          <input type="number" id="inp-qmax" step="any" value="100">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-xstep">Шаг делений</label>
-          <input type="number" id="inp-xstep" step="any" min="0" placeholder="Авто">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-xname">Название оси</label>
-          <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
-        </div>
-      </div>
-
-      <div class="wrench-group">
-        <div class="wrench-title">Ось Y</div>
-        <div class="wrench-row">
-          <label for="inp-pmin">От</label>
-          <input type="number" id="inp-pmin" step="any" value="0">
-          <label for="inp-pmax">До</label>
-          <input type="number" id="inp-pmax" step="any" value="100">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-ystep">Шаг делений</label>
-          <input type="number" id="inp-ystep" step="any" min="0" placeholder="Авто">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-yname">Название оси</label>
-          <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
-        </div>
-        <!-- П46: серых пояснений в ключе больше нет. Смысл «оставьте пустым —
-             возьмём то, что даёт сцена» показывает сам плейсхолдер поля. -->
-      </div>
-
-      <div class="wrench-group">
-        <!-- П49: «Область» → «Область значений». -->
-        <div class="wrench-title">Область значений</div>
-        <label class="chk"><input type="checkbox" id="chk-quad" checked>
-          Только первая четверть</label>
-      </div>
-
-      <!-- ИЗЛИШКИ (решение владельца 22.08). Карточка «Излишки» ушла из левой
-           панели, а показ заливок остался нужен — он живёт здесь, рядом с
-           сеткой и первой четвертью: это настройка ВИДА графика, а не ввод
-           модели. Цвета и названия областей не дублируем — они в «Площадях».
-           Прежние две галочки (CS и PS по отдельности) схлопнуты в одну:
-           порознь их никто не включал, а области монополии считаются своими
-           галочками #chk-mono-cs/#chk-mono-ps/#chk-mono-vc и не тронуты. -->
-      <div class="wrench-group">
-        <div class="wrench-title">Излишки</div>
-        <label class="chk"><input type="checkbox" id="chk-areas" checked>
-          Показать излишки</label>
-      </div>
-
-      <div class="wrench-group">
-        <div class="wrench-title">Сетка</div>
-        <div class="seg" id="grid-seg">
-          <button class="seg-btn" id="grid-dense" type="button">Подробная</button>
-          <button class="seg-btn active" id="grid-plain" type="button">Упрощённая</button>
-          <button class="seg-btn" id="grid-off" type="button">Нет</button>
-        </div>
-      </div>
-
-      <div class="wrench-group">
-        <div class="wrench-title">Подписи</div>
-        <label class="chk"><input type="checkbox" id="chk-legend" checked>
-          Легенда закрашенных областей</label>
-        <div class="wrench-row" style="margin-top:8px;">
-          <input type="text" id="inp-gtitle" placeholder="Название графика" autocomplete="off">
-          <span id="gtitle-color-slot"></span>
-        </div>
-        <!-- п. 33. Что можно сделать с названием прямо на графике, сказано
-             здесь, рядом с полем, а не подсказкой браузера поверх самой
-             надписи: та перехватывала бы указатель и мешала её взять. -->
-        <div class="wrench-note">На графике название можно перенести мышью, а двойной щелчок по нему открывает правку.</div>
-        <!-- П50: размер задаётся тремя буквами А, а не числом в поле, и меняет
-             ВСЁ внутри графика, кроме отметок координат на осях. -->
-        <div class="wrench-row" style="margin-top:8px;">
-          <label>Размер подписей</label>
-          <div class="seg lblsize-seg" id="lblsize-seg">
-            <button class="seg-btn" id="lbl-s" type="button" aria-label="Мелкие подписи"
-                    style="font-size:10px;font-weight:700;">А</button>
-            <button class="seg-btn active" id="lbl-m" type="button" aria-label="Средние подписи"
-                    style="font-size:14px;font-weight:700;">А</button>
-            <button class="seg-btn" id="lbl-l" type="button" aria-label="Крупные подписи"
-                    style="font-size:18px;font-weight:700;">А</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Сюда JS складывает вторичные секции сцены, если они есть. -->
-      <div id="tools-advanced"></div>
-    </div>
-  </div>
-
-  <!-- ── ПРАВАЯ ПАНЕЛЬ: АНАЛИТИКА ──────────────────────────────────────
-       Сверху живые регуляторы сцены: это основное управление, поэтому они
-       всегда открыты. Ниже два складных блока: расчёты и разбор. Часть узлов
-       (ставка, цена, зарплата, мировая цена) физически ПЕРЕНОСИТСЯ сюда из
-       «Ввода функций» через appendChild — обработчики и ID сохраняются,
-       клонирования нет. -->
-  <aside class="side side-right" id="params-panel" aria-label="Аналитика">
-    <button class="side-arrow" id="params-toggle" type="button" data-tip="Закрыть меню"
-            aria-label="Свернуть или развернуть панель аналитики" aria-expanded="true">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
-    </button>
-    <span class="side-spine" aria-hidden="true">Аналитика</span>
-    <div class="side-inner">
-      <div class="side-head"><h2>Аналитика</h2></div>
-      <div class="side-scroll">
-        <div id="params-body">
+    <!-- Свои точки и площади переехали в панель режима «Точки и площади»
+         (#pts-panel, ADR 0148). Оформление плоскости (название, оси, сетка,
+         границы, легенда) — в меню «Вид графика» над холстом. -->
+    <!-- «Параметры» (редизайн 10.2026): ползунки сдвигов и букв, которые
+         раньше пульт собирал в правой панели. Регуляторы сцен остаются в своих
+         секциях — пульт их больше не переносит (88-params.js). -->
+    <div class="section" id="sec-params">
+      <div class="section-title">Параметры</div>
+      <div id="params-body">
           <div id="params-curves"></div>
           <div id="params-extra"></div>
-          {% comment %}
-            П53. Пустое состояние по канону 3.13, а не абзац на месте органов
-            управления. Заголовок называет, чего здесь нет; строка ниже —
-            что здесь появится и каким действием.
-          {% endcomment %}
-          <div id="params-empty" class="k-empty"><b>Ползунков в этой модели нет</b>
-            <p>Впишите в формулу букву вместо числа, скажем «100 − a·Q»,
-            и она станет ползунком здесь.</p></div>
         </div>
 
-        <!-- ВМЕШАТЕЛЬСТВО ГОСУДАРСТВА переехало сюда из левой панели
-             (решение владельца 22.08). Разметка, идентификаторы и логика
-             applyScenarioVisibility не тронуты: блок просто живёт в панели
-             аналитики, рядом с ползунками, которыми им и управляют. Правая
-             панель будет перестраиваться отдельной сессией — блок стоит
-             ПЕРЕД «Ключевыми значениями», чтобы та его не потеряла. -->
-        <!-- Вмешательство государства: налог / субсидия (шаги 7–8) -->
-        <div class="section" id="sec-tax">
+    </div>
+    <div class="section" id="sec-tax">
           <div class="vsub">Вмешательство государства</div>
           <div class="seg">
             <button class="seg-btn active" id="seg-tax">Налог</button>
@@ -2290,6 +1710,7 @@
                      style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
             </div>
           </div>
+          <div id="tax-pair-controls" hidden></div>
           <!-- Поле регулируемой цены (потолок / пол) -->
           <div class="field" id="pc-field" style="margin-top:8px;display:none;">
             <label>Цена <span id="pc-letter">Pc</span> = <b id="pc-val">0</b></label>
@@ -2317,13 +1738,14 @@
             <label>Цена внутри коридора = <b id="quota-price-val">…</b></label>
             <input type="range" id="quota-price-slider" min="0" max="100" step="1" value="50"
                    style="width:100%;margin-top:4px;">
-            <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
+            <!-- Живое показание, не справка: под «?» не уходит (hint-keep, 86-workspace.js). -->
+            <div class="hint hint-keep" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
           </div>
           <div class="hint sb-note-src" id="quota-hint">Квота ограничивает объём напрямую.
-            Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт
+            Если она ниже равновесного количества, рыночная цена не определена однозначно: подойдёт
             любая цена от той, по которой продавцы готовы отдать этот объём, до той, по которой
-            покупатели готовы его выбрать. Двигайте цену внутри коридора: излишки перетекают
-            между сторонами, а их сумма и потери общества не меняются.</div>
+            покупатели готовы его выбрать. Цена внутри коридора перекладывает излишки между
+            сторонами, а их сумма и потери общества не меняются.</div>
           <!-- ⚠️ ТРИ ПОЯСНЕНИЯ ВМЕШАТЕЛЬСТВА ЖИВУТ В «ОБЪЯСНЕНИИ МОДЕЛИ», А НЕ ЗДЕСЬ
                (решение владельца 01.09). В карточке они скрыты классом .sb-note-src
                и служат ИСТОЧНИКОМ текста: собирает его intervHintHtml. Инлайновый
@@ -2340,14 +1762,328 @@
             <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
           <div id="info-tax" style="margin-top:8px;"></div>
         </div>
+    <!-- «ПОКАЗАТЬ НА ГРАФИКЕ» (редизайн 10.2026, фаза 5б; README макета, 6.4).
+         Галочки CS и PS заменили общую «Показать излишки» гаечного ключа
+         (пункт (е) закрытого списка); галочки областей монополии переезжают
+         сюда же (92-ui-kit.js, syncShowSection). Нечего показать — секции нет. -->
+    <div class="section" id="sec-show" style="display:none;">
+      <div class="section-title">Показать на графике</div>
+      <div id="show-list">
+        <label class="chk show-row" id="show-cs-row"><input type="checkbox" id="chk-cs" checked>
+          <span class="show-sw" data-area="CS"></span><span class="show-name">Излишек потребителя</span><span class="show-not">CS</span></label>
+        <label class="chk show-row" id="show-ps-row"><input type="checkbox" id="chk-ps" checked>
+          <span class="show-sw" data-area="PS"></span><span class="show-name">Излишек производителя</span><span class="show-not">PS</span></label>
+      </div>
+    </div>
+</div><!-- /tools-body -->
+        </section>
 
+      </div><!-- /side-scroll -->
+    </div><!-- /side-inner -->
+  </aside>
+
+  <!-- ── ПАНЕЛЬ РЕЖИМА «ТОЧКИ И ПЛОЩАДИ» (решение владельца 13.10, ADR 0148) ──
+       Стоит на месте «Условия», пока включён режим холста «Точки и площади»
+       (93-shell.js, setPtsMode). Разделы «Точки» и «Площади» — те же узлы с
+       теми же id, что жили в «Условии» (#sec-view, #mark-list, #sec-areascalc,
+       #ac-mode, #ac-pick): ПЕРЕЕЗД, не копия. «Условие» прячется классом
+       body.pts-on, не атрибутом hidden (поле MathLive со скрытым предком
+       fieldActive считает мёртвым); при возврате — afterColumnShown(). -->
+  <aside class="side side-left col-cond col-pts" id="pts-panel" aria-label="Точки и площади">
+    <div class="side-inner">
+      <!-- Сессия 7 «тихих панелей» (README пакета 9, 10.5): шапка — заголовок колонки и «Готово» (единственный
+           выход; Esc работает, надписи о нём нет). «← Условие» и строка-подсказка ушли по закрытому списку. -->
+      <div class="side-head col-head pts-head">
+        <h2 class="pts-title">Точки и площади</h2>
+        <button class="pts-done" id="pts-done" type="button">Готово</button>
+      </div>
+      <div class="side-scroll">
+        <section class="side-part pts-body">
+      <div class="section" id="sec-view">
+        <!-- Заголовок раздела и справа тихая «+ По координатам» (её ставит ensureAddMarkButton в .pts-sec-row). -->
+        <div class="pts-sec-row"><h3 class="sec-head pts-sec-head">Точки</h3></div>
+        <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
+             renderMarkList — кнопка обязана стоять ПОД уже созданными точками. -->
+        <div class="fold-body open" id="marks-body">
+          <div class="hint-row">
+            <span class="hint-lead">Зачем ставить точки</span>
+            <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
+          </div>
+          <div class="hint-pop" id="hp-marks">
+            <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
+              или щелчком по плоскости; рядом с кривой прилипает к ней.</p>
+            <p>Галочки решают, что видно: координаты, пунктир к осям, подпись. У каждой точки свой цвет.</p>
+            <!-- п. 33. Возможности холста названы здесь, а не в подсказке браузера:
+                 на сенсорном экране её нет вовсе, а плашка поверх самой фигуры
+                 перехватывает указатель и мешает по ней попасть. -->
+            <p>Пересечения, изломы и вершины машина находит сама: по наведению у них появляется
+              значок, кладущий точку в список. Подписи переименовываются двойным щелчком.</p>
+          </div>
+          <div id="mark-list"></div>
+          <!-- «Выбрано N · Площадь по точкам» (сессия 7, В2): узел без id — вид, не модель. -->
+          <div class="pts-selbar" hidden></div>
+        </div>
+      </div>
+
+      <!-- Раздел «Цвета областей» удалён (Н59): области сцены переехали строками в
+           таблицу площадей, где у них есть и число, и тот же выбор цвета. -->
+
+      <!-- Площади (Фаза 10): под кривой на отрезке или между отмеченными точками. -->
+      <div class="section" id="sec-areascalc">
+        <h3 class="sec-head pts-sec-head">Площади</h3>
+        <div class="fold-body open" id="areascalc-body">
+          <div class="hint-row">
+            <span class="hint-lead">Что здесь считается</span>
+            <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
+          </div>
+          <div class="hint-pop" id="hp-areascalc">
+            <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
+            <p>Второй способ считает площадь многоугольника по отмеченным вершинам: так берут излишки, сбор бюджета и потери общества, когда фигуру ограничивают не одна кривая, а отрезки.</p>
+            <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
+          </div>
+
+          <!-- Сегмент «+ Под кривой | + Между точками» (ADR 0144, 0148): кнопка
+               открывает построение площади своим способом; пока построения нет,
+               панели способа и «Посчитать площадь» спрятаны (#sec-areascalc без
+               .ac-open, 60-overlays.js). Источник правды — по-прежнему STATE.areaCalcMode. -->
+          <div class="seg ac-mode" id="ac-mode" role="radiogroup" aria-label="Как считаем площадь">
+            <button class="seg-btn active" id="ac-curve" type="button" role="radio" aria-checked="true">+ Под кривой</button>
+            <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">+ По точкам</button>
+          </div>
+
+          <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
+               Границы первой четверти подставляются сами, поля «от/до» больше
+               не нужны: их прежний смысл целиком в этой подписи. -->
+          <!-- Б16. Подпись отрезка стоит ОТДЕЛЬНОЙ СТРОКОЙ под списком. В одной
+               строке со списком места ей не оставалось, и «на отрезке [0; 100]»
+               переносилось по одному знаку в полосу шириной в два десятка
+               пикселей, а хвост обрезался краем панели. -->
+          <div id="ac-pane-curve">
+            <!-- Выбор кривой — кнопками с цветной точкой (ADR 0144). Скрытый
+                 select остаётся источником правды: его значение читают сцены,
+                 форма модели и приборы; кнопки пишут в него и шлют change. -->
+            <div class="ac-pick-row">
+              <div class="ac-cbtns" id="ac-pick-btns" role="radiogroup" aria-label="Кривая, под которой считается площадь"></div>
+              <select id="ac-pick" hidden aria-hidden="true" tabindex="-1"></select>
+            </div>
+            <div class="ac-range" id="ac-range"></div>
+          </div>
+
+          <!-- п. 27. Пустое состояние по канону 3.13 называет первый шаг, а не
+               ставит человека перед выключенной кнопкой. п. 28: «Убрать все
+               вершины» стоит ПОД списком — разрушающее действие не может
+               опережать то, что оно разрушает. -->
+          <!-- «+ По точкам» (сессия 7, В3): набор вершин на холсте, вершины — точки списка «Точки» (полоса режима
+               над холстом: «Отмечаете вершины», «Готово»). Отдельного списка вершин и его кнопок больше нет: их
+               судьба — «переехал в список точек». Узел оставлен пустым: на нём держится вид построения. -->
+          <div id="ac-pane-poly" style="display:none;"></div>
+
+          <button class="btn btn-quiet" id="ac-calc" type="button" style="margin-top:8px;width:100%;" disabled>Посчитать площадь</button>
+          <div class="error" id="ac-error"></div>
+          <div id="info-areacalc" style="margin-top:8px;"></div>
+        </div>
+      </div>
+          <!-- «Убрать все точки и площади» (сессия 7, В5; макет): тихая кнопка внизу панели; один шаг истории. -->
+          <button class="btn btn-quiet pts-clear" id="ac-clear" type="button">Убрать все точки и площади</button>
+        </section>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── КОЛОНКА ХОЛСТА ─────────────────────────────────────────────── -->
+  <div class="cv-col" id="canvas-col">
+   <div class="cv-card">
+    <!-- Вход из задачи каталога (?m=&from=, ADR 0145): строка возврата над холстом.
+         Адрес задачи собирает 91-session.js (номер — из адреса, на экране его нет);
+         строка живёт, пока открыта эта модель. -->
+    <a class="cv-back" id="cv-back" hidden data-href="{% url 'catalog:problem_detail' 0 %}">← Вернуться к задаче</a>
+    <!-- ── ПАНЕЛЬ ХОЛСТА (редизайн 10.2026, README раздел 7) ──────────
+         Стоит ВНЕ #graph-wrap: на обёртке холста висят колесо, протяжка и
+         двойной щелчок (52-modes.js), и под кнопками они сдвигали бы график. -->
+    <div class="cv-bar" id="canvas-bar" role="toolbar" aria-label="Холст">
+      <!-- Инструмент холста: «Курсор» | «Точки и площади» (решение владельца 13.10,
+           ADR 0148; 93-shell.js). Режим точек — вид, не модель: кнопки вне формы
+           (FORM_SKIP_IDS), в историю и ссылку не идут. Подпись «Esc: выйти из
+           режима» видна только в режиме. -->
+      <div class="cv-tools" role="group" aria-label="Инструмент">
+        <button class="cv-tool" id="tool-cursor" type="button" aria-pressed="true" data-tip="Тянуть ручки и двигать график"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg><span>Курсор</span></button>
+        <button class="cv-tool" id="tool-pts" type="button" aria-pressed="false" data-tip="Ставить свои точки и считать площади"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18l3-12 11 4-4 8z"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/></svg><span>Точки и площади</span></button>
+      </div>
+      <span class="cv-esc" id="cv-esc" aria-hidden="true">Esc: выйти из режима</span>
+      <span class="cv-gap"></span>
+      <button class="gt-btn cv-answer-btn" id="btn-answer" type="button" aria-expanded="false" data-tip="Показать «Ответ»">Ответ</button>
+      <span class="cv-zoom" id="zoom-level" aria-live="polite">100&nbsp;%</span>
+      <button class="gt-btn" id="btn-zoomout" type="button"
+              data-tip="Отдалить (клавиша «−»)" aria-label="Отдалить">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <button class="gt-btn" id="btn-zoomin" type="button"
+              data-tip="Приблизить (клавиша «+»)" aria-label="Приблизить">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="gt-btn cv-text" id="btn-resetview" type="button"
+              data-tip="Вернуться к изначальному масштабу (или двойной клик)" aria-label="Вписать: вернуться к изначальному масштабу">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Вписать</span>
+      </button>
+      <span class="mh-sep" aria-hidden="true"></span>
+      <button class="gt-btn cv-text" id="btn-view" type="button" aria-expanded="false" aria-controls="wrench-pop"
+              data-tip="Вид графика: оси, сетка, подписи, заголовок" aria-label="Вид графика">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Вид</span>
+      </button>
+      <button class="gt-btn" id="btn-focus" type="button" aria-pressed="false"
+              data-tip="Развернуть график" aria-label="Развернуть график">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>
+      </button>
+    </div>
+  <!-- 760–1239 px: главные числа строкой над холстом, «Ответ» выезжает (фаза 10). -->
+  <div class="ans-strip" id="ans-strip" aria-hidden="true"></div>
+  <div class="seg bigtrade-view" id="bigtrade-view" style="display:none;" aria-label="Вид рынков">
+    <button type="button" class="seg-btn" data-big-view="world">Мировой рынок</button>
+    <button type="button" class="seg-btn active" data-big-view="countries">Две страны</button>
+  </div>
+  <div class="graph-wrap" id="graph-wrap">
+    <!-- А58. Печатная шапка и подвал: на экране их нет, на листе они несут
+         название модели и ключевые значения. Заполняются перед печатью. -->
+    <div class="print-only" id="print-title"></div>
+    <svg id="chart"></svg>
+    <div class="print-only" id="print-stats"></div>
+
+    <!-- п. 25. Полоса режима холста: пока взведён набор точек или вершин,
+         человек видит словами, что сейчас делает щелчок и чем это кончить.
+         В обычном состоянии «смотрю» полосы нет: сообщать нечего. -->
+    <div class="cv-mode" id="cv-mode" hidden role="status">
+      <span class="cv-mode__what" id="cv-mode-what"></span>
+      <button class="cv-mode__stop" id="cv-mode-stop" type="button">Готово</button>
+    </div>
+
+    <!-- п. 80. Плавающей кнопки «Площадь по N точкам» здесь больше нет.
+         Она появлялась внизу по центру холста, в шестистах пикселях от
+         кнопки расчёта в панели, и читалась как подсказка к ней, а не как
+         второе такое же действие. Сколько вершин набрано, говорит полоса
+         режима над холстом; считает площадь одна кнопка — та, под которой
+         появляется результат. -->
+
+  </div>
+    <!-- ── МЕНЮ НАСТРОЕК КООРДИНАТНОЙ ПЛОСКОСТИ (Фаза 2) ──────────────
+         Сюда переехали бывшие секции «Все настройки» и «Сетка», а из
+         «Инструментов» — всё, что относится к оформлению плоскости,
+         а не к модели. -->
+    <!-- «Вид графика» (README макета, раздел 10): сетка, размер подписей, две
+         галочки, поля 2×2, заголовок; ниже — «от» у осей и шаг делений (из
+         прежнего гаечного ключа); «Вид по умолчанию» сбрасывает вид текущей
+         модели, окно и масштаб. Все id прежние — по ним работают сцены и приборы. -->
+    <div class="wrench" id="wrench-pop" role="dialog" aria-label="Вид графика">
+      <div class="wrench-head">Вид графика</div>
+
+      <!-- «На графике» (тихие панели 14.10, этап Г; решение …8142…; ADR 0152): всё, что меняет только
+           картинку этой модели. Галочки переезжают сюда УЗЛАМИ из «Условия» (92-ui-kit.js, vgSetup), строки
+           закрасок без своего признака — общий STATE.areaHidden (syncOnChart). Узлы группы без id: её
+           видимость — вид, не форма модели. -->
+      <div class="wrench-group vg-onchart" hidden>
+        <div class="wrench-title">На графике</div>
+        <div class="vg-sub" data-vg="curves">Кривые</div>
+        <div class="vg-list" data-vg="curves"></div>
+        <div class="vg-sub" data-vg="areas">Закраски</div>
+        <div class="vg-list" data-vg="areas"></div>
+        <div class="vg-list" data-vg="more"></div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Сетка</div>
+        <div class="seg" id="grid-seg">
+          <button class="seg-btn" id="grid-dense" type="button">Частая</button>
+          <button class="seg-btn active" id="grid-plain" type="button">Обычная</button>
+          <button class="seg-btn" id="grid-off" type="button">Без сетки</button>
+        </div>
+      </div>
+
+      <div class="wrench-group">
+        <div class="wrench-title">Подписи на графике</div>
+        <!-- П50: размер меняет ВСЁ внутри графика, кроме отметок координат на осях. -->
+        <div class="seg lblsize-seg" id="lblsize-seg">
+          <button class="seg-btn" id="lbl-s" type="button">Мелкие</button>
+          <button class="seg-btn active" id="lbl-m" type="button">Средние</button>
+          <button class="seg-btn" id="lbl-l" type="button">Крупные</button>
+        </div>
+      </div>
+
+      <div class="wrench-group">
+        <label class="chk"><input type="checkbox" id="chk-legend" checked>
+          Легенда закрашенных областей</label>
+        <label class="chk"><input type="checkbox" id="chk-quad" checked>
+          Только первая четверть</label>
+      </div>
+
+      <div class="wrench-grid">
+        <label class="wrench-field"><span>Ось x до</span><input type="number" id="inp-qmax" step="any" value="100"></label>
+        <label class="wrench-field"><span>Ось y до</span><input type="number" id="inp-pmax" step="any" value="100"></label>
+        <label class="wrench-field"><span>Имя оси x</span><input type="text" id="inp-xname" placeholder="Q" autocomplete="off"></label>
+        <label class="wrench-field"><span>Имя оси y</span><input type="text" id="inp-yname" placeholder="P" autocomplete="off"></label>
+      </div>
+      <label class="wrench-field wrench-title-field"><span>Заголовок на графике</span>
+        <span class="wrench-row"><input type="text" id="inp-gtitle" placeholder="Например: Налог t = 20" autocomplete="off"><span id="gtitle-color-slot"></span></span></label>
+      <!-- п. 33. Что можно сделать с названием прямо на графике, сказано здесь. -->
+      <div class="wrench-note">На графике заголовок можно перенести мышью, а двойной щелчок по нему открывает правку.</div>
+
+      <div class="wrench-group wrench-more">
+        <div class="wrench-title">Дополнительно</div>
+        <div class="wrench-grid">
+          <label class="wrench-field"><span>Ось x от</span><input type="number" id="inp-qmin" step="any" value="0"></label>
+          <label class="wrench-field"><span>Ось y от</span><input type="number" id="inp-pmin" step="any" value="0"></label>
+          <label class="wrench-field"><span>Шаг делений x</span><input type="number" id="inp-xstep" step="any" min="0" placeholder="Авто"></label>
+          <label class="wrench-field"><span>Шаг делений y</span><input type="number" id="inp-ystep" step="any" min="0" placeholder="Авто"></label>
+        </div>
+      </div>
+
+      <button class="btn btn-quiet wrench-defaults" id="view-defaults" type="button">Вид по умолчанию</button>
+
+      <!-- Сюда JS складывает вторичные секции сцены, если они есть. -->
+      <div id="tools-advanced"></div>
+    </div>
+   </div>
+  </div>
+
+  <!-- Телефон (< 760 px): вкладки шторки под холстом (фаза 10; README макета, 3). -->
+  <div class="ph-tabs" id="ph-tabs" role="tablist" aria-label="Части экрана">
+    <button class="ph-tab" type="button" role="tab" data-tab="cond" aria-selected="true">Условие</button>
+    <button class="ph-tab" type="button" role="tab" data-tab="ans" aria-selected="false">Ответ</button>
+    <button class="ph-tab" type="button" role="tab" data-tab="ex" aria-selected="false">Разбор</button>
+  </div>
+
+  <!-- ── «ОТВЕТ» (редизайн 10.2026, README раздел 8) ──────────────────
+       Регуляторы и вмешательство переехали в «Условие» (решение владельца
+       27.09: ползунок стоит рядом со своим смыслом). Здесь табло расчётов и
+       разбор; сцены по-прежнему пишут свои #info-*, вид «Ответа» собирается
+       поверх них (фаза 6). -->
+  <!-- От 1240 px «Ответ» прячется в полоску 44 px (ADR 0148) и на первом заходе
+       ЗАКРЫТ (решение владельца 14.10, ADR 0150; 93-shell.js, setAnswerHidden).
+       Стрелка #ans-hide — ОДИН узел, прямой ребёнок колонки вне .side-inner
+       (закрытая .side-inner прячет всё внутри): на левом краю колонки, открыт «›»,
+       закрыт «‹». Полоска #ans-rail — вертикальное «Ответ», нажимается вся. Это
+       ВИД (класс body.ans-hidden, память браузера calc2.v1.answerHidden), не
+       модель: кнопки вне формы (FORM_SKIP_IDS). -->
+  <aside class="side side-right col-answer" id="params-panel" aria-label="Ответ">
+    <button type="button" class="ans-hide" id="ans-hide" aria-label="Спрятать «Ответ»" aria-expanded="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></button>
+    <button type="button" class="ans-rail" id="ans-rail" aria-label="Показать «Ответ»"><span class="ans-rail-lab">Ответ</span></button>
+    <div class="side-inner">
+      <div class="side-head col-head"><h2>Ответ</h2><button type="button" id="self-showall" hidden>Показать всё</button><button type="button" class="btn-icon ans-x" id="ans-x" aria-label="Закрыть «Ответ»"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="side-scroll">
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
         <section class="side-part" id="scoreboard">
-          <button class="fold-btn" id="sb-btn" type="button" aria-expanded="false" aria-controls="sb-fold">
-            <span><svg class="sec-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16" stroke-width="1.5"/><path d="M7 16h4M7 11h7M7 6h3" stroke-width="2.6"/></svg><b>Ключевые значения</b></span>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="fold-body" id="sb-fold">
+          <div class="fold-body open" id="sb-fold">
+            <!-- «Ответ» (редизайн 10.2026, фаза 6; 94-answer.js): статус словами,
+                 главные величины строками по группам (ADR 0144), бремя. Собираются поверх табло и только
+                 читают его: сцены по-прежнему пишут свои блоки #info-*. -->
+            <p class="self-note" id="self-note" hidden>Числа спрятаны, на осях только обозначения. Впишите свой ответ и проверьте; любое число можно открыть отдельно.</p>
+            <!-- Строка об отрезке ответа (ADR 0144): только «Математика» и
+                 «Построение графиков», числа живые (buildSegNote, 94-answer.js). -->
+            <p class="ans-seg-note" id="ans-seg-note" hidden></p>
+            <div class="ans-status-box" id="ans-status" hidden></div>
+            <!-- Главные величины строками по группам (ADR 0144): у группы
+                 заголовок .ans-ghead, в ней строки .ans-cell. -->
+            <div class="ans-hero" id="ans-hero" hidden></div>
+            <button class="self-gate" id="self-gate" type="button" hidden>Таблица «было → стало» и итоговая функция: после ответа</button>
+            <div class="ans-burden" id="ans-burden" hidden></div>
             <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия -->
               <!-- ⚠️ ИТОГОВАЯ ФУНКЦИЯ СТОИТ ПЕРВОЙ, И ДЕРЖИТСЯ ЭТО ТЕМ, ЧТО ЕЁ
                    НЕТ В RESULT_IDS. relocateForScene делает appendChild для
@@ -2360,13 +2096,13 @@
           </div>
         </section>
 
-        <!-- Разбор: врезки «как это получилось» уезжают сюда из расчётов. -->
+        <!-- Разбор: врезки «как это получилось» уезжают сюда из расчётов.
+             Последняя строка «Ответа»: полоса «Разбор · N вопросов», свёрнута
+             (ADR 0150; 94-answer.js, syncExplainBar). Свёрнутость — вид:
+             класс body.ex-shown, кнопка в FORM_SKIP_IDS. -->
         <section class="side-part" id="explain">
-          <button class="fold-btn" id="ex-btn" type="button" aria-expanded="false" aria-controls="ex-fold">
-            <span><svg class="sec-ico" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z" stroke-width="1.5"/><path d="M9 9h6M9 13h6" stroke-width="2.6"/></svg><b>Объяснение модели</b></span>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="fold-body" id="ex-fold">
+          <h3 class="col-sub" id="ex-title"><button type="button" class="ex-bar" id="ex-bar" aria-expanded="false" aria-controls="ex-fold"><span class="ex-bar-name">Разбор</span><span class="ex-bar-count"></span><svg class="ex-bar-chev" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+          <div class="fold-body open" id="ex-fold">
             <div class="sb-body" id="ex-body"></div>
           </div>
         </section>
@@ -2375,52 +2111,68 @@
   </aside>
 
   <!-- ── ОКНО ЭКСПОРТА (Фаза 5) ─────────────────────────────────────── -->
+  <!-- ── ОКНО «СКАЧАТЬ ГРАФИК» (редизайн 10.2026, фаза 7; README макета,
+       раздел 10). Слева — предпросмотр белого листа (то, что уйдёт в файл),
+       справа — заголовок, подпись, главные числа, формат и ОДНА кнопка
+       «Скачать …» (пункт (к) закрытого списка вместо трёх кнопок). -->
   <div class="modal" id="export-modal" role="dialog" aria-modal="true"
        aria-labelledby="export-title" inert>
-    <div class="modal-card">
-      <!-- п. 69. Заголовок окна называет ровно то, что окно делает. Прежний
-           совпадал по слову с соседней кнопкой полосы, которая обещала
-           сохранение в профиль: два разных действия под одним именем. Список
-           форматов в подписи не перечисляем — кнопки внизу перечисляют себя
-           сами, а PDF есть не в каждом окружении. -->
-      <h2 class="modal-title" id="export-title">Скачать график</h2>
-      <p class="modal-sub">Заголовок попадёт в подпись под картинкой. Размер картинки
-        постоянный, 12 на 8 сантиметров: файл собирается обычным pdfLaTeX.</p>
-
-      <div class="field">
-        <label id="exp-title-lab">Заголовок</label>
-        <span id="exp-title-slot"></span>
-        <input type="hidden" id="exp-title">
-      </div>
-      <div class="field">
-        <div class="hint-row">
-          <span class="hint-lead">Метка для перекрёстной ссылки</span>
-          <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
+    <div class="modal-card exp-card">
+      <div class="exp-left">
+        <div class="exp-sheet" id="exp-sheet">
+          <div class="exp-sheet-title" id="exp-sheet-title"></div>
+          <img class="exp-sheet-img" id="exp-sheet-img" alt="Предпросмотр графика">
+          <div class="exp-sheet-cap" id="exp-sheet-cap"></div>
+          <div class="exp-sheet-nums" id="exp-sheet-nums"></div>
         </div>
-        <div class="hint-pop" id="hp-exp-label">
-          <p>Нужна только тем, кто вставляет график в большой документ: по
-            метке на картинку потом ссылаются из текста, и номер рисунка
-            проставляется сам. Для одиночной картинки поле можно не трогать.</p>
+        <div class="exp-what">
+          <div class="exp-what-lab">Что уйдёт в файл</div>
+          <div class="exp-preview" id="exp-preview" aria-live="polite"></div>
         </div>
-        <span id="exp-label-slot"></span>
-        <input type="hidden" id="exp-label">
       </div>
-
-      <div class="field">
-        <label>Что уйдёт в файл</label>
-        <div class="exp-preview" id="exp-preview" aria-live="polite"></div>
-      </div>
-
-      <div class="modal-opts">
-        <button class="btn" id="exp-png" type="button">Скачать PNG</button>
-        <button class="btn btn-ghost" id="exp-tex" type="button">Скачать .tex</button>
-        {% if has_pdflatex %}
-          <button class="btn btn-ghost" id="exp-pdf" type="button">Скачать PDF</button>
-        {% endif %}
-      </div>
-
-      <div class="modal-foot">
-        <button class="btn-sm" id="exp-close" type="button">Закрыть</button>
+      <div class="exp-right">
+        <div class="exp-head">
+          <h2 class="modal-title" id="export-title">Скачать график</h2>
+          <button class="pw-x" id="exp-x" type="button" aria-label="Закрыть">×</button>
+        </div>
+        <div class="field">
+          <label id="exp-title-lab">Заголовок</label>
+          <span id="exp-title-slot"></span>
+          <input type="hidden" id="exp-title">
+        </div>
+        <div class="field">
+          <label for="exp-caption">Подпись под графиком</label>
+          <input type="text" id="exp-caption" placeholder="Например: рис. 1 к задаче 3" autocomplete="off">
+        </div>
+        <label class="chk exp-nums-row"><input type="checkbox" id="exp-nums" checked>Главные числа ответа под графиком</label>
+        <div class="field">
+          <label>Формат</label>
+          <div class="seg exp-fmt" id="exp-fmt" role="radiogroup" aria-label="Формат">
+            <button class="seg-btn active" type="button" role="radio" aria-checked="true" data-fmt="png">PNG</button>
+            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-fmt="pdf"{% if not has_pdflatex or not user.is_authenticated %} disabled aria-disabled="true"{% endif %}>PDF</button>
+            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-fmt="tex">TeX</button>
+          </div>
+          <div class="exp-fmt-note" id="exp-fmt-note">Картинка с двойной чёткостью для презентации и конспекта.</div>
+          {% if not has_pdflatex %}<div class="exp-fmt-off">PDF собирает сервер, а здесь компилятора LaTeX нет: скачайте TeX и соберите его у себя.</div>
+          {% elif not user.is_authenticated %}<div class="exp-fmt-off">Войдите, чтобы скачать PDF.</div>{% endif %}
+        </div>
+        <div class="field exp-label-field" id="exp-label-field" hidden>
+          <div class="lab-row">
+            <span class="hint-lead">Метка для перекрёстной ссылки</span>
+            <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
+          </div>
+          <div class="hint-pop" id="hp-exp-label">
+            <p>Нужна только тем, кто вставляет график в большой документ: по
+              метке на картинку потом ссылаются из текста, и номер рисунка
+              проставляется сам. Для одиночной картинки поле можно не трогать.</p>
+          </div>
+          <span id="exp-label-slot"></span>
+          <input type="hidden" id="exp-label">
+        </div>
+        <div class="modal-foot exp-foot">
+          <button class="btn-sm" id="exp-close" type="button">Отмена</button>
+          <button class="btn" id="exp-go" type="button">Скачать PNG</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2429,39 +2181,73 @@
        Движок понимает кусочные записи через условие «? :», но набирать их
        руками неудобно и страшно. Здесь спрашиваем число кусков и рисуем
        фигурную скобку: в каждой строке своя формула и своя граница. -->
+  <!-- ── ВСПЛЫВАЮЩИЕ ОКНА «УСЛОВИЯ» (редизайн 10.2026, фаза 5б) ─────────
+       Одно окно за раз; Esc, щелчок мимо и повторный щелчок по якорю
+       закрывают (92-ui-kit.js). -->
+  <div class="pop howto-pop" id="howto-pop" role="dialog" aria-label="Как писать формулы"></div>
+  <div class="pop switch-pop" id="switch-pop" role="dialog" aria-label="Сменить модель"></div>
+  <div class="pop share-pop" id="share-pop" role="dialog" aria-label="Ссылка на этот график">
+    <div class="pop-title">Ссылка на этот график</div>
+    <p class="pop-text">В ссылке сохранены модель, функции и все ползунки. У того, кто откроет, будет ровно то, что сейчас у вас.</p>
+    <div class="share-row">
+      <input type="text" id="share-url" readonly aria-label="Ссылка">
+      <button class="btn" id="share-copy" type="button">Копировать</button>
+    </div>
+    <label class="chk share-self"><input type="checkbox" id="share-self"><span>Открыть в режиме «Сначала сам»<small>числа ответа спрятаны, удобно для домашки</small></span></label>
+  </div>
+
+  <div class="pop ph-more" id="ph-more-pop" role="dialog" aria-label="Действия">
+    <div class="ph-more-head"><div class="pop-title">Действия</div><button class="btn-icon" id="ph-more-x" type="button" aria-label="Закрыть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="ph-more-list" id="ph-more-list"></div>
+  </div>
+
   <div class="modal" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-title" inert>
-    <div class="modal-card">
-      <h2 class="modal-title" id="pw-title">Кусочная функция</h2>
-      <p class="modal-sub">Функция задана по-разному на разных участках. Укажите, сколько
-        кусков, впишите формулу каждого и границу, где он заканчивается.</p>
-
-      <div class="field pw-count-field">
-        <label for="pw-count">Сколько кусков</label>
-        <input type="number" id="pw-count" min="1" max="12" step="1" value="2">
+    <!-- Редизайн 10.2026, фаза 5б (README макета, 6.6 и раздел 10): шапка с
+         именем функции и крестиком, «Сколько кусков» кнопками, колонки
+         «Формула куска · От · До», «Добавить кусок», ошибки и замечания,
+         «Что получится», внизу «Клавиатура», «Отмена» и «Готово». -->
+    <div class="modal-card pw-card">
+      <div class="pw-head">
+        <h2 class="modal-title" id="pw-title">Кусочная функция<span class="pw-name" id="pw-name"></span></h2>
+        <button class="pw-x" id="pw-x" type="button" aria-label="Закрыть">×</button>
       </div>
-
-      <div class="pw-brace">
-        <!-- Настоящая фигурная скобка системы. Рамка со скруглёнными углами,
-             стоявшая тут раньше, читалась как знак объединения. -->
-        <svg class="pw-brace-mark" viewBox="0 0 12 100" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M11 1 C6 1 7 8 7 20 C7 40 1 44 1 50 C1 56 7 60 7 80 C7 92 6 99 11 99"
-                fill="none" stroke="currentColor" stroke-width="1.6"
-                vector-effect="non-scaling-stroke" stroke-linecap="round"/>
-        </svg>
-        <div class="pw-rows" id="pw-rows"></div>
+      <p class="modal-sub">Функция задана по-разному на разных участках. Впишите формулу каждого куска и границы, в которых он действует.</p>
+      <div class="pw-body">
+        <div class="pw-main">
+          <div class="pw-count-field">
+            <label for="pw-count">Сколько кусков</label>
+            <button class="pw-step" id="pw-minus" type="button" aria-label="Меньше кусков">−</button>
+            <input type="number" id="pw-count" min="1" max="12" step="1" value="2">
+            <button class="pw-step" id="pw-plus" type="button" aria-label="Больше кусков">+</button>
+            <span class="pw-range">от 1 до 12</span>
+          </div>
+          <div class="pw-cols" aria-hidden="true"><span>Формула куска</span><span id="pw-col-from">От <i>Q</i></span><span id="pw-col-to">До <i>Q</i></span><span></span></div>
+          <div class="pw-brace">
+            <span class="pw-prefix" id="pw-prefix" aria-hidden="true"></span>
+            <!-- Настоящая фигурная скобка системы. -->
+            <svg class="pw-brace-mark" viewBox="0 0 12 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M11 1 C6 1 7 8 7 20 C7 40 1 44 1 50 C1 56 7 60 7 80 C7 92 6 99 11 99"
+                    fill="none" stroke="currentColor" stroke-width="1.6"
+                    vector-effect="non-scaling-stroke" stroke-linecap="round"/>
+            </svg>
+            <div class="pw-rows" id="pw-rows"></div>
+          </div>
+          <button class="pw-add" id="pw-add" type="button">Добавить кусок</button>
+          <div class="pw-error" id="pw-error" role="alert" hidden></div>
+          <div class="pw-notes" id="pw-notes" hidden></div>
+          <div class="pw-preview" id="pw-preview-box">
+            <div class="pw-preview-lab">Что получится</div>
+            <div class="f-preview has" id="pw-preview"></div>
+          </div>
+        </div>
+        <!-- Клавиатура одна на всё окно: колонка справа, пишет в поле с курсором. -->
+        <div class="mkbd" id="pw-kbd"></div>
       </div>
-      <!-- Клавиатура одна на весь редактор: она переезжает к той строке,
-           в которой стоит курсор, а не висит пятью иконками сразу. -->
-      <div class="mkbd" id="pw-kbd"></div>
-
-      <div class="field">
-        <label>Что получится</label>
-        <div class="f-preview has" id="pw-preview"></div>
-      </div>
-
-      <div class="modal-foot">
+      <div class="modal-foot pw-foot">
+        <button class="btn-sm pw-kbd-toggle" id="pw-kbd-btn" type="button" aria-expanded="false" data-tip="Клавиатура формул"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01"/><path d="M8.2 15.6h7.6"/></svg><span>Клавиатура</span></button>
+        <span class="pw-gap"></span>
         <button class="btn-sm" id="pw-close" type="button">Отмена</button>
-        <button class="btn" id="pw-apply" type="button">Поставить в поле</button>
+        <button class="btn" id="pw-apply" type="button">Готово</button>
       </div>
     </div>
   </div>
@@ -2500,19 +2286,31 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
      Порядок подключения важен — он повторяет прежний порядок объявлений. -->
 <script src="{% calc2_static 'calc2/00-config.js' %}"></script>
 <script src="{% calc2_static 'calc2/10-math-core.js' %}"></script>
+<script src="{% calc2_static 'calc2/12-numbers.js' %}"></script>
 <script src="{% calc2_static 'calc2/20-plane.js' %}"></script>
 <script src="{% calc2_static 'calc2/30-curves.js' %}"></script>
 <script src="{% calc2_static 'calc2/40-scenes-market.js' %}"></script>
+<script src="{% calc2_static 'calc2/41-market-policies.js' %}"></script>
 <script src="{% calc2_static 'calc2/42-scenes-mono.js' %}"></script>
+<script src="{% calc2_static 'calc2/43-discrimination.js' %}"></script>
 <script src="{% calc2_static 'calc2/44-scenes-firm.js' %}"></script>
+<script src="{% calc2_static 'calc2/45-plants.js' %}"></script>
+<script src="{% calc2_static 'calc2/46-firm-supply.js' %}"></script>
+<script src="{% calc2_static 'calc2/47-firm-market.js' %}"></script>
 <script src="{% calc2_static 'calc2/46-scenes-labor.js' %}"></script>
 <script src="{% calc2_static 'calc2/48-scenes-consumer.js' %}"></script>
+<script src="{% calc2_static 'calc2/49-trade-policy.js' %}"></script>
 <script src="{% calc2_static 'calc2/50-scenes-macro.js' %}"></script>
+<script src="{% calc2_static 'calc2/51-islm.js' %}"></script>
 <script src="{% calc2_static 'calc2/52-modes.js' %}"></script>
+<script src="{% calc2_static 'calc2/53-adas.js' %}"></script>
 <script src="{% calc2_static 'calc2/54-scenes-ppf.js' %}"></script>
+<script src="{% calc2_static 'calc2/55-big-trade.js' %}"></script>
 <script src="{% calc2_static 'calc2/56-scenes-inequality.js' %}"></script>
+<script src="{% calc2_static 'calc2/57-distributions.js' %}"></script>
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
 <script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
+<script src="{% calc2_static 'calc2/72-export-tex.js' %}"></script>
 <script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
 {% comment %}
 ⚠️ ОБЩАЯ КЛАВИАТУРА — ПЕРЕД `82-input.js`. Тот зовёт `window.MathKbd.build`
@@ -2524,7 +2322,14 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
 <script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>
 <script src="{% calc2_static 'calc2/88-params.js' %}"></script>
+<script src="{% calc2_static 'calc2/89-model-state.js' %}"></script>
 <script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
+<script src="{% calc2_static 'calc2/91-session.js' %}"></script>
+<script src="{% calc2_static 'calc2/92-ui-kit.js' %}"></script>
+<script src="{% calc2_static 'calc2/93-shell.js' %}"></script>
+<script src="{% calc2_static 'calc2/94-answer.js' %}"></script>
+<script src="{% calc2_static 'calc2/95-picker-screen.js' %}"></script>
+<script src="{% calc2_static 'calc2/96-self.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
 
 {% comment %}

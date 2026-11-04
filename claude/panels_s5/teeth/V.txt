@@ -1,0 +1,37 @@
+## 1 обернуть поле копией с новым id — КРАСНЫЙ
+    FAIL [chromium] costs: ничего не вылезает (карточки, «Условие» вбок)  — inp-tc-copy span.edval 183>181
+    FAIL [chromium] costs: ОРГАН — id полей формул те же, что до обёртки (inp-tc)  — сейчас
+    FAIL [chromium] costs: поле inp-tc есть  — нет поля
+    FAIL [chromium] costs «Задаю кривые»: ОРГАН — id полей формул те же, что до обёртки (inp-catc,inp-cavc,inp-cmc)  — сейчас
+    FAIL [chromium] costs «Задаю кривые»: поле inp-cmc есть  — нет поля
+    FAIL [chromium] plants: ОРГАН — id полей формул те же, что до обёртки (inp-pl1,inp-pl2)  — сейчас
+## 2 глаз без действия — КРАСНЫЙ
+    FAIL [chromium] costs: глаз, «⋯», кнопка цвета что-то делают (глаз 1, «⋯» 1, цвет 0)  — карточка 0: глаз ничего не меняет на холсте
+    OK   [chromium] costs: ОРГАН — id полей формул те же, что до обёртки (inp-tc)
+    FAIL [chromium] costs «Задаю кривые»: глаз, «⋯», кнопка цвета что-то делают (глаз 3, «⋯» 0, цвет 0)  — карточка 0: глаз ничего не меняет на холсте | карточка 1: глаз ничего не меняет на холсте | карточка 2: глаз ничего не меняет на холсте
+    OK   [chromium] costs «Задаю кривые»: ОРГАН — id полей формул те же, что до обёртки (inp-catc,inp-cavc,inp-cmc)
+    FAIL [chromium] plants: глаз, «⋯», кнопка цвета что-то делают (глаз 2, «⋯» 0, цвет 0)  — карточка 0: глаз ничего не меняет на холсте | карточка 1: глаз ничего не меняет на холсте
+    OK   [chromium] plants: ОРГАН — id полей формул те же, что до обёртки (inp-pl1,inp-pl2)
+## 3 убрать обозначение — КРАСНЫЙ
+    FAIL [chromium] costs: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":["inp-tc"],"noName":[],"cut":[]}
+    OK   [chromium] costs: ОРГАН — id полей формул те же, что до обёртки (inp-tc)
+    FAIL [chromium] costs «Задаю кривые»: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":["inp-cmc","inp-catc","inp-cavc"],"noName":[],"cut":[]}
+    OK   [chromium] costs «Задаю кривые»: ОРГАН — id полей формул те же, что до обёртки (inp-catc,inp-cavc,inp-cmc)
+    FAIL [chromium] plants: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":["inp-pl1","inp-pl2"],"noName":[],"cut":[]}
+    OK   [chromium] plants: ОРГАН — id полей формул те же, что до обёртки (inp-pl1,inp-pl2)
+## 4 клонировать поле без обработчиков (тот же id) — КРАСНЫЙ
+    FAIL [chromium] costs: ничего не вылезает (карточки, «Условие» вбок)  — inp-tc span.edval 183>181
+    FAIL [chromium] costs: ОРГАН — id полей формул те же, что до обёртки (inp-tc)  — сейчас
+    FAIL [chromium] costs: ввод в карточке «inp-tc» меняет «Ответ» так же, как до обёртки, возврат возвращает  — {"now":"4|14#18|Q=3,67,ATC=11,35|Q=3,AVC=6|15|4|11,5|14|11,35","was":"4|2#30|Q=3,96,ATC=14,5|Q=3,AVC=6|15|4|14,5|2|14,5"}
+    FAIL [chromium] costs «Задаю кривые»: ОРГАН — id полей формул те же, что до обёртки (inp-catc,inp-cavc,inp-cmc)  — сейчас
+    FAIL [chromium] costs «Задаю кривые»: ввод в карточке «inp-cmc» меняет «Ответ» так же, как до обёртки, возврат возвращает  — {"now":"4|14#18|Q=3,67,ATC=11,35|Q=3,AVC=6|15|4|11,5|14|11,35","was":"3,53|12,77#18|Q=3,67,ATC=11,35|Q=3,AVC=6|15|3,53|11,38|12,77|11,3
+    FAIL [chromium] plants: ОРГАН — id полей формул те же, что до обёртки (inp-pl1,inp-pl2)  — сейчас
+## 5 обрезать имя многоточием — КРАСНЫЙ
+    FAIL [chromium] costs: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["inp-tc ellipsis/nowrap"]}
+    OK   [chromium] costs: ОРГАН — id полей формул те же, что до обёртки (inp-tc)
+    FAIL [chromium] costs «Задаю кривые»: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["inp-cmc ellipsis/nowrap","inp-catc ellipsis/nowrap","inp-cavc ellipsis/nowrap"]}
+    OK   [chromium] costs «Задаю кривые»: ОРГАН — id полей формул те же, что до обёртки (inp-catc,inp-cavc,inp-cmc)
+    FAIL [chromium] plants: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["inp-pl1 ellipsis/nowrap","inp-pl2 ellipsis/nowrap"]}
+    OK   [chromium] plants: ОРГАН — id полей формул те же, что до обёртки (inp-pl1,inp-pl2)
+
+git diff calc2/ после отката: пусто

@@ -273,6 +273,35 @@ function tradeBundleGain(d) {
   return { aut: { x: aut.x, y: aut.y }, tr, dx: tr.x - aut.x, dy: tr.y - aut.y };
 }
 
+/* Запись для .tex по строке КПВ (общий ввод блока, тот же разбор, что у
+   сцены): явная y = f(x) — формула; обратная x = g(y) — запись «по вертикали»,
+   как её вводит человек; неявная — узлы, найденные численно, с причиной. */
+function ppfMark(sel, src, name) {
+  const r = parsePpfEquation(src);
+  if (r.error) return markNumeric(sel, 'у кривой нет записи формулой', name);
+  if (r.kind === 'explicit') return markExpr(sel, r.src, 'x', null, { name });
+  if (r.kind === 'inverse') return markExpr(sel, r.src, 'y', null, { axis: 'y', name });
+  return markNumeric(sel, 'граница задана неявным уравнением и найдена численно: формулы y = f(x) у неё нет', name);
+}
+/* Запись области под или над КПВ: граница — формула y = f(x) (expr) на
+   отрезке, где нарисованы узлы pts. Нет формулы y = f(x) или узлы рвутся —
+   область уходит узлами с причиной. side: 'under' — от 0 до кривой,
+   'over' — от кривой до top. */
+function ppfMarkArea(sel, expr, pts, side, top) {
+  const ok = (pts || []).map(p => !!(p && isFinite(p[1])));
+  const a = ok.indexOf(true), b = ok.lastIndexOf(true);
+  if (!expr) return markNumeric(sel, 'граница области не задана формулой y = f(x): область посчитана по точкам');
+  if (a < 0 || ok.slice(a, b + 1).some(v => !v)) return markNumeric(sel, 'граница области прерывается: область посчитана по точкам');
+  return markArea(sel, side === 'over'
+    ? { from: pts[a][0], to: pts[b][0], lo: expr, hi: top, v: 'x' }
+    : { from: pts[a][0], to: pts[b][0], lo: 0, hi: expr, v: 'x' });
+}
+// Формула y = f(x) строки КПВ или null (обратная и неявная её не дают).
+function ppfExplicitExpr(src) {
+  const r = parsePpfEquation(src);
+  return (!r.error && r.kind === 'explicit') ? r.src : null;
+}
+
 // Кривая КПВ, вторая кривая сравнения, области и луч комплектов.
 function drawPpfCurve() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
@@ -294,21 +323,23 @@ function drawPpfCurve() {
   if (STATE.ppfShowOut) {
     const out = d3.area().defined(d => d !== null).x(d => sx(d[0]))
       .y0(d => sy(d[1])).y1(sy(CONFIG.Pmax));
-    g.append('path').datum(pts).attr('d', out)
+    ppfMarkArea(g.append('path').datum(pts).attr('d', out)
       .attr('fill', STATE.areaColor.ppfOut || COL.DWL).attr('opacity', 0.13)
-      .attr('data-legend', 'Недостижимые наборы');
+      .attr('data-legend', 'Недостижимые наборы'), ppfExplicitExpr(STATE.ppfFormula), pts, 'over', CONFIG.Pmax);
   }
   if (STATE.ppfShowIn) {
-    g.append('path').datum(pts).attr('d', area)
+    ppfMarkArea(g.append('path').datum(pts).attr('d', area)
       .attr('fill', STATE.areaColor.ppfIn || c1).attr('opacity', 0.1)
-      .attr('data-legend', 'Достижимые наборы');
+      .attr('data-legend', 'Достижимые наборы'), ppfExplicitExpr(STATE.ppfFormula), pts, 'under');
   }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line);
+  ppfMark(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line),
+    STATE.ppfFormula, STATE.ppfName1 || 'КПВ');
   labelCurve(g, evalPpf, STATE.ppfName1 || 'КПВ', c1, {});
 
   if (STATE.ppfF2) {
     const p2 = mk(evalPpf2);
-    g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line);
+    ppfMark(g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line),
+      STATE.ppfFormula2, STATE.ppfName2 || 'КПВ 2');
     labelCurve(g, evalPpf2, STATE.ppfName2 || 'КПВ 2', c2, { below: true });
   }
 
@@ -397,7 +428,7 @@ function drawBundleRay(g, f, color, curves) {
     g.append('circle').attr('cx', sx(x)).attr('cy', sy(y)).attr('r', 5)
       .attr('fill', COL.halo).attr('stroke', col).attr('stroke-width', 2.4);
     haloText(g, sx(x) + 9, sy(y) - 9,
-             (c.name ? c.name + ' ' : '') + '(' + fmt(x) + '; ' + fmt(y) + ')', 'start', 'auto');
+             'Комплект' + (list.length > 1 && c.name ? ' (' + c.name + ')' : '') + ' (' + fmt(x) + '; ' + fmt(y) + ')', 'start', 'auto');
   });
   void b; void color;
 }
@@ -430,8 +461,8 @@ function updatePpfPanel() {
   const linear = /линей/i.test(type);
 
   let html = `<div class="stat"><span>Тип КПВ</span><b>${type}</b></div>`;
-  html += `<div class="stat"><span>$X_{max}$ (весь ресурс на X)</span><b>${fmt(maxX)}</b></div>`;
-  html += `<div class="stat"><span>$Y_{max}$ (весь ресурс на Y)</span><b>${fmt(maxY)}</b></div>`;
+  html += `<div class="stat"><span>$X_{\\mathrm{max}}$ (весь ресурс на X)</span><b>${fmt(maxX)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{\\mathrm{max}}$ (весь ресурс на Y)</span><b>${fmt(maxY)}</b></div>`;
   if (at.length) {
     const mid = at[Math.floor(at.length / 2)];
     html += `<div class="stat"><span>Альт. издержки X в середине</span><b>${fmt(mid.oppX)} Y за ед. X</b></div>`;
@@ -439,7 +470,7 @@ function updatePpfPanel() {
   }
   if (STATE.ppfF2) {
     const m2x = ppfXmaxOf(evalPpf2), m2y = evalPpf2(0);
-    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{max}$ / $Y_{max}$</span>`
+    html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: $X_{\\mathrm{max}}$ / $Y_{\\mathrm{max}}$</span>`
           + `<b>${fmt(m2x)} / ${fmt(m2y)}</b></div>`;
     const k2 = Math.abs(ppfSlopeOf(evalPpf2, m2x * 0.5));
     html += `<div class="stat"><span>${STATE.ppfName2 || 'КПВ 2'}: альтернативные издержки X</span><b>${fmt(k2)} Y за ед. X</b></div>`;
@@ -457,7 +488,7 @@ function updatePpfPanel() {
   html += '<div class="sb-note"><b>Как это получилось</b>';
   html += '<p><b>Где кончается кривая?</b> Граница возможностей это все наборы, при которых ресурс израсходован '
         + 'полностью. Концы кривой и есть крайние случаи: весь ресурс на один товар. '
-        + `Здесь это $X_{max} = ${fmt(maxX)}$ и $Y_{max} = ${fmt(maxY)}$; они найдены численно, `
+        + `Здесь это $X_{\\mathrm{max}} = ${fmt(maxX)}$ и $Y_{\\mathrm{max}} = ${fmt(maxY)}$; они найдены численно, `
         + 'как точки пересечения кривой с осями.</p>';
   html += '<p><b>Откуда берутся альтернативные издержки?</b> Это наклон касательной в точке. Берём две близкие '
         + 'точки слева и справа и делим прирост Y на прирост X, поэтому счёт одинаково '
@@ -664,9 +695,32 @@ function ppfTouchXmax(f) {
   return (x > 0) ? x : null;
 }
 
+/* Форма, подогнанная по четырём пробным точкам, совпадает с КПВ на ВСЁМ
+   отрезке [0; Xmax]: густая сетка (PPF_CHECK_N + 1 узел, оба края включены),
+   расхождение не больше миллионной доли Ymax.
+   ⚠️ Без этой проверки кусочная КПВ, у которой все четыре пробные точки
+   легли на один прямой участок, объявлялась прямой. Замер 13.10: КПВ
+   500 − X² (X < 4), 516 − 8X (4 ≤ X < 54), 100 − (X − 50)² (X ≥ 54) с концом
+   X = 60 — пробы 12, 24, 36, 48 все на 516 − 8X, ответ «linear, a = 500,
+   b = 8» (у такой прямой свободный член 516), и КТВ при мировой цене 7,39
+   уходила в угол (0; 500) и шла НИЖЕ КПВ. Неопознанная форма идёт в общее
+   правило bestByValue, и это честный путь, а не поломка. */
+const PPF_CHECK_N = 200;
+function ppfFitsOnGrid(f, c) {
+  const F = ppfFam(c);
+  if (!F) return false;
+  const tol = 1e-6 * Math.max(1, Math.abs(c.Ymax));
+  for (let i = 0; i <= PPF_CHECK_N; i++) {
+    const x = c.Xmax * i / PPF_CHECK_N, y = f(x), g = F.f(c, x);
+    if (!isFinite(y) || !isFinite(g) || Math.abs(y - g) > tol) return false;
+  }
+  return true;
+}
+
 // Распознать тип КПВ из набора по пробным точкам внутри домена.
 // Возвращает { type, a, b, Xmax, Ymax }: linear (a-b·x), ellipse (sqrt(a-b·x²)),
 // parabola (a-b·x²), convex (a-b·√x) или { type:'unknown' }.
+// Форма принимается, только если она прошла проверку на сетке (ppfFitsOnGrid).
 function classifyPpf(f) {
   let Xmax = ppfXmaxOf(f);
   // Кривая может КАСАТЬСЯ оси, не переходя её (см. ppfTouchXmax).
@@ -677,14 +731,28 @@ function classifyPpf(f) {
   const ys = xs.map(f);
   if (ys.some(isNaN)) return { type: 'unknown', Xmax, Ymax };
   const TOL = 1e-6;
+  const ok = (c) => ppfFitsOnGrid(f, c);
   const lin = fitLinear(xs, ys);                                   // y vs x
-  if (lin && lin.r2 > 1 - TOL) return { type: 'linear', a: Ymax, b: -lin.slope, Xmax, Ymax };
+  // У прямой свободный член обязан совпасть с f(0): иначе это участок, а не вся КПВ.
+  if (lin && lin.r2 > 1 - TOL && Math.abs(lin.intercept - Ymax) <= TOL * Math.max(1, Math.abs(Ymax))) {
+    const c = { type: 'linear', a: Ymax, b: -lin.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const ell = fitLinear(xs.map(x => x * x), ys.map(y => y * y));   // y² vs x²  →  эллипс/дуга
-  if (ell && ell.r2 > 1 - TOL && ell.slope < 0) return { type: 'ellipse', a: ell.intercept, b: -ell.slope, Xmax, Ymax };
+  if (ell && ell.r2 > 1 - TOL && ell.slope < 0) {
+    const c = { type: 'ellipse', a: ell.intercept, b: -ell.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const par = fitLinear(xs.map(x => x * x), ys);                   // y vs x²   →  парабола
-  if (par && par.r2 > 1 - TOL) return { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
+  if (par && par.r2 > 1 - TOL) {
+    const c = { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
   const cvx = fitLinear(xs.map(x => Math.sqrt(x)), ys);            // y vs √x   →  выпуклая
-  if (cvx && cvx.r2 > 1 - TOL) return { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+  if (cvx && cvx.r2 > 1 - TOL) {
+    const c = { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+    if (ok(c)) return c;
+  }
 
   /* ─ ОБЩИЙ МНОГОЧЛЕН ВТОРОЙ СТЕПЕНИ ────────────────────────────────
      ⚠️ ПОДГОНКА ИДЁТ НЕ ПО ТРЁМ НЕИЗВЕСТНЫМ, А ПО ДВУМ, И ЭТО ТОЧНЕЕ.
@@ -699,7 +767,7 @@ function classifyPpf(f) {
   if (pq) {
     const cand = { type: 'poly2', c0: Ymax, c1: pq.intercept, c2: pq.slope, Xmax, Ymax };
     if (ppfFitR2(xs, ys, (x) => cand.c0 + cand.c1 * x + cand.c2 * x * x) > 1 - TOL
-        && ppfValid(cand)) {
+        && ppfValid(cand) && ok(cand)) {
       /* Конец области берём из САМОЙ формулы (меньший положительный корень), а
          не из численного поиска: у касания он точен, а поиск даёт 10,000000076. */
       cand.Xmax = ppfPoly2Xmax(cand);
@@ -717,7 +785,7 @@ function classifyPpf(f) {
     if (pw && isFinite(pw.slope) && isFinite(pw.intercept)) {
       const cand = { type: 'power', a: Ymax, b: Math.exp(pw.intercept), k: pw.slope, Xmax, Ymax };
       if (ppfFitR2(xs, ys, (x) => cand.a - cand.b * Math.pow(Math.max(0, x), cand.k)) > 1 - TOL
-          && ppfValid(cand)) {
+          && ppfValid(cand) && ok(cand)) {
         cand.Xmax = Math.pow(cand.a / cand.b, 1 / cand.k);
         return cand;
       }
@@ -934,16 +1002,13 @@ function detectCombinedKinks(f1, f2, xmax1, xmax2) {
    ломаную значило бы нарисовать не ту кривую. */
 function ppfCoefTex(b) {
   if (Math.abs(b - 1) < 1e-12) return 'X';
-  return fmt(b) + 'X';
+  return CalcNumber.factor(b) + 'X';
 }
 
-/* ⚠️ ЧИСЛО ДЛЯ MATH.JS ПЕЧАТАЕТСЯ ЧИСЛОМ, А НЕ ЧЕРЕЗ fmt.
-   `fmt` округляет для ПОКАЗА (и ставит русскую запятую), а эту строку потом
-   разбирает Math.js и вставляет обратно в поле формулы. Округляем до девятого
-   знака — ровно как в записи суммарного спроса. */
+/* Машинная запись сохраняет дроби и радикалы. Скобки обязательны: это
+   число может стать множителем, знаменателем или показателем степени. */
 function ppfNum(v) {
-  const r = ppfSnap(v);
-  return (r < 0) ? '(' + r + ')' : String(r);
+  return CalcNumber.expression(v, {atomic:true});
 }
 
 /* ⚠️ ШУМ НАИМЕНЬШИХ КВАДРАТОВ ДО ЗАПИСИ ДОХОДИТЬ НЕ ДОЛЖЕН.
@@ -954,6 +1019,8 @@ function ppfNum(v) {
    миллионной доли, и в остальных случаях округляем до шестого знака. */
 function ppfSnap(v) {
   if (!isFinite(v)) return v;
+  const exact=CalcNumber.classify(v);
+  if(exact.kind!=='approx')return CalcNumber.parse(exact.text)?.value ?? v;
   const near = Math.round(v);
   if (Math.abs(v - near) <= 1e-6 * Math.max(1, Math.abs(v))) return near;
   return Math.round(v * 1e6) / 1e6;
@@ -1354,11 +1421,9 @@ function ppfPieceAt(p, X) {
   return p.yConst + F.f(p.c, ppfClamp(X - p.xConst, 0, F.Xmax(p.c)));
 }
 
-/* Собрать запись из готовых участков. Форма та же, что у линейной записи
-   (combinedPpfLinearRecord): фигурная скобка, условие участком.
-   ⚠️ Границ у записи столько же, сколько участков, а ИЗЛОМОВ на один меньше:
-   последняя граница — это выход кривой на ось X, там кривая кончается, а не
-   ломается. Правило то же, что записано у линейной формы. */
+/* Собрать запись из готовых участков. Стык двух формул не обязательно
+   является изломом: проверяем односторонние наклоны. При смене семейства
+   (парабола → прямая) сохраняем полезную границу участка, называя её точно. */
 function ppfPiecesRecord(pieces, kind) {
   const ps = pieces.filter(p => p.x1 - p.x0 > 1e-7);
   if (!ps.length) return null;
@@ -1390,9 +1455,18 @@ function ppfPiecesRecord(pieces, kind) {
     return NaN;
   };
   const bounds = ps.map(p => ({ x: p.x1, y: ppfPieceAt(p, p.x1) }));
+  const kinks = bounds.slice(0, -1).flatMap((b, i) => {
+    const left = ps[i], right = ps[i + 1];
+    const h = Math.min(left.x1 - left.x0, right.x1 - right.x0) * 1e-6;
+    const dl = (b.y - ppfPieceAt(left, b.x - h)) / h;
+    const dr = (ppfPieceAt(right, b.x + h) - b.y) / h;
+    const smooth = Math.abs(dl - dr) <= 1e-4 * Math.max(1, Math.abs(dl), Math.abs(dr));
+    if (smooth && left.kind === right.kind) return [];
+    return [smooth ? Object.assign({}, b, {kind: 'join'}) : b];
+  });
   const n = ps.length;
   return { latex, expr, evalY, pieces: ps, bounds,
-           kinks: bounds.slice(0, -1), Xtot, Ytot: ppfPieceAt(ps[0], ps[0].x0),
+           kinks, Xtot, Ytot: ppfPieceAt(ps[0], ps[0].x0),
            type: kind + ' (' + n + (n === 1 ? ' кусок)' : (n < 5 ? ' куска)' : ' кусков)')) };
 }
 
@@ -2160,6 +2234,12 @@ function renderPpfSumRows() {
     wrap.append(lab, row);
     box.appendChild(wrap);
     equipFormulaField(inp.id, 'PPF');
+    /* Карточка функции (сессия 5, ADR 0153): строка собирается здесь заново при каждой смене числа кривых, поэтому
+       и в карточку оборачивается здесь; цвет — точкой-кнопкой, подпись на графике — в «⋯». */
+    if (typeof wrapFieldInCard === 'function' && scOn('ppfsum')) {
+      nameInp._scMenuLab = 'Подпись на графике';
+      wrapFieldInCard(wrap, { input: inp.id, sym: '\\text{КПВ}_{' + (i + 1) + '}', name: 'Участник ' + (i + 1), slotEl: pick, menu: [nameInp] });
+    }
   }
 }
 
@@ -2190,15 +2270,26 @@ function drawPpfSumCurves(d) {
   // Все слагаемые бледным пунктиром, каждое своим цветом и со своим именем.
   (d.parts || []).forEach((pts, i) => {
     const c = ppfSumColor(i);
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
-      .attr('stroke-dasharray', '5 4').attr('opacity', 0.6).attr('d', line);
+    ppfMark(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
+      .attr('stroke-dasharray', '5 4').attr('opacity', 0.95).attr('d', line), ppfSumGet(i), ppfSumName(i));   // как слагаемые «Сложения»: 0,6 давало 2 : 1 к холсту
     labelCurve(g, (x) => interpY(pts, x), ppfSumName(i), c, { below: i % 2 === 1 });
   });
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
   const sumC = STATE.ppfSumColor || COL.D;
-  g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
+  /* Запись суммы — та же formulaExpr, что в блоке «Итоговая функция»: она
+     уже сверена с численным Минковским (verifyFormula). Записи нет (смешанный
+     набор, параметрический участок) — узлы суммы с названной причиной. */
+  const sumWhy = d.formulaText || 'сумма построена численно (по Минковскому)';
+  const sa = g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
     .attr('data-legend', 'Достижимые наборы');
-  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d', line);
+  const sc = g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d', line);
+  if (d.formulaExpr) {
+    ppfMarkArea(sa, d.formulaExpr, d.points, 'under');
+    markExpr(sc, d.formulaExpr, 'x', null, { name: 'суммарная КПВ' });
+  } else {
+    markNumeric(sa, sumWhy);
+    markNumeric(sc, sumWhy, 'суммарная КПВ');
+  }
   if (STATE.bundleOn) drawBundleRay(g, (x) => interpY(d.points, x), sumC);
 }
 
@@ -2237,7 +2328,7 @@ function updatePpfSumPanel() {
   showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
   if (!d) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
-    box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return;
+    box.innerHTML = '<div class="muted">Введите кривые.</div>'; return;
   }
   if (!d.ok) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
@@ -2257,10 +2348,11 @@ function updatePpfSumPanel() {
   const ord = d.order || [];
   let html = '';
   html += `<div class="stat"><span>Складываем кривых</span><b>${d.n}</b></div>`;
-  html += `<div class="stat"><span>$X_{max}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
-  html += `<div class="stat"><span>$Y_{max}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
+  html += `<div class="stat"><span>$X_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Xtot)}</b></div>`;
+  html += `<div class="stat"><span>$Y_{\\mathrm{max}}$ суммарной</span><b>${fmt(d.Ytot)}</b></div>`;
   (d.kinks || []).forEach((k, i) => {
-    html += `<div class="stat"><span>Точка излома ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
+    const label = STATE.ppfSumKinks[i] && STATE.ppfSumKinks[i].kind === 'join' ? 'Граница участка' : 'Точка излома';
+    html += `<div class="stat"><span>${label} ${i + 1}</span><b>${fmt(k[0])}; ${fmt(k[1])}</b></div>`;
   });
   /* ТИП АЛЬТЕРНАТИВНЫХ ИЗДЕРЖЕК КАЖДОЙ КРИВОЙ. Этого в панели не было вовсе, а
      ученику оно нужно раньше самой записи: именно от типа издержек зависит и
@@ -2331,14 +2423,14 @@ function updatePpfSumPanel() {
           + 'наращивают X одновременно, а не по очереди. Так бывает у дуг и парабол.</p>';
   }
 
-  html += `<p>Концы суммарной кривой это просто суммы концов: $X_{max} = ${fmt(d.Xtot)}$ `
-        + `и $Y_{max} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
+  html += `<p>Концы суммарной кривой это просто суммы концов: $X_{\\mathrm{max}} = ${fmt(d.Xtot)}$ `
+        + `и $Y_{\\mathrm{max}} = ${fmt(d.Ytot)}$. Если все отдадут ресурс одному товару, выпуски складываются.</p>`;
   /* ⚠️ АБЗАЦА «ФОРМА КРИВОЙ» ЗДЕСЬ БОЛЬШЕ НЕТ, И ВОЗВРАЩАТЬ ЕГО НЕЛЬЗЯ.
      Запись — величина, а не разбор: она стоит блоком «Итоговая функция»
      первой карточкой «Ключевых значений» (см. setFinalFunctions выше).
      Внутри этой врезки она снова уехала бы в «Объяснение модели» вместе со
      всеми `.sb-note` (moveExplanations в 86-workspace.js). */
-  html += '<p>Саму запись суммарной кривой ищите в «Ключевых значениях», '
+  html += '<p>Саму запись суммарной кривой ищите в «Ответе», '
         + 'первым блоком «Итоговая функция»: по ней кривая и построена.</p>';
   html += '</div>';
   box.innerHTML = html;
@@ -2511,6 +2603,24 @@ function bestByValue(f, Xmax, Ymax, ratio) {
   return { xp: bx, yp: isFinite(y) ? y : 0, regime: 'касание (внутр. точка)' };
 }
 
+/* Диапазон альтернативных издержек X (наклона КПВ по модулю) на [0; Xmax].
+   Опознанное семейство отвечает формулой (ocAt0 / ocAtMax: у дуги и выпуклой
+   на краю бесконечность); неопознанная КПВ — численно: односторонние разности
+   на краях и центральные на сетке между ними (у кусочной наклон скачет). */
+function ppfOcRange(f, c, Xmax) {
+  const F = ppfFam(c);
+  if (F && F.ocAt0 && F.ocAtMax) {
+    const a = F.ocAt0(c), b = F.ocAtMax(c);
+    if (!isNaN(a) && !isNaN(b)) return { lo: Math.min(a, b), hi: Math.max(a, b) };
+  }
+  const h = Math.max(Xmax * 1e-6, 1e-9), N = PPF_CHECK_N, sl = [];
+  sl.push((f(0) - f(h)) / h, (f(Xmax - h) - f(Xmax)) / h);
+  for (let i = 1; i < N; i++) { const x = Xmax * i / N; sl.push((f(x - h) - f(x + h)) / (2 * h)); }
+  const ok = sl.filter(isFinite);
+  if (!ok.length) return null;
+  return { lo: Math.min.apply(null, ok), hi: Math.max.apply(null, ok) };
+}
+
 function recomputePpfTrade() {
   STATE.ppfTradeData = null;
   const r = parsePpfEquation(STATE.ppftFormula);
@@ -2542,12 +2652,35 @@ function recomputePpfTrade() {
     // Выпуклая, кусочная или незнакомая форма — общее правило по ценности.
     ({ xp, yp, regime } = bestByValue(f, Xmax, Ymax, ratio));
   }
+  /* ⚠️ ТОЧКА ПРОИЗВОДСТВА НЕ МОЖЕТ БЫТЬ ХУЖЕ ОБЩЕГО ПРАВИЛА. Что бы ни сказала
+     форма КПВ, ценность выпуска Y + Pw·X в выбранной точке сверяется с её
+     наибольшим значением на густой сетке (bestByValue). Ветка по форме короче и
+     точнее там, где форма опознана верно; ошиблась форма — побеждает общее
+     правило, и КТВ не уходит под КПВ (замер 13.10: угол (0; 500) против
+     касания (3,695; 486,347) у кусочной КПВ, принятой за прямую).
+     «Нет торговли» у прямой (Pw ровно равна наклону) остаётся как есть. */
+  if (regime !== 'нет торговли') {
+    const best = bestByValue(f, Xmax, Ymax, ratio);
+    const vOf = (x, y) => y + ratio * x;
+    const vb = vOf(best.xp, best.yp), vc = vOf(xp, yp);
+    if (!(vc >= vb - 1e-7 * Math.max(1, Math.abs(vb)))) ({ xp, yp, regime } = best);
+  }
   let line = null, xint = null, yint = null;
   if (regime !== 'нет торговли' && xp != null) {
     const c0 = yp + ratio * xp;                     // Y-перехват КТВ: Y = c0 − ratio·X
     line = { intercept: c0, slope: ratio }; yint = c0; xint = c0 / ratio;
   }
-  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax, ppfPts: singlePpfPoints(f, Xmax) };
+  /* У нелинейной КПВ одного числа «внутренней цены» нет: наклон меняется вдоль
+     кривой. Табло показывает диапазон альтернативных издержек (ppfOcRange), а
+     в точке производства — наклон слева и справа: у излома они разные. */
+  const ocRange = (c.type === 'linear') ? null : ppfOcRange(f, c, Xmax);
+  let slopeL = null, slopeR = null;
+  if (xp != null && xp > 0 && xp < Xmax) {
+    const h = Math.max(Xmax * 1e-6, 1e-9);
+    slopeL = (f(xp - h) - f(xp)) / h; slopeR = (f(xp) - f(xp + h)) / h;
+  }
+  STATE.ppfTradeData = { ok: true, c, Xmax, Ymax, ratio, xp, yp, regime, line, xint, yint, priceMin, priceMax,
+    ocRange, slopeL, slopeR, ppfPts: singlePpfPoints(f, Xmax) };
   const xm = Math.max(Xmax, xint || 0), ym = Math.max(Ymax, yint || 0);
   applyTradeRanges(padMax(xm), padMax(ym));  // плавно при смене Pw, иначе мгновенно
 }
@@ -2557,11 +2690,14 @@ function drawPpfTrade(d) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
-  g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06);
-  g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
+  ppfMarkArea(g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06),
+    ppfExplicitExpr(STATE.ppftFormula), d.ppfPts, 'under');
+  ppfMark(g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line),
+    STATE.ppftFormula, 'КПВ');
   if (d.line) {
     const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
+    markExpr(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line),
+      '(' + d.line.intercept + ') - (' + d.line.slope + ') * x', 'x', [0, d.xint], { name: 'КТВ' });
     // Задача 2: линия цены больше не перетаскивается мышью — управление ползунком Px/Py.
   }
   /* П4: в сцене есть и КПВ, и КТВ — луч комплектов обязан пересечь ОБЕ,
@@ -2612,7 +2748,7 @@ function updatePpfTradePanel() {
   showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
-    box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return;
+    box.innerHTML = '<div class="muted">Введите КПВ и мировую цену.</div>'; return;
   }
   if (!d.ok) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
@@ -2638,20 +2774,25 @@ function updatePpfTradePanel() {
       setFinalFunctions([]);
     }
   }
-  // Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один, у дуги
-  // берём его в точке производства — там и происходит сравнение с мировой.
-  const inner = (d.c.type === 'linear' && d.c.b > 0)
-    ? d.c.b
-    : ((d.xp != null && d.xp > 0) ? Math.abs(ppfSlopeOf((x) => interpY(d.ppfPts, x), d.xp))
-                                  : (d.Ymax / d.Xmax));
+  /* Внутренняя (автарктическая) цена X: наклон КПВ. У прямой он один. У
+     нелинейной КПВ одного числа нет (решение 13.10, карточка «NaN при кусочной
+     КПВ»): табло показывает диапазон альтернативных издержек «от … до …».
+     Наклон в точке производства числом не годится: у касания он по построению
+     равен мировой цене, и разбор говорил «совпала, торговать нечем». */
+  const linear = (d.c.type === 'linear' && d.c.b > 0);
+  const range = linear ? null : d.ocRange;
+  const inner = linear ? d.c.b : null;
+  const ocNum = (v) => (v === Infinity ? '$\\infty$' : fmt(v));
   /* ⚠️ НЕ fmt(inner) НАПРЯМУЮ, ЕСЛИ inner НЕ ЧИСЛО. fmt(NaN) печатает буквально
      «NaN» (isFinite-проверка внутри fmt отдаёт String(v) как есть), а
      fmt(null) — куда коварнее: roundShown(null) считает null нулём, и «нет
      значения» на экране неотличимо от настоящего нуля. Оба варианта врут.
      Есть значение — печатаем; нет — говорим об этом словами. */
-  const innerHtml = (typeof inner === 'number' && isFinite(inner))
+  const innerHtml = linear
     ? fmt(inner)
-    : '<span class="muted">не определена</span>';
+    : ((range && !isNaN(range.lo) && !isNaN(range.hi))
+        ? ('от ' + ocNum(range.lo) + ' до ' + ocNum(range.hi))
+        : '<span class="muted">не определена</span>');
   let html = '';
   html += `<div class="stat"><span>Режим</span><b>${d.regime}</b></div>`;
   html += `<div class="stat"><span>Мировая цена $P_x/P_y$</span><b>${fmt(d.ratio)}</b></div>`;
@@ -2685,25 +2826,50 @@ function updatePpfTradePanel() {
   }
 
   html += '<div class="sb-note"><b>Как это получилось</b>';
-  html += `<p><b>Стоит ли вообще торговать?</b> Сравниваем две цены. Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
-        + `единицу X, если делает всё сама. Здесь ${fmt(inner)}. Мировая цена ${fmt(d.ratio)}: `
-        + (Math.abs(d.ratio - inner) < 1e-6
-            ? 'она совпала с внутренней, поэтому торговать нечем.'
-            : (d.ratio > inner
-                ? 'за X дают больше, чем он стоит внутри, значит X выгодно производить и продавать.'
-                : 'за X дают меньше, чем он стоит внутри, значит выгоднее производить Y и покупать X.'))
-        + '</p>';
+  if (linear || !range) {
+    const v = linear ? inner : NaN;
+    html += `<p><b>Стоит ли вообще торговать?</b> Сравниваем две цены. Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
+          + `единицу X, если делает всё сама. Здесь ${fmt(v)}. Мировая цена ${fmt(d.ratio)}: `
+          + (Math.abs(d.ratio - v) < 1e-6
+              ? 'она совпала с внутренней, поэтому торговать нечем.'
+              : (d.ratio > v
+                  ? 'за X дают больше, чем он стоит внутри, значит X выгодно производить и продавать.'
+                  : 'за X дают меньше, чем он стоит внутри, значит выгоднее производить Y и покупать X.'))
+          + '</p>';
+  } else {
+    const eps = 1e-6 * Math.max(1, d.ratio);
+    html += `<p><b>Стоит ли вообще торговать?</b> Внутренняя цена X это альтернативные издержки: сколько Y страна теряет за `
+          + `единицу X, если делает всё сама. У этой КПВ они не постоянны и меняются ${innerHtml}, смотря сколько X `
+          + `уже производится. Мировая цена ${fmt(d.ratio)} `
+          + (d.ratio < range.lo - eps
+              ? 'ниже любых внутренних издержек X, значит выгоднее производить только Y и покупать X.'
+              : (d.ratio > range.hi + eps
+                  ? 'выше любых внутренних издержек X, значит X выгодно производить и продавать.'
+                  : 'лежит внутри этого диапазона: где остановиться с выпуском, решает ценность выпуска по мировым ценам.'))
+          + '</p>';
+  }
 
+  // Излом КПВ: наклоны слева и справа от точки производства заметно разные.
+  const kink = (d.slopeL != null && d.slopeR != null && isFinite(d.slopeL) && isFinite(d.slopeR)
+    && Math.abs(d.slopeR - d.slopeL) > 1e-3 * Math.max(1, Math.abs(d.slopeR)));
   if (d.xp != null) {
-    if (/касание/.test(d.regime)) {
+    if (/касание/.test(d.regime) && kink) {
+      html += `<p><b>Где остановиться с выпуском?</b> В изломе КПВ. Левее излома единица X обходится в ${fmt(d.slopeL)} `
+            + `единиц Y, дешевле мировой цены, и её выгодно делать; правее она стоит ${fmt(d.slopeR)}, дороже мировой. `
+            + `Точка найдена численно: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    } else if (/касание/.test(d.regime)) {
       html += `<p><b>Где остановиться с выпуском?</b> КПВ вогнутая, поэтому специализация неполная: страна наращивает X, пока `
             + `следующая единица обходится дешевле мировой цены. Останавливается там, где `
             + `издержки сравнялись с ней, то есть где наклон касательной к КПВ равен $P_x/P_y$. `
             + `Точка найдена численно: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
     } else if (/нет торговли/.test(d.regime)) {
       html += '<p>Цены совпали, торговля ничего не меняет: линия возможностей ложится на КПВ.</p>';
-    } else {
+    } else if (linear) {
       html += `<p><b>Где остановиться с выпуском?</b> На самом краю. КПВ прямая, издержки не растут, поэтому выгодно уйти в специализацию целиком. `
+            + `Всё производство идёт в ${d.yp === 0 ? 'X' : 'Y'}: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
+    } else {
+      html += `<p><b>Где остановиться с выпуском?</b> На самом краю. Выпуск, посчитанный по мировым ценам, $Y + P_x/P_y \\cdot X$, `
+            + `здесь больше, чем в любой другой точке КПВ, поэтому выгодно уйти в специализацию целиком. `
             + `Всё производство идёт в ${d.yp === 0 ? 'X' : 'Y'}: $X_п = ${fmt(d.xp)}$, $Y_п = ${fmt(d.yp)}$.</p>`;
     }
   }
@@ -2740,7 +2906,7 @@ function syncPpftPriceUI(d) {
 
 // Полная перерисовка под-режима «КТВ» (расчёт лёгкий — можно каждый раз).
 function redrawPpfTrade() {
-  if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: эндогенная мировая цена
+  if (STATE.tradeScenario === 'B') { redrawTradeB(); return; }   // ЧК5: две страны-партнёра
   recomputePpfTrade();
   makeScales();
   svg.selectAll('*').remove(); addDefs(); drawGrid(); drawAxes('X', 'Y');
@@ -2751,15 +2917,9 @@ function redrawPpfTrade() {
   _wantRangeAnim = false;   // страховка: гасим запрос, даже если recompute вышел по ошибке
 }
 
-/* --- ЧК5: сценарий Б — эндогенная мировая цена двух стран -----------
-   Две страны с КПВ. Автарктическая цена X каждой = наклон её КПВ. Равновесная
-   мировая цена Pw устанавливается МЕЖДУ автарктическими ценами (среднее
-   геометрическое — строго внутри интервала). Специализация по сравнительному
-   преимуществу: страна с меньшими альт. издержками X специализируется на X и
-   экспортирует его, другая — на Y. Линии торговых возможностей при Pw лежат вне
-   КПВ обеих стран (выигрыш от торговли). Полноценный баланс спроса-предложения
-   требует функций спроса (их нет) — берём разумную минимально достаточную
-   версию: Pw эндогенна и в правильном интервале, а не задана извне. */
+/* Две страны с ЛИНЕЙНЫМИ КПВ. Их наклоны задают границы взаимовыгодной
+   цены, но не равновесную цену: для неё нужны предпочтения и спрос.
+   Среднее геометрическое — только начальный пример внутри интервала. */
 function recomputeTradeB() {
   STATE.tradeBData = null;
   const r1 = compilePpf(STATE.tbF1), r2 = compilePpf(STATE.tbF2);
@@ -2770,16 +2930,20 @@ function recomputeTradeB() {
     STATE.tradeBData = { ok: false, error: 'Не удалось определить границы КПВ (нужны убывающие кривые, пересекающие оси).' };
     return;
   }
-  // Автарктическая цена X = альт. издержки X. Для линейной — наклон c.b; иначе среднее Ymax/Xmax.
-  const b1 = (c1.type === 'linear') ? c1.b : (c1.Ymax / c1.Xmax);
-  const b2 = (c2.type === 'linear') ? c2.b : (c2.Ymax / c2.Xmax);
-  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали, торговать незачем.' }; return; }
+  // У нелинейной КПВ предельные издержки меняются: отношение перехватов
+  // нельзя выдавать за её наклон, а производство — за полную специализацию.
+  if (c1.type !== 'linear' || c2.type !== 'linear' || !(c1.b > 0) || !(c2.b > 0)) {
+    STATE.tradeBData = { ok: false, error: 'Эта модель двух стран рассчитана на линейные убывающие КПВ вида Y = a − bX. Нелинейная КПВ требует отдельного расчёта производства и торговли; линейный ответ к ней неприменим.' };
+    return;
+  }
+  const b1 = c1.b, b2 = c2.b;
+  if (Math.abs(b1 - b2) < 1e-9) { STATE.tradeBData = { ok: false, error: 'Альтернативные издержки стран совпали. Строгого сравнительного преимущества нет; обмен по этой цене не расширяет производственные возможности.' }; return; }
   const co1 = { idx: 1, c: c1, b: b1, color: COL.D, ppts: singlePpfPoints(f1, c1.Xmax) };
   const co2 = { idx: 2, c: c2, b: b2, color: COL.S, ppts: singlePpfPoints(f2, c2.Xmax) };
   const lowIs1 = b1 < b2;                              // у кого меньше альт. цена X — тот экспортирует X
   const lowCo = lowIs1 ? co1 : co2, highCo = lowIs1 ? co2 : co1;
   const bL = lowCo.b, bH = highCo.b;
-  const Pweq = Math.sqrt(bL * bH);                     // равновесная (эндогенная) мировая цена в (bL, bH)
+  const Pweq = Math.sqrt(bL * bH);                     // пример цены; имя поля сохранено для совместимости
   /* Границы регулятора — сам экономически допустимый промежуток (Фаза 8).
      Раньше ползунок ходил по [0.1, 2×макс. автарктической], а введённое вручную
      число молча обрезалось до этого предела: набрал 9 при автарктических 1 и 2,
@@ -2789,14 +2953,14 @@ function recomputeTradeB() {
   const priceMin = bL, priceMax = bH;
   let manual = (STATE.tbManualPrice != null && STATE.tbManualPrice > 0);
   const Pw = manual ? STATE.tbManualPrice : Pweq;
-  const inInterval = (Pw > bL + 1e-9 && Pw < bH - 1e-9);
+  const inInterval = (Pw >= bL - 1e-9 && Pw <= bH + 1e-9);
+  const atBoundary = inInterval && (Math.abs(Pw - bL) <= 1e-9 || Math.abs(Pw - bH) <= 1e-9);
   // Цена вне интервала: одной из стран выгоднее автаркия, обмена не будет.
   let noTradeMsg = null;
   if (!inInterval) {
     const who = (Pw <= bL + 1e-9) ? lowCo.idx : highCo.idx;
-    noTradeMsg = 'Цена ' + fmt(Pw) + ' лежит вне промежутка: она обязана быть между ' +
-      fmt(bL) + ' и ' + fmt(bH) + '. При такой цене стране ' + who +
-      ' выгоднее автаркия, торговать она не станет, поэтому обмена нет.';
+    noTradeMsg = 'Цена ' + fmt(Pw) + ' вне допустимого интервала: цена должна быть между ' + fmt(bL) + ' и ' + fmt(bH) +
+      ', включая границы. Стране ' + who + ' невыгодно участвовать в показанном направлении обмена. Такая торговля между этими двумя странами не состоится.';
   }
   // Специализация (углы линейной КПВ): низкая страна → весь X, высокая → весь Y.
   lowCo.prod = [lowCo.c.Xmax, 0]; lowCo.exports = 'X';
@@ -2836,7 +3000,7 @@ function recomputeTradeB() {
     shift: [S_H / Pw, -S_H],
   };
 
-  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, noTrade: !inInterval, noTradeMsg, priceMin, priceMax,
+  STATE.tradeBData = { ok: true, Pw, Pweq, manual, inInterval, atBoundary, noTrade: !inInterval, noTradeMsg, priceMin, priceMax,
     bL, bH, b1, b2, co1, co2, lowIdx: lowCo.idx, highIdx: highCo.idx,
     lowCo, highCo, Ymax_H, Xmax_L, E_L, S_H };
   const xm = Math.max(c1.Xmax, c2.Xmax, lowCo.cpf.xint, highCo.cpf.xint);
@@ -2861,6 +3025,26 @@ function tradeCpfPoints(co) {
   const useX = (co.exports === 'X');
   const cut = tail.filter(p => useX ? (p[0] <= k.kink[0] + 1e-9) : (p[0] >= k.kink[0] - 1e-9));
   return pts.concat(cut.sort((a, b) => useX ? (b[0] - a[0]) : (a[0] - b[0])));
+}
+
+/* Запись КТВ страны для .tex — тем же устройством, что tradeCpfPoints:
+   прямая от точки производства до излома, за изломом (если партнёра не
+   хватило) своя КПВ, сдвинутая на вектор торговли: f(x − s₀) + s₁. Формула
+   своей КПВ подставляется деревом Math.js, а не правкой строки. */
+function tradeCpfMark(sel, co, src) {
+  const k = co.limit, p = co.prod;
+  const dx = k.kink[0] - p[0];
+  if (!(Math.abs(dx) > 1e-12)) return markPoly(sel, 'отрезок торговых возможностей по двум точкам', 'КТВ');
+  const lineE = '(' + p[1] + ') + (' + ((k.kink[1] - p[1]) / dx) + ') * (x - (' + p[0] + '))';
+  if (!k.binding) return markExpr(sel, lineE, 'x', null, { name: 'КТВ' });
+  let tail;
+  try {
+    tail = math.parse(prepExpr(String(src))).transform(n => (n.isSymbolNode && (n.name === 'x' || n.name === 'X'))
+      ? math.parse('(x - (' + k.shift[0] + '))') : n).toString();
+  } catch (e) { return markNumeric(sel, 'у своей КПВ нет записи формулой', 'КТВ'); }
+  const tailE = '(' + tail + ') + (' + k.shift[1] + ')';
+  const cond = (co.exports === 'X') ? ('x < ' + k.kink[0]) : ('x > ' + k.kink[0]);
+  return markExpr(sel, cond + ' ? (' + tailE + ') : (' + lineE + ')', 'x', null, { name: 'КТВ' });
 }
 
 /* Два графика рядом: слева страна 1, справа страна 2 (Фаза 15.3). У каждой
@@ -2929,12 +3113,15 @@ function drawTradeB(d) {
       .attr('fill', co.color).text(tbName(co.idx));
 
     // КПВ и КТВ обе сплошные (Фаза 15.4): пунктир читался как «ненастоящая».
-    g.append('path').datum(co.ppts).attr('fill', 'none')
-      .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
+    const ownSrc = co.idx === 1 ? STATE.tbF1 : STATE.tbF2;
+    markExpr(g.append('path').datum(co.ppts).attr('fill', 'none')
+      .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line), ownSrc, 'x', null, { name: tbName(co.idx) });
     // Торговли нет — нет и линии возможностей: рисовать её значило бы показывать
     // обмен, которого при такой цене не будет.
-    if (!d.noTrade) g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
-      .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line);
+    if (!d.noTrade) {
+      tradeCpfMark(g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
+        .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line), co, ownSrc);
+    }
 
     // Точка производства и точка предела торговли.
     if (d.noTrade) return;      // дальше только про состоявшийся обмен
@@ -2970,15 +3157,16 @@ function updateTradeBPanel() {
   const box = document.getElementById('info-tb'); if (!box) return;
   const d = STATE.tradeBData;
   showPaneError('tb-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
-  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить торговлю».</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ.</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   let html = '';
   if (d.noTradeMsg) html += `<div class="warn" style="margin-bottom:6px;">${d.noTradeMsg}</div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.1</span><b>${fmt(d.b1)}</b></div>`;
   html += `<div class="stat"><span>Автарк. цена X стр.2</span><b>${fmt(d.b2)}</b></div>`;
-  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(равновесная)</span>'}</div>`;
-  if (d.manual) html += `<div class="stat"><span>Равновесная Pw</span><b>${fmt(d.Pweq)}</b></div>`;
-  html += `<div class="stat"><span>Экспортируют</span><b>${tbName(d.lowIdx)} → X, ${tbName(d.highIdx)} → Y</b></div>`;
+  html += `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(d.Pw)}</b>${d.manual ? ' <span style="color:var(--curve-reg);">(своя)</span>' : ' <span style="color:var(--text2);">(пример цены)</span>'}</div>`;
+  if (d.manual) html += `<div class="stat"><span>Пример Pw</span><b>${fmt(d.Pweq)}</b></div>`;
+  if (d.noTrade) { box.innerHTML = html; return; }
+  html += `<div class="stat"><span>Направление обмена</span><b>${tbName(d.lowIdx)} → X, ${tbName(d.highIdx)} → Y</b></div>`;
   // Предел торговли (Фаза 15.6): сколько товара реально удаётся обменять.
   html += `<div class="stat"><span>Обмен X (макс.)</span><b>${fmt(d.E_L)}</b></div>`;
   html += `<div class="stat"><span>Обмен Y (макс.)</span><b>${fmt(d.S_H)}</b></div>`;
@@ -3010,28 +3198,16 @@ function updateTradeBPanel() {
   html += '<p>Рисовать КТВ бесконечной прямой от края до края неверно: это означало бы, что '
         + 'обменять можно сколько угодно, хотя партнёр физически столько не производит.</p>';
   html += '</div>';
-  // Фаза 4б: не просто число, а КАК оно получается — логика избыточного спроса
-  // и предложения, границы интервала и честная оговорка о том, чего модель не знает.
-  html += '<div class="hint" style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);">' +
-    '<b>Откуда берётся Pw</b><br>' +
-    `Автарктическая цена X это альтернативные издержки X внутри страны: ` +
-    `у страны&nbsp;${d.lowIdx} она ${fmt(d.bL)}, у страны&nbsp;${d.highIdx} она ${fmt(d.bH)}.<br><br>` +
-    'Мировая цена уравновешивает мировой рынок: <b>сколько X страна-экспортёр хочет продать при цене Pw, ' +
-    'столько же X страна-импортёр хочет купить</b>: избыточное предложение = избыточному спросу.<br><br>' +
-    `Отсюда сразу следуют границы. При $P_w \\le ${fmt(d.bL)}$ стране&nbsp;${d.lowIdx} невыгодно продавать X ` +
-    '(дома за него дают не меньше), и избыточное предложение обнуляется. ' +
-    `При $P_w \\ge ${fmt(d.bH)}$ стране&nbsp;${d.highIdx} невыгодно покупать X (дешевле произвести самой), и ` +
-    'обнуляется избыточный спрос. Значит равновесие обязано лежать <b>строго внутри</b> ' +
-    `интервала (${fmt(d.bL)};&nbsp;${fmt(d.bH)}), и это следует из ОДНИХ КПВ, без всяких допущений.<br><br>` +
-    '<b>Чего модель не знает.</b> Конкретная точка внутри интервала зависит от того, сколько каждая страна ' +
-    'хочет ПОТРЕБИТЬ при данной цене, то есть от предпочтений (функций спроса). В модели из одних КПВ их нет, ' +
-    'поэтому одним числом точка не определяется, определяется интервал. ' +
-    `Калькулятор ставит нейтральную точку строго внутри: среднее геометрическое ` +
-    `√(${fmt(d.bL)}·${fmt(d.bH)})&nbsp;=&nbsp;${fmt(d.Pweq)}. Ползунком Pw пройдите весь интервал: ` +
-    'чем ближе цена к автарктической цене страны, тем меньше её выигрыш от торговли.</div>';
-  if (d.manual) {
-    html += `<div class="hint" style="margin-top:6px;">Сейчас цена задана вручную. Кнопка «Сбросить к равновесной» вернёт ${fmt(d.Pweq)}.</div>`;
-  }
+  html += '<div class="hint"><b>Откуда берётся Pw</b><br>' +
+    `Линейные КПВ задают альтернативные издержки X: ${fmt(d.bL)} и ${fmt(d.bH)} единиц Y. ` +
+    `Взаимовыгодная цена лежит в интервале [${fmt(d.bL)}; ${fmt(d.bH)}]. ` +
+    'Строго внутри обе страны выигрывают от обмена и имеют стимул к полной специализации. ' +
+    'На границе одна страна безразлична между производством и обменом; возможна неполная специализация. ' +
+    'Показанная полная специализация на границе представляет один допустимый вариант, а не единственное решение.<br><br>' +
+    '<b>Чего модель не определяет.</b> Равновесная цена и фактический объём торговли зависят от предпочтений и спроса. ' +
+    'По одним КПВ они не известны. Здесь показаны возможности и максимальный обмен при выбранной цене. ' +
+    `Начальный пример задан средним геометрическим: √(${fmt(d.bL)}·${fmt(d.bH)}) = ${fmt(d.Pweq)}.</div>`;
+  if (d.atBoundary) html += '<div class="hint">Цена на границе интервала: одна страна безразлична между специализациями. Показан один из возможных планов.</div>';
   box.innerHTML = html;
 }
 
@@ -3043,7 +3219,7 @@ function syncTbPriceUI(d) {
   if (!d || !d.ok) return;
   // Ползунок ходит только по допустимому промежутку, поле принимает любое
   // число: набранное вручную не подменяем, а объясняем (см. recomputeTradeB).
-  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.step = Math.max((d.priceMax - d.priceMin) / 200, 0.001); sl.value = Math.max(d.priceMin, Math.min(d.priceMax, d.Pw)); }
+  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.step = Math.max((d.priceMax - d.priceMin) / 200, 0.001); sl.value = Math.max(d.priceMin, Math.min(d.priceMax, d.Pw)); sl._modelValue = d.Pw; }
   if (num) { num.removeAttribute('max'); num.min = 0; if (d.manual) num.value = d.Pw; else num.value = ''; }
   if (val) val.textContent = fmt(d.Pw) + (d.inInterval ? '' : ' (вне промежутка)');
 }

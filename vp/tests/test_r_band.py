@@ -60,10 +60,10 @@ class StudentBandTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.landing_tab()[0], ['10'])
 
-    def test_guest_gets_the_first_band(self):
+    def test_guest_gets_the_agreed_default_format(self):
         guest = Client()
-        self.assertEqual(self.landing_tab(guest)[0], ['9'])
-        self.assertEqual(self.variants_band(guest), '9')
+        self.assertEqual(self.landing_tab(guest)[0], ['11'])
+        self.assertEqual(self.variants_band(guest), '11')
 
     def test_no_class_column_and_first_place_caption(self):
         _, response = self.landing_tab()

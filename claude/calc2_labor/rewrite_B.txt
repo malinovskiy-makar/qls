@@ -1,0 +1,51 @@
+labor: разошлись поля start.state: curves, laborEq, laborFirmCS, laborMin, laborMinW, laborMinWelfare, laborS, laborWorkerCS
+    curves: [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0  →  [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0
+    laborEq: {"P":50,"Q":50}  →  {"P":40,"Q":60}
+    laborFirmCS: 1250  →  1800
+    laborMin: {"Qd":35,"Qs":65,"Wmin":65,"binding":true,"employment":35,"unemployment":30}  →  {"Qd":55,"Qs":70,"Wmin":45,"binding":true,"employment":55,"unemployment":15}
+    laborMinW: 65  →  45
+    laborMinWelfare: {"Lstar":35,"Wfact":65,"dwl":225,"firmCS":612.5,"workerCS":1662.5}  →  {"Lstar":55,"Wfact":45,"dwl":18.75,"firmCS":1512.5,"workerCS":1168.75}
+    laborS: {"color":"#E0563B","compiled":{},"expr":"L","id":2,"linear":{"a":1,"b":0},"role":"supply","shiftBase":0,"srcForm":"PQ","visible":true}  →  {"color":"#E0563B","compiled":{},"expr":"10 + 0.5*L","id":2,"linear":{"a":0.5,"b":10},"role":"supply","shiftBase":10,"srcForm":"PQ","visible":true}
+    laborWorkerCS: 1250  →  900
+    «Ответ» было: Lk​ (занятость) = 50 | Wk​ (зарплата) = 50 | Излишек рабочих = 1250 | Излишек фирм = 1250 | МРОТ W_min = 65 | Занятость = 35 (было 50) | Безработица = 30 | Излишек рабочих = 1662,5 | Излишек фирм = 612,5 | DWL (потери) = 225
+    «Ответ» стало: Lk​ (занятость) = 60 | Wk​ (зарплата) = 40 | Излишек рабочих = 900 | Излишек фирм = 1 800 | МРОТ Wmin​ = 45 | Занятость = 55 (было 60) | Безработица = 15 | Излишек рабочих = 1 168,75 | Излишек фирм = 1 512,5 | DWL (потери) = 18,75
+labor-mono: разошлись поля start.state: curves, laborEq, laborFirmCS, laborMin, laborMinW, laborMinWelfare, laborMono, laborS, laborWorkerCS
+    curves: [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0  →  [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0
+    laborEq: {"P":50,"Q":50}  →  {"P":40,"Q":60}
+    laborFirmCS: 1250  →  1800
+    laborMin: {"Lhat":65,"Lstar":35,"Wmin":65,"binding":true,"dwl":225,"unemployment":30,"wage":65}  →  {"Lhat":70,"Lstar":55,"Wmin":45,"binding":true,"dwl":18.75,"unemployment":15,"wage":45}
+    laborMinW: 65  →  45
+    laborMinWelfare: {"Lstar":35,"Wfact":65,"dwl":225,"firmCS":612.5,"workerCS":1662.5}  →  {"Lstar":55,"Wfact":45,"dwl":18.75,"firmCS":1512.5,"workerCS":1168.75}
+    laborMono: {"Lk":50,"Lm":33.33333333,"Wk":50,"Wm":33.33333333,"dwl":277.7777778}  →  {"Lk":60,"Lm":45,"Wk":40,"Wm":32.5,"dwl":168.75}
+    laborS: {"color":"#E0563B","compiled":{},"expr":"L","id":2,"linear":{"a":1,"b":0},"role":"supply","shiftBase":0,"srcForm":"PQ","visible":true}  →  {"color":"#E0563B","compiled":{},"expr":"10 + 0.5*L","id":2,"linear":{"a":0.5,"b":10},"role":"supply","shiftBase":10,"srcForm":"PQ","visible":true}
+    laborWorkerCS: 1250  →  900
+    «Ответ» было: Lм​ (занятость) = 33,33 | Wм​ (зарплата) = 33,33 | Lk​ (конкуренция) = 50 | Wk​ (конкуренция) = 50 | DWL (недозанятость) = 277,78 | МРОТ W_min = 65 | Занятость с МРОТ = 35 (было 33,33) | Зарплата = 65 | Безработица = 30 | Излишек рабочих = 1662,5 | Излишек фирм = 612,5 | DWL (потери) = 225
+    «Ответ» стало: Lм​ (занятость) = 45 | Wм​ (зарплата) = 32,5 | Lk​ (конкуренция) = 60 | Wk​ (конкуренция) = 40 | DWL (недозанятость) = 168,75 | МРОТ Wmin​ = 45 | Занятость с МРОТ = 55 (было 45) | Зарплата = 45 | Безработица = 15 | Излишек рабочих = 1 168,75 | Излишек фирм = 1 512,5 | DWL (потери) = 18,75
+labor-union: разошлись поля start.state: curves, laborEq, laborFirmCS, laborMin, laborMinW, laborMinWelfare, laborS, laborUnion, laborWorkerCS
+    curves: [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0  →  [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0
+    laborEq: {"P":50,"Q":50}  →  {"P":40,"Q":60}
+    laborFirmCS: 1250  →  1800
+    laborMin: {"Qd":35,"Qs":65,"Wmin":65,"binding":true,"employment":35,"unemployment":30}  →  {"Qd":55,"Qs":70,"Wmin":45,"binding":true,"employment":55,"unemployment":15}
+    laborMinW: 65  →  45
+    laborMinWelfare: {"Lstar":35,"Wfact":65,"dwl":225,"firmCS":612.5,"workerCS":1662.5}  →  {"Lstar":55,"Wfact":45,"dwl":18.75,"firmCS":1512.5,"workerCS":1168.75}
+    laborS: {"color":"#E0563B","compiled":{},"expr":"L","id":2,"linear":{"a":1,"b":0},"role":"supply","shiftBase":0,"srcForm":"PQ","visible":true}  →  {"color":"#E0563B","compiled":{},"expr":"10 + 0.5*L","id":2,"linear":{"a":0.5,"b":10},"role":"supply","shiftBase":10,"srcForm":"PQ","visible":true}
+    laborUnion: {"Lk":50,"Lu":33.33333333,"Wk":50,"Wu":66.66666667,"dwl":277.7777778}  →  {"L0":50,"Lk":60,"Lu":50,"Qs":80,"Wk":40,"Wu":50,"corner":false,"dwl":75,"fund":2500,"unemployment":30}
+    laborWorkerCS: 1250  →  900
+    «Ответ» было: Lп​ (занятость) = 33,33 | Wп​ (зарплата) = 66,67 | Lk​ (конкуренция) = 50 | Wk​ (конкуренция) = 50 | DWL (недозанятость) = 277,78
+    «Ответ» стало: Lп​ (занятость) = 50 | Wп​ (зарплата) = 50 | Фонд оплаты Wп​⋅Lп​ = 2 500 | Желающих работать = 80 | Безработица = 30 | Lk​ (конкуренция) = 60 | Wk​ (конкуренция) = 40 | DWL (недозанятость) = 75
+labor-bilat: разошлись поля start.state: curves, laborBilateral, laborEq, laborFirmCS, laborMin, laborMinOn, laborMinW, laborMinWelfare, laborMono, laborS, laborUnion, laborWorkerCS
+    curves: [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0  →  [{"color":"#2F6FED","compiled":{},"expr":"100 - L","id":1,"linear":{"a":-1,"b":100},"role":"demand","shiftBase":100,"srcForm":"PQ","visible":true},{"color":"#E0
+    laborBilateral: {"Lk":50,"Lm":33.33333333,"Lu":33.33333333,"Whi":66.66666667,"Wk":50,"Wlo":33.33333333,"Wm":33.33333333,"Wu":66.66666667}  →  {"Lk":60,"Lm":45,"Lu":50,"Uhi":30,"Ulo":0,"Whi":50,"Wk":40,"Wlo":32.5,"Wm":32.5,"Wu":50}
+    laborEq: {"P":50,"Q":50}  →  {"P":40,"Q":60}
+    laborFirmCS: 1250  →  1800
+    laborMin: {"Qd":35,"Qs":65,"Wmin":65,"binding":true,"employment":35,"unemployment":30}  →  null
+    laborMinOn: true  →  false
+    laborMinW: 65  →  45
+    laborMinWelfare: {"Lstar":35,"Wfact":65,"dwl":225,"firmCS":612.5,"workerCS":1662.5}  →  null
+    laborMono: {"Lk":50,"Lm":33.33333333,"Wk":50,"Wm":33.33333333,"dwl":277.7777778}  →  {"Lk":60,"Lm":45,"Wk":40,"Wm":32.5,"dwl":168.75}
+    laborS: {"color":"#E0563B","compiled":{},"expr":"L","id":2,"linear":{"a":1,"b":0},"role":"supply","shiftBase":0,"srcForm":"PQ","visible":true}  →  {"color":"#E0563B","compiled":{},"expr":"10 + 0.5*L","id":2,"linear":{"a":0.5,"b":10},"role":"supply","shiftBase":10,"srcForm":"PQ","visible":true}
+    laborUnion: {"Lk":50,"Lu":33.33333333,"Wk":50,"Wu":66.66666667,"dwl":277.7777778}  →  {"L0":50,"Lk":60,"Lu":50,"Qs":80,"Wk":40,"Wu":50,"corner":false,"dwl":75,"fund":2500,"unemployment":30}
+    laborWorkerCS: 1250  →  900
+    «Ответ» было: Нижняя граница Wм (монопсония) = 33,33 | Верхняя граница Wп (профсоюз) = 66,67 | Диапазон зарплаты = 33,33…66,67 | Конкурентный ориентир Wk = 50 | Занятость на границах = 33,33 и 33,33
+    «Ответ» стало: Нижняя граница Wм (монопсония) = 32,5 | Верхняя граница Wп (профсоюз) = 50 | Диапазон зарплаты = 32,5…50 | Конкурентный ориентир Wk = 40 | Занятость на границах = 45 и 50 | Безработица на границах = 0 и 30
+эталоны переписаны

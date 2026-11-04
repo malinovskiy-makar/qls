@@ -27,7 +27,7 @@ function consumerUtility() {
 function consumerOptimum(f, px, py, I) {
   const r = optimizeAlongConstraint(f, px, py, I);
   if (!r) return null;
-  return { x: r.a, y: r.b, U: r.value, mrs: r.mrs, xInt: r.aMax, yInt: r.bMax, px, py, I };
+  return { x: r.a, y: r.b, U: r.value, mrs: STATE.consType === 'compl' ? null : r.mrs, xInt: r.aMax, yInt: r.bMax, px, py, I };
 }
 
 /* Включение разложения Слуцкого. Вынесено из обработчика галочки, потому что
@@ -94,12 +94,23 @@ function drawBudgetLine(opt, color, dashed, label) {
 
 // Кривая безразличия (или изокванта) заданного уровня.
 function drawLevelCurve(f, level, color, width, opacity, dash) {
-  const pts = traceLevelCurve(f, level, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
+  /* У комплементов линия уровня многозначна по x: обычная трассировка y(x)
+     теряет вертикальный луч. Вершина и оба луча задаются самим min(x/a,y/b).
+     Изокванты используют прежний общий трассировщик. */
+  const corner = STATE.mode === 'consumer' && STATE.consType === 'compl';
+  const a = Math.abs(STATE.consA) > 1e-9 ? STATE.consA : 1;
+  const b = Math.abs(STATE.consB) > 1e-9 ? STATE.consB : 1;
+  const pts = corner
+    ? [[a * level, Math.max(b * level, CONFIG.Pmax)], [a * level, b * level], [Math.max(a * level, CONFIG.Qmax), b * level]]
+    : traceLevelCurve(f, level, CONFIG.Qmax, CONFIG.Pmax * 6, 220);
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width || 2.2).attr('opacity', opacity == null ? 1 : opacity).attr('d', line);
   if (dash) p.attr('stroke-dasharray', dash);
+  // запись для .tex: формулы y = f(x) у линии уровня нет, в файл идут узлы трассировки
+  markNumeric(p, corner ? 'линия уровня min(x/a,y/b): вертикальный и горизонтальный лучи через (aU,bU)'
+    : 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
 }
 
 // Точка выбора с проекциями и подписью.
@@ -145,7 +156,7 @@ function setConsumerNum(key, value, inputId) {
   STATE[key] = Math.round(value * 1000) / 1000;
   const e = document.getElementById(inputId); if (e) e.value = STATE[key];
   _wantRangeAnim = true;   // масштаб может поехать — плавно, с дебаунсом
-  redrawAll();
+  redrawKeepingWindow();
 }
 
 // Полная перерисовка режима «Потребитель».
@@ -159,7 +170,9 @@ function redrawConsumer() {
   const f = c.f, b = c.base, s = c.slutsky;
   // Веер соседних кривых безразличия — «карта» предпочтений (ниже и выше оптимума).
   if (STATE.consFan && b.U > 0) {
-    [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(f, b.U * m, COL.indiff, 1.6, 0.35));
+    // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
+    // при прозрачности 0,35 контраст к холсту был 1,5 : 1 (инвариант 3 : 1, contrast_probe.mjs).
+    [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(f, b.U * m, COL.indiff, 1.6, 0.95, '5 4'));
   }
   if (s) {
     // Три бюджетные линии: старая, компенсированная (Слуцкий), новая.
@@ -191,8 +204,9 @@ function updateConsumerPanel() {
   let html = '';
   html += `<div class="stat"><span>Оптимум $(x^*; y^*)$</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
   html += `<div class="stat"><span>Полезность U</span><b>${fmt(b.U)}</b></div>`;
-  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${fmt(b.mrs)}</b></div>`;
-  html += `<div class="stat"><span>$\\frac{P_x}{P_y}$</span><b>${fmt(b.px / b.py)}</b></div>`;
+  html += `<div class="stat"><span>$MRS$ в оптимуме</span><b>${b.mrs === null || Number.isNaN(b.mrs) ? 'не определена' : (Number.isFinite(b.mrs) ? fmt(b.mrs) : (b.mrs < 0 ? '−∞' : '∞'))}</b></div>`;
+  // Строка подписана словами и формулой, а не одной мелкой дробью (сессия 7, А3.3; Notion …81fd…).
+  html += `<div class="stat"><span>Отношение цен $P_x/P_y$</span><b>${fmt(b.px / b.py)}</b></div>`;
   html += `<div class="stat"><span>Перехваты I/Px, I/Py</span><b>${fmt(b.xInt)}; ${fmt(b.yInt)}</b></div>`;
   // Свойство, характерное для выбранного типа предпочтений.
   const t = STATE.consType;
@@ -215,16 +229,20 @@ function updateConsumerPanel() {
   const s = c.slutsky;
   if (s) {
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-    html += `<div class="stat"><span>A: старый выбор (Px=${fmt(b.px)})</span><b>${fmt(b.x)} / ${fmt(b.y)}</b></div>`;
-    html += `<div class="stat"><span>B: компенсированный ($I'$=${fmt(s.Icomp)})</span><b>${fmt(s.comp.x)} / ${fmt(s.comp.y)}</b></div>`;
-    html += `<div class="stat"><span>C: новый выбор (Px=${fmt(s.px1)})</span><b>${fmt(s.fin.x)} / ${fmt(s.fin.y)}</b></div>`;
-    const sg = (v) => (v > 0 ? '+' : '') + fmt(v);
+    /* Точки A, B, C — «(x; y)», как строка «Оптимум» (сессия 7 «тихих панелей», А3.1; Notion …81fd…): «50 / 25»
+       читалось делением. Скобка с ценой не отрывается от формулы переносом («B: компенсированный (» в конце строки);
+       «компенсация», а не «компенсированный»: при значении «(31,25; 62,5)» длинное слово ставило подпись в 3 строки. */
+    const nb = (t) => '<span style="white-space:nowrap">' + t + '</span>';
+    html += `<div class="stat"><span>A: старый выбор ${nb(`(Px=${fmt(b.px)})`)}</span><b>(${fmt(b.x)}; ${fmt(b.y)})</b></div>`;
+    html += `<div class="stat"><span>B: компенсация ${nb(`($I'$=${fmt(s.Icomp)})`)}</span><b>(${fmt(s.comp.x)}; ${fmt(s.comp.y)})</b></div>`;
+    html += `<div class="stat"><span>C: новый выбор ${nb(`(Px=${fmt(s.px1)})`)}</span><b>(${fmt(s.fin.x)}; ${fmt(s.fin.y)})</b></div>`;
+    const sg = (v) => (v > 0 ? '+' : '') + fmt(v).replace(/-/g, '−');
     html += '<table class="tx-table" style="margin-top:6px;"><tr><th></th><th>замещ.</th><th>доход</th><th>итог</th></tr>';
     html += `<tr><td>Δx</td><td>${sg(s.subX)}</td><td>${sg(s.incX)}</td><td>${sg(s.totX)}</td></tr>`;
     html += `<tr><td>Δy</td><td>${sg(s.subY)}</td><td>${sg(s.incY)}</td><td>${sg(s.totY)}</td></tr>`;
     html += '</table>';
     html += `<div class="hint">Компенсированный доход по Слуцкому $I' = P_{x_1} x_0 + P_y y_0 = ${fmt(s.Icomp)}$:
-      столько нужно, чтобы СТАРЫЙ набор остался доступен при НОВЫХ ценах. Переход A→B это чистый эффект
+      столько нужно, чтобы старый набор остался доступен при новых ценах. Переход A→B это чистый эффект
       замещения (полезность меняется, покупательная способность старого набора сохранена), B→C это эффект
       дохода. Их сумма равна общему изменению.</div>`;
   }

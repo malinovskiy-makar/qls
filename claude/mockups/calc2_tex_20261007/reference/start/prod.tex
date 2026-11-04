@@ -1,0 +1,50 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Производственная функция.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{c119C8A}{HTML}{119C8A}
+\definecolor{c0E8072}{HTML}{0E8072}
+\definecolor{cB5791F}{HTML}{B5791F}
+\definecolor{c9F6A1B}{HTML}{9F6A1B}
+\definecolor{c948C7E}{HTML}{948C7E}
+\definecolor{c7A7265}{HTML}{7A7265}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель prod-top: x от 0 до 30, y от 0 до 5000
+\begin{axis}[name=panelA, at={(47.3pt,200.3pt)}, anchor=south west, width=340.5pt, height=173.3pt, scale only axis, clip=false, xmin=0, xmax=30, ymin=0, ymax=5000, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={5,10,15,20,25}, ytick={1000,2000,3000,4000,5000}, yticklabels={{$1\,000$},{$2\,000$},{$3\,000$},{$4\,000$},{$5\,000$}}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={30}, extra x tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\node[anchor=base west, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c2D2D2D, yshift=4.5pt] at (axis cs:0.264,5000) {$\mathrm{TP},$ общий продукт};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D, xshift=4.5pt, yshift=-3.0pt] at (axis cs:30,0) {$L$};
+\addplot[c2F6FED, line width=1.17pt, domain=0:30, samples=81, forget plot] {30 * x^2 - x^3};
+\draw[c119C8A, line width=0.54pt, dash pattern=on 3.0pt off 2.4pt, opacity=0.80] (axis cs:10,5000) -- (axis cs:10,-4826.8);
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c0E8072] at (axis cs:10.33,4783.5) {перегиб $\mathrm{TP}\colon \max \mathrm{MP}$ при $L = 10$};
+\draw[cB5791F, line width=0.54pt, dash pattern=on 3.0pt off 2.4pt, opacity=0.80] (axis cs:15,5000) -- (axis cs:15,-4826.8);
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c9F6A1B] at (axis cs:15.33,4480.5) {$\max \mathrm{AP} = \mathrm{MP}$ при $L = 15$};
+\draw[c948C7E, line width=0.54pt, dash pattern=on 3.0pt off 2.4pt, opacity=0.80] (axis cs:20,5000) -- (axis cs:20,-4826.8);
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c7A7265] at (axis cs:20.33,4177.5) {$\max \mathrm{TP}\colon \mathrm{MP} = 0$};
+\end{axis}
+% -- Панель prod-bottom: x от 0 до 30, y от 0 до 350
+\begin{axis}[name=panelB, at={(47.3pt,33.0pt)}, anchor=south west, width=340.5pt, height=141.8pt, scale only axis, clip=false, xmin=0, xmax=30, ymin=0, ymax=350, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={5,10,15,20,25}, ytick={50,100,150,200,250,300,350}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={30}, extra x tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\node[anchor=base west, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c2D2D2D, yshift=4.5pt] at (axis cs:0.264,350) {$\mathrm{MP}$ и $\mathrm{AP}$};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D, xshift=4.5pt, yshift=-3.0pt] at (axis cs:30,0) {$L$};
+\addplot[c119C8A, line width=1.08pt, domain=0:19.899978, samples=41, forget plot] {60 * x - 3 * x^2};
+\addplot[cB5791F, line width=1.08pt, domain=0.00003:30, samples=41, forget plot] {(30 * x^2 - x^3) / x};
+\fill[cB5791F] (axis cs:15,225) circle[radius=2.7pt];
+\fill[c119C8A] (axis cs:10,300) circle[radius=2.7pt];
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

@@ -66,6 +66,15 @@ async function expandAll(page) {
     });
     /* Поля формул собираются лениво (А56): пока карточка была свёрнута, поле
        стояло в очереди и было бы замерено как голое текстовое окошко. */
+    /* Редизайн 10.2026: карточки не сворачиваются, но «Развернуть график»
+       прячет обе колонки — замер идёт при выключенном режиме и со всеми телами
+       секций раскрытыми. */
+    if (typeof setFocusMode === 'function') setFocusMode(false);
+    /* Тихие панели (решение 14.10, Notion …81de…, ADR 0150): «Ответ» от 1240 px и «Разбор» закрыты по
+       умолчанию. Замер идёт по открытым — так экран выглядит у человека, который их открыл. */
+    if (typeof setAnswerHidden === 'function') setAnswerHidden(false, true);
+    if (!document.body.classList.contains('ex-shown')) { const xb = document.getElementById('ex-bar'); if (xb) xb.click(); }
+    document.querySelectorAll('.app .fold-body').forEach(b => { if (!b.classList.contains('open')) { n += 1; b.classList.add('open'); } });
     if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
     return n;
   });
@@ -212,7 +221,8 @@ const inPage = (theme) => {
 
   /* 5. Не более одной главной кнопки на экран. Главная — залитая акцентом или
      графитом кнопка действия; в калькуляторе это `.btn` без `.btn-quiet`. */
-  const mains = all.filter(el => el.matches('.btn:not(.btn-quiet):not(.btn-sm), .k-btn--main'));
+  /* Редизайн 10.2026: графитовая кнопка шапки модели («Поделиться») — тоже главная. */
+  const mains = all.filter(el => el.matches('.btn:not(.btn-quiet):not(.btn-sm), .k-btn--main, .mh-main'));
   if (mains.length > 1) add('one_main_button', mains.length + ' шт: ' + mains.slice(0, 4).map(name).join(', '));
 
   /* 6. У выключенной кнопки есть видимый текстовый сосед: почему она заперта,
@@ -262,11 +272,23 @@ const inPage = (theme) => {
     '13/400', '13/500', '13/600', '13/700',
     '14/400', '14/600', '14/700',
     '15/600', '15/700', '22/600',
-    '26/700', '56/800', '10/700']);
+    '26/700', '56/800', '10/700',
+    /* Редизайн 10.2026 (COVERAGE.md, раздел 5; DESIGN.md 5.1): макет нарисован
+       в размерах нового сайта (14,5 / 13,5 / 17 px), и шкала для /calc2/
+       расширена ЗАКРЫТЫМ списком из восьми сочетаний. Кегль округляется до
+       целого: 13,5 считается как 14, 14,5 как 15. Других сочетаний нет. */
+    '14/500', '15/400', '15/500', '16/400', '16/600', '17/600', '19/600', '32/600',
+    /* Тихие панели 14.10 (решение владельца «шрифт панелей — вариант A», Notion …81d6…; пакет
+       claude/mockups/calc2_panels_20261014, README 3): заголовок колонки 18 / 600; главные числа «Ответа»
+       20 px — KaTeX, а текстовое значение («нет», «L = 10, MP = 300») тем же кеглем 20 / 400. */
+    '18/600', '20/400']);
   all.forEach(el => {
     const own = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').trim();
     if (own.length < 2 || inNav(el) || el.closest('svg') || el.closest('.katex')) return;
     const c = getComputedStyle(el);
+    /* Кегль 0 — текст, которого на экране нет: подпись строки таблицы «Ответа» показана словами
+       (::before с data-word), исходный код подписи (CS, PS…) остаётся в ячейке для паритета (README 5). */
+    if (parseFloat(c.fontSize) === 0) return;
     const k = Math.round(parseFloat(c.fontSize)) + '/' + (parseInt(c.fontWeight, 10) || 400);
     if (!SCALE.has(k)) add('type_scale', name(el) + ' ' + k);
   });
@@ -289,7 +311,8 @@ const inPage = (theme) => {
      оттенка делает плашку вторым акцентом экрана (канон 2.4). */
   const TINT = ['--accent-tint', '--amber-tint', '--green-tint', '--error-tint']
     .map(v => px(cs0.getPropertyValue(v).trim())).filter(Boolean);
-  Array.from(document.querySelectorAll('.warn, .err, .error, .state, .k-state, .notice')).filter(vis).forEach(el => {
+  // Редизайн 10.2026: строка статуса «Ответа» (.ans-status) — та же плашка состояния.
+  Array.from(document.querySelectorAll('.warn, .err, .error, .state, .k-state, .notice, .ans-status')).filter(vis).forEach(el => {
     const bg = px(getComputedStyle(el).backgroundColor);
     if (!bg || bg[3] < 0.05) return;
     if (TINT.some(t => Math.abs(t[0] - bg[0]) + Math.abs(t[1] - bg[1]) + Math.abs(t[2] - bg[2]) < 12))
@@ -471,9 +494,17 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
     const ready = await page.evaluate(() => typeof pickScene === 'function').catch(() => false);
     if (!ready) { console.error('calc2 не загрузился'); await browser.close(); process.exit(3); }
 
+    seen('answer_closed');
     for (const theme of THEMES) {
       for (const key of SCENES) {
         await openScene(page, key, theme);
+        /* Предусловие: колонка «Ответ» открыта, иначе проверки видимого в ней зеленеют вхолостую.
+           Ключ без потолка в CEILING: любое нарушение красное. */
+        const shown = await page.evaluate(() => {
+          const e = document.querySelector('#params-panel > .side-inner');
+          return window.innerWidth < 1240 || !!(e && e.getClientRects().length);
+        });
+        if (!shown) put('answer_closed', theme + '/' + key, '«Ответ» закрыт: #params-panel > .side-inner не видна');
         const found = await page.evaluate(inPage, theme);
         found.forEach(([k, what]) => put(k, theme + '/' + key, what));
       }
@@ -488,7 +519,16 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
 
        Порог 2 px за шаг: подпись имеет право ЕХАТЬ вслед за кривой, но не
        имеет права прыгать туда-сюда. До правки замер давал до 16 px при
-       неподвижной плоскости. */
+       неподвижной плоскости.
+
+       ⚠️ МЕРИТСЯ ПОДПИСЬ ОТНОСИТЕЛЬНО КРИВОЙ, А НЕ ЭКРАНА (10.10.2026). Окно
+       «Построения графиков» от параметра не растёт (ADR 0143), и кривая
+       a·x² − 3x сама уходит вверх на 5–11 px за шаг. Подпись стоит на ней в
+       той же точке x и едет следом — ровно то, что правило разрешает, — а
+       прежняя мерка (сдвиг по экрану) звала это «скачком 11,1 px». Теперь
+       скачок — это перемена отрыва подписи от кривой под её якорем (y кривой
+       на x якоря, по самому пути) или сдвиг якоря вбок: так ловится и прыжок
+       на соседний узел перебора проб, ради которого проверка заведена. */
     await openScene(page, 'm-graph', 'light');
     await page.evaluate(() => {
       const box = document.getElementById('graph-rows');
@@ -497,7 +537,7 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
       if (inp) { inp.value = 'a*x^2 - 3*x'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
     });
     await page.waitForTimeout(900);
-    let prevY = null, prevTick = null, worst = 0, tickMoved = 0;
+    let prev = null, prevTick = null, worst = 0, tickMoved = 0, measured = false;
     for (let i = 0; i <= 20; i++) {
       await page.evaluate((v) => {
         if (STATE.params && STATE.params.a) STATE.params.a.value = v;
@@ -506,20 +546,51 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
       await page.waitForTimeout(200);
       const st = await page.evaluate(() => {
         const lab = document.querySelector('#chart text.curve-name');
-        const box = document.querySelector('#chart').getBoundingClientRect();
         const tick = Array.from(document.querySelectorAll('#chart text.axis-num'))
           .filter(t => t.textContent.trim() === '2')[0];
-        return { y: lab ? lab.getBoundingClientRect().top - box.top : null,
-                 tick: tick ? tick.getBoundingClientRect().left - box.left : null };
+        const box = document.querySelector('#chart').getBoundingClientRect();
+        const tickX = tick ? tick.getBoundingClientRect().left - box.left : null;
+        if (!lab) return { x: null, off: null, tick: tickX };
+        // Точка привязки текста подписи; отступ от кривой у помощников свой
+        // (labelCurve ±6 и −7/+14, labelCurveMath −4 и −7) — меряется его ПЕРЕМЕНА.
+        const ax = +lab.getAttribute('x'), ay = +lab.getAttribute('y');
+        // y кривой на x якоря: отрезок пути, где x пересекает ax, и бисекция по длине.
+        let curveY = null;
+        document.querySelectorAll('#chart path').forEach(pth => {
+          if ((+pth.getAttribute('stroke-width') || 0) < 2 || pth.getAttribute('fill') !== 'none') return;
+          const L = pth.getTotalLength(); if (!L) return;
+          const N = 400; let q0 = pth.getPointAtLength(0);
+          for (let k = 1; k <= N; k++) {
+            const q1 = pth.getPointAtLength(L * k / N);
+            if ((q0.x - ax) * (q1.x - ax) <= 0 && q0.x !== q1.x) {
+              let lo = L * (k - 1) / N, hi = L * k / N;
+              const sgn = Math.sign(q1.x - q0.x);
+              for (let t = 0; t < 40; t++) {
+                const mid = (lo + hi) / 2;
+                if ((pth.getPointAtLength(mid).x - ax) * sgn < 0) lo = mid; else hi = mid;
+              }
+              const y = pth.getPointAtLength((lo + hi) / 2).y;
+              if (curveY == null || Math.abs(y - ay) < Math.abs(curveY - ay)) curveY = y;
+            }
+            q0 = q1;
+          }
+        });
+        return { x: ax, off: curveY == null ? null : ay - curveY, tick: tickX };
       });
-      if (st.y == null) continue;
-      if (prevY != null) worst = Math.max(worst, Math.abs(st.y - prevY));
+      if (st.x == null || st.off == null) continue;
+      measured = true;
+      if (prev) worst = Math.max(worst, Math.abs(st.x - prev.x), Math.abs(st.off - prev.off));
       if (prevTick != null && st.tick != null) tickMoved = Math.max(tickMoved, Math.abs(st.tick - prevTick));
-      prevY = st.y; if (prevTick == null) prevTick = st.tick;
+      prev = st; if (prevTick == null) prevTick = st.tick;
     }
+    const prevY = measured ? 0 : null;
+    /* Замер обязан состояться: подпись не нашлась (разметка сменилась) —
+       это нарушение, а не тихий ноль (COVERAGE.md, раздел 5). */
+    if (prevY == null) put('label_shake', 'm-graph', 'замер не состоялся: подпись кривой не найдена');
     if (worst > 2) put('label_shake', 'm-graph',
-                       'скачок ' + worst.toFixed(1) + ' px за шаг при сдвиге плоскости ' +
+                       'скачок ' + worst.toFixed(1) + ' px за шаг относительно кривой при сдвиге плоскости ' +
                        tickMoved.toFixed(1) + ' px');
+    console.log('label_shake: наибольший скачок подписи относительно кривой ' + worst.toFixed(2) + ' px за шаг');
 
     /* 9. Страница не едет вбок ни на одной из четырёх ширин (канон 1.9.1). */
     await openScene(page, SCENES[0], 'light');

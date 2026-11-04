@@ -1,0 +1,11 @@
+## 1 вернуть точку «MRL = S» (tex/ci_quick, старт labor-union) — КРАСНЫЙ (код 1)
+    ВЫГРУЗКА .tex: провалов 1 | стартов 44, своих точек и площадей 1, двусторонней с МРОТ 1, двух окон 5, превью сверено 42, 37.3 с
+## 2 МРОТ в двусторонней по-старому (tex/ci_quick, labor-bilat@mrot45) — КРАСНЫЙ (код 1)
+    ВЫГРУЗКА .tex: провалов 1 | стартов 44, своих точек и площадей 1, двусторонней с МРОТ 1, двух окон 5, превью сверено 42, 36.3 с
+
+git diff calc2/ после отката:  calc2/tests/test_calc2_tex.py         |  5 +++--
+ calc2/tests/tex/ci_quick.mjs          | 37 +++++++++++++++++++++++++++++++++--
+ calc2/tests/tex/recipes/40-extra.json |  1 +
+ calc2/tests/tex/states.json           |  1 +
+ 4 files changed, 40 insertions(+), 4 deletions(-)
+

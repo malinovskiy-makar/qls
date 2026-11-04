@@ -1,0 +1,26 @@
+{% load vp_extras %}
+<section class="vp-format" aria-label="Формат варианта">
+  <form class="vp-format-head" method="get" action="{% url 'vp:index' %}">
+    <b>Формат варианта</b>
+    <details class="vp-format-select" id="vp-format-band">
+      <summary aria-label="Класс варианта">{% for code, label in format_bands %}{% if code == selected_band %}{{ label }}{% endif %}{% endfor %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
+      <div class="vp-format-options">
+        {% for code, label in format_bands %}<button type="submit" name="band" value="{{ code }}"{% if code == selected_band %} aria-current="true"{% endif %}>{{ label }}{% if code == selected_band %}<span aria-hidden="true">✓</span>{% endif %}</button>{% endfor %}
+      </div>
+    </details>
+  </form>
+  <div class="vp-format-body">
+    <div class="vp-format-facts">
+      <div><strong>{{ composition.count }}</strong><span>{{ composition.count|plural_word:"задание,задания,заданий" }}</span></div>
+      {% if composition.minutes %}<div><strong>{{ composition.minutes }}</strong><span>{{ composition.minutes|plural_word:"минута,минуты,минут" }}</span></div>{% endif %}
+      <div><strong>{{ composition.total|num }}</strong><span>{{ composition.total|plural_word:"балл,балла,баллов" }}</span></div>
+    </div>
+    {# Схема последовательности, а не доли баллов: короткие блоки расширены для подписей. #}
+    <div class="vp-format-map" aria-label="Состав варианта">
+      {% for r in composition.rows %}<div class="vp-format-part is-{{ r.block }}">
+        <span class="vp-format-range">{{ r.range }}</span>
+        <span class="vp-format-label"><span>{{ r.short_title }}</span><b>{{ r.total|points_word }}</b></span>
+      </div>{% endfor %}
+    </div>
+  </div>
+</section>

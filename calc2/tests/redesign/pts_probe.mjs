@@ -1,0 +1,669 @@
+/* ТОЧКИ И ПЛОЩАДИ (тихие панели, сессия 7, 15.10.2026; README пакета calc2_panels_20261014, раздел 9;
+   решения владельца: вершина площади — это точка …81e0…, площадь по точкам — правило П43 …81be…).
+
+   Разделы (--only Б1,Б2,Б3,Б4,…):
+     Б1  шапка панели режима: заголовок «Точки и площади» (h2.pts-title) в шапке, справа «Готово»; кнопки
+         «← Условие» и строки-подсказки нет; «Готово» и Esc выходят из режима;
+     Б2  «Налоги и субсидии», старт: щелчки в углы клина налога (40; 60), (40; 40) и в пересечение (50; 50) →
+         строки «A (40; 60) точка Q₁ и P_b», «B (40; 40) точка Q₁ и P_s», «C (50; 50) пересечение D и S» (по
+         TeX-исходникам), у каждой галочка и «⋯»; четвёртая точка — щелчок по спросу при Q = 20 → «(20; 80) на D»;
+         «+ По координатам» — в строке заголовка раздела «Точки»;
+     Б3  меню «⋯» точки: «Переименовать» → имя в строке, на холсте и в .tex; «Изменить координаты» (45; 55) → точка
+         там; «Цвет» перекрашивает точку на холсте; «Пунктир к осям» и «Координаты на графике» меняют холст; каждое
+         изменение — один шаг истории, одно «Отменить» его возвращает; открыть и закрыть меню — не шаг; открытое
+         меню переживает пересборку списка и работает; Esc при открытом меню (и при открытом окне цвета) закрывает
+         только меню, режим остаётся;
+     Б4  имена — буквы: первая свободная A … Z (не занятая своей точкой и обозначением на холсте модели: буква
+         кривой, ключевой точки, области, оси); в «Неравенстве доходов» первая точка — не A и не B; буква точки
+         на спросе в «Налогах» — не D, S, P, Q; старая фикстура (claude/panels_s7/fixtures/old_taxes_pts.json):
+         «Точка 1», «Точка 2» на месте, новая точка — «A».
+   Между действиями пауза не меньше 1 с (склейка правок одного органа за 900 мс — HIST_GLUE_MS).
+   Первая проверка каждого раздела — панель режима видна (README 11).
+
+   ENGINES=chromium,webkit (по умолчанию оба), WIDTHS=1440,1280 (по умолчанию оба).
+   CALC2_BASE_URL=http://127.0.0.1:8099 node calc2/tests/redesign/pts_probe.mjs [--only Б1,Б2]
+   Код 0 — всё сошлось.                                                     */
+import * as pw from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(HERE, '..', '..', '..');
+const argv = process.argv.slice(2);
+const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
+const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
+const ONLY = (arg('only', '') || '').split(',').filter(Boolean);
+const want = (s) => !ONLY.length || ONLY.includes(s);
+const ENGINES = (process.env.ENGINES || 'chromium,webkit').split(',').filter(Boolean);
+const WIDTHS = (process.env.WIDTHS || '1440,1280').split(',').map(Number).filter(Boolean);
+const FIXTURE = path.join(ROOT, 'claude', 'panels_s7', 'fixtures', 'old_taxes_pts.json');
+const PAUSE = 1100;
+
+let bad = 0, total = 0, eng = '', W0 = 1440;
+function ok(label, cond, detail) {
+  total++; if (!cond) bad++;
+  console.log('  ' + (cond ? 'OK  ' : 'FAIL') + ' [' + eng + ' ' + W0 + '] ' + label + (detail && !cond ? '  — ' + String(detail).slice(0, 400) : ''));
+}
+const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 60 - s.length)));
+const near = (a, b, t) => Math.abs(a - b) <= (t == null ? 0.05 : t);
+
+let browser = null, engName = '', ctxCount = 0;
+async function newCtx(opts) {
+  // WebKit Playwright: не больше 63 контекстов на один запущенный браузер — перезапуск.
+  if (ctxCount >= 40 && !browser.contexts().length) { await browser.close(); browser = await pw[engName].launch(); ctxCount = 0; }
+  ctxCount++;
+  return browser.newContext(opts);
+}
+/* Страница модели с чистой памятью; «Ответ» открыт (ключ памяти до загрузки). init — что положить в память. */
+async function openModel(key, init) {
+  const ctx = await newCtx({ viewport: { width: W0, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  await ctx.addInitScript((o) => {
+    try {
+      if (sessionStorage.getItem('__probeInit')) return;
+      sessionStorage.setItem('__probeInit', '1');
+      localStorage.clear(); localStorage.setItem('theme', 'dark'); localStorage.setItem('calc2.v1.answerHidden', '0');
+      if (o) Object.entries(o).forEach(([k, v]) => localStorage.setItem(k, v));
+    } catch (e) {}
+  }, init || null);
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+  await page.goto(BASE + '/calc2/?m=' + key, { waitUntil: 'load', timeout: 40000 });
+  await page.waitForFunction(() => typeof pickScene === 'function' && typeof d3 !== 'undefined' && STATE.sceneKey, null, { timeout: 40000 });
+  await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
+  await page.waitForTimeout(700);
+  return { ctx, page, errors };
+}
+const settle = (page, ms) => page.waitForTimeout(ms == null ? PAUSE : ms);
+const panelShown = (page) => page.evaluate(() => { const e = document.getElementById('pts-panel'); return !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'); });
+async function enterPts(page) {
+  await page.click('#tool-pts');
+  await settle(page, 500);
+  return panelShown(page);
+}
+/* Пиксель точки модели (x; y) в окне страницы. */
+const pxOf = (page, x, y) => page.evaluate(([x, y]) => {
+  const { mx, my } = mainScales(null); const r = document.getElementById('chart').getBoundingClientRect();
+  return [r.left + mx(x), r.top + my(y)];
+}, [x, y]);
+async function clickModel(page, x, y) {
+  const [cx, cy] = await pxOf(page, x, y);
+  await page.mouse.click(cx, cy);
+  await settle(page);
+}
+const undoLen = (page) => page.evaluate(() => histOf().undo.length);
+async function undo(page) {
+  await page.evaluate(() => { const b = document.getElementById('btn-undo'); if (b) b.click(); else historyUndo(); });
+  await settle(page);
+}
+const texOf = (sel) => `[...(${sel}).querySelectorAll('annotation')].map(a => a.textContent).join(' ')`;
+/* Строки списка точек: имя (TeX), координаты (TeX), «на чём стоит» (текст и TeX), галочка, «⋯». */
+const rows = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const tex = (e) => e ? [...e.querySelectorAll('annotation')].map(a => a.textContent).join(' ') : '';
+  return [...document.querySelectorAll('#mark-list .mark-row:not(.mark-draft)')].filter(r => r.getClientRects().length).map(r => ({
+    id: r.dataset.mark,
+    name: tx(r.querySelector('.mark-name')), nameTex: tex(r.querySelector('.mark-name')),
+    xy: tx(r.querySelector('.mark-xy')), xyTex: tex(r.querySelector('.mark-xy')),
+    on: tx(r.querySelector('.mark-on')), onTex: tex(r.querySelector('.mark-on')),
+    pick: !!r.querySelector('input[type=checkbox]'), more: !!r.querySelector('[aria-haspopup]'),
+    extra: [...r.querySelectorAll('button, input, .edval')].filter(e => e.getClientRects().length).length,
+  }));
+});
+const marks = (page) => page.evaluate(() => (STATE.marks || []).filter(m => !m.pending).map(m => ({ id: m.id, text: m.text, x: m.x, y: m.y, color: m.color, showDash: m.showDash, showCoords: m.showCoords })));
+/* Холст: подпись точки (первая строка) и её цвет, пунктиры, вторая строка координат. */
+const canvasMark = (page, id) => page.evaluate((id) => {
+  const t = document.querySelector('#chart g.marks text[data-mark-id="' + id + '"]');
+  const g = t ? t.parentNode : null;
+  const circ = [...document.querySelectorAll('#chart g.marks circle')].find(c => c.getAttribute('data-mark-id') === String(id));
+  return { label: t ? t.textContent : null, fill: circ ? circ.getAttribute('fill') : null,
+    dash: [...document.querySelectorAll('#chart g.marks line[data-mark-id="' + id + '"]')].length,
+    coords: [...document.querySelectorAll('#chart g.marks text[data-mark-coords="' + id + '"]')].map(x => x.textContent).join(' ') };
+}, String(id));
+const exitedMode = (page) => page.evaluate(() => !CANVAS.pts && !document.body.classList.contains('pts-on'));
+
+/* ── Б1 ── */
+async function sectionB1() {
+  head('Б1. Шапка панели режима');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна после входа', await enterPts(page));
+  const h = await page.evaluate(() => {
+    const head = document.querySelector('#pts-panel .pts-head');
+    const title = head && head.querySelector('h2.pts-title');
+    const cs = title ? getComputedStyle(title) : null;
+    return { title: title ? title.textContent.trim() : '', fs: cs ? cs.fontSize : '', fw: cs ? cs.fontWeight : '',
+      done: !!(head && head.querySelector('#pts-done')), back: !!document.getElementById('pts-back'),
+      backText: [...document.querySelectorAll('#pts-panel button')].filter(b => b.getClientRects().length).some(b => /Условие/.test(b.textContent)),
+      hint: [...document.querySelectorAll('#pts-panel .pts-hint')].length,
+      titles: document.querySelectorAll('#pts-panel h2').length,
+      order: head ? [...head.children].map(c => c.tagName + (c.id ? '#' + c.id : '')).join(',') : '' };
+  });
+  ok('в шапке слева «Точки и площади» 18 / 600, справа «Готово»', h.title === 'Точки и площади' && h.fs === '18px' && +h.fw === 600 && h.done && /^H2,BUTTON#pts-done$/.test(h.order), JSON.stringify(h));
+  ok('«← Условие» нет, строки-подсказки нет, заголовок колонки один', !h.back && !h.backText && !h.hint && h.titles === 1, JSON.stringify(h));
+  await page.click('#pts-done');
+  await settle(page, 500);
+  ok('«Готово» выходит из режима', await exitedMode(page));
+  await enterPts(page);
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+  await page.keyboard.press('Escape');
+  await settle(page, 500);
+  ok('Esc выходит из режима', await exitedMode(page));
+  ok('Б1: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── Б4: имена — буквы ── */
+async function sectionB4() {
+  head('Б4. Имена своих точек — буквы');
+  let { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50], [20, 80]]) await clickModel(page, x, y);
+  let m = await marks(page);
+  ok('taxes: три точки — A, B, C', m.length === 4 && m[0].text === 'A' && m[1].text === 'B' && m[2].text === 'C', JSON.stringify(m.map(x => x.text)));
+  ok('taxes: буква точки на спросе — не D, S, P, Q (' + (m[3] && m[3].text) + ')', !!m[3] && /^[A-Z]$/.test(m[3].text) && !/[DSPQ]/.test(m[3].text), JSON.stringify(m[3]));
+  const cv = await canvasMark(page, m[0].id);
+  ok('подпись на холсте — то же имя', cv.label === 'A', JSON.stringify(cv));
+  ok('Б4 taxes: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+  ({ ctx, page, errors } = await openModel('ineq'));
+  ok('ineq: панель режима видна', await enterPts(page));
+  await clickModel(page, 30, 10);
+  m = await marks(page);
+  const legend = await page.evaluate(() => [...document.querySelectorAll('#chart [data-legend]')].map(e => e.getAttribute('data-legend')));
+  ok('ineq: первая точка — не A и не B (области A и B: ' + legend.join(', ') + ')', m.length === 1 && /^[A-Z]$/.test(m[0].text) && !/[AB]/.test(m[0].text), JSON.stringify(m));
+  ok('Б4 ineq: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+  // Старая фикстура: автосохранение кода старта сессии (фаза −1).
+  const fx = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+  ({ ctx, page, errors } = await openModel('taxes', { 'calc2.v1.model.taxes': fx.done.autosave }));
+  ok('фикстура: панель режима видна', await enterPts(page));
+  m = await marks(page);
+  ok('фикстура: «Точка 1», «Точка 2» на месте', m.length === 2 && m[0].text === 'Точка 1' && m[1].text === 'Точка 2', JSON.stringify(m.map(x => x.text)));
+  await clickModel(page, 80, 70);
+  m = await marks(page);
+  ok('фикстура: новая точка — «A»', m.length === 3 && m[2].text === 'A', JSON.stringify(m.map(x => x.text)));
+  ok('Б4 фикстура: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── Б3: меню «⋯» точки ── */
+const menuOpen = (page) => page.evaluate(() => { const m = document.querySelector('.pts-menu'); return !!(m && m.classList.contains('open') && m.getClientRects().length); });
+/* Действия — настоящими щелчками мыши (Playwright): история пишет только события человека (isTrusted). */
+async function openMenuOf(page, id) {
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] [aria-haspopup]').click();
+  await settle(page, 400);
+}
+async function menuItem(page, text) {
+  await page.locator('.pts-menu.open .pts-mi', { hasText: text }).first().click();
+}
+async function menuCheck(page, re) {
+  await page.locator('.pts-menu.open label.pts-mi', { hasText: re }).locator('input').click();
+}
+async function sectionB3() {
+  head('Б3. Меню «⋯» точки');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  await clickModel(page, 40, 60);
+  let m = await marks(page);
+  const id = m[0] && m[0].id;
+  ok('точка A поставлена', m.length === 1 && m[0].text === 'A', JSON.stringify(m));
+  // Открыть и закрыть — не шаг.
+  let u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  const items = await page.evaluate(() => [...document.querySelectorAll('.pts-menu.open .pts-mi')].map(x => x.textContent.trim()));
+  ok('меню открылось: Переименовать, Изменить координаты, Цвет, Пунктир к осям, Координаты на графике, Убрать',
+    (await menuOpen(page)) && items.join('|') === 'Переименовать|Изменить координаты|Цвет|Пунктир к осям|Координаты на графике|Убрать', JSON.stringify(items));
+  await page.keyboard.press('Escape');
+  await settle(page);
+  ok('Esc при открытом меню закрывает только меню: меню закрыто, режим остаётся', !(await menuOpen(page)) && !(await exitedMode(page)));
+  ok('открыть и закрыть меню — не шаг истории', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  // Пунктир к осям: один шаг, «Отменить» возвращает.
+  let c0 = await canvasMark(page, id);
+  u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  await menuCheck(page, /Пунктир/);
+  await settle(page);
+  let c1 = await canvasMark(page, id);
+  ok('«Пунктир к осям» снят: пунктиров на холсте ' + c0.dash + ' → ' + c1.dash, c0.dash === 2 && c1.dash === 0, JSON.stringify({ c0, c1 }));
+  ok('«Пунктир к осям» — ровно один шаг истории', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  // Пересборка списка при открытом меню: меню живо и работает.
+  await page.evaluate(() => { renderMarkList(); redrawAll(); });
+  await settle(page, 400);
+  ok('меню пережило пересборку списка', await menuOpen(page));
+  await menuCheck(page, /Координаты/);
+  await settle(page);
+  c1 = await canvasMark(page, id);
+  ok('после пересборки пункт меню работает: «Координаты на графике» меняют холст (' + c0.coords + ' → ' + c1.coords + ')', c0.coords !== c1.coords, JSON.stringify({ c0, c1 }));
+  ok('«Координаты на графике» — ещё один шаг', (await undoLen(page)) === u0 + 2, (await undoLen(page)) + ' против ' + u0);
+  await page.keyboard.press('Escape'); await settle(page, 300);
+  await undo(page);
+  ok('одно «Отменить» вернуло координаты на холсте', (await canvasMark(page, id)).coords === c0.coords);
+  await undo(page);
+  ok('ещё одно — пунктир', (await canvasMark(page, id)).dash === 2);
+  // Цвет: окно цвета из меню; Esc закрывает только окно цвета.
+  await openMenuOf(page, id);
+  await page.locator('.pts-menu.open .pts-mi-color .cpick-btn').click();
+  await settle(page, 400);
+  const cp = await page.evaluate(() => !!document.querySelector('.cpick-menu'));
+  await page.keyboard.press('Escape');
+  await settle(page, 500);
+  const after = await page.evaluate(() => ({ cp: !!document.querySelector('.cpick-menu'), menu: !!document.querySelector('.pts-menu.open') }));
+  ok('Esc при открытом окне цвета закрывает только его: меню и режим остаются', cp && !after.cp && after.menu && !(await exitedMode(page)), JSON.stringify(after));
+  u0 = await undoLen(page);
+  const col0 = (await canvasMark(page, id)).fill;
+  await page.locator('.pts-menu.open .pts-mi-color .cpick-btn').click();
+  await settle(page, 400);
+  const k = await page.evaluate((c) => [...document.querySelectorAll('.cpick-menu .cpick-sw')].findIndex(x => normHex(x.style.background) !== normHex(c || '')), col0);
+  await page.locator('.cpick-menu .cpick-sw').nth(k).click();
+  await settle(page);
+  const col1 = (await canvasMark(page, id)).fill;
+  ok('«Цвет» перекрашивает точку на холсте (' + col0 + ' → ' + col1 + '), один шаг', col1 && col1 !== col0 && (await undoLen(page)) === u0 + 1, JSON.stringify({ col0, col1 }));
+  await page.keyboard.press('Escape'); await settle(page, 300);
+  await undo(page);
+  ok('«Отменить» вернула цвет', (await canvasMark(page, id)).fill === col0);
+  // Переименовать: правка на холсте, имя в строке, на холсте и в .tex.
+  u0 = await undoLen(page);
+  await openMenuOf(page, id);
+  await menuItem(page, 'Переименовать');
+  await settle(page, 400);
+  const inp = await page.evaluate(() => !!document.getElementById('pt-rename'));
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Ж');
+  await page.keyboard.press('Enter');
+  await settle(page);
+  const rn = await page.evaluate((id) => {
+    const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.trim(); };
+    const r = document.querySelector('#mark-list .mark-row[data-mark="' + id + '"]');
+    return { row: tx(r && r.querySelector('.mark-name')), tex: /Ж/.test(buildTex('', '')) };
+  }, String(id));
+  const cvn = await canvasMark(page, id);
+  ok('«Переименовать» — правка на холсте; новое имя в строке, на холсте и в .tex', inp && rn.row === 'Ж' && cvn.label === 'Ж' && rn.tex, JSON.stringify({ inp, rn, cvn }));
+  ok('переименование — один шаг истории', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  await undo(page);
+  ok('«Отменить» вернула имя A', (await marks(page))[0].text === 'A');
+  // Изменить координаты (45; 55).
+  await openMenuOf(page, id);
+  await menuItem(page, 'Изменить координаты');
+  await settle(page, 400);
+  const eds = await page.evaluate((id) => [...document.querySelectorAll('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval')].length, String(id));
+  ok('«Изменить координаты»: в строке поля координат', eds === 2, String(eds));
+  /* «Изменить координаты» — одно действие: поля правят черновик, «✓» кладёт обе координаты разом (README 9;
+     цепочка В: «A → (30; 70)» и одно «Отменить» возвращает (40; 60)). */
+  u0 = await undoLen(page);
+  for (const [i, v] of [[0, '45'], [1, '55']]) {
+    await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval').nth(i).click();
+    await settle(page, 300);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(v);
+    await page.keyboard.press('Enter');
+    await settle(page);
+  }
+  ok('набор в полях — ещё не шаг', (await undoLen(page)) === u0, (await undoLen(page)) + ' против ' + u0);
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-ok').click();
+  await settle(page);
+  m = await marks(page);
+  ok('«✓» → точка стоит в (45; 55); один шаг', near(m[0].x, 45) && near(m[0].y, 55) && (await undoLen(page)) === u0 + 1, JSON.stringify(m[0]) + ' шагов ' + (await undoLen(page)));
+  await undo(page);
+  m = await marks(page);
+  ok('одно «Отменить» вернула (40; 60)', near(m[0].x, 40) && near(m[0].y, 60), JSON.stringify(m[0]));
+  ok('режим «Точки и площади» всё время включён', !(await exitedMode(page)));
+  ok('Б3: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── Б2: раздел «Точки», строки ── */
+async function sectionB2() {
+  head('Б2. Раздел «Точки»: строки точек');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  const hdr = await page.evaluate(() => {
+    const row = document.querySelector('#sec-view .pts-sec-row');
+    const add = document.querySelector('#sec-view .btn-mark-add');
+    return { inRow: !!(row && add && row.contains(add)), notInHead: !!(add && !add.closest('h3')), text: add ? add.textContent.trim() : '',
+      head: row ? row.querySelector('h3.pts-sec-head').textContent.trim() : '' };
+  });
+  ok('«+ По координатам» — в строке заголовка «Точки», рядом с h3', hdr.inRow && hdr.notInHead && hdr.text === '+ По координатам' && hdr.head === 'Точки', JSON.stringify(hdr));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50], [20, 80]]) await clickModel(page, x, y);
+  const r = await rows(page);
+  const want = [
+    ['A', '(40;\\ 60)', /точка/, [/Q_\{1\}/, /P_\{b\}/]],
+    ['B', '(40;\\ 40)', /точка/, [/Q_\{1\}/, /P_\{s\}/]],
+    ['C', '(50;\\ 50)', /пересечение/, [/^D\b|\bD\b/, /\bS\b/]],
+  ];
+  want.forEach(([n, xy, word, texs], i) => {
+    const q = r[i] || {};
+    ok('строка ' + n + ' ' + xy + ' «' + (q.on || '') + '»: имя, координаты и «на чём стоит» формулой, галочка и «⋯»',
+      q.nameTex === n && q.xyTex === xy && word.test(q.on) && texs.every(t => t.test(q.onTex)) && q.pick && q.more, JSON.stringify(q));
+  });
+  const d = r[3] || {};
+  ok('четвёртая точка — «(20; 80) на D», буква не D, S, P, Q', d.xyTex === '(20;\\ 80)' && /^на D$/.test(d.on.replace(/\s+/g, ' ')) && d.onTex === 'D' && /^[A-Z]$/.test(d.nameTex) && !/[DSPQ]/.test(d.nameTex), JSON.stringify(d));
+  ok('в строке ничего больше нет: галочка и «⋯» — все органы строки', r.every(q => q.extra === 2), JSON.stringify(r.map(q => q.extra)));
+  // Вид: имя 19 px, координаты 16 px, «на чём стоит» 12 / 500 --text3.
+  const st = await page.evaluate(() => {
+    const r0 = document.querySelector('#mark-list .mark-row:not(.mark-draft)');
+    const cs = (sel) => { const e = r0.querySelector(sel); const c = e && getComputedStyle(e); return c ? [c.fontSize, c.fontWeight, c.color].join(' ') : ''; };
+    return { name: cs('.mark-name'), xy: cs('.mark-xy'), on: cs('.mark-on'), text3: getComputedStyle(document.body).getPropertyValue('--text3').trim() };
+  });
+  ok('вид строки: имя 19 px, координаты 16 px, «на …» 12 / 500', /^19px/.test(st.name) && /^16px/.test(st.xy) && /^12px 500 /.test(st.on), JSON.stringify(st));
+  // Галочка выбора — вид, не модель: щелчок не шаг истории.
+  const u0 = await undoLen(page);
+  await page.locator('#mark-list .mark-row .mark-pick input').first().click();
+  await settle(page);
+  ok('галочка выбора — не шаг истории и не STATE', (await undoLen(page)) === u0 && (await page.evaluate(() => JSON.stringify(STATE).indexOf('ptsSel') < 0 && CANVAS.ptsSel.length === 1)), String(await undoLen(page)));
+  ok('Б2: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── В: площади — цепочка в «Налогах» со старта ── */
+const areasNow = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const st = (STATE.areaCalcList || []).map(r => ({ id: r.id, label: r.label, kind: r.kind, value: r.value, ids: r.ids || null, order: r.order || null }));
+  const rows = [...document.querySelectorAll('#info-areacalc [data-area], #info-areacalc .area-row:not(.area-head)')].filter(e => e.getClientRects().length)
+    .map(e => ({ text: tx(e), tex: [...e.querySelectorAll('annotation')].map(a => a.textContent).join(' ') }));
+  const drawn = [...document.querySelectorAll('#chart g.areacalc path')].map(x => x.getAttribute('data-legend'));
+  const legend = [...document.querySelectorAll('#chart [data-legend-item], #chart .legend text, #chart g.legend text')].map(t => t.textContent.trim());
+  const g = [...document.querySelectorAll('#ans-hero .ans-group')].find(x => /Свои площади/.test((x.querySelector('.ans-ghead') || {}).textContent || ''));
+  const ans = g ? [...g.querySelectorAll('.ans-cell')].map(c => ({ lab: tx(c.querySelector('.ans-lab')), val: tx(c.querySelector('.ans-val')).replace(/\s+/g, '') })) : [];
+  const dwl = [...document.querySelectorAll('#ans-hero .ans-cell')].find(c => /DWL|Потери/.test(c.textContent || ''));
+  return { st, rows, drawn, legend, ans, dwl: dwl ? tx(dwl.querySelector('.ans-val')).replace(/\s+/g, '') : null, open: !!document.querySelector('#params-panel .side-inner') && document.querySelector('#params-panel .side-inner').getClientRects().length > 0 };
+});
+async function setCoords(page, id, x, y) {
+  await openMenuOf(page, id);
+  await menuItem(page, 'Изменить координаты');
+  await settle(page, 400);
+  for (const [i, v] of [[0, x], [1, y]]) {
+    await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-xy .edval').nth(i).click();
+    await settle(page, 300);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(String(v));
+    await page.keyboard.press('Enter');
+    await settle(page);
+  }
+  await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-ok').click();
+  await settle(page);
+}
+const fmtN = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+let CH = null;   // общая страница цепочки В (шаги 1–6, 9–12 идут подряд)
+async function chainStart() {
+  CH = await openModel('taxes');
+  const page = CH.page;
+  ok('В: панель режима видна', await enterPts(page));
+  for (const [x, y] of [[40, 60], [40, 40], [50, 50]]) await clickModel(page, x, y);
+  CH.ids = (await marks(page)).map(m => m.id);
+}
+async function sectionV1() {
+  head('В1–В2. Площадь по отмеченным точкам, живое число');
+  await chainStart();
+  const page = CH.page;
+  const u0 = await undoLen(page);
+  const sig0 = await page.evaluate(() => histSig(collectModelState()));
+  for (const id of CH.ids) { await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-pick input').click(); await settle(page, 400); }
+  const sig1 = await page.evaluate(() => histSig(collectModelState()));
+  const bar = await page.evaluate(() => { const b = document.querySelector('#sec-view .pts-selbar'); return b && !b.hidden ? b.textContent.replace(/\s+/g, ' ').trim() : ''; });
+  ok('отмечены три точки → плашка «Выбрано 3 · Площадь по точкам»', /^Выбрано 3\s*Площадь по точкам$/.test(bar), bar);
+  // Выбор — вид: ни шага истории, ни следа в состоянии модели (оно идёт в ссылку и автосохранение).
+  ok('11. выбор галочками — не шаги истории и не состояние модели', (await undoLen(page)) === u0 && sig0 === sig1, (await undoLen(page)) + ' против ' + u0 + '; подпись ' + (sig0 === sig1 ? 'та же' : 'другая'));
+  await page.locator('#sec-view .pts-selbar-go').click();
+  await settle(page);
+  let a = await areasNow(page);
+  const s1 = a.st[0] || {};
+  ok('1. S₁ = 100 по точкам A, B, C (ids — точки списка)', a.st.length === 1 && near(s1.value, 100, 0.01) && JSON.stringify(s1.ids) === JSON.stringify(CH.ids), JSON.stringify(a.st));
+  ok('1. «Площадь по точкам» — ровно один шаг; выбор снят', (await undoLen(page)) === u0 + 1 && (await page.evaluate(() => CANVAS.ptsSel.length)) === 0, String(await undoLen(page)));
+  ok('1. S₁ на холсте и в «Ответе» (Свои площади: S₁ 100); это DWL модели (' + a.dwl + ')', a.open && a.drawn.includes(s1.label) && a.ans.length === 1 && a.ans[0].val === '100' && a.dwl === '100', JSON.stringify(a));
+  await setCoords(page, CH.ids[2], 60, 50);
+  a = await areasNow(page);
+  ok('2. C → (60; 50): S₁ = 200 в списке, «Ответе»', near(a.st[0].value, 200, 0.01) && a.ans[0] && a.ans[0].val === '200', JSON.stringify(a));
+  const fill = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d') : ''; });
+  await setCoords(page, CH.ids[0], 30, 70);
+  a = await areasNow(page);
+  const fill2 = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d') : ''; });
+  ok('3. A → (30; 70): S₁ = 350, заливка на холсте сменилась', near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350' && fill && fill2 && fill !== fill2, JSON.stringify(a.st));
+  CH.after3 = a;
+}
+
+async function sectionV5() {
+  head('В5. Каскад: убрали точку — ушла площадь; «Отменить»; «Убрать все»');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  const B = CH.ids[1];
+  let u0 = await undoLen(page);
+  await openMenuOf(page, B);
+  await menuItem(page, 'Убрать');
+  await settle(page);
+  let a = await areasNow(page);
+  const mk = await marks(page);
+  ok('4. B «Убрать» → S₁ нет в списке, на холсте, в легенде и в «Ответе»; точек две', !a.st.length && !a.rows.length && !a.drawn.length && !a.legend.some(t => /S₁/.test(t)) && !a.ans.length && mk.length === 2, JSON.stringify({ a, n: mk.length }));
+  ok('4. убрать точку с площадью — один шаг', (await undoLen(page)) === u0 + 1, (await undoLen(page)) + ' против ' + u0);
+  await undo(page);
+  a = await areasNow(page);
+  ok('5. «Отменить» → B и S₁ = 350 вернулись', (await marks(page)).length === 3 && a.st.length === 1 && near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350', JSON.stringify(a.st));
+  await undo(page);
+  a = await areasNow(page);
+  const A = (await marks(page)).find(m => m.id === CH.ids[0]);
+  ok('5. ещё «Отменить» → A (40; 60), S₁ = 200', A && near(A.x, 40) && near(A.y, 60) && near(a.st[0].value, 200, 0.01), JSON.stringify({ A, st: a.st }));
+  u0 = await undoLen(page);
+  await page.locator('#ac-clear').click();
+  await settle(page);
+  a = await areasNow(page);
+  const lab = await page.evaluate(() => document.getElementById('ac-clear').textContent.trim());
+  ok('6. «' + lab + '» → пусто; один шаг', lab === 'Убрать все точки и площади' && !(await marks(page)).length && !a.st.length && (await undoLen(page)) === u0 + 1, JSON.stringify({ lab, n: (await marks(page)).length, a: a.st }));
+  await undo(page);
+  a = await areasNow(page);
+  ok('6. «Отменить» → три точки и S₁ = 200', (await marks(page)).length === 3 && a.st.length === 1 && near(a.st[0].value, 200, 0.01), JSON.stringify(a.st));
+}
+
+const shoelace = (pts) => { let s2 = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; s2 += p.x * q.y - q.x * p.y; } return Math.abs(s2) / 2; };
+/* Пустые места холста «Налогов» для набора: не ближе 30 px к кривым D, S, S + t, осям, пунктирам точек A, B, C и
+   ключевым точкам — и ниже полосы режима над холстом («Отмечаете вершины» лежит поверх верха поля). Подобраны и
+   проверены прибором при 1 440 и 1 280: новые точки ни к чему не прилипают. */
+const EMPTY = [[64, 8], [80, 12], [74, 20]];
+const EMPTY2 = [[88, 6], [55, 28]];
+async function sectionV3() {
+  head('В3. «+ По точкам»: набор вершин — точки списка');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  const lab = await page.evaluate(() => document.getElementById('ac-poly').textContent.trim());
+  ok('кнопка раздела — «+ По точкам»', lab === '+ По точкам', lab);
+  const n0 = (await marks(page)).length, a0 = (await areasNow(page)).st.length;
+  let u0 = await undoLen(page);
+  await page.locator('#ac-poly').click();
+  await settle(page);
+  const mode = await page.evaluate(() => ({ cm: canvasMode(), banner: (document.getElementById('cv-mode-what') || {}).textContent || '' }));
+  ok('11. вход в набор — не шаг истории; полоса «Отмечаете вершины»', (await undoLen(page)) === u0 && mode.cm === 'vert' && /Отмечаете вершины/.test(mode.banner), JSON.stringify(mode) + ' шагов ' + (await undoLen(page)) + '/' + u0);
+  for (const [x, y] of EMPTY) await clickModel(page, x, y);
+  let m = await marks(page);
+  const fresh = m.slice(n0);
+  const free = await page.evaluate(() => (STATE.marks || []).slice(-3).every(k => !k.snapTo && !k.on));
+  ok('7. три щелчка в пустые места → три новые точки списка с буквами, ни к чему не прилипли (' + fresh.map(k => k.text).join(', ') + ')',
+    fresh.length === 3 && fresh.every(k => /^[A-Z]$/.test(k.text)) && free, JSON.stringify(fresh));
+  ok('7. каждая вершина — один шаг (3)', (await undoLen(page)) === u0 + 3, (await undoLen(page)) + ' против ' + u0);
+  await page.locator('#cv-mode-stop').click();
+  await settle(page);
+  let a = await areasNow(page);
+  const r = a.st[a.st.length - 1] || {};
+  const want = shoelace(fresh);
+  ok('7. «Готово» → площадь = треугольник по координатам точек (шнурки ' + want.toFixed(3) + ', ±0,5 %), вершины — эти точки',
+    a.st.length === a0 + 1 && Math.abs(r.value - want) <= want * 0.005 && JSON.stringify(r.ids) === JSON.stringify(fresh.map(k => k.id)), JSON.stringify(r));
+  ok('7. имя — первый свободный индекс (' + r.label + ')', r.label === 'S₂', r.label);
+  ok('7. набор закрыт, режим «Точки и площади» остался', (await page.evaluate(() => canvasMode())) === 'pts');
+  CH.v7 = { ids: fresh.map(k => k.id), area: r.id };
+  // 8. Esc посреди набора.
+  await page.locator('#ac-poly').click();
+  await settle(page);
+  const n1 = (await marks(page)).length, a1 = (await areasNow(page)).st.length;
+  for (const [x, y] of EMPTY2) await clickModel(page, x, y);
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+  await page.keyboard.press('Escape');
+  await settle(page);
+  a = await areasNow(page);
+  m = await marks(page);
+  ok('8. два щелчка и Esc → площади нет, две новые точки в списке, режим остался', a.st.length === a1 && m.length === n1 + 2 && (await page.evaluate(() => canvasMode())) === 'pts', JSON.stringify({ n: m.length, n1, a: a.st.length }));
+  await undo(page);
+  ok('8. одно «Отменить» убирает последнюю точку', (await marks(page)).length === n1 + 1);
+  await undo(page);
+}
+
+/* ── В6: строки площадей; шаг 10 — первый свободный индекс ── */
+const areaRows = (page) => page.evaluate(() => {
+  const tx = (e) => { if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s   ​]+/g, ' ').trim(); };
+  const tex = (e) => e ? [...e.querySelectorAll('annotation')].map(a => a.textContent).join(' ') : '';
+  return [...document.querySelectorAll('#info-areacalc .area-line')].filter(r => r.getClientRects().length).map(r => ({
+    id: r.dataset.area, sw: !!r.querySelector('.area-sw .cpick-btn'), name: tex(r.querySelector('.area-name')), verts: tx(r.querySelector('.area-verts')),
+    vertsTex: tex(r.querySelector('.area-verts')), val: tx(r.querySelector('.area-val')), more: !!r.querySelector('.area-more[aria-haspopup]') }));
+});
+async function sectionV6() {
+  head('В6. Строки своих площадей');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  let rows = await areaRows(page);
+  const s1 = rows[0] || {};
+  const rot = ['ABC', 'BCA', 'CAB', 'CBA', 'BAC', 'ACB'];
+  ok('строка «S₁ ABC 200»: образец цвета, имя KaTeX, вершины — имена точек в порядке обхода, число, «⋯»',
+    s1.sw && s1.name === 'S_{1}' && rot.includes(s1.vertsTex.replace(/\s+/g, '')) && s1.val === '200' && s1.more, JSON.stringify(rows));
+  const btns = await page.evaluate(() => ['ac-curve', 'ac-poly'].map(id => document.getElementById(id).textContent.trim()).join('|'));
+  ok('кнопки раздела — «+ Под кривой» и «+ По точкам»', btns === '+ Под кривой|+ По точкам', btns);
+  const dead = await page.evaluate(() => document.querySelectorAll('#info-areacalc .area-head, #info-areacalc [data-area-key], #info-areacalc .area-name-fixed').length);
+  ok('строк закрасок модели и шапки «Название | Площадь» нет', dead === 0, String(dead));
+  // Меню «⋯» площади: пункты; Переименовать — один шаг.
+  await page.locator('#info-areacalc .area-line[data-area="' + s1.id + '"] .area-more').click();
+  await settle(page, 400);
+  const items = await page.evaluate(() => [...document.querySelectorAll('.pts-menu.open .pts-mi')].map(x => x.textContent.trim()).join('|'));
+  ok('«⋯» площади: Переименовать, Цвет, Убрать', items === 'Переименовать|Цвет|Убрать', items);
+  let u0 = await undoLen(page);
+  await menuItem(page, 'Переименовать');
+  await settle(page, 400);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('DWL');
+  await page.keyboard.press('Enter');
+  await settle(page);
+  const a = await areasNow(page);
+  ok('переименование площади: в строке, на холсте (легенда) и в «Ответе»; один шаг', a.st[0].label === 'DWL' && a.drawn.includes('DWL') && a.ans.some(x => /DWL/.test(x.lab)) && (await undoLen(page)) === u0 + 1, JSON.stringify(a) + ' шагов ' + (await undoLen(page)) + '/' + u0);
+  await undo(page);
+  ok('«Отменить» вернула S₁', (await areasNow(page)).st[0].label === 'S₁');
+}
+async function sectionV10() {
+  head('В6, шаг 10. Имя новой площади — первый свободный индекс');
+  if (!CH) { await chainStart(); }
+  const page = CH.page;
+  let a = await areasNow(page);
+  const s1 = a.st.find(r => r.label === 'S₁');
+  await page.locator('#info-areacalc .area-line[data-area="' + s1.id + '"] .area-more').click();
+  await settle(page, 400);
+  await menuItem(page, 'Убрать');
+  await settle(page);
+  a = await areasNow(page);
+  ok('площадь S₁ убрана, точки остались', !a.st.some(r => r.label === 'S₁') && (await marks(page)).length >= 3, JSON.stringify(a.st));
+  for (const id of CH.ids) { await page.locator('#mark-list .mark-row[data-mark="' + id + '"] .mark-pick input').click(); await settle(page, 300); }
+  await page.locator('#sec-view .pts-selbar-go').click();
+  await settle(page);
+  a = await areasNow(page);
+  ok('10. убрали S₁, добавили новую — она S₁, а не ' + 'S' + '₃', a.st.some(r => r.label === 'S₁') && a.st.length === (CH.v7 ? 2 : 1), JSON.stringify(a.st.map(r => r.label)));
+}
+/* ── В4, шаг 9: площадь под кривой — число живое ── */
+async function sectionV9() {
+  head('В4, шаг 9. Площадь под кривой: число = заливка');
+  const { ctx, page, errors } = await openModel('taxes');
+  ok('панель режима видна', await enterPts(page));
+  await page.locator('#ac-curve').click();
+  await settle(page, 500);
+  await page.locator('#ac-pick-btns .ac-cbtn', { hasText: 'D' }).first().click();
+  await settle(page, 500);
+  await page.locator('#ac-calc').click();
+  await settle(page);
+  let a = await areasNow(page);
+  let rows = await areaRows(page);
+  ok('«+ Под кривой» → D → 5 000; строка «S₁ D, [0; 100] 5 000»', a.st.length === 1 && near(a.st[0].value, 5000, 0.5) && rows[0] && /^D, \[0; 100\]$/.test(rows[0].verts) && rows[0].val.replace(/\s/g, '') === '5000', JSON.stringify({ st: a.st, rows }));
+  await page.locator('#pts-done').click();
+  await settle(page, 600);
+  /* У «Налогов» ползунка «Сдвиг» нет (NO_CURVE_DRAG, 30-curves.js: кривые здесь не двигаются): сдвиг D на 10 —
+     запись D = 110 − Q в поле карточки D (отступление от шага задания записано в журнале сессии 7). */
+  const moved = await page.evaluate(() => {
+    const d = (STATE.curves || []).find(c => c.role === 'demand');
+    const inp = d && document.getElementById('curve-expr-' + d.id);
+    if (!inp) return null;
+    setFieldValue(inp, '110 - Q'); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    return 10;
+  });
+  await settle(page);
+  a = await areasNow(page);
+  const fillArea = await page.evaluate(() => { const p = document.querySelector('#chart g.areacalc path'); return p ? p.getAttribute('d').length : 0; });
+  ok('D сдвинут на 10 (110 − Q в «Условии») → «Ответ», Свои площади: 6 000', moved === 10 && a.ans[0] && a.ans[0].val === '6000' && near(a.st[0].value, 6000, 0.5) && fillArea > 0, JSON.stringify({ moved, ans: a.ans, st: a.st }));
+  await enterPts(page);
+  rows = await areaRows(page);
+  ok('снова «Точки и площади» → в строке 6 000', rows[0] && rows[0].val.replace(/\s/g, '') === '6000', JSON.stringify(rows));
+  ok('шаг 9: ошибок страницы нет', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+/* ── шаг 12: ссылка «Поделиться» и автосохранение со шагов 1–3 ── */
+async function openLink(link) {
+  const ctx = await newCtx({ viewport: { width: W0, height: 900 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  await ctx.addInitScript(() => { try { if (sessionStorage.getItem('__i')) return; sessionStorage.setItem('__i', '1'); localStorage.clear(); localStorage.setItem('calc2.v1.answerHidden', '0'); } catch (e) {} });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
+  await page.goto(link, { waitUntil: 'load', timeout: 40000 });
+  await page.waitForFunction(() => typeof pickScene === 'function' && STATE.sceneKey, null, { timeout: 40000 });
+  await page.waitForTimeout(1500);
+  return { ctx, page, errors };
+}
+async function sectionV12() {
+  head('Шаг 12. Ссылка «Поделиться» и автосохранение со шагов 1–3');
+  if (!CH) { await chainStart(); }
+  const link = await CH.page.evaluate(async () => (await shareLinkOf()).replace(/^https?:\/\/[^/]+/, ''));
+  const save = await CH.page.evaluate(() => localStorage.getItem('calc2.v1.model.taxes'));
+  for (const [what, open] of [['ссылка', () => openLink(BASE + link)], ['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': save })]]) {
+    const { ctx, page, errors } = await open();
+    const m = await marks(page);
+    const a = await areasNow(page);
+    ok('12. ' + what + ': те же имена A, B, C и S₁ = 350', m.map(k => k.text).join('') === 'ABC' && a.st.length === 1 && a.st[0].label === 'S₁' && near(a.st[0].value, 350, 0.01) && a.ans[0] && a.ans[0].val === '350', JSON.stringify({ m: m.map(k => k.text), st: a.st, ans: a.ans }));
+    ok('12. ' + what + ': открыта не в режиме набора, ошибок нет', (await page.evaluate(() => canvasMode())) !== 'vert' && !errors.length, errors.join(' | '));
+    await ctx.close();
+  }
+}
+/* ── шаг 13 (В7): старая фикстура ── */
+async function sectionV13() {
+  head('В7, шаг 13. Старые сохранения и ссылки');
+  const fx = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
+  const old = fx.done;
+  for (const [what, open] of [['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': old.autosave })],
+                              ['ссылка', () => openLink(BASE + old.link.replace(/^https?:\/\/[^/]+/, ''))]]) {
+    const { ctx, page, errors } = await open();
+    ok('фикстура (' + what + '): панель режима видна', await enterPts(page));
+    const m = await marks(page);
+    const a = await areasNow(page);
+    const rows = await areaRows(page);
+    const ring = await page.evaluate(() => (STATE.areaCalcList[0] || {}).ring);
+    ok('13. ' + what + ': открывается, «Точка 1», «Точка 2», S₁ = 100 и контур прежние', m.map(k => k.text).join('|') === 'Точка 1|Точка 2' && a.st.length === 1 && near(a.st[0].value, old.areas[0].value, 1e-6) && JSON.stringify(ring) === JSON.stringify(old.areas[0].ring) && a.drawn.length === 1, JSON.stringify({ m, st: a.st, ring }));
+    ok('13. ' + what + ': в строке площади «по координатам»', rows[0] && rows[0].verts === 'по координатам' && rows[0].val === '100', JSON.stringify(rows));
+    ok('13. ' + what + ': ошибок нет', !errors.length, errors.join(' | '));
+    await ctx.close();
+  }
+  // Недонабранная площадь (непустой areaVerts): открывается без ошибки, не в режиме набора, набор отброшен.
+  for (const [what, open] of [['автосохранение', () => openModel('taxes', { 'calc2.v1.model.taxes': fx.pending.autosave })],
+                              ['ссылка', () => openLink(BASE + fx.pending.link.replace(/^https?:\/\/[^/]+/, ''))]]) {
+    const { ctx, page, errors } = await open();
+    await enterPts(page);
+    const st = await page.evaluate(() => ({ cm: canvasMode(), verts: (STATE.areaVerts || []).length, n: (STATE.areaCalcList || []).length, m: (STATE.marks || []).length }));
+    ok('13. недонабранная площадь (' + what + '): без ошибки, не в наборе, набор отброшен', !errors.length && st.cm === 'pts' && !st.verts && st.n === 1 && st.m === 2, JSON.stringify(st) + ' ' + errors.join(' | '));
+    await ctx.close();
+  }
+  if (CH) { await CH.ctx.close(); CH = null; }
+}
+
+const SECTIONS = [['Б1', sectionB1], ['Б2', sectionB2], ['Б3', sectionB3], ['Б4', sectionB4], ['В1', sectionV1], ['В12', sectionV12], ['В5', sectionV5], ['В3', sectionV3], ['В6', sectionV6], ['В10', sectionV10], ['В9', sectionV9], ['В13', sectionV13]];
+for (const name of ENGINES) {
+  eng = name; engName = name; ctxCount = 0;
+  try { browser = await pw[name].launch(); } catch (e) {
+    console.log('\n!!! ' + name + ': движок не запустился — НЕ ПРОВЕРЕНО (' + String(e).slice(0, 120) + ')');
+    continue;
+  }
+  for (const w of WIDTHS) {
+    W0 = w;
+    for (const [s, fn] of SECTIONS) if (want(s)) await fn();
+  }
+  await browser.close();
+}
+console.log('\nИТОГ pts_probe: ' + (total - bad) + ' из ' + total + (bad ? ', провалов ' + bad : ', всё сошлось'));
+process.exit(bad ? 1 : 0);

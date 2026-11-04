@@ -13,6 +13,8 @@
 // Коды выхода: 0 — все тесты прошли; 1 — есть провалы; 3 — calc2 не загрузился
 //   (нет CDN Math.js/D3 или сервер не отдал страницу) → вызывающий тест пропускает.
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
+import { installShownReader } from './parse_shown.mjs';
 
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
@@ -22,6 +24,29 @@ const PASS = process.env.CALC2_PASS || 'admin12345';
 // состояние, дёргает redrawAll() и возвращает плоский объект вычисленных величин.
 // checks — пары [подпись, ключ, ожидание, допуск?].
 const CASES = [
+  {
+    name: 'Десятичная формула · правка и восстановление сохраняют число и запятые аргументов',
+    run: `pickScene('labor');
+          var inp = document.getElementById('curve-expr-2');
+          flushMathfieldsSoon();
+          await new Promise(r => setTimeout(r, 250));
+          var mf = inp._mf;
+          mf.value = mathToLatexField('10 + 0.5*L') + '+5';
+          mf.dispatchEvent(new Event('input', {bubbles:true}));
+          await new Promise(r => setTimeout(r, 400));
+          var value = evalCurve(STATE.curves[1], 10);
+          var saved = JSON.stringify(collectModelState());
+          resetSceneMemory(); pickScene('sd');
+          applyModelState(JSON.parse(saved));
+          var restored = evalCurve(STATE.curves[1], 10);
+          var args = math.evaluate(latexToMath(mathToLatexField('min(1.25,2.5)')));
+          var plain = math.evaluate(latexToMath('max(1,2)'));
+          return {value, restored, args, plain};`,
+    checks: [['изменённая кривая при L=10', 'value', 20, 1e-9],
+             ['восстановленная кривая при L=10', 'restored', 20, 1e-9],
+             ['два десятичных аргумента min', 'args', 1.25, 1e-9],
+             ['обычная запятая разделяет аргументы', 'plain', 2, 1e-9]],
+  },
   {
     name: 'Рынок · равновесие D=100−Q, S=Q',
     run: `loadScene('sd'); redrawAll();
@@ -132,22 +157,40 @@ const CASES = [
              ['налог Пигу', 'tax', 20, 0.2], ['Pопт', 'Popt', 60, 0.4]],
   },
   {
+    /* Кривые задаются ЯВНО (сессия «рынок труда», 15.10, ADR 0156): старт модели сменился на D = 100 − L,
+       S = 10 + 0,5L, а этот случай — «Старый пример» D = 100 − L, S = L, числа прежние. */
     name: 'Труд · монопсония D=100−L, S=L',
-    run: `setMode('labor'); setLaborStruct('monopsony'); redrawAll();
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('monopsony'); redrawAll();
           var m = STATE.laborMono || {};
           return { Lm: m.Lm, Wm: m.Wm };`,
     checks: [['Lм', 'Lm', 33.33, 0.1], ['Wм', 'Wm', 33.33, 0.1]],
   },
   {
-    name: 'Труд · профсоюз-монополист',
-    run: `setMode('labor'); setLaborStruct('union'); redrawAll();
+    /* Профсоюз максимизирует фонд оплаты W·L (решение владельца 15.10, Notion …81ac…, ADR 0156), а не выигрыш
+       членов MRL = S (прежде 33,33 / 66,67). На «Старом примере» D = 100 − L, S = L MRL = 0 ровно в Lk = 50 — угол:
+       профсоюзу выгодна конкурентная ставка, фонд 2 500, безработицы и потерь нет. */
+    name: 'Труд · профсоюз-монополист, старый пример D=100−L, S=L ⇒ угол 50 / 50 (фонд оплаты)',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
           var u = STATE.laborUnion || {};
-          return { Lu: u.Lu, Wu: u.Wu };`,
-    checks: [['Lп', 'Lu', 33.33, 0.2], ['Wп', 'Wu', 66.67, 0.2]],
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, un: u.unemployment, dwl: u.dwl, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 50, 0.2], ['Wп', 'Wu', 50, 0.2], ['фонд', 'fund', 2500, 5], ['безработица', 'un', 0, 0.01],
+             ['DWL', 'dwl', 0, 0.01], ['угол', 'corner', 1, 0.1]],
   },
   {
     name: 'Труд · МРОТ=50 в монопсонии ⇒ занятость растёт к 50',
-    run: `setMode('labor'); setLaborStruct('monopsony');
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('monopsony');
           STATE.laborMinOn = true; setLaborMin(50); redrawAll();
           var min = STATE.laborMin || {};
           // занятость при связывающем МРОТ: Lstar (короткая сторона)
@@ -186,7 +229,8 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.ppfSumData = null;
-          var b=document.getElementById('btn-ppfsum-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить сумму» нет; её действие —
+          // сброс ppfSumData и перерисовка — стоит здесь явно.
           redrawAll();
           // сэмплируем сумму при X=10 и сравниваем с √(324−100)=√224≈14.966
           var d = STATE.ppfSumData; if(!d||!d.ok||!d.points) return { yAt10: null };
@@ -201,7 +245,8 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.ppfSumData = null;
-          var b=document.getElementById('btn-ppfsum-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить сумму» нет; её действие —
+          // сброс ppfSumData и перерисовка — стоит здесь явно.
           redrawAll();
           var ks = (STATE.ppfSumKinks||[]).slice().sort(function(a,c){return a.x-c.x;});
           var k0 = ks[0]||{}, k1 = ks[ks.length-1]||{};
@@ -216,7 +261,9 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.tradeBData = null;
-          var b=document.getElementById('btn-tb-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить торговлю» нет, запись полей
+          // применяет Enter в поле (то же applyTradeB).
+          document.getElementById('inp-tb1').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
           redrawAll();
           var t = STATE.tradeBData || {};
           return { Pweq: t.Pweq, Pw: t.Pw };`,
@@ -280,7 +327,8 @@ const CASES = [
        Оптимум MSB = MSC ⇒ 120−Q = Q ⇒ Q=60, P = 60.
        DWL = ∫₅₀^60 (120−2q) dq = 100. Субсидия = |D(60) − S(60)| = 20
        (в расчёте она приходит со знаком «минус» — это и значит субсидию). */
-    run: `loadScene('ext'); STATE.msbOn = true; STATE.msbExpr = '120 - Q';
+    // С 24.10 старт — MSC = Q + 20 и видна (решение …81e7…): положительный случай гасит её сам.
+    run: `loadScene('ext'); STATE.mscOn = false; STATE.msbOn = true; STATE.msbExpr = '120 - Q';
           recompileSocial(); redrawAll();
           var e = STATE.ext || {};
           return { Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl, sub: -e.corrective,
@@ -498,7 +546,7 @@ const CASES = [
     run: `setMode('costs'); setCostsSub('plants');
           STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; setPlantsQ(30);
           var a = plantsAt(30), b = plantsAt(15);
-          var naive30 = plantTC(STATE.plants.c1, 30) + plantTC(STATE.plants.c2, 30);
+          var naive30 = plantCost(STATE.plants.specs[0], 30) + plantCost(STATE.plants.specs[1], 30);
           return { q1: a.q1, q2: a.q2, mc30: a.m, tc30: a.tcDirect, vc30: a.vc,
                    q1b: b.q1, q2b: b.q2, mc15: b.m, tc15: b.tcDirect, vc15: b.vc,
                    naive: naive30 };`,
@@ -513,7 +561,9 @@ const CASES = [
 
   /* ── Фазы 12–13: двусторонняя монополия, коэффициент фондов ──────────── */
   {
-    name: 'Двусторонняя монополия · D=100−L, S=L ⇒ диапазон зарплаты [33.33; 66.67], не точка',
+    /* Верхняя граница — профсоюз по фонду оплаты (ADR 0156): на «Старом примере» угол 50, диапазон 33,33 … 50
+       (прежде 33,33 … 66,67). МРОТ выключен явно: с ним модель считает границы торга иначе. */
+    name: 'Двусторонняя монополия · D=100−L, S=L ⇒ диапазон зарплаты [33.33; 50], не точка',
     // Границы берутся из уже проверенных монопсонии и профсоюза-монополиста.
     // Кривые задаём явно: предыдущие кейсы могли оставить набор без роли S
     // (например «монополист и мировой рынок» держит D и MC), и тогда рынок труда
@@ -522,13 +572,159 @@ const CASES = [
           STATE.curves = [];
           addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
           addCurve('L');       setRole(STATE.curves[1], 'supply');
-          setLaborStruct('bilateral'); redrawAll();
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
           var b = STATE.laborBilateral || {};
-          return { Wm: b.Wm, Wu: b.Wu, lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu };`,
-    checks: [['Wм (монопсония)', 'Wm', 33.33, 0.15], ['Wп (профсоюз)', 'Wu', 66.67, 0.2],
-             ['нижняя граница', 'lo', 33.33, 0.15], ['верхняя граница', 'hi', 66.67, 0.2],
+          return { Wm: b.Wm, Wu: b.Wu, lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['Wм (монопсония)', 'Wm', 33.33, 0.15], ['Wп (профсоюз)', 'Wu', 50, 0.2],
+             ['нижняя граница', 'lo', 33.33, 0.15], ['верхняя граница', 'hi', 50, 0.2],
              ['конкурентный ориентир', 'Wk', 50, 0.2],
-             ['Lм', 'Lm', 33.33, 0.15], ['Lп', 'Lu', 33.33, 0.25]],
+             ['Lм', 'Lm', 33.33, 0.15], ['Lп', 'Lu', 50, 0.25],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 0, 0.05]],
+  },
+  /* ── Рынок труда, 15.10 (ADR 0156): профсоюз по фонду оплаты, новый пример, наборы кривых задаются ЯВНО ─── */
+  {
+    name: 'Труд · профсоюз по фонду оплаты, новый пример D=100−L, S=10+0,5L ⇒ Lп 50, Wп 50, фонд 2500, безработица 30',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, Qs: u.Qs, un: u.unemployment, Lk: u.Lk, Wk: u.Wk, dwl: u.dwl,
+                   L0: u.L0, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 50, 0.2], ['Wп', 'Wu', 50, 0.2], ['фонд', 'fund', 2500, 5], ['желающих', 'Qs', 80, 0.3],
+             ['безработица', 'un', 30, 0.3], ['Lk', 'Lk', 60, 0.2], ['Wk', 'Wk', 40, 0.2], ['DWL', 'dwl', 75, 1],
+             ['MRL = 0 при L', 'L0', 50, 0.2], ['не угол', 'corner', 0, 0.1]],
+  },
+  {
+    name: 'Труд · профсоюз, угол D=100−L, S=2L ⇒ MRL = 0 правее Lk, конкурентная ставка 33,33 / 66,67, потерь нет',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('2*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, un: u.unemployment, dwl: u.dwl, L0: u.L0, corner: u.corner ? 1 : 0 };`,
+    checks: [['Lп', 'Lu', 33.33, 0.2], ['Wп', 'Wu', 66.67, 0.2], ['фонд', 'fund', 2222.22, 5],
+             ['безработица', 'un', 0, 0.01], ['DWL', 'dwl', 0, 0.01], ['MRL = 0 при L', 'L0', 50, 0.2], ['угол', 'corner', 1, 0.1]],
+  },
+  {
+    name: 'Труд · профсоюз, второй пример D=120−2L, S=20+L ⇒ Lп 30, Wп 60, фонд 1800, безработица 10, DWL 16,67',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('union'); setUnionModel('monopoly'); redrawAll();
+          var u = STATE.laborUnion || {};
+          return { Lu: u.Lu, Wu: u.Wu, fund: u.fund, Qs: u.Qs, un: u.unemployment, Lk: u.Lk, Wk: u.Wk, dwl: u.dwl };`,
+    checks: [['Lп', 'Lu', 30, 0.2], ['Wп', 'Wu', 60, 0.2], ['фонд', 'fund', 1800, 5], ['желающих', 'Qs', 40, 0.3],
+             ['безработица', 'un', 10, 0.3], ['Lk', 'Lk', 33.33, 0.2], ['Wk', 'Wk', 53.33, 0.2], ['DWL', 'dwl', 16.67, 0.5]],
+  },
+  {
+    name: 'Двусторонняя монополия · новый пример D=100−L, S=10+0,5L без МРОТ ⇒ 32,5 … 50, занятость 45 и 50, безработица 0 и 30',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
+          var b = STATE.laborBilateral || {};
+          return { lo: b.Wlo, hi: b.Whi, Wk: b.Wk, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['нижняя граница', 'lo', 32.5, 0.15], ['верхняя граница', 'hi', 50, 0.2], ['Wk', 'Wk', 40, 0.2],
+             ['занятость внизу', 'Lm', 45, 0.2], ['занятость вверху', 'Lu', 50, 0.2],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 30, 0.3]],
+  },
+  {
+    name: 'Двусторонняя монополия · второй пример D=120−2L, S=20+L без МРОТ ⇒ 45 … 60, занятость 25 и 30, безработица 0 и 10',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('bilateral'); redrawAll();
+          var b = STATE.laborBilateral || {};
+          return { lo: b.Wlo, hi: b.Whi, Lm: b.Lm, Lu: b.Lu, Ulo: b.Ulo, Uhi: b.Uhi };`,
+    checks: [['нижняя граница', 'lo', 45, 0.15], ['верхняя граница', 'hi', 60, 0.2],
+             ['занятость внизу', 'Lm', 25, 0.2], ['занятость вверху', 'Lu', 30, 0.2],
+             ['безработица внизу', 'Ulo', 0, 0.01], ['безработица вверху', 'Uhi', 10, 0.3]],
+  },
+  {
+    /* МРОТ в двусторонней монополии (решение …8168…, ADR 0156): нижняя граница — монопсонист при МРОТ, верхняя —
+       max(Wп, W_min), МРОТ не ниже Wп — исход один. Числа — перебор (таблица задания сессии «рынок труда»). */
+    name: 'Двусторонняя монополия · новый пример с МРОТ 30 / 36 / 45 / 50 / 60 ⇒ не связывает; 36…50; 45…50; исход один 50 и 60',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('bilateral'); STATE.laborMinOn = true;
+          var r = {};
+          [30, 36, 45, 50, 60].forEach(function (w) { setLaborMin(w); var m = (STATE.laborBilateral || {}).min || {};
+            r['b' + w] = m.binding ? 1 : 0; r['s' + w] = m.single ? 1 : 0; r['lo' + w] = m.Wlo; r['hi' + w] = m.Whi;
+            r['Ll' + w] = m.Llo; r['Lh' + w] = m.Lhi; r['Ul' + w] = m.Ulo; r['Uh' + w] = m.Uhi; });
+          STATE.laborMinOn = false; redrawAll();
+          return r;`,
+    checks: [['30: не связывает', 'b30', 0, 0.1], ['30: нижняя Wм', 'lo30', 32.5, 0.15],
+             ['36: нижняя', 'lo36', 36, 0.05], ['36: верхняя', 'hi36', 50, 0.2], ['36: занятость внизу', 'Ll36', 52, 0.2],
+             ['36: занятость вверху', 'Lh36', 50, 0.2], ['36: безработица внизу', 'Ul36', 0, 0.05], ['36: безработица вверху', 'Uh36', 30, 0.3],
+             ['45: нижняя', 'lo45', 45, 0.05], ['45: верхняя', 'hi45', 50, 0.2], ['45: занятость внизу', 'Ll45', 55, 0.2],
+             ['45: занятость вверху', 'Lh45', 50, 0.2], ['45: безработица внизу', 'Ul45', 15, 0.2], ['45: безработица вверху', 'Uh45', 30, 0.3],
+             ['50: исход один', 's50', 1, 0.1], ['50: занятость', 'Ll50', 50, 0.2], ['50: безработица', 'Ul50', 30, 0.3],
+             ['60: исход один', 's60', 1, 0.1], ['60: занятость', 'Ll60', 40, 0.2], ['60: безработица', 'Ul60', 60, 0.3]],
+  },
+  {
+    name: 'Двусторонняя монополия · второй пример D=120−2L, S=20+L с МРОТ 55 и 70; старый пример с МРОТ 65 ⇒ исход один 65',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('120 - 2*L'); setRole(STATE.curves[0], 'demand');
+          addCurve('20 + L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('bilateral'); STATE.laborMinOn = true;
+          setLaborMin(55); var a = (STATE.laborBilateral || {}).min || {};
+          setLaborMin(70); var c = (STATE.laborBilateral || {}).min || {};
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborMin(65); var o = (STATE.laborBilateral || {}).min || {};
+          STATE.laborMinOn = false; redrawAll();
+          return { lo: a.Wlo, hi: a.Whi, Ll: a.Llo, Lh: a.Lhi, Ul: a.Ulo, Uh: a.Uhi, s70: c.single ? 1 : 0, L70: c.Llo, U70: c.Ulo,
+                   s65: o.single ? 1 : 0, L65: o.Llo, U65: o.Ulo };`,
+    checks: [['55: нижняя', 'lo', 55, 0.05], ['55: верхняя', 'hi', 60, 0.2], ['55: занятость внизу', 'Ll', 32.5, 0.2],
+             ['55: занятость вверху', 'Lh', 30, 0.2], ['55: безработица внизу', 'Ul', 2.5, 0.2], ['55: безработица вверху', 'Uh', 10, 0.3],
+             ['70: исход один', 's70', 1, 0.1], ['70: занятость', 'L70', 25, 0.2], ['70: безработица', 'U70', 25, 0.3],
+             ['старый пример, 65: исход один', 's65', 1, 0.1], ['65: занятость', 'L65', 35, 0.2], ['65: безработица', 'U65', 30, 0.3]],
+  },
+  {
+    name: 'Труд · конкуренция и монопсония, новый пример D=100−L, S=10+0,5L ⇒ 60 / 40 и 45 / 32,5; МРОТ 45 ⇒ занятость 55',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('10 + 0.5*L'); setRole(STATE.curves[1], 'supply');
+          STATE.laborMinOn = false; setLaborStruct('competition'); redrawAll();
+          var eq = STATE.laborEq || {}, wcs = STATE.laborWorkerCS, fcs = STATE.laborFirmCS;
+          STATE.laborMinOn = true; setLaborMin(45);
+          var cm = STATE.laborMin || {}, cw = STATE.laborMinWelfare || {};
+          STATE.laborMinOn = false; setLaborStruct('monopsony'); redrawAll();
+          var m = STATE.laborMono || {};
+          STATE.laborMinOn = true; setLaborMin(45);
+          var mm = STATE.laborMin || {}, mw = STATE.laborMinWelfare || {};
+          return { Lk: eq.Q, Wk: eq.P, wcs: wcs, fcs: fcs, cEmp: cm.employment, cUn: cm.unemployment, cQs: cm.Qs,
+                   cW: cw.workerCS, cF: cw.firmCS, cD: cw.dwl, Lm: m.Lm, Wm: m.Wm, mDwl: m.dwl,
+                   mL: mm.Lstar, mWage: mm.wage, mUn: mm.unemployment, mW: mw.workerCS, mF: mw.firmCS, mD: mw.dwl };`,
+    checks: [['Lk', 'Lk', 60, 0.2], ['Wk', 'Wk', 40, 0.2], ['излишек рабочих', 'wcs', 900, 3], ['излишек фирм', 'fcs', 1800, 3],
+             ['конкуренция + МРОТ 45: занятость', 'cEmp', 55, 0.2], ['безработица', 'cUn', 15, 0.2], ['желающих', 'cQs', 70, 0.3],
+             ['излишек рабочих при МРОТ', 'cW', 1168.75, 3], ['излишек фирм при МРОТ', 'cF', 1512.5, 3], ['DWL при МРОТ', 'cD', 18.75, 0.5],
+             ['Lм', 'Lm', 45, 0.2], ['Wм', 'Wm', 32.5, 0.15], ['DWL монопсонии', 'mDwl', 168.75, 1],
+             ['монопсония + МРОТ 45: занятость', 'mL', 55, 0.3], ['зарплата', 'mWage', 45, 0.1], ['безработица', 'mUn', 15, 0.3],
+             ['излишек рабочих при МРОТ', 'mW', 1168.75, 3], ['излишек фирм при МРОТ', 'mF', 1512.5, 3], ['DWL при МРОТ', 'mD', 18.75, 0.5]],
+  },
+  {
+    name: 'Труд · конкуренция, старый пример D=100−L, S=L, МРОТ 65 ⇒ занятость 35, безработица 30, излишки 1662,5 и 612,5, DWL 225',
+    run: `setMode('labor');
+          STATE.curves = [];
+          addCurve('100 - L'); setRole(STATE.curves[0], 'demand');
+          addCurve('L'); setRole(STATE.curves[1], 'supply');
+          setLaborStruct('competition'); STATE.laborMinOn = true; setLaborMin(65);
+          var cm = STATE.laborMin || {}, cw = STATE.laborMinWelfare || {};
+          return { emp: cm.employment, un: cm.unemployment, w: cw.workerCS, f: cw.firmCS, d: cw.dwl };`,
+    checks: [['занятость', 'emp', 35, 0.2], ['безработица', 'un', 30, 0.2], ['излишек рабочих', 'w', 1662.5, 3],
+             ['излишек фирм', 'f', 612.5, 3], ['DWL', 'd', 225, 1]],
   },
   {
     name: 'Коэф. фондов · доходы 10,15,20,25,30,35,40,50,70,150 ⇒ 150/10 = 15 (а P90/P10 = 5.38)',
@@ -749,15 +945,17 @@ const CASES = [
   {
     name: 'Площадь по точкам · треугольник (0;0) (10;0) (0;10) ⇒ 50',
     // Вершины набираются щелчками по графику (Фаза 7); здесь ставим их через
-    // ту же функцию, что и щелчок, — галочек в списке больше нет.
+    // ту же функцию, что и щелчок. С сессии 7 «тихих панелей» вершина — ТОЧКА списка (README пакета
+    // calc2_panels_20261014, раздел 9): набор — id точек (CANVAS.buildIds), «Готово» — finishPolyBuild.
     run: `loadScene('sd'); redrawAll();
-          clearAreaCalc(); setAreaCalcMode('poly'); clearAreaVerts();
-          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(0, 10, '');
+          clearAreaCalc(); STATE.marks = []; setAreaCalcMode('poly');
+          var ids = [[0, 0], [10, 0], [0, 10]].map(function (p) { return addMarkAt(p[0], p[1], null, null, '').id; });
+          CANVAS.buildIds = ids.slice();
           var armed = STATE.vertArm ? 1 : 0;
-          runAreaCalc();
+          finishPolyBuild();
           var r0 = STATE.areaCalcList[0];
           var v = r0 ? r0.value : NaN;
-          clearAreaVerts(); clearAreaCalc(); setAreaCalcMode('curve');
+          clearAreaCalc(); STATE.marks = []; renderMarkList(); setAreaCalcMode('curve'); closeAreaBuild();
           return { S: v, armed: armed };`,
     checks: [['площадь', 'S', 50, 0.01], ['режим набора взведён', 'armed', 1, 0]],
   },
@@ -772,15 +970,24 @@ const CASES = [
     checks: [['x', 'x', 50, 0.2], ['y', 'y', 50, 0.2], ['всего точек', 'n', 4, 0]],
   },
   {
-    name: 'Формула в pgfplots · 100 − 2*Q ⇒ (100 - (2 * x))',
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): прежний переводчик mathToPgf удалён
+       вместе со старыми сборщиками; формулу в pgfplots печатает
+       TexExport.exprToPgf. Скобки — по приоритету, а не вокруг каждой
+       операции; условие переводится условием pgfmath (кусочную запись сборка
+       делит по кускам сама), а не отклоняется; степень pgfmath
+       левоассоциативна — вложенная степень в скобках (SPEC, раздел 8). */
+    name: 'Формула в pgfplots · 100 − 2*Q ⇒ 100 - 2 * x',
     run: `loadScene('sd');
-          var got = mathToPgf('100 - 2*Q', 'Q');
-          var bad = mathToPgf('Q < 20 ? 100 - Q : 60', 'Q');
-          var root = mathToPgf('sqrt(Q)', 'Q');
-          return { ok: (got === '(100 - (2 * x))') ? 1 : 0,
+          var got = TexExport.exprToPgf('100 - 2*Q', 'Q');
+          var cond = TexExport.exprToPgf('Q < 20 ? 100 - Q : 60', 'Q');
+          var root = TexExport.exprToPgf('sqrt(Q)', 'Q');
+          var pow = TexExport.exprToPgf('2^3^2', 'Q');
+          return { ok: (got === '100 - 2 * x') ? 1 : 0,
                    rootOk: (root === 'sqrt(x)') ? 1 : 0,
-                   badIsNull: (bad === null) ? 1 : 0 };`,
-    checks: [['линейная', 'ok', 1, 0], ['корень', 'rootOk', 1, 0], ['кусочная отклонена', 'badIsNull', 1, 0]],
+                   condOk: (cond === '(x < 20 ? 100 - x : 60)') ? 1 : 0,
+                   powOk: (pow === '2^(3^2)') ? 1 : 0 };`,
+    checks: [['линейная', 'ok', 1, 0], ['корень', 'rootOk', 1, 0], ['условие переведено', 'condOk', 1, 0],
+             ['вложенная степень в скобках', 'powOk', 1, 0]],
   },
   {
     name: 'Кусочная функция · три куска с двумя границами ⇒ 90 / 60 / 20',
@@ -821,11 +1028,12 @@ const CASES = [
     run: `setMode('inequality'); setIneqInput('formula');
           var inp = document.getElementById('ineq-formula');
           inp.value = 'p^2';
-          document.getElementById('ineq-formula-apply').click();
+          inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить»
           var before = STATE.ineqFormula;
           openPiecewise(inp, 'p');
           PW.n = 2;
-          PW.rows = [{f:'0.5*p', a:'0', b:'0.5'}, {f:'p - 0.25', a:'0.5', b:''}];
+          // Э7: прежнее p−0.25 давало L(1)=0.75 и не являлось кривой Лоренца.
+          PW.rows = [{f:'0.5*p', a:'0', b:'0.5'}, {f:'1.5*p - 0.5', a:'0.5', b:''}];
           document.getElementById('pw-apply').click();
           var changed = (STATE.ineqFormula !== before) ? 1 : 0;
           return { before: before, after: STATE.ineqFormula, changed: changed,
@@ -1076,7 +1284,8 @@ const CASES = [
     run: `openPicker(); pickScene('trade'); closePicker();
           STATE.params = {};
           var inp = document.getElementById('inp-ppft');
-          var apply = document.getElementById('btn-ppft-apply');
+          // Перенацелено (фаза 5а): кнопки «Построить КТВ» нет, применяет Enter в поле.
+          var apply = { click: function () { inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); } };
           inp.value = '100 - X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
           var plain = STATE.ppfTradeData.Xmax;
           inp.value = '100 - a*X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
@@ -1129,14 +1338,18 @@ const CASES = [
   {
     /* П28. Пайплайн добавления точки: кнопка → тумблер → два поля координат.
        Точка появляется, как только заполнены ОБА поля, и переезжает на каждый
-       введённый символ. Кнопка «Добавить точку» стоит ПОД созданными точками. */
+       введённый символ. Кнопка «Добавить точку» стоит ПОД созданными точками.
+       С сессии 7 «тихих панелей» (README пакета calc2_panels_20261014, раздел 9) кнопка «+ По координатам» —
+       в строке заголовка раздела «Точки» (#sec-view .pts-sec-row), а не под списком: «последней» — значит
+       в строке заголовка, вне списка. */
     name: 'Точки · точка появляется, как только заполнены оба поля',
     run: `openPicker(); pickScene('sd'); closePicker();
           STATE.marks = []; renderMarkList();
           var box = document.getElementById('mark-list');
-          var only = box.children.length === 1 && box.firstElementChild.classList.contains('btn-mark-add') ? 1 : 0;
-          box.querySelector('.btn-mark-add').click();
-          var noBtn = box.querySelector('.btn-mark-add') ? 0 : 1;
+          var hdr = document.querySelector('#sec-view .pts-sec-row');
+          var only = box.children.length === 0 && hdr.querySelector('.btn-mark-add') ? 1 : 0;
+          hdr.querySelector('.btn-mark-add').click();
+          var noBtn = document.querySelector('#sec-view .btn-mark-add') ? 0 : 1;
           /* Н36, Н47: координаты — не поля в рамке, а редактируемые значения
              (contenteditable внутри .edval). Печатаем в них так же, как человек:
              ставим текст и будим «input». */
@@ -1153,8 +1366,8 @@ const CASES = [
           var y1 = live ? live.y : -1;
           type(f[1], '50');
           var y2 = STATE.marks.filter(function (m) { return !m.pending; })[0].y;
-          var back = document.getElementById('mark-list').querySelector('.btn-mark-add') ? 1 : 0;
-          var lastIsBtn = document.getElementById('mark-list').lastElementChild.classList.contains('btn-mark-add') ? 1 : 0;
+          var back = document.querySelector('#sec-view .btn-mark-add') ? 1 : 0;
+          var lastIsBtn = hdr.lastElementChild.classList.contains('btn-mark-add') && !box.querySelector('.btn-mark-add') ? 1 : 0;
           return { only: only, noBtn: noBtn, half: half, y1: y1, y2: y2, back: back, last: lastIsBtn };`,
     checks: [['сначала только кнопка', 'only', 1, 0], ['после щелчка кнопки нет', 'noBtn', 1, 0],
              ['одно поле — точки нет', 'half', 0, 0], ['«5» ⇒ точка (50; 5)', 'y1', 5, 0.001],
@@ -1212,17 +1425,24 @@ const CASES = [
           var range = '[' + rangeNums.join('; ') + ']';
           var rangeEditable = rangeEl.querySelectorAll('.edval').length;
           btn.click();
-          var head = [].map.call(document.querySelectorAll('.area-head span'),
-                                 function (s) { return s.textContent; }).join('|');
+          /* С сессии 7 строки своих площадей без шапки «Название | Площадь» (README пакета calc2_panels_20261014, 9;
+             макет 04_screen_points): «заголовки» — у строки есть имя и число. */
+          var line = document.querySelector('#info-areacalc .area-line');
+          var head = line && line.querySelector('.area-name') && line.querySelector('.area-val') ? 'Название|Площадь|' : '';
           var areaVal = STATE.areaCalcList[0].value;
-          setAreaCalcMode('poly');
-          var lockedPoly = btn.disabled ? 1 : 0;
-          addAreaVert(0, 0, ''); addAreaVert(10, 0, ''); addAreaVert(10, 10, '');
-          var openPoly = btn.disabled ? 0 : 1;
-          var crosses = document.querySelectorAll('.vert-row .btn-icon').length;
-          // Возвращаем секцию в исходное состояние: следующие случаи считают
-          // площадь под кривой, а оставленный режим «между точками» их сломал бы.
-          clearAreaVerts(); setAreaCalcMode('curve'); clearAreaCalc();
+          /* С сессии 7 площадь по точкам — по ОТМЕЧЕННЫМ точкам списка (README пакета 9, решение …81e0…): «заперта» —
+             плашки «Площадь по точкам» нет, пока отмечено меньше трёх; «у каждой вершины крестик» — у каждой
+             отмеченной точки «⋯», где «Убрать». */
+          STATE.marks = []; CANVAS.ptsSel = [];
+          var mids = [[0, 0], [10, 0], [10, 10]].map(function (p) { return addMarkAt(p[0], p[1], null, null, '').id; });
+          var bar = document.querySelector('#sec-view .pts-selbar');
+          CANVAS.ptsSel = mids.slice(0, 2); syncPtsSelBar();
+          var lockedPoly = bar.hidden ? 1 : 0;
+          CANVAS.ptsSel = mids.slice(); syncPtsSelBar();
+          var openPoly = !bar.hidden && bar.querySelector('.pts-selbar-go') ? 1 : 0;
+          var crosses = mids.filter(function (id) { return document.querySelector('#mark-list .mark-row[data-mark="' + id + '"] .mark-more'); }).length;
+          // Возвращаем секцию в исходное состояние: следующие случаи считают площадь под кривой.
+          CANVAS.ptsSel = []; STATE.marks = []; renderMarkList(); setAreaCalcMode('curve'); clearAreaCalc();
           return { lockedCurve: lockedCurve, openCurve: openCurve, lockedPoly: lockedPoly,
                    openPoly: openPoly, area: areaVal,
                    rangeOk: range === '[0; 100]' ? 1 : 0,
@@ -1234,10 +1454,10 @@ const CASES = [
              ['отрезок [0; 100]', 'rangeOk', 1, 0],
              ['и обе границы правятся (Н52)', 'rangeEd', 2, 0],
              ['площадь под D = 5000', 'area', 5000, 1],
-             ['заголовки «Название» и «Площадь» (Н53)', 'headOk', 1, 0],
-             ['без вершин кнопка заперта', 'lockedPoly', 1, 0],
-             ['три вершины — открылась', 'openPoly', 1, 0],
-             ['у каждой вершины крестик', 'verts', 3, 0]],
+             ['у строки площади имя и число (Н53; шапки нет с сессии 7)', 'headOk', 1, 0],
+             ['без вершин кнопка заперта (две отмечены — плашки нет)', 'lockedPoly', 1, 0],
+             ['три вершины — открылась («Площадь по точкам»)', 'openPoly', 1, 0],
+             ['у каждой вершины крестик («⋯» с «Убрать»)', 'verts', 3, 0]],
   },
   {
     /* П40. Разбор построен как вопрос с ответом, и кусочная кривая его не
@@ -1250,7 +1470,7 @@ const CASES = [
           var inp = document.getElementById('inp-ppf');
           inp.value = 'y = x < 50 ? 100 - x : 75 - 0.5*x';
           inp.dispatchEvent(new Event('input', { bubbles: true }));
-          document.getElementById('btn-ppf-apply').click();
+          inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить»
           var f = parsePpfEquation(STATE.ppfFormula).f;
           var ex = document.getElementById('ex-body');
           var qs = [].map.call(ex.querySelectorAll('p > b'), function (b) { return b.textContent.trim(); });
@@ -1327,14 +1547,13 @@ const CASES = [
           xt.value = '1'; xt.dispatchEvent(new Event('input', { bubbles: true }));
           yt.value = '1'; yt.dispatchEvent(new Event('input', { bubbles: true }));
           var texts = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent; });
-          var ppf = texts.filter(function (s) { return s.indexOf('КПВ (') === 0; })[0] || '';
-          var ktv = texts.filter(function (s) { return s.indexOf('КТВ (') === 0; })[0] || '';
+          var ppf = texts.filter(function (s) { return s.indexOf('Комплект (КПВ) (') === 0; })[0] || '';
+          var ktv = texts.filter(function (s) { return s.indexOf('Комплект (КТВ) (') === 0; })[0] || '';
           /* Дробная часть на экране отделяется ЗАПЯТОЙ (Б15), поэтому разбор
              числа с холста обязан её понимать: со старым классом [-\\d.] из
              «66,67» вычитывалось «67». */
-          var nums = function (s) { var m = s.match(/([-\\d.,]+); ([-\\d.,]+)/);
-            var n = function (t) { return parseFloat(String(t).replace(',', '.')); };
-            return m ? [n(m[1]), n(m[2])] : [-1, -1]; };
+          var nums = function (s) { var m = s.match(/\\(([^();]+); ([^();]+)\\)/);
+            return m ? [__parseShown(m[1]), __parseShown(m[2])] : [-1, -1]; };
           return { chk: chk, off: off, on: STATE.bundleOn ? 1 : 0,
                    px: nums(ppf)[0], py: nums(ppf)[1],
                    tx: nums(ktv)[0], ty: nums(ktv)[1],
@@ -1363,7 +1582,10 @@ const CASES = [
                  разложена на tspan'ы, и firstChild у неё элемент, а не текст.
                  Ожидаемые размеры прежние — меняется только способ найти
                  подпись. Подсказку в <title> отбрасываем. */
-              var s = labelPlainText(n).trim();
+              /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: помощник страницы labelPlainText ушёл вместе со
+                 старыми сборщиками .tex — то же чтение здесь: разметка data-raw или
+                 текст без подсказки <title>. */
+              var s = (n.getAttribute('data-raw') || (function (k) { k.querySelectorAll('title,desc').forEach(function (x) { x.remove(); }); return k.textContent; })(n.cloneNode(true))).trim();
               if (s === 'S' && curve === null) curve = +n.getAttribute('font-size');
               else if (other === null) other = +n.getAttribute('font-size');
             });
@@ -1649,11 +1871,16 @@ const CASES = [
           var p = keyTargets().filter(function (t) { return /D и S/.test(t.name); })[0];
           pinKeyPoint(p);
           var m = STATE.marks[STATE.marks.length - 1];
-          var open = document.getElementById('sec-view').classList.contains('open-card') ? 1 : 0;
+          /* С 13.10 (ADR 0148) список точек живёт в панели режима «Точки и площади»;
+             закрепка режим не включает. Вынесенная точка обязана быть и в списке, и на
+             холсте (прежде здесь стояло «блок «Свои точки» раскрылся»). */
+          redrawAll();
+          var open = (document.querySelectorAll('#pts-panel #mark-list .mark-row:not(.mark-draft)').length === STATE.marks.length
+                      && document.querySelectorAll('#chart g.marks circle').length >= 1) ? 1 : 0;
           return { added: STATE.marks.length - before, x: m.x, y: m.y, open: open,
                    armed: STATE.armedCurve === curveShortName(d) ? 1 : 0 };`,
     checks: [['точка добавлена', 'added', 1, 0], ['координата Q', 'x', 50, 0.1],
-             ['координата P', 'y', 50, 0.1], ['блок раскрылся', 'open', 1, 0],
+             ['координата P', 'y', 50, 0.1], ['точка в списке и на холсте', 'open', 1, 0],
              ['вынос не гасит взведённую кривую', 'armed', 1, 0]],
   },
   {
@@ -1796,11 +2023,15 @@ const CASES = [
        окно, что на экране; меняется только форма поля.
 
        Проверяем новое требование: размер постоянный и заявленный. */
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (новая выгрузка, ADR 0139): размер поля задаётся в
+       пунктах — 340,5 × 226,5 pt, это прежние 12 × 8 см с точностью до
+       полумиллиметра (454 × 302 px холста при 1 px = 0,75 pt). Смысл тот же:
+       размер постоянный, окно файла равно окну экрана. */
     name: 'Экспорт · размер картинки постоянный и не зависит от окна',
     run: `pickScene('tax');
           var tex = buildTex('Проверка', 'fig:t');
           var ax = /xmin=([-\\d.]+), xmax=([-\\d.]+), ymin=([-\\d.]+), ymax=([-\\d.]+)/.exec(tex);
-          var sz = /width=([\\d.]+)cm, height=([\\d.]+)cm/.exec(tex);
+          var sz = /width=([\\d.]+)pt, height=([\\d.]+)pt/.exec(tex);
           var s = mainScales();
           var xd = s.mx.domain(), yd = s.my.domain();
           return { w: +sz[1], h: +sz[2],
@@ -1808,7 +2039,7 @@ const CASES = [
                    xmin: +ax[1], xmax: +ax[2], ymin: +ax[3], ymax: +ax[4],
                    wantXmin: xd[0], wantXmax: xd[1], wantYmin: yd[0], wantYmax: yd[1],
                    only: tex.indexOf('scale only axis') >= 0 ? 1 : 0 };`,
-    checks: [['ширина, см', 'w', 12, 0], ['высота, см', 'h', 8, 0],
+    checks: [['ширина, pt', 'w', 340.5, 0], ['высота, pt', 'h', 226.5, 0],
              ['левая граница', 'xmin', 'WANTXMIN', 0.02],
              ['правая граница', 'xmax', 'WANTXMAX', 0.02],
              ['нижняя граница', 'ymin', 'WANTYMIN', 0.02],
@@ -1901,9 +2132,20 @@ const CASES = [
           });
           pickScene('tax');
           var tex = buildTex('', '');
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: число точки на месте деления уходит подписью
+             деления ($60_{b}$ в yticklabels), а не отдельным узлом; число узлов
+             поэтому меньше прежних 11. Смысл «подписи не пропали» — подписей в
+             файле (узлы, подписи делений, имена осей) столько же, сколько видимых
+             на холсте. */
+          var vis = [].filter.call(document.querySelectorAll('#chart text'), function (t) {
+            if (t.closest('.legend') || t.closest('[data-service]')) return false;
+            // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: текст подписи — data-raw или текст без <title> (labelPlainText ушёл)
+            var r = t.getBoundingClientRect(); return (r.width > 0.5 || r.height > 0.5) && (t.getAttribute('data-raw') || (function (k) { k.querySelectorAll('title,desc').forEach(function (x) { x.remove(); }); return k.textContent; })(t.cloneNode(true))).trim();
+          }).length;
+          var st = buildTex._stats;
           return { glued: glued, withSub: withSub,
-                   texPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
-                   texNodes: (tex.match(/\\\\node\\[/g) || []).length };`,
+                   texPb: tex.indexOf('$60_{b}$') >= 0 ? 1 : 0,
+                   texNodes: st.texts + st.tickLabels + st.zeroLabels + st.axisNames - vis };`,
     /* ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО 19.08. Значения координат уехали за оси и потеряли
        имя оси: вместо «P_b = 60» на оси стоит «60» с индексом «b». Требование
        осталось тем же по сути — индекс обязан доехать до бумаги, — но искать
@@ -1920,7 +2162,7 @@ const CASES = [
     checks: [['слипшихся величин', 'glued', 0, 0],
              ['подписей с индексом', 'withSub', 61, 28],
              ['в файле цена покупателя с индексом', 'texPb', 1, 0],
-             ['подписи из файла не пропали', 'texNodes', 11, 4]],
+             ['подписей в файле столько же, сколько на холсте (разница)', 'texNodes', 0, 0]],
   },
   {
     /* А60. Подписи не налезают друг на друга.
@@ -1980,7 +2222,8 @@ const CASES = [
             if (el.scrollWidth > el.clientWidth + 1) cut++;
             if (el.scrollHeight > el.clientHeight + 1) cut++;
             if (cs.textOverflow === 'ellipsis') cut++;
-            heads[Math.round(document.querySelector('.side-head').getBoundingClientRect().height)] = 1;
+            // Перенацелено (фаза 5а): имя модели живёт в шапке модели.
+            heads[Math.round(document.querySelector('.mhead').getBoundingClientRect().height)] = 1;
           });
           pickScene('sd');
           return { cut: cut, headSizes: Object.keys(heads).length };`,
@@ -2126,16 +2369,23 @@ const CASES = [
             nodes: nodes.length,
             mathAll: (nodes.length && math === nodes.length) ? 1 : 0,
             // Координата уехала за ось и стоит одним числом с индексом (19.08).
-            hasPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
-            hasPs: tex.indexOf('$40_s$') >= 0 ? 1 : 0,
-            // Своя легенда одна: вторую, от pgfplots, убрали.
-            legend: (tex.match(/addlegendentry/g) || []).length,
+            /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): индекс набирается в фигурных
+               скобках ($60_{b}$), а число точки на месте деления — подписью
+               деления, не узлом; поэтому узлов меньше прежних 10. Легенда —
+               строки легенды pgfplots, как на экране: их столько же, сколько
+               строк нарисованной легенды, а свою вторую легенду pgfplots гасит
+               forget plot. */
+            hasPb: tex.indexOf('$60_{b}$') >= 0 ? 1 : 0,
+            hasPs: tex.indexOf('$40_{s}$') >= 0 ? 1 : 0,
+            legend: (tex.match(/addlegendentry/g) || []).length - document.querySelectorAll('#chart .legend text').length,
+            forget: ((tex.match(/\\\\addplot\\[[^\\n]*/g) || []).every(function (l) { return l.indexOf('forget plot') >= 0; })) ? 1 : 0,
           };`,
-    checks: [['подписей на холсте', 'nodes', 10, 4],
+    checks: [['подписей-узлов в файле', 'nodes', 5, 2],
              ['все математикой', 'mathAll', 1, 0],
              ['цена покупателя с индексом', 'hasPb', 1, 0],
              ['цена продавца с индексом', 'hasPs', 1, 0],
-             ['лишней легенды нет', 'legend', 0, 0]],
+             ['строк легенды столько же, сколько на холсте (разница)', 'legend', 0, 0],
+             ['у каждого \\\\addplot forget plot', 'forget', 1, 0]],
   },
   {
     /* А49. Кривая, у которой есть выражение, уходит формулой, а не таблицей
@@ -2303,7 +2553,7 @@ const CASES = [
     //   AP = 30L − L²  → максимум в L = 15, AP = 225; там же MP = 60·15 − 3·225 = 225.
     //   TP максимален там, где MP = 0: L = 20, TP = 30·400 − 8000 = 4000.
     name: 'Б2 · Производственная функция: перегиб, max AP = MP, max TP',
-    run: `pickScene('production');
+    run: `pickScene('prod');   /* перенацелено (фаза 5а): ключа 'production' нет — маршрут падал на «Спрос и предложение», а числа брались из устаревшего STATE.prod прошлых случаев */
           STATE.prodExpr = '30*L^2 - L^3'; redrawAll();
           var p = STATE.prod || {};
           return { mpL: (p.maxMP||{}).L, mpV: (p.maxMP||{}).val,
@@ -2315,7 +2565,7 @@ const CASES = [
              ['L максимума TP', 'tpL', 20, 0.1], ['max TP', 'tpV', 4000, 8]],
   },
   {
-    // Б3. TC₁ = Q², TC₂ = 2Q², предел мощности одного завода 100 (PLANT_SCAN_Q).
+    // Б3. TC₁ = Q², TC₂ = 2Q², предел мощности одного завода 100 (явные K в Э6).
     //   MC₁ = 2Q₁, MC₂ = 4Q₂. Равенство предельных ⇒ Q₂ = Q₁/2, то есть Q₁ = 2Q/3.
     //   Пока оба завода внутри мощности (Q ≤ 150):
     //     TC(Q) = (2Q/3)² + 2(Q/3)² = 4Q²/9 + 2Q²/9 = 2Q²/3.
@@ -2325,7 +2575,7 @@ const CASES = [
     //   Q = 180 → 10000 + 2·6400 = 22800; Q = 30 → 600.
     name: 'Б3 · Сложение заводов: 2Q²/3 до излома, дальше 10000 + 2(Q−100)²',
     run: `pickScene('plants');
-          STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; redrawAll();
+          STATE.pl1 = 'Q^2'; STATE.pl2 = '2*Q^2'; STATE.plCaps = [100, 100]; redrawAll();
           var at = function (q) { STATE.plQ = q; redrawAll(); var c = plantsAt(q) || {}; return c; };
           var a = at(30), b = at(60), c = at(150), d = at(180);
           return { tc30: a.tcDirect, tc60: b.tcDirect, tc150: c.tcDirect, tc180: d.tcDirect,
@@ -2392,7 +2642,9 @@ const CASES = [
                     atcQ: (STATE.minATC||{}).Q, shown: !!realMin(STATE.minAVC) };
           STATE.costsTC = '20*Q'; redrawAll();
           var b = { avc: (STATE.minAVC||{}).kind, atc: (STATE.minATC||{}).kind };
-          var txt = (document.getElementById('info-costs')||{}).innerText || '';
+          /* Пояснение блока табло с 14.10 стоит в «Разборе» (решение …81eb…, README пакета
+             calc2_panels_20261014, 5): в «Ответе» оно спрятано, ищем там, где его читают. */
+          var txt = ((document.getElementById('info-costs')||{}).innerText || '') + ' ' + ((document.getElementById('ex-body')||{}).textContent || '');
           return { a1: a.avc === 'boundary' ? 1 : 0, a2: a.atc === 'interior' ? 1 : 0,
                    atcQ: a.atcQ, shown: a.shown ? 1 : 0,
                    b1: b.avc === 'flat' ? 1 : 0, b2: b.atc === 'flat' ? 1 : 0,
@@ -2485,10 +2737,12 @@ const CASES = [
           setS('10 + Q');
           STATE.elastQS = 10; redrawAll();
           var lin = STATE.elastS || {};
-          var t1 = (document.getElementById('info-elast') || {}).innerText || '';
+          // Пояснение — в «Разборе» (с 14.10, решение …81eb…): ищем и там.
+          var exT = function () { return ((document.getElementById('info-elast') || {}).innerText || '') + ' ' + ((document.getElementById('ex-body') || {}).textContent || ''); };
+          var t1 = exT();
           setS('Q^2');
           STATE.elastQS = 10; redrawAll();
-          var t2 = (document.getElementById('info-elast') || {}).innerText || '';
+          var t2 = exT();
           return {
             Es: lin.absEs,
             // «эластично» стоит РЯДОМ с «положительный перехват», а не «неэластично».
@@ -2517,15 +2771,23 @@ const CASES = [
        проверяется прямо: тот же ключ читается ДО и ПОСЛЕ чужой сцены. */
     name: 'Б37 · Подпись оси в .tex совпадает со сценой',
     run: `resetSceneMemory();
-          var yl = function (k) { pickScene(k); redrawAll();
-            var m = /ylabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
-          var xl = function (k) { pickScene(k); redrawAll();
-            var m = /xlabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): имя оси набрано математикой
+             (ylabel={$P$}); сравнивается буква без долларов. Панели со своими
+             осями («Производственная функция») ставят имя оси сами, обычной
+             подписью у конца оси: тогда имя — подпись-узел в конце оси. */
+          var bare = function (s) { return s.replace(/\\$|\\\\mathrm|[{}]/g, ''); };
+          var node = function (tex, re) { var m = re.exec(tex); return m ? bare(m[1]) : ''; };
+          var yl = function (k) { pickScene(k); redrawAll(); var tex = buildTex('', '');
+            var m = /ylabel=\\{([^}]*)\\}/.exec(tex);
+            return m ? bare(m[1]) : node(tex, /yshift=[\\d.]+pt\\] at \\(axis cs:[\\d.]+,[\\d.]+\\) \\{(.*)\\};/); };
+          var xl = function (k) { pickScene(k); redrawAll(); var tex = buildTex('', '');
+            var m = /xlabel=\\{([^}]*)\\}/.exec(tex);
+            return m ? bare(m[1]) : node(tex, /xshift=[\\d.]+pt, yshift=-?[\\d.]+pt\\] at \\(axis cs:[\\d.]+,0\\) \\{(.*)\\};/); };
           var costs = yl('costs'), plants = yl('plants'), prodY = yl('prod'), prodX = xl('prod');
           var sd = yl('sd');
           var costsAfterProd = yl('costs'), prodAfterCosts = yl('prod');
           return { costsOk: costs === 'P' ? 1 : 0,
-                   plantsOk: plants === 'P' ? 1 : 0,
+                   plantsOk: plants === 'TC' ? 1 : 0, // Э6: согласованная ось общих затрат
                    prodOk: /TP/.test(prodY) ? 1 : 0, prodX: prodX === 'L' ? 1 : 0,
                    noLeak: (costsAfterProd === costs && prodAfterCosts === prodY) ? 1 : 0,
                    sdOk: sd === 'P' ? 1 : 0 };`,
@@ -2548,7 +2810,7 @@ const CASES = [
           var re = /\\(axis cs:(-?[\\d.]+),(-?[\\d.]+)\\)/g, m;
           while ((m = re.exec(tex))) { if (+m[1] < -1e-6 || +m[2] < -1e-6) outside++; }
           // Точка «излом MC» на графике затрат: в сцене заводов её быть не должно.
-          resetSceneMemory(); pickScene('plants'); setPlantsView('tc'); redrawAll();
+          resetSceneMemory(); pickScene('plants'); STATE.plCaps = [100, 100]; STATE.plQ = 180; setPlantsView('tc'); redrawAll();
           var names = keyTargets().map(function (k) { return k.name; }).join('|');
           var mcOnTc = /MC/.test(names) ? 1 : 0;
           setPlantsView('mc'); redrawAll();
@@ -2578,9 +2840,18 @@ const CASES = [
     run: `resetSceneMemory(); pickScene('tax'); redrawAll();
           var tex = buildTex('', '');
           var thin = /\\u202F/.test(tex) ? 1 : 0;
-          var shifted = /at \\(axis cs:0,60\\)/.test(tex) && /anchor=east[^;]*xshift=-3pt[^;]*at \\(axis cs:0,60\\)/.test(tex) ? 1 : 0;
-          var num = quantityTex('30\\u202F000');
-          var plain = quantityTex('12');
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): число точки на делении 60 стало
+             подписью деления; подпись у оси с привязкой к точке на оси и сдвигом в
+             пунктах (Т5) проверяется на числе МЕЖДУ делениями — ставка 25,
+             цена покупателя 62,5. */
+          setTax(25); redrawAll();
+          var tex25 = buildTex('', '');
+          setTax(20); redrawAll();
+          var shifted = /anchor=[a-z ]*east[^\\n]*xshift=-[\\d.]+pt[^\\n]*at \\(axis cs:0,62\\.5\\)/.test(tex25) ? 1 : 0;
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): прежний quantityTex удалён; подпись
+             холста переводит TexExport.labelTex — ожидания те же. */
+          var num = TexExport.labelTex('30\\u202F000');
+          var plain = TexExport.labelTex('12');
           return { thin: thin, shifted: shifted,
                    num: num === '$30\\\\,000$' ? 1 : 0, plain: plain === '$12$' ? 1 : 0 };`,
     checks: [['узкого пробела в файле нет', 'thin', 0, 0],
@@ -2833,7 +3104,7 @@ const CASES = [
           return { moved: moved, noScale: noScale.length, scenes: scenes.length };`,
     checks: [['сдвинутых чисел на осях', 'moved', 0, 0],
              ['сцен без разметки шкалы', 'noScale', 0, 0],
-             ['сцен всего', 'scenes', 44, 0]],   // +3: 'taxes' (объединённый сюжет налогов), 'quota' и 'sdsum' (сложение)
+             ['сцен всего', 'scenes', 46, 0]],   // Э11/Э13: добавлены firmmarket и bigopen; прежние 44 сцены остаются.
   },
 
   {
@@ -2982,7 +3253,8 @@ const CASES = [
                \\addplot есть и «domain=», и «restrict y to domain=», и без
                запятой перед словом в счёт попадали оба. */
             var domains = (tex.match(/, domain=[\\d.]+:[\\d.]+/g) || []).length;
-            var notes = (tex.match(/выгружена точками/g) || []).length;
+            // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): кривая без формулы уходит узлами расчёта модели с причиной
+            var notes = (tex.match(/узлы расчёта модели/g) || []).length;
             return { formulas: formulas, tables: tables, domains: domains, notes: notes };
           };
           var c = f('costs'), pr = f('prod'), pl = f('plants');
@@ -2997,9 +3269,9 @@ const CASES = [
              ['и ни одной таблицей', 'cT', 0, 0],
              ['производство: TP, MP, AP формулой', 'pF', 3, 0],
              ['и ни одной таблицей', 'pT', 0, 0],
-             ['заводы: TC₁ и TC₂ формулой', 'plF', 2, 0],
-             ['со своими отрезками', 'plDom', 2, 0],
-             ['а совокупная — с пояснением', 'plNotes', 1, 0],
+             ['заводы: TC₁, TC₂ и точная сумма формулой', 'plF', 3, 0],
+             ['со своими отрезками', 'plDom', 3, 0],
+             ['точная сумма не помечена численной', 'plNotes', 0, 0],
              ['символьная производная верна', 'deriv', 15, 0.001]],
   },
   {
@@ -3133,7 +3405,7 @@ const CASES = [
     run: `return (async function () {
             resetSceneMemory(); pickScene('ppf');
             document.getElementById('inp-ppf').value = 'y=100-a*x';
-            document.getElementById('btn-ppf-apply').click();
+            document.getElementById('inp-ppf').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а)
             syncParams();
             var frame = function () { return new Promise(function (r) { requestAnimationFrame(r); }); };
             await frame(); await frame();
@@ -3221,7 +3493,10 @@ const CASES = [
           var field = document.getElementById('labmin-field');
           var eq = field.querySelector('.reg-eq');
           var eqWidth = eq.getBoundingClientRect().width;
-          var panelWidth = document.getElementById('params-body').getBoundingClientRect().width;
+          /* ПЕРЕНАЦЕЛЕНО (фаза 5а): регулятор живёт в «Условии», а не в ленте
+             #params-body правой панели; «панель» — колонка, где он стоит. */
+          var host = field.closest('#tools-panel, #params-panel, #params-body');
+          var panelWidth = host ? host.getBoundingClientRect().width : 0;
           eq.click();
           var inp = field.querySelector('input.param-eq-input');
           var cs = getComputedStyle(inp);
@@ -3229,12 +3504,38 @@ const CASES = [
           var borderTop = parseFloat(cs.borderTopWidth);
           var bg = cs.backgroundColor;
           var bgFlag = (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') ? 1 : 0;
-          var widFlag = (wid > 0 && wid <= 40) ? 1 : 0;
+          // Проверяем правило «поле по содержимому», а не прежний размер шрифта.
+          // 114 в текущем Montserrat даёт 40.375px: это не растяжение до панели.
+          // Независимая линейка — отрисованный текст с тем же шрифтом, включая
+          // табличные цифры; формулу length + 1 из fitWidth здесь не повторяем.
+          var measure = document.createElement('span');
+          Object.assign(measure.style, {position:'absolute', visibility:'hidden',
+            whiteSpace:'pre', fontFamily:cs.fontFamily, fontSize:cs.fontSize,
+            fontWeight:cs.fontWeight, fontStyle:cs.fontStyle,
+            fontVariantNumeric:cs.fontVariantNumeric, letterSpacing:cs.letterSpacing});
+          document.body.appendChild(measure);
+          var padding = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+          var fontSize = parseFloat(cs.fontSize);
+          var fits = function () {
+            measure.textContent = inp.value;
+            var textWidth = measure.getBoundingClientRect().width;
+            var width = inp.getBoundingClientRect().width;
+            return width >= textWidth + padding - 1 &&
+                   width <= textWidth + padding + 1.5 * fontSize && width < panelWidth * 0.6;
+          };
+          var fitShort = fits() ? 1 : 0;
+          inp.value = '12345678'; inp.dispatchEvent(new Event('input', {bubbles:true}));
+          var fitLong = fits() ? 1 : 0;
+          var grows = inp.getBoundingClientRect().width > wid + fontSize ? 1 : 0;
+          inp.value = '114'; inp.dispatchEvent(new Event('input', {bubbles:true}));
+          measure.remove();
           var eqNarrowFlag = (eqWidth < panelWidth * 0.6) ? 1 : 0;
           inp.blur();
-          return { wid: wid, widFlag: widFlag, borderTop: borderTop, bgFlag: bgFlag,
+          return { fitShort, fitLong, grows, borderTop: borderTop, bgFlag: bgFlag,
                    eqWidth: eqWidth, panelWidth: panelWidth, eqNarrowFlag: eqNarrowFlag };`,
-    checks: [['ширина поля ≤ 40px (флаг)', 'widFlag', 1, 0.1], ['ширина поля, px (сырое)', 'wid', 20, 20],
+    checks: [['короткое число помещается без лишней ширины', 'fitShort', 1, 0],
+             ['длинное число помещается без лишней ширины', 'fitLong', 1, 0],
+             ['поле растёт вместе с числом', 'grows', 1, 0],
              ['border-top = 0', 'borderTop', 0, 0.1], ['фон прозрачный (флаг)', 'bgFlag', 1, 0.1],
              ['строка .reg-eq заметно уже панели (флаг)', 'eqNarrowFlag', 1, 0.1],
              ['ширина .reg-eq, px (сырое)', 'eqWidth', 70, 70], ['ширина #params-body, px (сырое)', 'panelWidth', 260, 260]],
@@ -3252,7 +3553,15 @@ const CASES = [
           document.querySelectorAll('.fold-btn').forEach(function (b) {
             if (b.getAttribute('aria-expanded') !== 'true') b.click();
           });
-          var t = document.getElementById('sec-eq').querySelector('.section-title');
+          /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 6): заголовок группы результатов
+             стоит над главными числами «Ответа» (#ans-title, копия заголовка
+             табло); в табло он спрятан. Меряем видимый. */
+          /* ПЕРЕНАЦЕЛЕНО (сессия 3, ADR 0144): «Ответ» строками по группам —
+             заголовок раздела равновесия стоит заголовком первой группы
+             (.ans-ghead, копия заголовка табло); #ans-title больше нет. */
+          if (typeof buildAnswer === 'function') { _answerSig = ''; buildAnswer(); }
+          var t = document.querySelector('#ans-hero .ans-ghead');
+          if (!t) t = document.getElementById('sec-eq').querySelector('.section-title');
           var textNode = Array.prototype.filter.call(t.childNodes, function (n) { return n.nodeType === 3; })[0];
           var texSpan = t.querySelector('.tex');
           var range = document.createRange();
@@ -3515,7 +3824,8 @@ const CASES = [
        и ручка упиралась в левый край. */
     name: 'Четыре дефекта (в) правка формулы обнуляет сдвиг и центрирует ручку',
     run: `var chip = function () {
-            var ch = document.querySelector('#params-curves .pchip[data-cid="1"]');
+            // Ползунок сдвига стоит под карточкой своей кривой (фаза 5б): ищем по коробке пульта.
+            var ch = document.querySelector('.pchip[data-pult-box="params-curves"][data-cid="1"]');
             if (!ch) return { shift: NaN, pos: NaN };
             var sl = ch.querySelector('input[type=range]');
             var mn = parseFloat(sl.min), mx = parseFloat(sl.max), v = parseFloat(sl.value);
@@ -3531,7 +3841,7 @@ const CASES = [
           resetSceneMemory(); pickScene('sd'); redrawAll();
           var start = chip();
           // Сдвигаем на +20 ползунком — тем же путём, что и человек.
-          var sl = document.querySelector('#params-curves .pchip[data-cid="1"] input[type=range]');
+          var sl = document.querySelector('.pchip[data-pult-box="params-curves"][data-cid="1"] input[type=range]');
           sl.value = '20'; sl.dispatchEvent(new Event('input', { bubbles: true }));
           var shifted = chip();
           // Переписываем формулу: свободный член меняется со 120 на 50.
@@ -3624,8 +3934,7 @@ const CASES = [
              формулой, и у готового KaTeX textContent это тройка «MathML +
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
-            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return __parseShown(__readShownText(e));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, price: nums[0], qd: nums[1], qs: nums[2], gap: nums[3], dwl: nums[4],
@@ -3650,8 +3959,7 @@ const CASES = [
              формулой, и у готового KaTeX textContent это тройка «MathML +
              исходная запись + видимый текст»: «30» читалось как «303030». */
           var nums = [].map.call(document.querySelectorAll('#info-eq .stat b'), function (e) {
-            var t = e.querySelector('.katex') ? katexVisibleText(e) : (e.textContent || '');
-            return parseFloat(String(t).replace(/\\u00a0|\\u2009|\\s/g, '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+            return __parseShown(__readShownText(e));
           });
           var title = (document.querySelector('#sec-eq .section-title') || {}).textContent || '';
           return { n: nums.length, Q: nums[0], P: nums[1],
@@ -4322,7 +4630,7 @@ const CASES = [
             ['input', 'change'].forEach(function (t) { f.dispatchEvent(new Event(t, { bubbles: true })); });
             var p = document.getElementById('inp-ppft-price');
             p.value = String(price); p.dispatchEvent(new Event('change', { bubbles: true }));
-            document.getElementById('btn-ppft-apply').click();
+            f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить КТВ»
             redrawAll();
             var d = STATE.ppfTradeData || {};
             return { xp: d.xp, yp: d.yp, xint: d.xint, yint: d.yint, regime: d.regime };
@@ -4430,8 +4738,10 @@ const CASES = [
           // Сцен с двумя полями всего две — считаем по всему списку.
           var two = 0;
           var keys = Object.keys(SCENE_ROUTE);
+          /* Поля рисует перерисовка синхронно: 60 мс хватает. Прежние 320 мс на каждую
+             из 44 сцен стоили ~14 с, и calc2_math подходил к пределу CI (13.10). */
           for (var i = 0; i < keys.length; i++) {
-            resetSceneMemory(); pickScene(keys[i]); await w(320); redrawAll();
+            resetSceneMemory(); pickScene(keys[i]); await w(60); redrawAll();
             if (panes().length >= 2) two++;
           }
           return { tangentPanes: t1.panes, tangentTop: t1.top, tangentBot: t1.bot,
@@ -4483,30 +4793,32 @@ const CASES = [
               if (!t.dataset.mathset) bad++;
             });
           });
-          return { bad: bad, total: total };`,
-    checks: [['обозначений обычным текстом (потолок)', 'bad', 0, 3],
-             ['обозначений всего проверено', 'total', 24, 12]],
+          return { bad: bad, covered: total >= 24 ? 1 : 0 };`,
+    // Э10 добавляет S. Число обозначений может расти; проверяем покрытие
+    // и отсутствие обычного текста, а не запрещаем новые математические подписи.
+    checks: [['обозначений обычным текстом', 'bad', 0, 0],
+             ['проверено не менее 24 обозначений', 'covered', 1, 0]],
   },
   {
-    /* (л) Исходное состояние сюжета внешних эффектов: MSB и MSC выключены и
-       равны частным кривым, поэтому оптимум совпадает с рыночным равновесием,
-       DWL равен нулю, а на графике нет ни одной общественной кривой. */
-    name: '(л) Внешние эффекты: MSB и MSC выключены по умолчанию, DWL=0',
+    /* (л) Исходное состояние сюжета внешних эффектов. С 24.10 (решение владельца …81e7…, ADR 0158; пересматривает
+       стартовую часть решения 21.08): MSC = Q + 20 включена и видна, MSB равна спросу и спрятана. Открыл модель —
+       сразу виден эффект: рынок 50, оптимум 40, DWL 100. Прежде здесь стерёгся старт «обе выключены, DWL = 0». */
+    name: '(л) Внешние эффекты: на старте MSC = Q + 20 видна, MSB спрятана, DWL=100',
     run: `pickScene('ext'); redrawAll();
           var e = STATE.ext || {};
           var labels = [].map.call(document.querySelectorAll('#chart text'), function (t) { return t.textContent.trim(); });
           var names = [].map.call(document.querySelectorAll('#chart text.curve-name'), function (t) { return t.textContent.trim(); });
-          return { msbOn: STATE.msbOn ? 1 : 0, mscOn: STATE.mscOn ? 1 : 0,
+          return { msbOn: STATE.msbOn ? 1 : 0, mscOn: STATE.mscOn ? 1 : 0, mscExpr: STATE.mscExpr,
                    boxB: document.getElementById('chk-msb').checked ? 1 : 0,
                    boxC: document.getElementById('chk-msc').checked ? 1 : 0,
-                   onChart: (labels.indexOf('MSB') >= 0 ? 1 : 0) + (labels.indexOf('MSC') >= 0 ? 1 : 0),
+                   msb: labels.indexOf('MSB') >= 0 ? 1 : 0, msc: labels.indexOf('MSC') >= 0 ? 1 : 0,
                    Qmkt: e.Qmkt, Qopt: e.Qopt, dwl: e.dwl,
                    keepD: names.indexOf('D') >= 0 ? 1 : 0, keepS: names.indexOf('S') >= 0 ? 1 : 0 };`,
-    checks: [['MSB выключен', 'msbOn', 0, 0], ['MSC выключен', 'mscOn', 0, 0],
-             ['галочка MSB снята', 'boxB', 0, 0], ['галочка MSC снята', 'boxC', 0, 0],
-             ['общественных кривых на графике нет', 'onChart', 0, 0],
-             ['рынок', 'Qmkt', 50, 0.3], ['оптимум совпал с рынком', 'Qopt', 50, 0.3],
-             ['DWL', 'dwl', 0, 1e-6],
+    checks: [['MSB выключен', 'msbOn', 0, 0], ['MSC включён', 'mscOn', 1, 0],
+             ['галочка MSB снята', 'boxB', 0, 0], ['галочка MSC стоит', 'boxC', 1, 0],
+             ['MSB на графике нет', 'msb', 0, 0], ['MSC на графике есть', 'msc', 1, 0],
+             ['рынок', 'Qmkt', 50, 0.3], ['оптимум', 'Qopt', 40, 0.3],
+             ['DWL', 'dwl', 100, 1e-6],
              ['кривая D не переименована', 'keepD', 1, 0], ['кривая S не переименована', 'keepS', 1, 0]],
   },
 
@@ -4727,10 +5039,12 @@ const CASES = [
           open('curve-expr-1');
           var back = PW.rows.map(function (r) { return r.f + '|' + r.a + '|' + r.b; }).join(' ; ');
           closePiecewise();
-          return { midDefault: (mid === '100 - Q') ? 1 : 0,
+          /* ПЕРЕНАЦЕЛЕНО (README макета 6.6): конструктор у обычной формулы
+             начинает с ЭТОЙ формулы двумя кусками; в чужом поле (S = Q) — Q. */
+          return { midDefault: (mid === 'Q') ? 1 : 0,
                    back: back,
                    ok: (back === '90 - Q|0|30 ; 60 - 0.5*Q|30|') ? 1 : 0 };`,
-    checks: [['чужое поле показало значения по умолчанию (флаг)', 'midDefault', 1, 0],
+    checks: [['чужое поле показало свою формулу, а не чужие куски (флаг)', 'midDefault', 1, 0],
              ['разбор вернул те же два куска (флаг)', 'ok', 1, 0]],
   },
   {
@@ -4912,13 +5226,15 @@ const CASES = [
           var wantSum = raw.indexOf('D') >= 0 ? 1 : 0;
           /* Полное имя обязано остаться в панели: обозначение его не заменяет,
              а сопровождает. Иначе связь холста со списком теряется. */
-          var names = [].slice.call(document.querySelectorAll('#curve-list .curve-row span.curve-name'))
+          /* С 14.10 (ADR 0152) строки суммарных кривых живут в «Виде графика», раздел «На графике». */
+          var ROWS = '#curve-list .curve-row, #wrench-pop .vg-onchart .curve-row';
+          var names = [].slice.call(document.querySelectorAll(ROWS.replace(/curve-row/g, 'curve-row span.curve-name')))
             .map(function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); });
           var full = names.filter(function (s) { return /групп/.test(s) || /рыночн/.test(s); }).length;
-          var tags = document.querySelectorAll('#curve-list .crow-tag').length;
+          var tags = document.querySelectorAll(ROWS.replace(/\.curve-row/g, ' .crow-tag')).length;
           /* Строка суммарной кривой не должна выглядеть обломком: поля формулы
              у неё нет и быть не может, но пустое место надо объяснить. */
-          var autos = document.querySelectorAll('#curve-list .crow-auto').length;
+          var autos = document.querySelectorAll(ROWS.replace(/\.curve-row/g, ' .crow-auto')).length;
           return { longOnes: longOnes, wantD1: wantD1, wantSum: wantSum,
                    full: full, tags: tags, autos: autos };`,
     checks: [['подписей длиннее четырёх знаков на холсте', 'longOnes', 0, 0],
@@ -4937,7 +5253,8 @@ const CASES = [
     run: `resetSceneMemory(); pickScene('sdsum');
           sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
           if (typeof updatePult === 'function') updatePult();
-          var chips = [].slice.call(document.querySelectorAll('#params-curves .pchip'));
+          // Ползунки сдвига стоят под карточками групп (фаза 5б): ищем по коробке пульта.
+          var chips = [].slice.call(document.querySelectorAll('.pchip[data-pult-box="params-curves"]'));
           var cut = 0, seen = {}, dupText = 0, bright = 0;
           var lum = function (c) { var f = c.map(function (x) { x /= 255;
             return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });
@@ -4950,6 +5267,11 @@ const CASES = [
             cl.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); });
             var t = cl.textContent.replace(/\s+/g, ' ').trim();
             if (/…/.test(t)) cut++;
+            /* С сессии 6 «тихих панелей» (README пакета 4, ADR 0154) строка сдвига — «Сдвиг» и число, кривую называет
+               карточка, под которой стоит ползунок: различимость — по обозначению карточки вместе со строкой. */
+            var card = ch.closest('.fc-card');
+            var nt = card && card.querySelector('.fc-notation');
+            if (nt) { var cn = nt.cloneNode(true); cn.querySelectorAll('.katex-mathml, annotation').forEach(function (x) { x.remove(); }); t = cn.textContent.replace(/\s+/g, '') + ' ' + t; }
             if (seen[t]) dupText++; else seen[t] = 1;
             /* Светлый акцент заставляет Chromium рисовать незалитую дорожку
                тёмной, и на панели оказываются рядом ползунки двух видов.
@@ -5084,7 +5406,7 @@ const CASES = [
        клавиатуру. Ширина поля формулы одна для ВСЕХ строк. */
     name: 'Приёмка · конструктор кусочной: колонки участка не ужимаются',
     run: `resetSceneMemory(); pickScene('sd'); redrawAll();
-          openPiecewise(document.querySelector('.f-slot > input'), 'Q');
+          openPiecewise(document.getElementById('curve-expr-1'), 'Q');
           PW.n = 5; renderPw();
           var card = document.querySelector('#pw-modal .modal-card');
           var slots = [], bounds = [], overflow = 0;
@@ -5757,19 +6079,25 @@ const CASES = [
             var e = document.getElementById(id);
             return e ? e.textContent : '';
           }).join(' ').replace(/\s+/g, ' ');
-          var note = document.querySelector('#ex-body .sb-note, #info-ppfsum .sb-note');
+          // Врезка самой сцены: перенесённые пояснения «Ответа» и «Условия» (.ex-from-answer, .ex-from-cond,
+          // тихие панели 14.10) стоят первыми и разбором сцены не считаются.
+          var note = document.querySelector('#ex-body .sb-note:not(.ex-from-answer):not(.ex-from-cond), #info-ppfsum .sb-note');
           var noteLen = note ? note.textContent.replace(/\s+/g, ' ').trim().length : 0;
           /* Исходники калькулятора: ищем текст врезки во всех файлах сразу. */
           var srcs = Array.prototype.map.call(document.querySelectorAll('script[src]'),
             function (t) { return t.src; }).filter(function (u) { return u.indexOf('/calc2/') >= 0; });
-          var joined = '';
+          var joined = '', readCount = 0;
           for (var i = 0; i < srcs.length; i++) {
-            try { joined += await (await fetch(srcs[i])).text(); } catch (e) { joined += ''; }
+            try { var response = await fetch(srcs[i]); var source = await response.text();
+              if (response.ok && source.trim()) { joined += source; readCount++; }
+            } catch (e) { joined += ''; }
           }
           var inSrc = (joined.indexOf('сложить по вертикали') >= 0
                        || joined.indexOf('Вертикальная сумма') >= 0) ? 1 : 0;
           return {
-            srcFiles: srcs.length,
+            // Новые модули не должны ломать инвентаризацию. Проверяем
+            // успешное чтение КАЖДОГО подключённого файла, а не старый потолок.
+            srcFiles: srcs.length >= 22 && readCount === srcs.length ? 1 : 0,
             noVertSrc: inSrc ? 0 : 1,
             noVert: parts.indexOf('сложить по вертикали') < 0 ? 1 : 0,
             noVertSum: parts.indexOf('Вертикальная сумма') < 0 ? 1 : 0,
@@ -5789,7 +6117,7 @@ const CASES = [
                 сцену, а убрать врезку велено ВЕЗДЕ. Проверка зубастости это и
                 поймала: врезка, возвращённая в соседнюю сцену, проходила мимо
                 экранной проверки незамеченной. */
-             ['файлы calc2 прочитаны', 'srcFiles', 22, 8],
+             ['все подключённые файлы calc2 прочитаны', 'srcFiles', 1, 0],
              ['текста нет и в исходниках calc2', 'noVertSrc', 1, 0],
              ['слов «Вертикальная сумма» нет', 'noVertSum', 1, 0],
              ['формулы Минковского нет', 'noMink', 1, 0],
@@ -5996,8 +6324,12 @@ function approx(got, want, tol) {
 }
 
 const browser = await chromium.launch({ args: ['--force-color-profile=srgb'] });
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его, как у
+   человека, однажды открывшего «Ответ» (зазор .ans-ghead меряется на открытой колонке). */
+keepAnswerOpen(browser);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
+await installShownReader(page);
 
 // логин
 try {
@@ -6023,6 +6355,9 @@ if (!ready) {
 
 let pass = 0, fail = 0;
 const failures = [];
+// Предусловие: колонка «Ответ» открыта — иначе замеры видимого в ней зеленеют вхолостую (ADR 0150).
+if (await answerShown(page)) { pass++; console.log('✓ предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); }
+else { fail++; failures.push('предусловие: «Ответ» закрыт'); console.log('✗ предусловие: «Ответ» закрыт (#params-panel > .side-inner не видна)'); }
 /* Отбор случаев по куску имени: `CALC2_ONLY='(е)' node calc2/tests/calc2_math.mjs`.
    Нужен для проверки зубастости — временно вернул дефект и хочешь увидеть
    ИМЕННО тот случай, который его ловит, не дожидаясь полутора сотен других.
@@ -6317,10 +6652,11 @@ await gesture('(в) ползунок меняет геометрию КТВ бе
     const f = document.getElementById('inp-ppft');
     f.value = '100 - a*X';
     document.getElementById('inp-ppft-price').value = '1.5';
-    document.getElementById('btn-ppft-apply').click(); await w(400);
+    f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(400);   // перенацелено (фаза 5а): Enter вместо «Построить КТВ»
     const before = geom();
     const d0 = STATE.ppfTradeData ? { Xmax: STATE.ppfTradeData.Xmax, yint: STATE.ppfTradeData.yint } : null;
-    const sl = [...document.querySelectorAll('#params-panel input[type=range]')]
+    // Перенацелено (фаза 5а): ползунки букв живут в «Параметрах» колонки «Условие».
+    const sl = [...document.querySelectorAll('#params-body input[type=range]')]
       .find(x => (x.id || '').indexOf('ppft') < 0);
     if (!sl) return { none: true };
     sl.value = String(Math.min(parseFloat(sl.max), 2));
@@ -6356,6 +6692,34 @@ await gesture('(е) добавленная кривая не меняет рав
                && r.drawn === 3,
            detail: `до ${JSON.stringify(r.eq0)}, после ${JSON.stringify(r.eq1)}, роль ${r.role}, `
                  + `кривых на холсте ${r.drawn}, формула «${r.expr}»` };
+});
+
+/* (ж) Сторож утечки 13.10 ВЫНЕСЕН (13.10, часть 3) в свой Django-тест
+   calc2/tests/test_calc2_memory.py → `SHORT=1 node calc2/tests/memory_probe.mjs`
+   (150 шагов «Сдвига MC», те же пороги +2 000 узлов и +400 обработчиков, очереди
+   KaTeX и MathLive). Здесь он стоил ~15 с, и calc2_math шёл 125–131 с при пределе
+   180 с: на медленной машине CI весь прибор с контрольными числами пропускался. */
+
+/* (з) «Разбор» «Дискриминации 3-й степени» без чужого абзаца про налог (13.10).
+   Модель запирает карточку вмешательства (лок L_INTERV), но признак
+   `scoped-off` ставится в конце перерисовки, а «Разбор» собирался раньше: первым
+   абзацем шёл «Потоварный налог на стороне производителя: кривая предложения S…». */
+await gesture('(з) «Разбор» дискриминации 3-й степени без абзаца про налог', async () => {
+  const tax = () => page.evaluate(() => /Потоварн/.test((document.getElementById('ex-body') || {}).textContent || ''));
+  await page.goto(`${BASE}/calc2/?m=mono-d3`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const fresh = await tax();
+  await page.goto(`${BASE}/calc2/?m=mono`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => { const s = document.querySelector('#sec-tax input[type=range]'); s.value = 20; s.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(500);
+  const mono = await tax();
+  await page.evaluate(() => openModelByUser('mono-d3'));
+  await page.waitForTimeout(900);
+  const after = await tax();
+  return { ok: !fresh && mono && !after,
+           detail: `?m=mono-d3: абзац про налог ${fresh ? 'ЕСТЬ' : 'нет'}; ?m=mono со ставкой: ${mono ? 'есть' : 'НЕТ'}; `
+                 + `mono → mono-d3: ${after ? 'ЕСТЬ' : 'нет'}` };
 });
 
 await browser.close();

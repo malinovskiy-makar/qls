@@ -7,9 +7,20 @@
 const svg = d3.select('#chart');   // корневой SVG-элемент
 let W = 0, H = 0;                  // размеры области графика в пикселях
 let sx, sy;                       // D3-шкалы: данные -> пиксели
+let _coordMarginLeft = 0;          // измеренное место под точную подпись ключевой координаты
+let _coordMarginBottom = 0;        // второй ряд близких координат остаётся под своей осью
 
 // Размер SVG берём из контейнера (обновляется при изменении окна).
 function computeSize() {
+  // Бумажный прогон выгрузки .tex: поле графика постоянного размера (72-export-tex.js).
+  if (typeof texPaperActive === 'function' && texPaperActive()) { texPaperComputeSize(); return; }
+  // Верх сайта может включать полосу рабочей версии. Фиксированные 48 px
+  // уводили низ колонок под край экрана и под кнопку чата.
+  const app = document.querySelector('.app');
+  if (app && window.innerWidth >= 760) {
+    const top = Math.max(0, app.getBoundingClientRect().top + window.scrollY) + 'px';
+    if (app.style.getPropertyValue('--calc2-app-top') !== top) app.style.setProperty('--calc2-app-top', top);
+  }
   const wrap = document.getElementById('graph-wrap');
   W = wrap.clientWidth;
   H = wrap.clientHeight;
@@ -99,7 +110,7 @@ function fitMargins() {
      Число подобрано замером живых подписей по всем сценам, а не на глаз:
      scripts/calc2_coordlabel_probe.js считает, сколько подписей залезло правее
      оси, и при этом запасе их ноль. */
-  m.left = Math.max(30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
+  m.left = Math.max(_coordMarginLeft, 30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
 
   /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
      «t (ставка)» — 76 px, «Поступления» — 106. При поле 32 такое название
@@ -109,7 +120,7 @@ function fitMargins() {
   m.right = Math.max(32, Math.min(140,
               Math.ceil(AXIS_LABEL_GAP + measureText(xName, FS.large, 600)) + 6));
 
-  m.bottom = BOTTOM_BAND;
+  m.bottom = Math.max(BOTTOM_BAND, _coordMarginBottom);
   /* Сверху: полоса под своё название графика плюс место под НАЗВАНИЕ оси Y,
      которое drawAxes печатает над стрелкой. */
   const yName = STATE.axisYName || STATE.axisYDefault || 'P';
@@ -134,6 +145,33 @@ function fitLeftForLabels(values) {
   const need = Math.max(30, Math.min(120, Math.ceil(wide) + 14));
   if (need > CONFIG.margin.left) { CONFIG.margin.left = need; makeScales(); }
   return CONFIG.margin.left;
+}
+
+/* Э3: радикал шире обычного деления. Замеряем уже набранные подписи,
+   затем один раз перестраиваем шкалы; цена остаётся слева от своей оси. */
+function fitCoordinateMargin() {
+  const node=svg.node();if(!node)return false;
+  let width=0;
+  node.querySelectorAll('text.coord-num').forEach(label=>{
+    if(label.getAttribute('text-anchor')!=='middle')width=Math.max(width,label.getBoundingClientRect().width);
+  });
+  const limit=Math.max(0,W-Math.min(240,W*.6));
+  const need=Math.min(limit,Math.ceil(width)+18);
+  let changed=false;
+  if(need>CONFIG.margin.left+1){_coordMarginLeft=need;changed=true;}
+  const xs=[...node.querySelectorAll('text.coord-num')]
+    .filter(t=>t.getAttribute('text-anchor')==='middle').map(t=>t.getBoundingClientRect());
+  // На узком холсте соседние значения занимают два ряда, без сдвига вдоль оси.
+  // Измеряем реальный шрифт; это также работает для других моделей и крупной «А».
+  const rows=[];
+  xs.sort((a,b)=>a.left-b.left).forEach(b=>{
+    let row=rows.find(r=>r.right+4<=b.left);
+    if(!row){row={right:0,height:0};rows.push(row);}
+    row.right=b.right;row.height=Math.max(row.height,b.height);
+  });
+  const bottom=12+rows.reduce((n,r)=>n+r.height+4,0);
+  if(rows.length>1 && bottom>CONFIG.margin.bottom+1){_coordMarginBottom=bottom;changed=true;}
+  return changed;
 }
 
 // Линейные шкалы по двум осям. Границы берём из CONFIG целиком: нижние
@@ -261,6 +299,7 @@ function panelZoomBy(id, factor, px, py) {
   if (!((nx1 - nx0) > 1e-9) || !((ny1 - ny0) > 1e-9)) return false;
   if (!isFinite(nx0) || !isFinite(nx1) || !isFinite(ny0) || !isFinite(ny1)) return false;
   (STATE.panelWin || (STATE.panelWin = {}))[id] = { x0: nx0, x1: nx1, y0: ny0, y1: ny1 };
+  if(typeof bigTradeSyncPriceWindow==='function')bigTradeSyncPriceWindow(id);
   return true;
 }
 
@@ -273,6 +312,7 @@ function panelPanBy(id, dxPx, dyPx) {
   const dx = (x1 - x0) * dxPx / w, dy = (y1 - y0) * dyPx / h;
   (STATE.panelWin || (STATE.panelWin = {}))[id] =
     { x0: x0 - dx, x1: x1 - dx, y0: y0 + dy, y1: y1 + dy };
+  if(typeof bigTradeSyncPriceWindow==='function')bigTradeSyncPriceWindow(id);
   return true;
 }
 
@@ -327,7 +367,7 @@ function quadLo(v) { return STATE.firstQuad ? Math.max(0, v) : v; }
    которой он выйдет на рынок, равна нулю. Готовность платить у покупателя —
    тем же: ниже нуля она не бывает.
 
-   Пока этого правила не было, излишек продавца считался ПО ВСЕЙ площади до
+   Пока этого правила не было, излишек производителя считался ПО ВСЕЙ площади до
    отрицательных цен: замер 24.08 давал PS первой группы 7 688 вместо 2 688 —
    ровно на пять тысяч больше, то есть на треугольник под осью Q.
 
@@ -362,66 +402,23 @@ function toData(px, py) { return [sx.invert(px), sy.invert(py)]; }
    само раздвинется под новые, более длинные числа. */
 const NBTHIN = ' ';        // узкий неразрывный пробел — разделитель разрядов
 
-/* ⚠️ ЧИСЛО НА ЭКРАНЕ ОКРУГЛЯЕТСЯ РОВНО В ОДНОМ МЕСТЕ (канон 2.2).
-   Глубина округления — здесь и больше нигде: любое «Math.round(v*100)/100»,
-   написанное рядом с выводом, рано или поздно разъедется с этим. */
-const SHOWN_DECIMALS = 2;
-const SHOWN_POW = Math.pow(10, SHOWN_DECIMALS);
-function roundShown(v) { return Math.round(v * SHOWN_POW) / SHOWN_POW; }
-
-/* ⚠️ СУММА СЧИТАЕТСЯ ИЗ ОКРУГЛЁННЫХ СЛАГАЕМЫХ, А НЕ ОКРУГЛЯЕТСЯ САМА (п. 1).
-   На экране стояло «SW = CS + PS», а под ним CS 907,91 + PS 907,91 = 1 815,81:
-   сумма считалась по сырым float и округлялась отдельно от слагаемых, поэтому
-   в последнем разряде расходилась с тем, что человек видит и складывает сам.
-   Первое, что заметит ученик, — именно это.
-   Математика не меняется: STATE.sw по-прежнему точная сумма, из округлённого
-   собирается только ПОКАЗ. */
+/* Э2, решение 29.10: итог складывается из точных величин. Округление —
+   только последняя операция показа, иначе 7500/9 превращалось в 833,34. */
 function fmtSum(...parts) {
-  const s = parts.reduce((acc, v) => acc + (isFinite(v) ? roundShown(v) : NaN), 0);
-  return fmt(s, sumDecimals(parts));
+  const s = parts.reduce((acc, v) => acc + (isFinite(v) ? v : NaN), 0);
+  return fmt(s);
 }
-/* Та же оговорка для разности: столбец «Δ» в таблице «До / После / Δ» обязан
-   сходиться с двумя соседними столбцами, а не считаться по сырым значениям. */
-function shownDiff(after, before) { return roundShown(after) - roundShown(before); }
+/* Э3: разность тоже считается до преобразования в запись для экрана. */
+function shownDiff(after, before) { return after - before; }
 function fmtDiff(after, before) {
   const d = shownDiff(after, before);
-  return (d > 0 ? '+' : '') + fmt(d, sumDecimals([after, before]));
+  if (d <= 0) return fmt(d);
+  const r=CalcNumber.classify(d);
+  return r.kind==='approx' ? r.text.replace('≈ ', '≈ +') : '+'+CalcNumber.factor(d);
 }
 
-/* ⚠️ У СУММЫ ТА ЖЕ ГЛУБИНА, ЧТО У СЛАГАЕМЫХ (канон 2.2).
-   «290,65 + 290,65 = 581,3» арифметически верно и всё равно читается как
-   ошибка: в столбце два знака у слагаемых и один у итога, глаз ищет
-   пропавшую копейку. Незначащий ноль печатается только там, где рядом
-   стоят числа с этим разрядом; одиночное «50» так и остаётся «50».
-   shownDecimals отвечает на вопрос «сколько знаков fmt напечатает САМ»,
-   поэтому padding никогда не срезает значащую цифру. */
-function shownDecimals(v) {
-  const r = roundShown(v);
-  if (!isFinite(r)) return 0;
-  let frac = Math.round(Math.abs(r) * SHOWN_POW) % SHOWN_POW;
-  let d = SHOWN_DECIMALS;
-  while (d > 0 && frac % 10 === 0) { frac /= 10; d--; }
-  return d;
-}
-function sumDecimals(parts) {
-  return parts.reduce((d, v) => isFinite(v) ? Math.max(d, shownDecimals(v)) : d, 0);
-}
-
-function fmt(v, minDecimals) {
-  const r = roundShown(v);
-  if (!isFinite(r)) return String(v);
-  const sign = r < 0 ? '-' : '';
-  const a = Math.abs(r);
-  const whole = Math.floor(a);
-  let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
-  const want = Math.max(shownDecimals(r), minDecimals || 0);
-  // Дробная часть отделяется ЗАПЯТОЙ: интерфейс русский (Б15).
-  if (want > 0) {
-    const frac = String(Math.round((a - whole) * SHOWN_POW))
-                   .padStart(SHOWN_DECIMALS, '0');
-    s += ',' + frac.slice(0, want);
-  }
-  return sign + s;
+function fmt(v) {
+  return CalcNumber.format(v);
 }
 
 /* То же число для ЧИСЛОВОГО ПОЛЯ. Поле type=number принимает только машинную
@@ -429,8 +426,7 @@ function fmt(v, minDecimals) {
    недопустимым, и браузер молча очищает поле. Поэтому показ и заполнение
    поля — две разные записи одного числа. */
 function fmtInput(v) {
-  const r = Math.round(v * 100) / 100;
-  return isFinite(r) ? String(r) : '';
+  return Number.isFinite(v) ? String(v) : '';
 }
 
 /* Шаг делений из «красивой» лесенки 1–2–5. Считается только от размаха окна,
@@ -490,6 +486,13 @@ function addDefs(mx, my) {
     .attr('x', x0).attr('y', y1)
     .attr('width', Math.max(0, x1 - x0))
     .attr('height', Math.max(0, y0 - y1));
+
+  // Э2: денежный перевод при субсидии может лежать ниже нулевой цены.
+  // Это отдельный слой бюджета, а не продолжение экономических D и MC.
+  defs.append('clipPath').attr('id', 'budget-clip').append('rect')
+    .attr('x', x0).attr('y', my(dy1))
+    .attr('width', Math.max(0, x1 - x0))
+    .attr('height', Math.max(0, my(dy0) - my(dy1)));
 
   /* ⚠️ ТО ЖЕ ОКНО ПЛЮС ПОЛОВИНА ТОЛЩИНЫ ЛИНИИ СНИЗУ.
      Линия, идущая ровно по нижней границе окна, теряет ровно половину своей
@@ -676,13 +679,32 @@ function coordValue(value) {
 
    Проверка живёт ЗДЕСЬ, в общей точке печати координат, а не в сценах: сцены
    не знают друг о друге, а второй такой же проверки рядом быть не должно. */
+/* ⚠️ ОДНО МЕСТО — ОДНО ЧИСЛО И С РАЗНЫМИ ИНДЕКСАМИ (сессия 7 «тихих панелей», А2; Notion …81b8…). Две величины с
+   одним числом в одной точке оси («50_рын» и «50_опт» во «Внешних эффектах» на старте) печатались друг на друге,
+   и левую срезал край холста. Теперь подпись ОДНА, с обоими индексами: «50_{рын, опт}» — число одно, и оно
+   действительно общее; различители остаются оба. Вторая подпись не рисуется, у первой дописывается индекс. */
+function coordSplit(raw) {
+  const m = /^(.*?)_(?:\{(.*)\}|(.))$/.exec(String(raw || '').trim());
+  return m ? { num: m[1], idx: (m[2] != null ? m[2] : m[3]).split(/,\s*/) } : { num: String(raw || '').trim(), idx: [] };
+}
 function coordAlreadyAt(px, horiz, text) {
   let found = false;
+  const want = coordSplit(text);
   svg.selectAll('text.coord-num').each(function () {
     if (found) return;
-    if ((this.getAttribute('data-raw') || this.textContent || '').trim() !== String(text).trim()) return;
+    const raw = (this.getAttribute('data-raw') || this.textContent || '').trim();
     const at = horiz ? +this.getAttribute('x') : +this.getAttribute('y');
-    if (isFinite(at) && Math.abs(at - px) < 6) found = true;
+    if (!isFinite(at) || Math.abs(at - px) >= 6) return;
+    // Подпись той же оси: под осью Q — по центру, у оси P — по правому краю.
+    if ((this.getAttribute('text-anchor') === 'middle') !== !!horiz) return;
+    if (raw === String(text).trim()) { found = true; return; }
+    const have = coordSplit(raw);
+    if (have.num !== want.num || !have.idx.length || !want.idx.length) return;
+    const idx = have.idx.concat(want.idx.filter(i => have.idx.indexOf(i) < 0));
+    const sel = d3.select(this);
+    sel.text(null);
+    renderLabelText(sel, have.num + '_{' + idx.join(', ') + '}');
+    found = true;
   });
   return found;
 }
@@ -930,7 +952,7 @@ function drawAxes(xLabel, yLabel, opts) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', sx(t)).attr('y', oy + 8)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'hanging')
-      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t).replace(/-/g, '−'));
   });
   // Деления и числа на оси Y.
   if (atZeroX) yTicks().forEach(t => {
@@ -941,7 +963,7 @@ function drawAxes(xLabel, yLabel, opts) {
       .attr('stroke', AX).attr('stroke-width', 1);
     g.append('text').attr('x', ox - 8).attr('y', sy(t))
       .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t));
+      .attr('class', 'axis-num').attr('font-size', FS.small).attr('fill', LBL).text(fmt(t).replace(/-/g, '−'));
   });
   // Единственный «0» в начале координат (только если начало видно).
   if (atZeroX && atZeroY) {

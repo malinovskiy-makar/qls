@@ -71,12 +71,12 @@ class TextsTests(TestCase):
         self.assertNotIn('змейк', html.lower())
         row = html[html.index('1 тур'):html.index('r-arch-1')]   # от метки тура до ссылки «Разбор»
         self.assertIn('архив', row)
-        self.assertNotIn('в таблице', row)
+        self.assertNotIn('в лидерборде', row)
 
     def test_card_meta_and_band_once_on_result(self):
         html = self.client.get(reverse('vp:variants') + '?band=10').content.decode()
         # R-fix: происхождение уже в надзаголовке карточки — в мете его нет.
-        self.assertIn('<p class="vp-vcard-m">2026/27 · 18 заданий · 70 мин</p>', html)
+        self.assertIn('<p class="vp-vcard-m">10 класс · 2026/27 · 18 заданий · 70 мин</p>', html)
         variant = load_demo('10')
         self.client.post(reverse('vp:start', args=[variant.slug]))
         attempt = VPAttempt.objects.get(variant=variant)

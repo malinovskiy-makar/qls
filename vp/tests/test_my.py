@@ -78,7 +78,7 @@ class MyAttemptsTests(TestCase):
         """Инвариант: 6 = 2 + 3 + 1, и каждый фильтр отдаёт ровно своё число."""
         html = self.page()
         self.assertIn('Все · 6', html)
-        self.assertIn('В таблице · 2', html)
+        self.assertIn('В лидерборде · 2', html)
         self.assertIn('Тренировка · 3', html)
         self.assertIn('Не сдана · 1', html)
 
@@ -97,7 +97,7 @@ class MyAttemptsTests(TestCase):
 
         done_row = [r for r in rows(self.page(f='ranked'))][0]
         self.assertIn('/vp/r/', done_row)
-        self.assertIn('в таблице', done_row)
+        self.assertIn('в лидерборде', done_row)
 
     def test_04_a_repeat_is_marked_as_one(self):
         training = self.page(f='training')
@@ -115,13 +115,13 @@ class MyAttemptsTests(TestCase):
         self.assertTrue(self.live.is_auto_submitted)
         self.assertIn('Не сдана · 0', html)
         # Попытка была ПЕРВОЙ с таймером по своему варианту, то есть зачётной:
-        # автосдача этого не меняет, и строка уходит в «В таблице», а не в «Не сдана».
-        self.assertIn('В таблице · 3', html)
+        # автосдача этого не меняет, и строка уходит в «В лидерборде», а не в «Не сдана».
+        self.assertIn('В лидерборде · 3', html)
         self.assertIn('Тренировка · 3', html)
         self.assertEqual(len(rows(self.page(f='open'))), 0)
 
     def test_06_only_the_best_ranked_attempt_carries_a_place(self):
-        """Строка на человека в таблице одна, значит и место в списке ровно одно."""
+        """Строка на человека в лидерборде одна, значит и место в списке ровно одно."""
         attempt_rows = rows(self.page(f='ranked'))
         self.assertEqual(len(attempt_rows), 2)
         self.assertEqual(sum('-е' in row for row in attempt_rows), 1)
@@ -165,15 +165,15 @@ class IntroAttemptsBlockTests(TestCase):
         self.assertNotIn('Ваши попытки по этому варианту', self.intro(Client()))
 
     def test_04_the_timer_caption_changes_once_a_ranked_attempt_exists(self):
-        self.assertIn('Первая попытка идёт в таблицу лучших попыток.', self.intro())
+        self.assertIn('Первая попытка идёт в лидерборд.', self.intro())
         self._finish()
         html = self.intro()
-        self.assertIn('Первая попытка по варианту уже в таблице; эта будет тренировкой.', html)
-        self.assertNotIn('Первая попытка идёт в таблицу лучших попыток.', html)
+        self.assertIn('Первая попытка по варианту уже в лидерборде; эта будет тренировкой.', html)
+        self.assertNotIn('Первая попытка идёт в лидерборд.', html)
 
     def test_05_an_untimed_attempt_does_not_change_the_caption(self):
         self._finish(timer=False)
-        self.assertIn('Первая попытка идёт в таблицу лучших попыток.', self.intro())
+        self.assertIn('Первая попытка идёт в лидерборд.', self.intro())
 
     def test_06_all_variants_link_is_on_the_intro(self):
         self.assertIn(reverse('vp:variants'), self.intro())

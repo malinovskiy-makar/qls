@@ -60,12 +60,15 @@ const r = await page.evaluate(async () => {
   set(2, '20'); await wait(200); out.forms.constant = STATE.curves[2].srcForm;
 
   // Крестик: штатная гаснет, добавленная удаляется
-  const del = (i) => rows()[i].querySelector('.crow-top .btn-icon:last-of-type').click();
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): крестик строки стал
+     пунктом меню «…» карточки («Убрать с графика» у штатной, «Удалить
+     функцию» у добавленной), галочка видимости — глазом карточки. */
+  const del = (i) => rows()[i].querySelector('.fc-menu .btn-icon.fc-mi').click();
   const before = STATE.curves.length;
   del(0); await wait(250);
   out.staffAfterX = { count: STATE.curves.length, visible: STATE.curves[0].visible, role: STATE.curves[0].role };
   // галочка возвращает
-  rows()[0].querySelector('input[type=checkbox]').click(); await wait(250);
+  rows()[0].querySelector('.fc-eye').click(); await wait(250);
   out.staffBack = STATE.curves[0].visible;
   del(2); await wait(250);
   out.addedAfterX = { was: before, now: STATE.curves.length };
@@ -95,7 +98,7 @@ rep('число «20» — это P(Q)', r.forms.constant === 'PQ', r.forms.cons
 rep('крестик у ШТАТНОЙ гасит, не удаляет',
     r.staffAfterX.count === 3 && r.staffAfterX.visible === false && r.staffAfterX.role === 'demand',
     JSON.stringify(r.staffAfterX));
-rep('галочка возвращает погашенную', r.staffBack === true, String(r.staffBack));
+rep('глаз возвращает погашенную', r.staffBack === true, String(r.staffBack));
 rep('крестик у ДОБАВЛЕННОЙ удаляет', r.addedAfterX.now === r.addedAfterX.was - 1, JSON.stringify(r.addedAfterX));
 if (errs.length) rep('без ошибок страницы', false, errs.slice(0, 3).join(' | '));
 await browser.close();

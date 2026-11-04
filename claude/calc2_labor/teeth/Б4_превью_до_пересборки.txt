@@ -1,0 +1,5 @@
+ПРОВАЛ превью устарело: labor-bilat, пересоберите командой node calc2/tests/previews/make_previews.mjs (отпечаток старта 8c38fdb8218e911b, в previews.json 32dd97fb03c2b7c3)
+ПРОВАЛ превью устарело: labor-mono, пересоберите командой node calc2/tests/previews/make_previews.mjs (отпечаток старта 868e50594bcc39be, в previews.json 03ada2774216b16e)
+ПРОВАЛ превью устарело: labor-union, пересоберите командой node calc2/tests/previews/make_previews.mjs (отпечаток старта 7c6e0c7eb9e40b86, в previews.json 1a69fe62cc85901b)
+ПРОВАЛ превью устарело: labor, пересоберите командой node calc2/tests/previews/make_previews.mjs (отпечаток старта c7e467c914842e17, в previews.json 31c8e6fc54fd6adc)
+ВЫГРУЗКА .tex: провалов 4 | стартов 44, своих точек и площадей 1, двух окон 5, превью сверено 42, 35.7 с

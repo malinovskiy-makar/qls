@@ -1,0 +1,482 @@
+[
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "internal",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 1600.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 1,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "producer",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 660.08,
+      "Q": 14.8,
+      "q": 14.8
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 2,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "trade",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 1777.0,
+      "Q": 48.0,
+      "q": 25.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 3,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "internal",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 661.4000000000001,
+      "Q": 21.0,
+      "q": 11.4
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "producer",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 1800.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 0,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "trade",
+        "form": "world",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 833.32,
+      "Q": 16.6,
+      "q": 16.6
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 1,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "internal",
+        "form": "buyer",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 2093.8279999999995,
+      "Q": 39.0,
+      "q": 33.4
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 2,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "producer",
+        "form": "buyer",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 591.4960000000001,
+      "Q": 17.0,
+      "q": 13.8
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "trade",
+        "form": "world",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 1400.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 4,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "internal",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 618.3600000000001,
+      "Q": 15.4,
+      "q": 13.8
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 0,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "producer",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 2150.0,
+      "Q": 50.0,
+      "q": 30.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 1,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "trade",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 817.1199999999999,
+      "Q": 17.0,
+      "q": 16.2
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "internal",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 1800.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 3,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "producer",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 605.0,
+      "Q": 15.0,
+      "q": 15.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 4,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "trade",
+        "form": "world",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 1644.0,
+      "Q": 44.0,
+      "q": 26.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 0,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "internal",
+        "form": "buyer",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 697.6400000000001,
+      "Q": 22.4,
+      "q": 11.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "producer",
+        "form": "buyer",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 1720.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 2,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "trade",
+        "form": "world",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 800.3199999999999,
+      "Q": 16.4,
+      "q": 16.4
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 3,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "internal",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 1909.5,
+      "Q": 37.0,
+      "q": 35.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 4,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "producer",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 618.3600000000001,
+      "Q": 15.4,
+      "q": 13.8
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 20,
+      "ca": -1,
+      "Pw": 30,
+      "policy": {
+        "kind": "subsidy",
+        "target": "trade",
+        "form": "unit",
+        "rate": 10
+      }
+    },
+    "grid": {
+      "profit": 1400.0,
+      "Q": 20.0,
+      "q": 20.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 1,
+      "ca": 2,
+      "Pw": 35,
+      "policy": {
+        "kind": "tax",
+        "target": "internal",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 639.4000000000001,
+      "Q": 17.0,
+      "q": 14.4
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 1,
+      "c0": 2,
+      "ca": 1,
+      "Pw": 40,
+      "policy": {
+        "kind": "subsidy",
+        "target": "producer",
+        "form": "seller",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 2277.0,
+      "Q": 48.0,
+      "q": 30.0
+    }
+  },
+  {
+    "config": {
+      "d0": 100,
+      "ds": 2,
+      "c0": 3,
+      "ca": 2,
+      "Pw": 45,
+      "policy": {
+        "kind": "tax",
+        "target": "trade",
+        "form": "world",
+        "rate": 20
+      }
+    },
+    "grid": {
+      "profit": 784.24,
+      "Q": 16.6,
+      "q": 16.0
+    }
+  }
+]

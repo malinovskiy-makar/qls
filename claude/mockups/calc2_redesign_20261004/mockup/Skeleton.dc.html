@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Один каркас на 42 модели</title>
+<script src="./support.js"></script>
+<script src="./calc-core.js"></script>
+<script src="./calc-data.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 2400px; height: {{H}}px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 28px; font-family: Montserrat, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.45; color: #2d2d2d; background: #f4eed2">
+  <div style="display: flex; flex-direction: column; gap: 8px; max-width: 1500px">
+    <h1 style="margin: 0; font-size: 32px; line-height: 1.25; font-weight: 600">Один каркас на все 42 модели</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #5c5346">Любая модель раскладывается в одни и те же семь слотов экрана. Эта таблица — спецификация: по ней собирается «Условие», холст и «Ответ» для каждой модели. Столбцы идут в том порядке, в каком слоты стоят на экране. Источник — разбор calc2: 84-picker.js, 52-modes.js, 88-params.js, 90-explain.js и файлы сцен.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px">
+    <sc-for list="{{slots}}" as="sl">
+      <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 10px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #2e2b27">{{sl.n}}</span><span style="font-size: 15px; font-weight: 600">{{sl.name}}</span></div>
+        <div style="font-size: 13px; font-weight: 500; color: #006c6d">{{sl.where}}</div>
+        <div style="font-size: 13.5px; line-height: 1.5; color: #5c5346">{{sl.what}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex-shrink: 0; display: flex; flex-direction: column; background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; overflow: hidden">
+    <div style="display: grid; grid-template-columns: {{cols}}; gap: 0; background: #2e2b27; color: #ffffff; font-size: 13px; font-weight: 600">
+      <sc-for list="{{head}}" as="h"><div style="padding: 10px 12px; border-right: 1px solid rgba(255,255,255,.12)">{{h.t}}</div></sc-for>
+    </div>
+    <sc-for list="{{blocks}}" as="bl">
+      <div style="padding: 10px 12px; font-size: 13px; font-weight: 600; color: #5c5346; background: #f4eed2; border-top: 1px solid rgba(45,45,45,.14)">{{bl.name}}</div>
+      <sc-for list="{{bl.rows}}" as="r">
+        <div style="display: grid; grid-template-columns: {{cols}}; gap: 0; border-top: 1px solid rgba(45,45,45,.08); font-size: 13.5px; line-height: 1.45">
+          <div style="padding: 9px 12px; border-right: 1px solid rgba(45,45,45,.08); display: flex; flex-direction: column; gap: 2px">
+            <span style="font-weight: 600">{{r.name}}</span>
+            <span style="font-size: 12px; color: #665e51; font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{r.key}}</span>
+            <sc-if value="{{r.live}}"><span style="align-self: flex-start; margin-top: 2px; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 999px; color: #006c6d; background: rgba(0,108,109,.09)">живая в макете</span></sc-if>
+          </div>
+          <sc-for list="{{r.cells}}" as="c"><div style="padding: 9px 12px; border-right: 1px solid rgba(45,45,45,.08); color: {{c.color}}; font-family: {{c.font}}">{{c.t}}</div></sc-for>
+        </div>
+      </sc-for>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px; max-width: 1500px; font-size: 14px; line-height: 1.6; color: #5c5346">
+    <div style="font-size: 15px; font-weight: 600; color: #2d2d2d">Как читать</div>
+    <div>«—» значит: такого слота у модели нет, и на экране его секция не рисуется вовсе (правило нуля). Особенности — то, что нельзя потерять при переносе: они проверяются отдельно.</div>
+    <div>Шесть моделей оживлены в макете целиком (спрос и предложение, налоги, пол и потолок, монополия, издержки, производная). Остальные 36 показаны тем же каркасом со схемой холста: их числа считает рабочий движок calc2.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2400,"height":4700}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const E = window.CalcEngine;
+    const slots = [
+      ['1', 'Функции', '«Условие» · карточки', 'Обозначение, имя, поле формулы, форма P(Q) или Q(P), цвет, видимость, подпись; буквы из формулы — ползунки под карточкой.'],
+      ['2', 'Параметры', '«Условие» · ползунки', 'Числа и варианты модели: цена, доход, ставка, «как задаём». Ползунок всегда с полем числа.'],
+      ['3', 'Вмешательство', '«Условие» · каскад', 'Инструмент → вид → кто платит → величина. Одна форма для налогов, потолка, квоты, МРОТ, тарифа.'],
+      ['4', 'Показать', '«Условие» · галочки', 'Площади и вспомогательные кривые, у каждой — образец цвета с холста.'],
+      ['5', 'Холст', 'центр', '1 или 2 панели, квадрат Лоренца. Ручки тянутся; щелчок по кривой зажигает её ключевые точки.'],
+      ['6', 'Ответ', '«Ответ» · числа и таблица', 'Главные числа 2×2 с «было · Δ», таблица «было / стало / Δ», итоговая функция с «Копировать».'],
+      ['7', 'Разбор', '«Ответ» · аккордеон', 'Вопрос → ответ → вывод из SCENE_EXPLAIN, текст без изменений.']
+    ].map((x) => ({ n: x[0], name: x[1], where: x[2], what: x[3] }));
+    const head = ['Модель', 'Функции', 'Параметры и ползунки', 'Вмешательство', 'Показать', 'Тянется мышью', 'Холст', 'Ответ: главное', 'Ответ: остальное', 'Итоговая функция', 'Особенности'].map((t) => ({ t: t }));
+    const cols = '200px 250px 230px 230px 190px 150px 190px 170px 190px 150px minmax(0, 1fr)';
+    if (!E) return { slots: slots, head: head, cols: cols, blocks: [], H: 4700 };
+    const dash = (x) => (x && String(x).length ? String(x) : '—');
+    const tone = (x) => (x && String(x).length ? '#2d2d2d' : '#9a917f');
+    const cell = (t, math) => ({ t: dash(t), color: tone(t), font: math ? "'STIX Two Text', 'Times New Roman', serif" : 'inherit' });
+    let rowsTotal = 0;
+    const blocks = E.BLOCKS.map((b) => {
+      const rows = E.CARDS.filter((c) => c.block === b && !c.soon).map((c) => {
+        const s = E.SPECS[c.key] || { fn: [], par: [], sl: [], show: [], hd: [], hero: [], more: [] };
+        const pretty = (x) => E.prettyExpr(String(x || '')).replace(/\^2(?![0-9.])/g, '²').replace(/\^3(?![0-9.])/g, '³');
+        const fn = s.fn.map((f) => f[0] + ' — ' + f[1].toLowerCase() + ': ' + pretty(f[2])).join('; ');
+        const par = s.par.map((x) => (x[0] ? x[0] + ' — ' : '') + x[1].toLowerCase() + ': ' + x[2]).concat(s.sl.length ? ['ползунки: ' + s.sl.join(', ')] : []).join('; ');
+        rowsTotal++;
+        return {
+          key: c.key, name: c.name, live: E.LIVE_KEYS.indexOf(c.key) >= 0,
+          cells: [cell(fn), cell(par), cell(s.iv), cell(s.show.join(', ')), cell((s.hd || []).join(', ')), cell(s.cv), cell(s.hero.join(', ')), cell(s.more.join(', ')), cell(s.ff), cell(s.note)]
+        };
+      });
+      return { name: b + ' · ' + rows.length, rows: rows };
+    }).filter((b) => b.rows.length);
+    return { slots: slots, head: head, cols: cols, blocks: blocks, H: 4700 };
+  }
+}
+</script>
+</body>
+</html>

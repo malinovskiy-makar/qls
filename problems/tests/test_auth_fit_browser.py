@@ -40,10 +40,14 @@ class AuthFitsTheWindowTest(StaticLiveServerTestCase):
             self.skipTest(out[-1500:])
         self.assertIn('###FIT-JSON###', out, out[-2000:])
         seen = json.loads(out.split('###FIT-JSON###', 1)[1].strip().splitlines()[0])
-        self.assertEqual(len(seen), 4)
-        for key, (scroll, inner, buttons, ticks) in seen.items():
+        self.assertEqual(len(seen), 10)
+        for key, (scroll, inner, buttons, ticks, width, viewport, overlap, footer_overlap) in seen.items():
             with self.subTest(key):
                 self.assertEqual(buttons, 2, 'кнопок сервисов нет — замер не как у владельца')
                 if key.startswith('/register/'):
                     self.assertEqual(ticks, 2)
-                self.assertLessEqual(scroll, inner, '%s: прокрутка %d px' % (key, scroll - inner))
+                self.assertLessEqual(width, viewport, '%s: горизонтальная прокрутка' % key)
+                self.assertFalse(overlap, '%s: заголовок перекрыт карточкой' % key)
+                self.assertFalse(footer_overlap, '%s: Telegram перекрывает подвал' % key)
+                if viewport >= 1440:
+                    self.assertLessEqual(scroll, inner, '%s: прокрутка %d px' % (key, scroll - inner))

@@ -1,0 +1,39 @@
+квота 40: {
+ "ids": [
+  "oi-quota:BUTTON/submit",
+  "open-quota-field:DIV",
+  "open-quota-name:SPAN",
+  "open-quota-val:B",
+  "open-quota-slider:INPUT/range [0…100] =20",
+  "open-quota-input:INPUT/number [0…100] =20",
+  "seg-quota:BUTTON/submit",
+  "quota-field:DIV",
+  "quota-val:B",
+  "quota-slider:INPUT/range [0…100] =40",
+  "quota-input:INPUT/number [0…100] =40",
+  "quota-price-field:DIV",
+  "quota-price-val:B",
+  "quota-price-slider:INPUT/range [0…150] =50",
+  "quota-price-range:DIV",
+  "quota-hint:DIV"
+ ],
+ "qt": {
+  "P": 50,
+  "Plo": 40,
+  "Phi": 60,
+  "cs": 1200,
+  "ps": 1200,
+  "dwl": 100
+ },
+ "pos": 0.5
+}
+P → expr «P», eq нет
+= → expr «P», eq нет
+1 → expr «1», eq 1.00;1.00
+0 → expr «10», eq 10.00;10.00
+0 → expr «100», eq 100.00;100.00
+- → expr «100», eq 100.00;100.00
+2 → expr «100-2», eq 98.00;98.00
+P → expr «100-2», eq 98.00;98.00
+Enter → expr «100-2», eq 98.00;98.00, ошибка: «»
+Ошибок страницы: 0

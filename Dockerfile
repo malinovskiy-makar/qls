@@ -50,14 +50,22 @@ ENV PYTHONUNBUFFERED=1 \
 # --build-arg (docs/SERVER.md, «Обновить сайт до свежего кода»), получает
 # `unknown`, и поведение боя от этой правки не меняется ничем — плашку
 # окружения рисует только SITE_ENV=dev, а не наличие хеша.
-ARG GIT_SHA=unknown
-ENV GIT_SHA=$GIT_SHA
+# ARG/ENV объявлены после установки пакетов: новый SHA не должен заново
+# скачивать TeX и Python-зависимости, если их состав не изменился.
 
 # libpq5 — рантайм-часть драйвера PostgreSQL. Без -dev и без компилятора.
 # curl нужен healthcheck-у контейнера.
+# Графики собирают PDF обычным pdflatex: pgfplots/TikZ, T2A и кириллица.
+# Без этих пакетов рабочая кнопка экспорта возвращала 503 на production.
+# XeLaTeX и локальные ML-зависимости сюда не добавляются. Экспорт сохраняет
+# отдельный временный каталог, запрет shell escape и ограничение чтения файлов.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpq5 curl \
+        libpq5 curl texlive-latex-base texlive-latex-extra \
+        texlive-lang-cyrillic texlive-fonts-recommended texlive-pictures cm-super \
     && rm -rf /var/lib/apt/lists/*
+
+COPY deploy/prepare_tex_fonts.py /tmp/prepare_tex_fonts.py
+RUN python /tmp/prepare_tex_fonts.py && rm /tmp/prepare_tex_fonts.py
 
 # ⚠️ ПРИЛОЖЕНИЕ РАБОТАЕТ НЕ ОТ root. Пробой в веб-приложении не должен
 # сразу давать полные права внутри контейнера.
@@ -68,6 +76,9 @@ COPY --from=build /wheels /wheels
 COPY requirements/base.txt /tmp/base.txt
 RUN pip install --no-index --find-links=/wheels -r /tmp/base.txt \
     && rm -rf /wheels /tmp/base.txt
+
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 
 WORKDIR /app
 COPY --chown=weco:weco . /app

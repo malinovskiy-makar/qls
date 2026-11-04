@@ -48,6 +48,7 @@ EXPECTED = {
     'd.landing_hero_not_clipped', 'd.landing_board_10_rows_visible',
     'd.landing_rules_dialog_opens_and_closes_by_esc',
     't.landing_no_hscroll_1024', 't.landing_no_hscroll_810',
+    *{f't.take_header_fits_{w}' for w in (768, 810, 1024)},
     # стена регистрации: гостю на интро открывается окно
     'd.intro_gate_opens_for_guest',
     # шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
@@ -92,6 +93,7 @@ EXPECTED = {
     'i.twelve_saved_indicator',
     't.warn_state', 't.warn_banner_lists_missed', 't.warn_banner_updates_on_answer',
     't.warn_contrast_both_themes', 't.offline_indicator', 't.online_saved',
+    't.warn_header_fits_tablet', 't.offline_phone_status_separate_row',
     't.danger_state', 't.danger_contrast_both_themes',
     't.timeup_redirects_to_result', 't.timeup_result_says_auto',
 }
@@ -254,7 +256,7 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
         self.assertEqual(fast.answers.get(item__number=1).raw, 'абум')
         self.assertEqual(fast.score, D('2.00'))
 
-        # События раздела: браузер отправил, /api/track/ принял, строки лежат в таблице (ADR 0127).
+        # События раздела: браузер отправил, /api/track/ принял, строки лежат в лидерборде (ADR 0127).
         names = set(Event.objects.filter(name__startswith='vp_').values_list('name', flat=True))
         self.assertGreaterEqual(names, {'vp_landing_open', 'vp_intro_open', 'vp_start', 'vp_submit',
                                         'vp_result_open', 'vp_share_click', 'vp_practice_check'})

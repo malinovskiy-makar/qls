@@ -209,13 +209,31 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
     main.push(inMain ? [q, v] : null);
     tail.push(inTail ? [q, v] : null);
   }
-  if (tail.some(p => p !== null)) {
-    g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
-      .attr('stroke-width', Math.max(1, width * 0.55)).attr('stroke-dasharray', dash)
-      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line);
+  /* Запись для выгрузки. У основной части и у продолжения формула одна, а
+     отрезок свой: граница между ними — ТОЧНЫЙ корень, а не ближайший узел
+     сетки (на экране между крайними узлами частей остаётся щель в шаг сетки). */
+  let cut = null;
+  if (o.expr) {
+    for (let i = 1; i <= N && cut == null; i++) {
+      let a = from + (end - from) * (i - 1) / N, b = from + (end - from) * i / N;
+      const va = fn(a), vb = fn(b);
+      if (!isFinite(va) || !isFinite(vb) || !(va > 0 && vb <= 0)) continue;
+      for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (fn(m) > 0) a = m; else b = m; }
+      cut = (a + b) / 2;
+    }
   }
-  const p = g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
-    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line);
+  const record = (sel, lo, hi) => {
+    if (o.expr) markExpr(sel, o.expr, 'Q', [lo, hi], { name: o.name || '' });
+    else if (o.why) markNumeric(sel, o.why, o.name || '');
+    return sel;
+  };
+  if (tail.some(p => p !== null)) {
+    record(g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
+      .attr('stroke-width', Math.max(1, width * 0.55)).attr('stroke-dasharray', dash)
+      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line), cut != null ? cut : from, stop);
+  }
+  const p = record(g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
+    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line), from, cut != null ? Math.min(cut, to) : to);
   return p;
 }
 
@@ -239,13 +257,16 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
    зная про экспорт. Кривые, у которых аналитического выражения нет вовсе
    (изокванта, сумма КПВ по Минковскому, горизонтальная сумма заводов),
    по-прежнему честно уходят точками. */
-function markExpr(sel, curveOrExpr, varName, domain) {
+function markExpr(sel, curveOrExpr, varName, domain, opt) {
   const expr = (curveOrExpr && typeof curveOrExpr === 'object')
     ? (curveOrExpr.texExpr || curveOrExpr.expr)
     : curveOrExpr;
   if (expr) {
     sel.attr('data-expr', String(expr));
     if (varName) sel.attr('data-expr-var', varName);
+    // Запись «по вертикали»: горизонтальная координата есть функция вертикальной.
+    if (opt && opt.axis === 'y') sel.attr('data-expr-axis', 'y');
+    if (opt && opt.name) sel.attr('data-expr-name', opt.name);
     /* Свой отрезок построения (Б5). Нужен кусочным кривым: у совокупных
        издержек двух заводов каждый гладкий кусок живёт на своём промежутке,
        и без этого pgfplots рисовал бы обе формулы во всю ширину. */
@@ -254,6 +275,73 @@ function markExpr(sel, curveOrExpr, varName, domain) {
     }
   }
   return sel;
+}
+
+/* ── Остальные записи для выгрузки в LaTeX (пилот «запись при рисовании») ──
+   Запись живёт на нарисованном узле, как и у markExpr: место рисования
+   сообщает, ЧТО оно нарисовало, а выгрузка сверяет запись с рисунком и
+   пишет её в файл. Картинку эти помощники не меняют. */
+
+// «Формулы у этой кривой нет»: в файл уйдут узлы расчёта модели и причина.
+function markNumeric(sel, why, name) {
+  if (name) sel.attr('data-expr-name', name);
+  return sel.attr('data-numeric', String(why || 'посчитано по точкам'));
+}
+// «Это ломаная, заданная вершинами».
+function markPoly(sel, why, name) {
+  if (name) sel.attr('data-expr-name', name);
+  return sel.attr('data-poly', String(why || 'ломаная по вершинам'));
+}
+
+/* Запись для .tex на ОБЪЕКТЕ РАСЧЁТА (кривая в STATE.macroRes, STATE.discr3,
+   STATE.kinked) ставится НЕПЕРЕЧИСЛИМЫМ свойством: рисователь её читает
+   (c.rec, c.expr), а снимок состояния модели, история и сверка редизайна со
+   старым экраном видят объект прежним. Замер 08.10: перечислимое поле меняло
+   старт 14 моделей в session_probe (п. 8, «заполненное хранилище»). */
+function texTag(obj, key, value) {
+  if (obj && typeof obj === 'object') Object.defineProperty(obj, key, { value, enumerable: false, configurable: true, writable: true });
+  return obj;
+}
+
+/* Формула кривой как функции горизонтальной величины, строкой на языке
+   Math.js; null, если такой записи у кривой нет (вертикаль, сумма по точкам,
+   непрямая кривая, введённая как Q = f(P)). */
+function curveFormula(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (c.kind === 'vertical' || c.sumNumeric) return null;
+  if (c.srcForm === 'QP') return c.linear ? ('(' + c.linear.a + ') * Q + (' + c.linear.b + ')') : null;
+  return c.texExpr || c.expr || null;
+}
+
+/* Запись для пути, нарисованного по кривой списка (продолжение, поворот,
+   участок вне четверти): формула от Q на отрезке domain; у непрямой кривой,
+   введённой как Q = f(P), — запись человека «по вертикали»; у суммы,
+   посчитанной по точкам, — узлы с причиной. */
+function markCurve(sel, c, domain, name) {
+  if (c && c.srcForm === 'QP' && c.srcExpr && !c.linear) return markExpr(sel, c.srcExpr, 'P', null, { axis: 'y', name: name || '' });
+  const e = curveFormula(c);
+  if (e) return markExpr(sel, e, 'Q', domain, { name: name || '' });
+  return markNumeric(sel, c && c.sumNumeric
+    ? 'сумма посчитана по точкам: среди слагаемых есть непрямая, записи формулой у суммы нет'
+    : 'у кривой нет записи формулой', name || '');
+}
+
+/* Область «между нижней и верхней границей на отрезке [from, to]».
+   Граница — число, объект кривой или строка формулы. floor0: граница-кривая
+   прижата к нулю снизу (нарисована через quadPrice или mcFloor); true — обе
+   границы, 'lo' или 'hi' — одна. У границы нет формулы — область честно
+   уходит узлами расчёта, с причиной. */
+function markArea(sel, rec) {
+  const side = (b, floor) => {
+    if (typeof b === 'number') return isFinite(b) ? b : null;
+    const e = (b && typeof b === 'object') ? curveFormula(b) : (b ? String(b) : null);
+    return e ? (floor ? 'max(0, ' + e + ')' : e) : null;
+  };
+  const lo = side(rec.lo, rec.floor0 === true || rec.floor0 === 'lo');
+  const hi = side(rec.hi, rec.floor0 === true || rec.floor0 === 'hi');
+  if (lo == null || hi == null) return markNumeric(sel, 'у границы области нет записи формулой');
+  if (!isFinite(rec.from) || !isFinite(rec.to)) return sel;
+  return sel.attr('data-area', JSON.stringify({ from: rec.from, to: rec.to, lo, hi, v: rec.v || 'Q' }));
 }
 
 /* Производная формулы В ВИДЕ ФОРМУЛЫ (Б4). Предельные величины движок считает
@@ -269,7 +357,15 @@ function derivativeExpr(expr, varName) {
     // Производную берёт Math.js, значит и здесь запись обязана быть на его
     // языке: символьное дифференцирование разбирает строку само.
     const src = prepExpr(String(expr)).replace(/\bx\b/g, v).replace(/\bQ\b/g, v).replace(/\bL\b/g, v);
-    const d = math.derivative(src, v).toString();
+    /* Запись с условиями (окно «Кусочная функция»): условие поднимается наверх
+       (liftConditional), и каждая ветка дифференцируется отдельно; «функции
+       нет» (NaN) остаётся собой. math.derivative условий не понимает. */
+    const dn = (node) => {
+      const n = unwrapParens(node);
+      if (n.type === 'ConditionalNode') return new math.ConditionalNode(n.condition, dn(n.trueExpr), isNaNNode(n.falseExpr) ? n.falseExpr : dn(n.falseExpr));
+      return math.derivative(n, v);
+    };
+    const d = (/\?/.test(src) ? dn(liftConditional(math.parse(src))) : math.derivative(src, v)).toString();
     // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
     const c = math.parse(d).compile();
     const probe = c.evaluate(paramScope(axisScope(1, { [v]: 1 })));
@@ -343,7 +439,12 @@ function curveAnchor(f, fromFrac, toFrac, key) {
   const at = (q) => { try { const v = f(q); return isNaN(v) ? null : v; } catch (e) { return null; } };
   let best = null, loose = null, prevQ = null, prevV = null;
   for (let i = 0; i <= N; i++) {
-    const q = qHi * (from + (to - from) * i / N);
+    // На свободной плоскости оставляем справа место для имени функции.
+    // Якорь у самой границы при изменении параметра быстро уходил за верх,
+    // заставляя подпись менять сторону и перескакивать на соседний участок.
+    const q = STATE.mode === 'graph' && fromFrac == null
+      ? qLo + (qHi - qLo) * (0.8 - 0.76 * i / N)
+      : qHi * (from + (to - from) * i / N);
     const v = at(q);
     if (v == null || v < vLo || v > vHi) { prevQ = q; prevV = v; continue; }
     // Запасное место тоже не должно уходить за четверть: иначе, когда годного
@@ -530,6 +631,77 @@ function keepAxisNamesInside() {
   });
 }
 
+/* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
+   Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
+   размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
+   («35_спрос» вдвое шире «40»), и пара, разошедшаяся якорями на девять
+   пикселей, всё равно налезала друг на друга. Раньше это скрывало разведение
+   подписей: оно двигало деление в сторону. Теперь деления прибиты, и порог
+   обязан считаться по тому же, что видит глаз, — по рамкам.
+   Сессия 7 «тихих панелей» (А2; Notion …81b8…): деление уходит и тогда, когда рамки не пересекаются, но стоят
+   ближе 4 px (вплотную «35спрос40» читалось одним числом); проход идёт ДВАЖДЫ — до разведения и после него
+   (подпись, разведённая вдоль оси, могла встать на деление); подпись под осью Q не выходит за боковой край. */
+const TICK_GAP = 4;
+function yieldTicksToCoords(node) {
+  const box0 = node.getBoundingClientRect();
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    if (t.getAttribute('text-anchor') !== 'middle') return;
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    let dx = 0;
+    if (r.left < box0.left + 2) dx = box0.left + 2 - r.left;
+    else if (r.right > box0.right - 2) dx = box0.right - 2 - r.right;
+    const cur = parseFloat(t.getAttribute('x'));
+    if (dx && isFinite(cur)) t.setAttribute('x', cur + dx);
+  });
+  const coordBoxes = [];
+  node.querySelectorAll('text.coord-num').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if (r.width > 0.5 && r.height > 0.5) coordBoxes.push(r);
+  });
+  if (!coordBoxes.length) return;
+  node.querySelectorAll('text.axis-num').forEach(t => {
+    const r = t.getBoundingClientRect();
+    if (r.width < 0.5) return;
+    const over = coordBoxes.some(c =>
+      (Math.min(r.right, c.right) - Math.max(r.left, c.left)) > -TICK_GAP &&
+      (Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) > -TICK_GAP);
+    if (over) t.remove();
+  });
+}
+
+// Ручки остаются в точках перехвата; число отступает только поперёк оси.
+function spaceAxisLabelsFromHandles() {
+  const node=svg.node();if(!node)return;
+  const handles=[...node.querySelectorAll('circle[data-service="handle"]')]
+    .map(e=>e.getBoundingClientRect()).filter(r=>r.width>0);
+  node.querySelectorAll('text.axis-num,text.coord-num').forEach(t=>{
+    const r=t.getBoundingClientRect();
+    const hits=handles.filter(h=>r.left<h.right+2&&r.right>h.left-2&&r.top<h.bottom+2&&r.bottom>h.top-2);
+    if(!hits.length)return;
+    if(t.getAttribute('text-anchor')==='middle'){
+      const dy=Math.max(...hits.map(h=>h.bottom+3-r.top));
+      t.setAttribute('y',+t.getAttribute('y')+dy);
+    }else{
+      const dx=Math.min(...hits.map(h=>h.left-3-r.right));
+      t.setAttribute('x',+t.getAttribute('x')+dx);
+    }
+  });
+}
+
+// Синхронизируем область двойного щелчка с окончательным положением подписи.
+function syncRenameHits() {
+  svg.node().querySelectorAll('text').forEach(t => {
+    const hit = t.__renameHit;
+    if (!hit) return;
+    const b = t.getBBox(), w = Math.max(RENAME_HIT_PX, b.width + 10), h = Math.max(RENAME_HIT_PX, b.height + 8);
+    if (hit.parentNode !== t.parentNode) t.parentNode.insertBefore(hit, t);
+    hit.setAttribute('x', b.x + (b.width - w) / 2);
+    hit.setAttribute('y', b.y + (b.height - h) / 2);
+    hit.setAttribute('width', w); hit.setAttribute('height', h);
+  });
+}
+
 function spreadLabels() {
   const node = svg.node();
   if (!node) return;
@@ -550,35 +722,18 @@ function spreadLabels() {
     t.setAttribute('x', cur + (box0.left + 2 - r.left));
   });
 
-  /* ⚠️ ДЕЛЕНИЕ УСТУПАЕТ МЕСТО ПОДПИСИ КООРДИНАТЫ — ПО НАСТОЯЩИМ РАМКАМ.
-     Правило владельца уже было, но срабатывало по порогу «ближе 7 px или 2 %
-     размаха», то есть по РАССТОЯНИЮ МЕЖДУ ЯКОРЯМИ. Числа бывают разной длины
-     («35_спрос» вдвое шире «40»), и пара, разошедшаяся якорями на девять
-     пикселей, всё равно налезала друг на друга. Раньше это скрывало разведение
-     подписей: оно двигало деление в сторону. Теперь деления прибиты, и порог
-     обязан считаться по тому же, что видит глаз, — по рамкам. */
-  const coordBoxes = [];
-  node.querySelectorAll('text.coord-num').forEach(t => {
-    const r = t.getBoundingClientRect();
-    if (r.width > 0.5 && r.height > 0.5) coordBoxes.push(r);
-  });
-  if (coordBoxes.length) {
-    node.querySelectorAll('text.axis-num').forEach(t => {
-      const r = t.getBoundingClientRect();
-      if (r.width < 0.5) return;
-      const over = coordBoxes.some(c =>
-        (Math.min(r.right, c.right) - Math.max(r.left, c.left)) > 1 &&
-        (Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) > 1);
-      if (over) t.remove();
-    });
-  }
+  yieldTicksToCoords(node);
 
   const items = [], anchored = [];
   node.querySelectorAll('text').forEach(t => {
-    if (t.getAttribute('data-no-spread')) return;
+    if (t.getAttribute('data-no-spread') || t.closest('g.legend')) return;
     const r = t.getBoundingClientRect();
     if (r.width < 0.5 || r.height < 0.5) return;
     const rec = { el: t, x: r.left, y: r.top, w: r.width, h: r.height };
+    if(t.hasAttribute('data-label-anchor-x')){
+      const pt=node.createSVGPoint();pt.x=+t.getAttribute('data-label-anchor-x');pt.y=+t.getAttribute('data-label-anchor-y');
+      const anchor=pt.matrixTransform(t.getScreenCTM());rec.anchor={x:anchor.x,y:anchor.y};
+    }
     /* ⚠️ ЧИСЛО НА ОСИ ПРИБИТО К СВОЕМУ МЕСТУ, И ДВИГАТЬ ЕГО НЕЛЬЗЯ.
        Деление шкалы и подпись координаты отвечают на вопрос «где именно», и
        сдвинутое число отвечает на него неправдой. А разведение подписей
@@ -602,8 +757,10 @@ function spreadLabels() {
   });
   if (items.length < 2) return;
 
-  const hit = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 2
-                     && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 2;
+  // Нужен зазор, а не разрешённое наложение на 2 px: в WebKit строки ATC/AVC
+  // высотой 14,6 px при шаге 13 формально проходили прежний порог (Э1).
+  const hit = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > -2
+                     && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > -2;
   const m = CONFIG.margin;
   /* ⚠️ ПЛАВАЮЩИЕ БЛОКИ — ТАКОЕ ЖЕ ЗАНЯТОЕ МЕСТО, ЧТО И ЧУЖАЯ ПОДПИСЬ (п. 39).
      Стопка кнопок масштаба лежит НАД холстом и вне SVG, поэтому разведение
@@ -612,8 +769,55 @@ function spreadLabels() {
   const placed = (typeof floatRects === 'function' ? floatRects() : [])
     .map(r => ({ el: null, x: r.left, y: r.top, w: r.w, h: r.h }))
     .concat(anchored);          // числа на осях не двигаются, вокруг них расходятся
+  // Легенда — единый блок: её текст не отрывается от цветных меток.
+  node.querySelectorAll('g.legend,circle[data-service="handle"]').forEach(el=>{
+    const r=el.getBoundingClientRect();if(r.width>.5)placed.push({el:null,x:r.left,y:r.top,w:r.width,h:r.height});
+  });
+  // Кривые calc2 рисуются ломаными M/L. Их отрезки тоже заняты: длинная
+  // подпись экстремума иначе могла встать прямо поперёк своей функции.
+  const ink = [];
+  if (items.some(it => it.anchor)) node.querySelectorAll('path').forEach(path => {
+    const style = getComputedStyle(path), d = path.getAttribute('d') || '';
+    if (style.stroke === 'none' || style.stroke === 'rgba(0, 0, 0, 0)' || +style.opacity === 0
+        || parseFloat(style.strokeWidth) > 6 || /[ACHQVST]/i.test(d)) return;
+    const matrix = path.getScreenCTM();
+    if (!matrix) return;
+    let previous = null;
+    for (const match of d.matchAll(/([ML])\s*([-+.\deE]+)[ ,]+([-+.\deE]+)/gi)) {
+      const point = new DOMPoint(+match[2], +match[3]).matrixTransform(matrix);
+      if (match[1].toUpperCase() === 'L' && previous) ink.push([previous, point]);
+      previous = point;
+    }
+  });
+  const crossesInk = rect => ink.some(([a, b]) => {
+    let lo = 0, hi = 1;
+    for (const [axis, min, max] of [['x', rect.x - 2, rect.x + rect.w + 2], ['y', rect.y - 2, rect.y + rect.h + 2]]) {
+      const delta = b[axis] - a[axis];
+      if (!delta) { if (a[axis] < min || a[axis] > max) return false; }
+      else {
+        const first = (min - a[axis]) / delta, last = (max - a[axis]) / delta;
+        lo = Math.max(lo, Math.min(first, last)); hi = Math.min(hi, Math.max(first, last));
+        if (lo > hi) return false;
+      }
+    }
+    return true;
+  });
   const STEP = 13;               // чуть больше строки: подпись уходит целиком
   items.forEach(it => {
+    if(it.anchor){
+      const box=node.getBoundingClientRect(),a=it.anchor,pad=8;
+      const candidates=[
+        [a.x+pad,a.y-pad-it.h],[a.x-pad-it.w,a.y-pad-it.h],
+        [a.x+pad,a.y+pad],[a.x-pad-it.w,a.y+pad],
+        [a.x-it.w/2,a.y-pad-it.h],[a.x-it.w/2,a.y+pad],
+      ].map(([x,y])=>({x:Math.max(box.left+2,Math.min(box.right-it.w-2,x)),y:Math.max(box.top+2,Math.min(box.bottom-it.h-2,y)),w:it.w,h:it.h}));
+      const score=c=>placed.reduce((s,p)=>s+(hit(c,p)?(p.tick?100:10000):0),0)
+        + (crossesInk(c) ? 1000 : 0) + Math.hypot(c.x-it.x,c.y-it.y);
+      const chosen=candidates.reduce((a,b)=>score(a)<=score(b)?a:b);
+      it.el.setAttribute('x',+it.el.getAttribute('x')+chosen.x-it.x);
+      it.el.setAttribute('y',+it.el.getAttribute('y')+chosen.y-it.y);
+      Object.assign(it,chosen);placed.push(it);return;
+    }
     if (!placed.length) { placed.push(it); return; }
     let dy = 0, dx = 0;
     /* Сначала вверх и вниз с нарастающим шагом, и только потом вбок: подпись
@@ -626,7 +830,8 @@ function spreadLabels() {
        прежним набором попыток из-под неё просто не вылезала и садилась на
        соседнюю подпись. Прежние мелкие шаги идут первыми — подпись обязана
        остаться у своего объекта, а большой сдвиг это последняя мера. */
-    const tries = [
+    const coordStep=Math.ceil(it.h+4);
+    const tries = it.only==='down' ? [[0,coordStep],[0,2*coordStep],[0,3*coordStep]] : [
       [0, -STEP], [0, STEP], [0, -2 * STEP], [0, 2 * STEP], [0, -3 * STEP], [0, 3 * STEP],
       [22, 0], [-22, 0], [26, -STEP], [-26, -STEP],
       [-46, 0], [-46, -STEP], [-46, STEP], [-70, 0], [-70, -STEP],
@@ -666,6 +871,32 @@ function spreadLabels() {
       const probe = { x: it.x + wx, y: top, w: it.w, h: it.h };
       if (!against.some(p => hit(probe, p))) { dy = wy; dx = wx; it.y = top; it.x = probe.x; break; }
     }
+    /* ⚠️ ДВЕ ПОДПИСИ КООРДИНАТ ОДНОЙ ОСИ, КОТОРЫМ НЕКУДА УЙТИ НАРУЖУ (сессия 7, А2; Notion …81b8…).
+       У оси P поле узкое: «66,67_п» и «65_min» в «Двусторонней монополии» стоят на 9 px друг от друга, и левее
+       оси второй подписи места нет. Тогда — последняя мера — подпись отходит ВДОЛЬ оси ровно настолько, чтобы не
+       лечь на соседку, и в ту сторону, где её число: большее выше (правее), меньшее ниже (левее). Порядок чисел
+       сохраняется, сдвиг — меньше высоты строки, пунктир к оси остаётся у своего числа. Одно и то же число с разными
+       индексами сюда не доходит: такие подписи сливаются в одну (coordAlreadyAt, 20-plane.js). */
+    // И после сдвига наружу: разведение по порогу 2 px оставляло касание 1–2 px (WebKit, «66,67_п» и «65_min»).
+    if (it.only) {
+      const mates = placed.filter(p => p.el && p.only === it.only);
+      const touch = (a, b) => (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) > 0.5
+                           && (Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)) > 0.5;
+      for (let n = 0; n < 4; n++) {
+        const p = mates.find(q => touch(it, q));
+        if (!p) break;
+        if (it.only === 'left') {
+          // Зазор 3 px: в WebKit рамка подписи после набора на 1–2 px выше, чем при разведении.
+          const up = (it.y + it.h / 2) < (p.y + p.h / 2);
+          const ny = up ? p.y - it.h - 3 : p.y + p.h + 3;
+          dy += ny - it.y; it.y = ny;
+        } else {
+          const lft = (it.x + it.w / 2) < (p.x + p.w / 2);
+          const nx = lft ? p.x - it.w - 2 : p.x + p.w + 2;
+          dx += nx - it.x; it.x = nx;
+        }
+      }
+    }
     if (dy) {
       const cur = parseFloat(it.el.getAttribute('y'));
       if (isFinite(cur)) it.el.setAttribute('y', cur + dy);
@@ -676,6 +907,25 @@ function spreadLabels() {
     }
     placed.push(it);
   });
+  yieldTicksToCoords(node);   // второй проход: подпись, разведённая вдоль оси, могла встать на деление
+}
+
+/* Рамки подписей зависят от шрифта: холст, нарисованный до того, как догрузился шрифт подписей, разводил их по
+   узким рамкам, и потом «35_спрос» вставала на деление «40» (сессия 7, А2). Догрузился шрифт — одна перерисовка
+   (не в бумажном прогоне выгрузки и не до первой модели). */
+let _fontsRedraw = 0;
+function redrawAfterFonts() {
+  if (_fontsRedraw) return;
+  _fontsRedraw = requestAnimationFrame(() => {
+    _fontsRedraw = 0;
+    if (typeof texPaperActive === 'function' && texPaperActive()) return;
+    if (!STATE.sceneKey || typeof redrawAll !== 'function' || !svg || !svg.node()) return;
+    redrawAll();
+  });
+}
+if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(redrawAfterFonts);
+  if (typeof document.fonts.addEventListener === 'function') document.fonts.addEventListener('loadingdone', redrawAfterFonts);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -865,12 +1115,16 @@ function applyLabelSize() {
    на 12 пикселей, а возвращается обратно, лишь когда до края остаётся столько
    же с другой стороны. На самой границе подпись больше не мигает. */
 const _labelPos = new Map();
+/* Ширина подписи по замеру прошлого кадра (px): грубая оценка «6,3 px на
+   знак» не знает набора формулой, и «MC» вылезала за правый край холста. */
+const _labelW = new Map();
 const LABEL_EASE = 0.35;       // доля пути к новому месту за одну перерисовку
 const LABEL_JUMP = 60;         // дальше этого едем сразу: масштаб сменился резко
 const FLIP_HYST = 12;          // запас на переворот выравнивания, px
 
 function smoothLabel(key, px, py, toLeft) {
-  if (!key) return { px, py, toLeft };
+  // Здесь кривая меняется сразу; отложенная анимация отрывала от неё имя.
+  if (!key || STATE.mode === 'graph') return { px, py, toLeft };
   const prev = _labelPos.get(key);
   if (!prev) { _labelPos.set(key, { px, py, toLeft }); return { px, py, toLeft }; }
   const far = Math.hypot(px - prev.px, py - prev.py) > LABEL_JUMP;
@@ -904,10 +1158,11 @@ function requestLabelFrame() {
   _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawKeepingWindow(); });
 }
 // Сцена сменилась — прошлые места подписей к ней отношения не имеют.
-function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); }
+function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); _labelW.clear(); }
 
 /* ТОЧКА ПОСТАНОВКИ ПОДПИСИ И САМА ПОДПИСЬ — ОДНО ПРАВИЛО, ДВА ПОТРЕБИТЕЛЯ.
-   Зовут её отрисовка (drawCurves) и выгрузка в .tex (buildTexFromState).
+   Звали её отрисовка (drawCurves) и прежняя выгрузка в .tex «от состояния»
+   (удалена 08.10, ADR 0139: файл теперь читает подпись с самого холста).
    Пока каждый считал место сам, выгрузка ставила подпись не туда, куда экран,
    а сверить это было нечем: экран брал якорь у curveAnchor, а файл — у
    пикселей нарисованного узла.
@@ -929,7 +1184,7 @@ function labelCurve(g, f, txt, color, opts) {
   if (!a) return null;
   const m = CONFIG.margin;
   const right = W - m.right;
-  const wide = txt.length * 6.3 + 8;              // грубая ширина текста, px
+  const wide = (_labelW.get(anchorKey) || txt.length * 6.3) + 8;   // ширина текста, px: замер или оценка
   const rawPx = sx(a.q), rawPy = sy(a.v);
   // Переворот с запасом: у самой границы решение не меняется туда-сюда.
   const over = rawPx + wide - right;
@@ -972,9 +1227,24 @@ function labelCurve(g, f, txt, color, opts) {
   // А28: название кривой набирается как величина (MC, S + t, Q_d), а не
   // обычным текстом. Решает общий разбор, тот же, что у панели и у файла.
   renderLabelText(t, txt);
+  /* Набранная подпись шире оценки: если она всё же вылезла за правый край
+     области графика, переворачиваем её влево сразу, в этом же кадре, и
+     запоминаем ширину — следующий кадр решит сторону уже по замеру. */
+  let txFinal = tx;
+  try {
+    const bb = t.node().getBBox();
+    if (bb.width > 0) {
+      _labelW.set(anchorKey, bb.width);
+      if (!toLeft && bb.x + bb.width > right + 1) {
+        txFinal = px - 6;
+        t.attr('text-anchor', 'end').attr('x', txFinal);
+        sm.toLeft = true; _labelPos.set(key, sm);
+      }
+    }
+  } catch (e) { /* холст не в документе (выгрузка) — замерять нечего */ }
   // Название кривой правится двойным щелчком прямо на графике.
   if (o.curve) {
-    makeRenamable(t, txt, tx, y, (v) => {
+    makeRenamable(t, txt, txFinal, y, (v) => {
       if (v) o.curve.label = v; else delete o.curve.label;
       renderCurveList();
     }, curveShortName(o.curve));   // одиночный щелчок по имени взводит саму кривую
@@ -1051,7 +1321,7 @@ function curveOpacity(curve) {
 }
 
 // Рисуем все видимые кривые внутри «окна» первой четверти.
-function drawCurves() {
+function drawCurves(include) {
   /* ⚠️ СЛОЙ ПОД КРИВЫЕ, ИДУЩИЕ ПО САМОЙ ОСИ, — ОТДЕЛЬНЫЙ, А НЕ ВЛОЖЕННЫЙ.
      Вложенная обрезка ПЕРЕСЕКАЕТСЯ с родительской, а не заменяет её: группа
      внутри `curves` со своим окном получала бы всё то же тесное окно и
@@ -1066,7 +1336,7 @@ function drawCurves() {
   STATE.curves.forEach(curve => {
     /* Пустая строка — это заведённое кнопкой ПОЛЕ, а не кривая: пока формулу
        не набрали, рисовать нечего (решение владельца 22.08). */
-    if (!curve.visible || !curve.expr) return;
+    if (!curve.visible || !curve.expr || (include && !include(curve))) return;
     const pts = curvePoints(curve);
     const w = curveWidth(curve);
     /* ── УЧАСТОК, КОТОРОГО НЕТ (решение владельца 25.08) ──────────────
@@ -1259,7 +1529,11 @@ const CURVE_HIT_PX = 16;
    кривой) — тот записан в карточке решений 19.08 и больше не действует.
 
    Кривая — это спрос, предложение, MR, MC, ATC, КПВ, КТВ, линия уровня,
-   вписанная человеком функция: всё, что задано формулой. Формулу правят в
+   вписанная человеком функция: всё, что задано формулой.
+
+   ИСКЛЮЧЕНИЕ ОДНО (решение владельца 13.10, ADR 0149): MC в монополии, у которой
+   есть ползунок «Сдвиг MC», тянется мышью — через setCurveFreeTerm, ровно как
+   ползунок (drawMcDragHandle, 42-scenes-mono.js). Второго не заводить. Формулу правят в
    строке ввода, и второго способа задать её у продукта нет.
 
    МАНИПУЛЯТОРЫ СЦЕНЫ ЭТО ПРАВИЛО НЕ ТРОГАЕТ. Точка клина налога t, линия
@@ -1310,12 +1584,22 @@ function setCurveFreeTerm(curve, b) {
   }
   /* Кривую перерисовывает не только холст: строка «Построения графиков» живёт
      своим списком, и без этого прохода в поле оставалась бы прежняя запись —
-     то есть ровно тот дефект, ради которого фаза и затевалась. */
-  if (typeof renderGraphRows === 'function' && document.getElementById('graph-rows'))
-    renderGraphRows();
+     то есть ровно тот дефект, ради которого фаза и затевалась.
+     ⚠️ СТРОКИ ОБНОВЛЯЮТСЯ НА МЕСТЕ, А НЕ ПЕРЕСОБИРАЮТСЯ (13.10). Этот путь идёт
+     на КАЖДОМ шаге ползунка и мыши: пересборка списка с полями MathLive стоила
+     70–150 мс на шаг и копила память (Safari ронял вкладку). Пересобирать —
+     только если строки нет (refreshCurveRow вернула false). */
+  const gRow = document.querySelector('#graph-rows .grow[data-cid="' + curve.id + '"] .f-slot > input');
+  if (gRow) setFormulaFieldQuiet(gRow, curve.expr);
+  else if (STATE.mode === 'graph' && typeof renderGraphRows === 'function') renderGraphRows();
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // труд авто-масштабируется → плавно (Фаза 4)
   redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
-  renderCurveList();  // обновим формулу в списке кривых (и слайдеры пульта — в конце renderCurveList)
+  // Формула в списке кривых — на месте; ползунки пульта идут за значением.
+  if (typeof refreshCurveRow === 'function' && refreshCurveRow(curve)) {
+    if (typeof updatePult === 'function') updatePult();
+  } else {
+    renderCurveList();
+  }
 }
 
 // TODO (будущие шаги): вернуть перетаскивание кривых, если владелец передумает;

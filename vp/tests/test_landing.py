@@ -294,7 +294,7 @@ class ClassesTests(LandingBase):
 @tour1_screens
 class DurationTests(LandingBase):
     def test_variants_that_differ_only_in_duration_share_a_table_but_not_the_minutes_claim(self):
-        """Длительность в таблице не видна: две одинаковые таблицы были бы шумом. А «за 30 минут» на
+        """Длительность в лидерборде не видна: две одинаковые таблицы были бы шумом. А «за 30 минут» на
         странице нет, раз минуты у вариантов разные."""
         other = make_published('vp-short')
         VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1500)

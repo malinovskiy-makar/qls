@@ -37,3 +37,10 @@ rapidfuzz                 # ⚠️ ЗДЕСЬ, А НЕ В base.in: команд�
                           # молча падали бы в CI. Ровно ловушка pymorphy3 выше.
                           # Импорт в команде ленивый, внутри функции — как у
                           # sentence_transformers в build_embeddings.
+
+# Прежний Windows-зависимый пакет CLI сохраняется в общем локе на macOS.
+colorama==0.4.6
+
+# Реальные проверки регистрации и входа используют Python API Playwright.
+# Версия совпадает с package-lock.json: один Chromium для обоих раннеров.
+playwright==1.62.0

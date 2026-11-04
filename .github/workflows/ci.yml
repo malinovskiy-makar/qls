@@ -41,7 +41,7 @@ jobs:
   # ---------------------------------------------------------------------
   lint:
     name: Стиль (ruff)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -77,7 +77,7 @@ jobs:
   # ---------------------------------------------------------------------
   security:
     name: Безопасность (bandit, pip-audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -125,20 +125,14 @@ jobs:
       # ⚠️ Проверяем БОЕВОЙ лок, а не dev: уязвимость в линтере на сервер
       # не поедет, а уязвимость в Django поедет.
       - name: pip-audit
-        # ⚠️ ВРЕМЕННЫЙ ИГНОР ОДНОГО CVE (решение 15.10.2026). CVE-2026-106454
-        # (GHSA-8pqf-f4m5-798g) — ReDoS в twisted/mail/imap4.py (wildcardToRegexp),
-        # twisted 26.4.0, исправленной версии нет. Нас не касается: эксплуатируется
-        # только через запущенный IMAP-сервер на Twisted, а у нас twisted приходит
-        # лишь как основа Daphne (`# via daphne` в requirements/base.txt), twisted.mail
-        # и IMAP в коде не используются. Остальные проверки pip-audit не ослаблены.
-        # Снять, когда выйдет исправленная версия twisted:
-        # https://app.notion.com/p/3fab11c92bc1818a84b7f118f6b67edd
-        run: pip-audit -r requirements/base.txt --ignore-vuln CVE-2026-106454
+        # Twisted 26.10.0 закрывает прежнее исключение CVE-2026-106454.
+        # Проверяем весь боевой лок без исключений.
+        run: pip-audit -r requirements/base.txt
 
   # ---------------------------------------------------------------------
   migrations:
     name: Миграции с нуля
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -189,11 +183,11 @@ jobs:
   # ---------------------------------------------------------------------
   tests:
     name: Тесты на PostgreSQL 17
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
-    # Полному набору хватает часа с запасом; ставим 45 минут, чтобы зависший
-    # браузерный тест не жёг раннер шесть часов по умолчанию.
-    timeout-minutes: 45
+    # Последовательный A+B на Linux занял 92 минуты (04.11.2026).
+    # Даём время всему набору; индивидуальные таймауты тестов не увеличены.
+    timeout-minutes: 120
 
     # ⚠️ ПОЧЕМУ ЗДЕСЬ НЕТ МАТРИЦЫ ПО ПРИЛОЖЕНИЯМ. Разложить набор по
     # приложениям напрашивается, но на этом проекте это не работает:
@@ -280,7 +274,13 @@ jobs:
         run: npm ci
 
       - name: Браузер для playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Настоящий PDF и кириллические шрифты
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-latex-extra texlive-lang-cyrillic texlive-fonts-recommended texlive-pictures cm-super poppler-utils
+          sudo "$(command -v python)" deploy/prepare_tex_fonts.py
 
       # Приложения перечислены поимённо, а не отдано на автопоиск: так
       # видно, что проверяется всё семь, и пропажа приложения из списка
@@ -292,33 +292,22 @@ jobs:
       # поимённый, поэтому без этой строки тесты нашлись бы локально
       # (manage.py test без аргументов) и НЕ нашлись бы в CI.
       #
-      # ⚠️ ПРОГОН ИДЁТ В ДВА ШАГА, И ЗАПУСКАЕТ ИХ СКРИПТ, А НЕ ДВЕ СТРОКИ ЗДЕСЬ.
-      # Шаг A — всё, кроме помеченных `serial`, в `--parallel auto`.
-      # Шаг B — только `serial` (живой сервер с браузером, настоящий Redis),
-      # последовательно. Причина каждой метки записана у самого класса,
-      # список — в docs/TESTING.md.
-      #
-      # Скрипт нужен ради кода возврата: две команды подряд легко написать
-      # так, что виден код только второй (`A && B` скроет падение A, если B
-      # тоже упал; `A; B` скроет всегда). scripts/run_tests.py возвращает
-      # ненулевой код, если упал ЛЮБОЙ шаг. Проверено мутацией: поломка
-      # в каждом шаге по очереди краснит джоб.
-      #
-      # ⚠️ REDIS_URL остаётся заданным на весь джоб (см. env выше). На шаге A
-      # скрипт сам уводит кэш в память процесса: воркеров четыре, а база
-      # Redis была бы одна на всех, и `cache.clear()` одного обнулял бы кэш
-      # остальным. На шаге B Redis снова настоящий — ради него `RedisLiveTests`
-      # туда и вынесены.
+      # Для объединённого выпуска владелец потребовал A и B последовательно,
+      # без --parallel. B запускается и после провала A; сохраняем ОБА кода.
+      # На A кэш локальный, на B настоящий Redis. Набор не сокращается.
       - name: Прогон (два шага)
         run: |
-          python scripts/run_tests.py \
-            problems catalog teacher student calc2 game calendar_stub config olympiads vp legal \
-            --settings=config.settings_test_pg --verbosity 2
+          set +e
+          QLS_TEST_LOCAL_CACHE=1 python manage.py test problems catalog teacher student calc2 game calendar_stub config olympiads vp legal --exclude-tag=serial --settings=config.settings_test_pg --verbosity 2 --noinput
+          result_a=$?
+          python manage.py test problems catalog teacher student calc2 game calendar_stub config olympiads vp legal --tag=serial --settings=config.settings_test_pg --verbosity 2 --noinput
+          result_b=$?
+          test "$result_a" -eq 0 && test "$result_b" -eq 0
 
   # ---------------------------------------------------------------------
   deploy-check:
     name: Продакшен-настройки
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       DJANGO_SETTINGS_MODULE: config.settings_production

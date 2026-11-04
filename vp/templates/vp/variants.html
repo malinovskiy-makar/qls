@@ -21,9 +21,7 @@
         Тренажёр ВП
       </a>
       <h1 class="vp-sel-h1">Выберите класс и вариант</h1>
-      {% if user.is_authenticated %}
-      <p class="vp-sel-sub">Первая попытка по варианту с таймером идёт в таблицу лучших попыток. Повторные – тренировка.</p>
-      {% else %}
+      {% if not user.is_authenticated %}
       <p class="vp-sel-sub">Открыть можно любой. Чтобы начать прохождение, понадобится короткая бесплатная регистрация.</p>
       {% endif %}
     </div>
@@ -46,8 +44,8 @@
         <span class="vp-vcard-src">Источник: <a class="vp-link" href="{{ card.variant.source_url }}" target="_blank" rel="noopener">{{ card.variant.source_label }}</a></span>
         {% endif %}{# год — в строке меты, отдельно в углу не повторяется #}
       </div>
-      <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant|with_band }}</a></h2>
-      <p class="vp-vcard-m">{{ card.meta }}</p>
+      <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant|variant_title }}</a></h2>
+      <p class="vp-vcard-m">{{ card.variant.grade_band|grade_label }} · {{ card.meta }}</p>
 
       <div class="vp-vcard-f">
         {% if not card.variant.is_published %}
@@ -59,7 +57,7 @@
         {% elif card.status.kind == 'ranked' %}
         <span class="vp-st is-ok">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
-          {{ card.status.ranked.score|num }} · {{ card.status.seconds|mmss }} · в таблице
+          {{ card.status.ranked.score|num }} · {{ card.status.seconds|mmss }} · в лидерборде
         </span>
         {% elif card.status.kind == 'done' %}
         <span class="vp-st">Пройден · лучший {{ card.status.best|num }}</span>
@@ -80,13 +78,6 @@
   <p class="vp-land-empty">Опубликованных вариантов пока нет.</p>
   {% endif %}
 
-  <div class="vp-sel-foot">
-    <span>Ответы сохраняются сами, проходить можно сколько угодно раз.</span>
-    {% if user.is_authenticated %}<a class="vp-link" href="{% url 'vp:my' %}">Мои попытки</a>{% endif %}
-    <a class="vp-link" href="{% url 'vp:index' %}#rules">Правила и формат</a>
-    <a class="vp-ext" href="https://olymp.hse.ru/mmo/materials-eco" target="_blank" rel="noopener">Материалы ВШЭ
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg>
-    </a>
-  </div>
+
 </div>
 {% endblock %}

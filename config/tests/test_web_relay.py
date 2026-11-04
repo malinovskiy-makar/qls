@@ -230,7 +230,8 @@ class ProdRealipScriptTests(SimpleTestCase):
         self.assertEqual(directives(parse_nginx(текст), 'set_real_ip_from'), [])
 
     def test_маска_и_мусор_отвергаются_и_файл_не_пишется(self):
-        for плохое in ('0.0.0.0/0', '0.0.0.0', '10.0.0.0/8', '192.0.2.10:443',
+        # Это запрещённые входные значения теста; сетевой сокет не открывается.
+        for плохое in ('0.0.0.0/0', '0.0.0.0', '10.0.0.0/8', '192.0.2.10:443',  # nosec B104
                        '300.1.1.1', '127.0.0.1', 'tg.weconomics.ai'):
             with self.subTest(значение=плохое):
                 код, текст = self.run_script('WEB_RELAY_IP=%s' % плохое)

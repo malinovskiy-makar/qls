@@ -6,6 +6,8 @@
    блоки результатов → в плавающее табло справа.
    --------------------------------------------------------------------- */
 const SCENE_NAMES = {
+  bigopen: 'Большие открытые экономики',
+  firmmarket: 'Рынок и фирма в СК',
   sd: 'Спрос и предложение', sdsum: 'Сложение спросов и предложений',
   tax: 'Потоварные налоги и субсидии', ceil: 'Пол и потолок цены',
   mono: 'Стандартная монополия', elast: 'Эластичность', ext: 'Внешние эффекты',
@@ -44,7 +46,7 @@ const SCENE_NAMES = {
 // с секцией sec-eq (она несёт заголовок «Равновесие»), остальные — голыми div'ами.
 // info-areacalc сюда НЕ входит: посчитанная площадь остаётся в своей секции
 // «Площади», рядом с кнопкой, которая её посчитала.
-const RESULT_IDS = ['info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
+const RESULT_IDS = ['info-bigtrade', 'info-graph', 'info-areas', 'info-sum', 'info-tax', 'info-mono', 'info-nat', 'info-costs',
   'info-prod', 'info-iso', 'info-plants', 'info-labor',
   'info-inequality', 'info-consumer', 'info-macro', 'info-math', 'info-elast', 'info-ext', 'info-open', 'info-d3', 'info-kink',
   'info-ppf', 'info-ppfsum', 'info-ppft', 'info-tb'];
@@ -89,12 +91,21 @@ function clearResultPanels() {
   // только «Убрать» рядом с кнопкой расчёта.
 }
 
-// Маленький тост для заглушек («сохранить/экспорт — скоро»).
-function toast(msg) {
+// Маленький тост. opts.action и opts.fn — кнопка действия («Вернуть» после
+// «Сбросить»); с действием тост живёт дольше (opts.ms, по умолчанию 6,5 с).
+function toast(msg, opts) {
   let t = document.getElementById('calc2-toast');
-  if (!t) { t = document.createElement('div'); t.id = 'calc2-toast'; t.className = 'toast'; document.body.appendChild(t); }
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2400);
+  if (!t) { t = document.createElement('div'); t.id = 'calc2-toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = '';
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  if (opts && opts.action && typeof opts.fn === 'function') {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'toast-act'; b.textContent = opts.action;
+    b.addEventListener('click', () => { t.classList.remove('show'); opts.fn(); });
+    t.appendChild(b);
+  }
+  t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), (opts && opts.ms) || (opts && opts.action ? 6500 : 2400));
 }
 
 function dockActive(id, on) {
@@ -105,6 +116,12 @@ function dockActive(id, on) {
    полосы со стрелкой — график при этом становится шире, поэтому после
    анимации ширины его надо перерисовать (этим занимается ResizeObserver). */
 function setSideOpen(panelId, btnId, open) {
+  /* Редизайн 10.2026: колонки «Условие» и «Ответ» не сворачиваются (их место
+     занял «Развернуть график», пункт (в) закрытого списка). Функция осталась:
+     её зовут приборы и прежние места кода, а поля формул после показа колонки
+     по-прежнему надо собрать. */
+  if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+  return;
   const p = document.getElementById(panelId);
   if (p) {
     p.classList.toggle('collapsed', !open);
@@ -158,8 +175,18 @@ function moveExplanations() {
   /* ⚠️ В КЛЮЧЕ ЕЩЁ И ВИД ВМЕШАТЕЛЬСТВА. Пояснение под ползунком переехало
      сюда (01.09), а вид вмешательства меняется БЕЗ смены сцены: с одним
      только именем сцены абзац «про потолок» остался бы висеть у пола. */
+  /* ⚠️ И САМА МОДЕЛЬ, А НЕ ТОЛЬКО БАЗОВАЯ СЦЕНА (редизайн 10.2026, фаза 1).
+     Тексты разбора у моделей одной семьи свои (SCENE_EXPLAIN: labor и
+     labor-mono, consumer и cons-slutsky), а базовая сцена у них одна: после
+     «Рынка труда» «Монопсония» показывала чужой разбор, и модель открывалась
+     по-разному в зависимости от того, что открывали до неё. */
+  /* ⚠️ И ТЕКСТ ПОЯСНЕНИЙ «УСЛОВИЯ» (тихие панели 14.10): с 14.10 они тоже идут в «Разбор»
+     (conditionNotesToExplain), а меняются без табло — у внешнего эффекта абзац свой на
+     каждый знак. Без этого «Разбор» держал прежний абзац (state_probe, ext). */
   const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '')
-              + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '');
+              + '|' + String(STATE.sceneKey || '')
+              + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '')
+              + '|' + conditionNotesSig();
   const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
   if (!changed && to._explainFor === scene && to.children.length) return;
   to._explainFor = scene;
@@ -218,6 +245,126 @@ function moveExplanations() {
     const ih = intervHintHtml();
     if (ih) to.insertAdjacentHTML('afterbegin', ih);
   }
+  answerNotesToExplain(from, to);
+  conditionNotesToExplain(to);
+}
+
+/* Пояснения «Условия» — в «Разбор» (тихие панели 14.10, этап В; решение «никаких
+   подсказок, объяснения только в «Разборе»», Notion …81eb…; README пакета 6).
+   Экономика и математика модели: абзацы .hint «Условия» (прятались под «?»), пометка
+   «коридор от … до …» у квоты и абзацы плашек «?» с пометкой data-explain. Как
+   пользоваться интерфейсом — не копируется (синтаксис формул — в клавиатуре поля).
+   Видимость — сценой (hidden, display: none, scoped-off): чужие модели не попадают.
+   Абзацы встают после вступления, перед вопросами; уже стоящий текст второй раз не
+   кладётся. */
+/* Подпись пояснений «Условия», видимых сценой: по ней «Разбор» знает, что пора собраться заново. */
+function conditionNotesSig() {
+  const root = document.getElementById('tools-panel');
+  if (!root) return '';
+  let out = '';
+  root.querySelectorAll('.hint, .hint-pop [data-explain]').forEach(n => {
+    for (let a = n; a && a !== root; a = a.parentElement) {
+      if (a.hidden || (a.style && a.style.display === 'none') || a.classList.contains('scoped-off')) return;
+    }
+    out += (n.textContent || '').length + ':' + (n.textContent || '').slice(0, 40) + ';';
+  });
+  return out;
+}
+function conditionNotesToExplain(to) {
+  const root = document.getElementById('tools-panel');
+  if (!root || !to) return;
+  /* Пересобирается целиком при каждом вызове: зовут его и сборка «Разбора», и сборка
+     «Ответа» (кадром позже — сцены правят текст своих абзацев уже после «Разбора»). */
+  to.querySelectorAll(':scope > .ex-from-cond').forEach(n => n.remove());
+  const norm = (t) => String(t || '').replace(/[\s\u00a0\u202f\u2009\u200b]+/g, ' ').trim();
+  const key = (t) => norm(t).replace(/\s+/g, '').slice(0, 60);
+  const sceneHidden = (w) => {
+    for (let n = w; n && n !== root; n = n.parentElement) {
+      if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return true;
+    }
+    return false;
+  };
+  const items = [];
+  root.querySelectorAll('.hint, .hint-pop [data-explain]').forEach(n => {
+    if (n.classList.contains('hint-keep')) return; // Живое показание остаётся рядом с регулятором.
+    if (n.closest('.sb-note-src') || n.classList.contains('sb-note-src') || sceneHidden(n)) return;
+    const c = n.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    if (!norm(c.textContent)) return;
+    items.push({ html: n.innerHTML, text: c.textContent });
+  });
+  if (!items.length) return;
+  /* Весь текст «Разбора» (ключ абзаца — его первые 60 знаков, а «Разбор» целиком не обрезается) и без невидимой
+     копии формул KaTeX (.katex-mathml): прежнее key(to.textContent) брало только первые 60 знаков «Разбора», и тот
+     же абзац клался второй раз (m-transform, tradeprice; сессия 5, А4). */
+  const have = norm((() => { const c = to.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent; })()).replace(/\s+/g, '');
+  const seen = new Set();
+  const ps = items.filter(it => {
+    const k = key(it.text);
+    if (!k || seen.has(k) || have.indexOf(k) >= 0) return false;
+    seen.add(k);
+    return true;
+  }).map(it => '<p>' + it.html + '</p>').join('');
+  if (!ps) return;
+  const html = '<div class="sb-note ex-from-cond">' + ps + '</div>';
+  const firstQ = [...to.children].find(n => n.querySelector && n.querySelector('p > b:first-child'));
+  if (firstQ) firstQ.insertAdjacentHTML('beforebegin', html); else to.insertAdjacentHTML('beforeend', html);
+}
+
+/* Пояснения «Ответа» — в «Разбор» (тихие панели 14.10, решение владельца
+   «объяснения только в «Разборе»», Notion …81eb…; README пакета 5). Заметки
+   блоков табло (.hint, .muted), строка под полосой бремени и вторая фраза строки
+   об отрезке уходят из «Ответа» (там их прячет стиль) и КОПИРУЮТСЯ сюда первыми
+   абзацами, без повторов: текст, уже стоящий в «Разборе», второй раз не кладётся.
+   Источник в табло остаётся — его читают печать, паритет и проверки. Заметка,
+   которую спрятала сама сцена (hidden, display: none, scoped-off), не идёт.
+   «до вмешательства государства» (.scope-note) не копируется: блок «Излишки» при
+   ней повторяет столбец «до» таблицы и спрятан (hideEchoes). */
+function answerNotesToExplain(from, to) {
+  if (!from || !to) return;
+  const norm = (t) => String(t || '').replace(/[\s\u00a0\u202f\u2009\u200b]+/g, ' ').trim();
+  const key = (t) => norm(t).replace(/\s+/g, '').slice(0, 60);
+  const sceneHidden = (w) => {
+    for (let n = w; n && n !== from; n = n.parentElement) {
+      if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return true;
+    }
+    return false;
+  };
+  /* Порядок — как в колонке: строка об отрезке (под шапкой), заметки блоков, чьи
+     строки стоят в главных числах (HERO), строка бремени, остальные блоки по порядку. */
+  // Блок с главными СТРОКАМИ (номер или '*'); строка таблицы «До / После» (налог, DWL) блок не поднимает.
+  const heroBlocks = new Set(((typeof HERO !== 'undefined' && HERO[STATE.sceneKey]) || [])
+    .filter(h => typeof h[1] === 'number' || h[1] === '*').map(h => h[0]));
+  const first = [], rest = [];
+  from.querySelectorAll('.hint, .muted').forEach(n => {
+    if (n.closest('.sb-note-src') || sceneHidden(n)) return;
+    const c = n.cloneNode(true);
+    c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+    if (!norm(c.textContent)) return;
+    const blk = n.closest('#sb-body > [id]');
+    (blk && heroBlocks.has(blk.id) ? first : rest).push({ html: n.innerHTML, text: c.textContent });
+  });
+  const items = [];
+  /* «Масштаб графика на ответ не влияет» — только если «Разбор» сам ещё не говорит о масштабе (в «Касательной» это уже
+     ответ на вопрос о шаге производной; сессия 5, А4: без повторов). */
+  const toLower = (to.textContent || '').toLowerCase();
+  if (typeof segNoteOn === 'function' && segNoteOn() && toLower.indexOf('масштаб') < 0) items.push({ html: SEG_NOTE_SCALE, text: SEG_NOTE_SCALE });
+  items.push(...first);
+  if (typeof burdenNoteText === 'function') { const b = burdenNoteText(); if (b) items.push({ html: b, text: b }); }
+  items.push(...rest);
+  if (!items.length) return;
+  /* Весь текст «Разбора» (ключ абзаца — его первые 60 знаков, а «Разбор» целиком не обрезается) и без невидимой
+     копии формул KaTeX (.katex-mathml): прежнее key(to.textContent) брало только первые 60 знаков «Разбора», и тот
+     же абзац клался второй раз (m-transform, tradeprice; сессия 5, А4). */
+  const have = norm((() => { const c = to.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent; })()).replace(/\s+/g, '');
+  const seen = new Set();
+  const ps = items.filter(it => {
+    const k = key(it.text);
+    if (!k || seen.has(k) || have.indexOf(k) >= 0) return false;
+    seen.add(k);
+    return true;
+  }).map(it => '<p>' + it.html + '</p>').join('');
+  if (ps) to.insertAdjacentHTML('afterbegin', '<div class="sb-note ex-from-answer">' + ps + '</div>');
 }
 
 /* Правая панель показывает ровно то, что есть: ползунки, расчёты, разбор.
@@ -235,10 +382,10 @@ function syncAnalyticsPanel() {
   if (expl) expl.classList.toggle('hidden', !hasExplain);
   const body = document.getElementById('params-body');
   const hasKnobs = !!body && !!body.querySelector('input, select, button');
-  const empty = document.getElementById('params-empty');
-  if (empty) empty.style.display = (hasKnobs || !(hasValues || hasExplain)) ? 'none' : '';
-  const panel = document.getElementById('params-panel');
-  if (panel) panel.classList.toggle('empty', !(hasKnobs || hasValues || hasExplain));
+  /* Редизайн 10.2026: колонка «Ответ» на экране всегда (пустая колонка — это
+     пустой «Ответ», а не пропавшая панель); пустого состояния «Ползунков нет»
+     больше нет вовсе (пункт (л) закрытого списка). */
+  void hasKnobs;
 }
 
 /* ── Панель ввода: список карточек (Фаза 5) ──────────────────────────
@@ -255,6 +402,9 @@ const FOLD_CHEVRON = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" st
 
 // Имена для секций, у которых своего заголовка в разметке нет.
 const SECTION_NAMES = {
+  'sec-tax': 'Вмешательство государства',
+  'sec-params': 'Параметры',
+  'sec-show': 'Показать на графике',
   'sec-costs': 'Фирма',
   'sec-labor': 'Рынок труда',
   'sec-inequality': 'Неравенство доходов',
@@ -310,11 +460,53 @@ function sectionIcon(secId) {
        + 'stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
 }
 
+/* ⚠️ РЕДИЗАЙН 10.2026: КАРТОЧКИ БОЛЬШЕ НЕ СВОРАЧИВАЮТСЯ (пункт (д) закрытого
+   списка). Скелет «заголовок + тело» остаётся (на нём стоят селекторы
+   `:scope > .fold-body` по всему коду), но заголовок — просто заголовок, а не
+   кнопка, и тело раскрыто всегда: колонка «Условие» прокручивается целиком. */
 function cardifySections() {
   document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     if (sec._card) return;
     sec._card = true;
-    sec.classList.add('card');
+    sec.classList.add('card', 'open-card');
+    // Складная кнопка уже стояла в разметке («Точки на графике», «Площади»):
+    // она становится заголовком на месте, тело раскрывается.
+    const had0 = sec.querySelector(':scope > .fold-btn');
+    if (had0) {
+      const h0 = document.createElement('h3');
+      h0.className = 'sec-head';
+      const txt0 = (had0.querySelector(':scope > span') || had0).textContent.trim();
+      h0.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+      h0.querySelector('span > b').textContent = txt0;
+      const box0 = document.getElementById(had0.getAttribute('aria-controls'));
+      if (box0) box0.classList.add('open');
+      // Значок «?» заголовка (hintsToDots) переезжает в новый заголовок (О6).
+      had0.querySelectorAll('.help-dot').forEach(d => h0.querySelector('span').appendChild(d));
+      had0.replaceWith(h0);
+      return;
+    }
+    if (!sec.querySelector(':scope > .section-title')) {
+      const vs = sec.querySelector(':scope > .vsub');
+      if (vs) { vs.classList.add('section-title'); vs.classList.remove('vsub'); }
+    }
+    const title0 = sec.querySelector(':scope > .section-title');
+    const name0 = (title0 ? title0.textContent.trim() : '') || SECTION_NAMES[sec.id] || 'Настройки';
+    const body0 = document.createElement('div');
+    body0.className = 'fold-body open';
+    body0.id = (sec.id || 'sec') + '-fold';
+    const h = document.createElement('h3');
+    h.className = 'sec-head';
+    h.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+    h.querySelector('span > b').textContent = name0;
+    if (title0) title0.querySelectorAll('.help-dot').forEach(d => h.querySelector('span').appendChild(d));
+    if (title0) title0.remove();
+    while (sec.firstChild) body0.appendChild(sec.firstChild);
+    sec.appendChild(h);
+    sec.appendChild(body0);
+  });
+  syncFirstCard();
+  if (cardifySections._legacy !== true) return;
+  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     const had = sec.querySelector(':scope > .fold-btn');
     if (had) {                                   // складной заголовок уже был
       had.setAttribute('aria-expanded', 'false');
@@ -365,6 +557,7 @@ function cardifySections() {
    ⚠️ Прибор, считающий что-либо на экране, обязан раскрывать карточки САМ —
    правило записано в calc2/CLAUDE.md, и теперь оно касается обеих панелей. */
 function collapseCards() {
+  return;   // редизайн 10.2026: карточки не сворачиваются (пункт (д))
   document.querySelectorAll('#tools-panel .tools-body > .section, #params-panel .side-part')
     .forEach(sec => {
       const btn = sec.querySelector(':scope > .fold-btn');
@@ -395,6 +588,9 @@ function syncLabelSizeSeg() {
 function openSection(secId) {
   const sec = document.getElementById(secId);
   if (!sec) return;
+  // Редизайн 10.2026: раскрывать нечего, секция всегда открыта; показываем её.
+  if (secId !== 'sec-input' && sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest' });
+  return;
   const btn = sec.querySelector(':scope > .fold-btn');
   const box = sec.querySelector(':scope > .fold-body');
   if (btn) btn.setAttribute('aria-expanded', 'true');
@@ -451,7 +647,7 @@ function syncFirstCard() {
     if (!b) return;
     if (s === named) {
       if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
-      b.textContent = 'Ввод функций';
+      b.textContent = 'Функции';
     } else if (b.dataset.ownName !== undefined) {
       b.textContent = b.dataset.ownName;
     }
@@ -459,7 +655,8 @@ function syncFirstCard() {
 }
 
 function wireScene() {
-  const rst = document.getElementById('btn-scene-reset');
+  // «Сбросить» в шапке модели (пункт (и): прежняя «Вернуть исходный вид»).
+  const rst = document.getElementById('btn-model-reset');
   if (rst) rst.addEventListener('click', resetCurrentScene);
 
   const tools = document.getElementById('tools-panel');
@@ -505,8 +702,7 @@ function wireScene() {
        функцию, определённую ТОЛЬКО на отрезке (вне его кривой нет). Нижняя
        граница была 2 и отрезала этот случай без причины. */
     if (!isFinite(n) || n < 1 || n > 12) return;
-    PW.n = n;
-    renderPw();
+    pwSetCount(n);
   });
   /* Сколько групп спроса и сколько предложения (сюжет сложения). Меняем
      число — добавляются или убираются ТОЛЬКО хвостовые группы, уже набранные
@@ -520,9 +716,19 @@ function wireScene() {
       if (typeof sumSetCount === 'function') sumSetCount(side, n);
     });
   });
+  const pwX = document.getElementById('pw-x');
+  if (pwX) pwX.addEventListener('click', () => closePiecewise());
+  const pwMinus = document.getElementById('pw-minus'), pwPlus = document.getElementById('pw-plus');
+  if (pwMinus) pwMinus.addEventListener('click', () => pwSetCount(PW.n - 1));
+  if (pwPlus) pwPlus.addEventListener('click', () => pwSetCount(PW.n + 1));
+  const pwAdd = document.getElementById('pw-add');
+  if (pwAdd) pwAdd.addEventListener('click', () => pwAddRow());
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
+    // С ошибкой «Готово» запись не применяет: тост с текстом ошибки (раздел 10).
+    if (PW.error) { toast(PW.error); return; }
     if (PW.inp) {
+      if (typeof pushUndo === 'function') pushUndo('Кусочная функция');
       // Движку — цепочку условий, полю — одну фигурную скобку. Правится она
       // прямо в строке: разбор скобки обратно в выражение умеет latexToMath.
       // Приставка («y = », «P = ») читается из ТЕКУЩЕГО значения поля и
@@ -541,14 +747,13 @@ function wireScene() {
          конца и здесь. */
       PW.inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }
+    const inList = PW.inp && PW.inp.closest('#curve-list');
     closePiecewise();
+    // Карточка функции показывает кусочную запись скобкой: пересобираем список.
+    if (inList && typeof renderCurveList === 'function') renderCurveList();
   });
-  const expPng = document.getElementById('exp-png');
-  if (expPng) expPng.addEventListener('click', () => exportPNG(2));   // 2× — читаемо в печати
-  const expTex = document.getElementById('exp-tex');
-  if (expTex) expTex.addEventListener('click', () => exportTex());
-  const expPdf = document.getElementById('exp-pdf');
-  if (expPdf) expPdf.addEventListener('click', () => exportPDF());
+  // Окно «Скачать»: формат и одна кнопка (70-scenes-math.js, wireExport).
+  if (typeof wireExport === 'function') wireExport();
 
   // «Ко всем моделям».
   const back = document.getElementById('scene-back');
@@ -619,6 +824,8 @@ function wireScene() {
    же восстановит ровно то, что мы отменяем. Другие модели не трогаем: у
    каждой снимок свой. */
 function resetCurrentScene() {
+  // Редизайн 10.2026: сброс обратим — шаг истории и «Вернуть» в тосте.
+  if (typeof resetModelWithUndo === 'function') { resetModelWithUndo(); return; }
   const key = STATE.sceneKey;
   if (!key) return;
   if (typeof forgetSceneSnapshot === 'function') forgetSceneSnapshot(key);
@@ -628,7 +835,7 @@ function resetCurrentScene() {
 
 function setWrenchOpen(open) {
   const pop = document.getElementById('wrench-pop');
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   if (!pop) return;
   pop.classList.toggle('open', open);
   if (btn) { btn.classList.toggle('on', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
@@ -852,7 +1059,13 @@ function fitTipMath(t) {
   ffFitCases(host.querySelector('.ff-math'));
 }
 
+/* ⚠️ ТИХИЕ ПАНЕЛИ (решение владельца 14.10 «никаких подсказок», Notion …81eb…; ADR 0151):
+   плашка больше не показывается ни по наведению, ни по фокусу, ни по касанию.
+   Текст `data-tip` остаётся невидимой подписью `aria-label` (syncTipLabels) —
+   её читает экранный диктор. Пояснения живут только в «Разборе». */
+const HINT_TIP_OFF = true;
 function showHintTip(dot, html) {
+  if (HINT_TIP_OFF) { hideHintTip(); return; }
   const t = hintTip();
   t.innerHTML = html;
   t.classList.remove('tip-math');
@@ -885,6 +1098,11 @@ function showHintTip(dot, html) {
   ];
   const controls = Array.from(document.querySelectorAll(
     'button, input, select, textarea, a[href], [data-tip]'));
+  /* Холст — тоже препятствие (то же правило): карточка функции широкая, и
+     место «справа» у неё приходилось ровно на холст (прибор final_fn_probe,
+     «плашка не залезает на холст»). Подсказки самого холста его не избегают. */
+  const chartEl = document.getElementById('chart');
+  if (chartEl && !chartEl.contains(dot)) controls.push(chartEl);
   const covers = (x, y) => controls.some(el => {
     if (el === dot || el.contains(dot) || dot.contains(el)) return false;
     const r = el.getBoundingClientRect();
@@ -1015,7 +1233,7 @@ function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
    постоянная проверка.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const FF_MAX_PX = 15;   // канонический кегль записи: крупнее чисел табло (13)
+const FF_MAX_PX = 22;   // кегль записи в «Ответе» (тихие панели 14.10, README 5; было 15). Отступление ADR 0048 прежнее
 const FF_MIN_PX = 13;   // ниже НЕ опускаемся — подгонку до 10 владелец забраковал
 /* Кегль УСЛОВИЯ участка (решение владельца 31.08): 11 px в покое, 10 px —
    первый шаг отступления при нехватке ширины. Условие набирается своим KaTeX
@@ -1421,7 +1639,9 @@ function markNotationsIn(root) {
      Её и так набирает формулой paintEqLabel, а имя для неё читается обратно из
      той же подписи. Разметив её здесь, мы кормили бы чтение собственным
      выводом: «Цена P» → «Цена $P$» → на экране «Цена PPP» (замер 24.08). */
-  const SKIP = '.katex, math-field, input, textarea, code, script, style, '
+  /* select и option — тоже (COVERAGE О29): в <option> разметка не набирается,
+     и «D, спрос» превращался в «DDD, спрос». */
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, select, option, '
              + '.f-typeset, .mf-hidden, .param-eq, .pchip-label, .reg-eq';
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {
@@ -1494,18 +1714,31 @@ function wireTips() {
   document.addEventListener('click', (e) => { if (near(e)) hideHintTip(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideHintTip(); });
   syncTipLabels();
+  /* Узлы с data-tip появляются и позже (строки кривых, окна, ползунки): подпись для
+     диктора раздаётся им на кадре после появления. Наблюдатель смотрит только
+     на data-tip и новые узлы; сам он пишет aria-label — на него не отвечает. */
+  if (typeof MutationObserver === 'function') {
+    let queued = false;
+    new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; syncTipLabels(); });
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-tip'] });
+  }
 }
 
 /* п. 81. Один текст на подпись и на чтеца. Своего `aria-label` у кнопки с
    подсказкой нет: он собирается из того же `data-tip`, и разойтись им негде.
    Зовётся и после смены подписи (стрелки панелей меняют её на «Открыть» и
    «Закрыть»). */
+/* С 14.10 (ADR 0151) плашки нет вовсе: подпись `aria-label` получает КАЖДЫЙ узел с
+   `data-tip`, не только кнопка-иконка, — иначе его пояснение пропало бы совсем. */
 function syncTipLabels() {
   document.querySelectorAll('[data-tip]').forEach(el => {
     const t = tipText(el);
     if (!t) return;
-    const own = (el.textContent || '').trim();
-    if (!own) el.setAttribute('aria-label', tipPlain(t));   // у кнопки-иконки своего текста нет
+    const a = tipPlain(t);
+    if (el.getAttribute('aria-label') !== a) el.setAttribute('aria-label', a);
   });
 }
 
@@ -1536,6 +1769,9 @@ function hintAnchor(hint) {
      обе подсказки оставались без якоря и получали по пустой строке с «?». */
   let sec = hint.closest('.section');
   while (sec) {
+    // Заголовок карточки после редизайна 10.2026 — h3.sec-head (cardifySections).
+    const head = sec.querySelector(':scope > .sec-head > span');
+    if (head) return head;
     const fold = sec.querySelector(':scope > .fold-btn > span');
     if (fold) return fold;
     const title = sec.querySelector(':scope > .section-title');
@@ -1632,11 +1868,16 @@ function syncHintDots(root) {
   });
 }
 
+/* ⚠️ «?» У ЗАГОЛОВКОВ БОЛЬШЕ НЕТ (решение 14.10 «никаких подсказок», Notion …81eb…;
+   ADR 0151). Абзац-пояснение «Условия» прячется, как прятался, а его текст уходит в
+   «Разбор» (conditionNotesToExplain). Вопросик не заводится: HINT_DOTS_OFF. */
+const HINT_DOTS_OFF = true;
 function hintsToDots(root) {
   root = root || document.getElementById('tools-panel');
   if (!root) return;
   root.querySelectorAll('.hint').forEach(hint => {
     if (hint._dotted || hint.classList.contains('hint-keep')) return;
+    if (HINT_DOTS_OFF) { hint._dotted = true; hint.classList.add('hint-hidden'); return; }
     const anchor = hintAnchor(hint);
     if (!anchor) return;                 // некуда вешать — оставляем абзац как был
     hint._dotted = true;
@@ -1713,7 +1954,7 @@ function wireHintButtons() {
 }
 
 function wireWrench() {
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   const pop = document.getElementById('wrench-pop');
   if (btn) btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1741,6 +1982,47 @@ function wireWrench() {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => applyViewBounds());
   });
+  /* Отрезок ответа (ADR 0143): вход модели, окно не трогает. Применяется,
+     когда человек ушёл из СТРОКИ (не из поля) или нажал Enter: иначе «от 7»
+     при прежнем «до 5» тут же сбрасывалось к формуле, и вписать «от 7 до 20»
+     по порядку было нельзя. На каждый символ отрезок дёргался бы. */
+  const segRow = document.getElementById('ans-seg-row');
+  if (segRow) {
+    let dirty = false;
+    ['ans-a', 'ans-b'].forEach(id => {
+      const e = document.getElementById(id);
+      if (!e) return;
+      e.addEventListener('input', () => { dirty = true; });
+      e.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault(); dirty = false; applyAnsSegInputs();
+      });
+      /* Ушли из поля во второе поле той же строки (Tab, щелчок): верная пара
+         применяется сразу (13.10). Иначе поля показывали «−60…200», а «Ответ»
+         оставался для прежнего отрезка, пока фокус не покинет строку. Неверная
+         пара («от 7» при прежнем «до 5») по-прежнему ждёт ухода из строки. */
+      e.addEventListener('change', () => {
+        if (!dirty) return;
+        const a = ansSegParse((document.getElementById('ans-a') || {}).value);
+        const b = ansSegParse((document.getElementById('ans-b') || {}).value);
+        if (a == null || b == null || !(b > a)) return;
+        dirty = false; applyAnsSegInputs();
+      });
+    });
+    /* WebKit отдаёт relatedTarget = null чаще Chromium (щелчок по кнопке, временная
+       потеря фокуса окном), поэтому решение — после того, как фокус осел: фокус снова
+       в строке — человек ещё набирает (Safari, 13.10). */
+    segRow.addEventListener('focusout', (ev) => {
+      if (ev.relatedTarget && segRow.contains(ev.relatedTarget)) return;   // перешли во второе поле
+      if (!dirty) return;
+      setTimeout(() => {
+        if (!dirty || segRow.contains(document.activeElement)) return;
+        dirty = false; applyAnsSegInputs();
+      }, 0);
+    });
+  }
+  const segAuto = document.getElementById('ans-seg-auto');
+  if (segAuto) segAuto.addEventListener('click', () => resetAnsSegToAuto());
   [['inp-xstep', 'xStep'], ['inp-ystep', 'yStep']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('input', () => {
@@ -1774,6 +2056,12 @@ function wireWrench() {
     });
   });
   syncLabelSizeSeg();
+  // «Вид по умолчанию» (README макета, раздел 10): вид ТЕКУЩЕЙ модели —
+  // сетка, подписи, легенда, первая четверть, имена и шаги осей, заголовок —
+  // к её старту, окно и масштаб — к вписанному. Модель (функции, ползунки)
+  // не трогается. Один шаг истории.
+  const vd = document.getElementById('view-defaults');
+  if (vd) vd.addEventListener('click', () => { if (typeof viewDefaults === 'function') viewDefaults(); });
   // Цвет заголовка — тем же пикером, что и у кривых.
   const slot = document.getElementById('gtitle-color-slot');
   if (slot && !slot.firstChild) {
@@ -1803,8 +2091,10 @@ function fillPrintBlocks() {
   const src = document.getElementById('sb-body');
   if (!src) return;
   // Берём только строки со значениями: разбор на бумаге ни к чему.
+  const masked = typeof selfMasked === 'function' && selfMasked();   // «Сначала сам»: на листе те же «?»
   src.querySelectorAll('.stat').forEach(row => {
     const clone = row.cloneNode(true);
+    if (masked) clone.querySelectorAll(':scope > b').forEach(b => { b.textContent = '?'; });
     stats.appendChild(clone);
   });
 }

@@ -1,9 +1,9 @@
 """Сессия R-fix, фаза 2: короткая мета варианта, архив 1 тура на результате, метка «до сотых».
 
 * мета без хвоста `author` / `source_note` — на экране вариантов, интро и в «Моих попытках»;
-* результат попытки скрытого тура: «архив 1 тура», без места, «в таблице» и «Этот же
+* результат попытки скрытого тура: «архив 1 тура», без места, «в лидерборде» и «Этот же
   вариант без таймера» (интро скрытого варианта ученику — 404); у 2 тура всё на месте;
-* счётчик «В таблице» в «Моих попытках» не считает попытку скрытого тура.
+* счётчик «В лидерборде» в «Моих попытках» не считает попытку скрытого тура.
 """
 import json
 import re
@@ -22,7 +22,7 @@ from vp.tests.test_rfix_phone import STYLES, _rule
 
 User = get_user_model()
 
-TAIL = ('Методическая', 'Официальная')
+TAIL = ('Методическая', 'Подробная справка об источнике')
 
 
 class MetaTests(TestCase):
@@ -30,7 +30,8 @@ class MetaTests(TestCase):
         self.variant = load_demo('10')
         # Хвост, который убираем, в данных есть — иначе тест ничего бы не проверял.
         self.assertIn('Методическая', self.variant.author)
-        self.assertIn('Официальная', self.variant.source_note)
+        self.variant.source_note = 'Подробная справка об источнике'
+        self.variant.save(update_fields=['source_note'])
         self.client = Client()
         self.client.force_login(User.objects.create_user('vp_rf_meta', password='p12345'))
 
@@ -38,7 +39,7 @@ class MetaTests(TestCase):
         html = self.client.get(reverse('vp:variants') + '?band=10').content.decode()
         card = re.search(r'<article class="vp-vcard.*?</article>', html, re.S).group(0)
         self.assertEqual(re.findall(r'<p class="vp-vcard-m">(.*?)</p>', card),
-                         ['2026/27 · 18 заданий · 70 мин'])
+                         ['10 класс · 2026/27 · 18 заданий · 70 мин'])
         self.assertIn('Демоверсия ВШЭ', card)                       # надзаголовок остался
         self.assertNotIn('<span class="vp-vcard-src">', card)        # года в углу нет
         for tail in TAIL:
@@ -76,7 +77,7 @@ class ArchiveResultTests(TestCase):
                                 raw=old.items.get(number=1).answer)
         views._finalize(attempt, auto=False)
         self.archived_url = reverse('vp:result', args=[attempt.public_code])
-        # Попытка 2 тура: первая с таймером — в таблице; 17-е — «1,607».
+        # Попытка 2 тура: первая с таймером — в лидерборде; 17-е — «1,607».
         self.variant = load_demo('10')
         self.client.post(reverse('vp:start', args=[self.variant.slug]))
         current = VPAttempt.objects.get(variant=self.variant)
@@ -90,14 +91,14 @@ class ArchiveResultTests(TestCase):
         self.assertFalse(self.user.is_staff)
         html = self.client.get(self.archived_url).content.decode()
         self.assertIn('архив 1 тура', html)
-        for gone in ('Открыть таблицу', 'в таблице', 'Этот же вариант без таймера', '-е</b> место'):
+        for gone in ('Открыть лидерборд', 'в лидерборде', 'Этот же вариант без таймера', '-е</b> место'):
             self.assertNotIn(gone, html, gone)
         self.assertIn('Пройти другой вариант', html)
         self.assertNotIn('Что дальше', html)              # без карточек «Что дальше» пустой
 
     def test_tour_2_result_keeps_the_table(self):
         html = self.client.get(self.current_url).content.decode()
-        for kept in ('первая попытка – в таблице', 'Открыть таблицу', '1-е</b> место',
+        for kept in ('первая попытка – в лидерборде', 'Открыть лидерборд', '1-е</b> место',
                      'Этот же вариант без таймера', 'Что дальше'):
             self.assertIn(kept, html, kept)
         self.assertNotIn('архив 2 тура', html)
@@ -115,7 +116,7 @@ class ArchiveResultTests(TestCase):
     def test_ranked_counter_skips_the_hidden_tour(self):
         html = self.client.get(reverse('vp:my')).content.decode()
         self.assertIn('Все · 2', html)
-        self.assertIn('В таблице · 1', html)
+        self.assertIn('В лидерборде · 1', html)
         ranked = self.client.get(reverse('vp:my') + '?f=ranked').content.decode()
         self.assertIn(self.current_url, ranked)
         self.assertNotIn(self.archived_url, ranked)

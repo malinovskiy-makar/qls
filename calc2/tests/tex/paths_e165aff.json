@@ -1,0 +1,710 @@
+{
+ "adas#start": {
+  "paths": 4,
+  "sha": "8b96c4838fb08d14"
+ },
+ "ceil#start": {
+  "paths": 7,
+  "sha": "535b50e7f32d4171"
+ },
+ "cons-slutsky#start": {
+  "paths": 10,
+  "sha": "2af3bfc06a2a5e67"
+ },
+ "consumer#start": {
+  "paths": 6,
+  "sha": "100f3235baee38d4"
+ },
+ "costs#start": {
+  "paths": 8,
+  "sha": "9b3292add3123d97"
+ },
+ "elast#start": {
+  "paths": 6,
+  "sha": "56b0375660a7d700"
+ },
+ "ext#start": {
+  "paths": 4,
+  "sha": "1a9fac609148a928"
+ },
+ "fx#start": {
+  "paths": 4,
+  "sha": "24edd0a3638ee1d3"
+ },
+ "ineq#start": {
+  "paths": 4,
+  "sha": "6089f295c34a1845"
+ },
+ "islm#start": {
+  "paths": 4,
+  "sha": "65d58e346b25ce41"
+ },
+ "isoquant#start": {
+  "paths": 5,
+  "sha": "07764638b6d8d3d4"
+ },
+ "labor-bilat#start": {
+  "paths": 7,
+  "sha": "3b356b579f5a881a"
+ },
+ "labor-mono#start": {
+  "paths": 9,
+  "sha": "c301cdb3abee55ec"
+ },
+ "labor-union#start": {
+  "paths": 7,
+  "sha": "90125f88ec25cb60"
+ },
+ "labor#start": {
+  "paths": 7,
+  "sha": "3e2b447113435f3d"
+ },
+ "laffer#start": {
+  "paths": 3,
+  "sha": "a3f6cbe372f4753d"
+ },
+ "loanable#start": {
+  "paths": 4,
+  "sha": "195eed5b5bed116c"
+ },
+ "m-constraint#start": {
+  "paths": 6,
+  "sha": "6a2528f3949dcf3c"
+ },
+ "m-graph#start": {
+  "paths": 2,
+  "sha": "d53dd0e7bf21d5ff"
+ },
+ "m-minmax#start": {
+  "paths": 6,
+  "sha": "b2827cb0c079a37f"
+ },
+ "m-optimum#start": {
+  "paths": 2,
+  "sha": "9781c5cc09243cf1"
+ },
+ "m-tangent#start": {
+  "paths": 6,
+  "sha": "92f71c1fb74f9cfa"
+ },
+ "m-transform#start": {
+  "paths": 4,
+  "sha": "45d7a8840ca65435"
+ },
+ "money#start": {
+  "paths": 2,
+  "sha": "d9b91d0fb417e4dc"
+ },
+ "mono-d1#start": {
+  "paths": 5,
+  "sha": "6a7ffe2805a2c477"
+ },
+ "mono-d3#start": {
+  "paths": 10,
+  "sha": "f2557a2cd970a16f"
+ },
+ "mono-kink#start": {
+  "paths": 10,
+  "sha": "3f05cd2fc0dbea7a"
+ },
+ "mono-nat#start": {
+  "paths": 7,
+  "sha": "4a013dce69a8f729"
+ },
+ "mono#start": {
+  "paths": 9,
+  "sha": "6c9d897a849ec28d"
+ },
+ "monoexport#start": {
+  "paths": 6,
+  "sha": "84e39701e578faac"
+ },
+ "phillips#start": {
+  "paths": 2,
+  "sha": "be6c338b50f9fcbd"
+ },
+ "plants#start": {
+  "paths": 4,
+  "sha": "f8bf89a66dcd52b5"
+ },
+ "ppf#start": {
+  "paths": 3,
+  "sha": "ecf164519a4b5c15"
+ },
+ "ppfsum#start": {
+  "paths": 7,
+  "sha": "b0bada01fa4431cc"
+ },
+ "prod#start": {
+  "paths": 4,
+  "sha": "23e7bc0460532d54"
+ },
+ "quota#start": {
+  "paths": 7,
+  "sha": "e1821e49e5c024ff"
+ },
+ "sd#start": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sdsum#start": {
+  "paths": 14,
+  "sha": "5b4d9e8e7c4e0961"
+ },
+ "smallopen#start": {
+  "paths": 6,
+  "sha": "453a3aef91416982"
+ },
+ "tax-adv#start": {
+  "paths": 9,
+  "sha": "79509290ed05fd1f"
+ },
+ "tax#start": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes#start": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "trade#start": {
+  "paths": 5,
+  "sha": "e6156de91640805f"
+ },
+ "tradeprice#start": {
+  "paths": 6,
+  "sha": "defce822d64f7c59"
+ },
+ "taxes@subsidy": {
+  "paths": 9,
+  "sha": "ee03c7a6992f673b"
+ },
+ "taxes@buyer": {
+  "paths": 9,
+  "sha": "989dc13b2fb97e72"
+ },
+ "taxes@vat": {
+  "paths": 9,
+  "sha": "79509290ed05fd1f"
+ },
+ "taxes@excise": {
+  "paths": 9,
+  "sha": "e69d928e4d90e41f"
+ },
+ "taxes@ghost": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes@nonlinear": {
+  "paths": 9,
+  "sha": "fa98d53432dc983f"
+ },
+ "taxes@piecewise": {
+  "paths": 9,
+  "sha": "982d2dd4d7920aaa"
+ },
+ "taxes@self": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes@marks": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes@title": {
+  "paths": 9,
+  "sha": "97dafc3f2ef2013b"
+ },
+ "taxes@allquad": {
+  "paths": 9,
+  "sha": "e79e8c68f79f7a3e"
+ },
+ "sd@param": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@qp": {
+  "paths": 6,
+  "sha": "16b40fe9ac7193c0"
+ },
+ "sd@nonlin": {
+  "paths": 6,
+  "sha": "95b710c844ab13cf"
+ },
+ "sd@hyper": {
+  "paths": 6,
+  "sha": "a82145214b6ecaf9"
+ },
+ "sd@zoom": {
+  "paths": 6,
+  "sha": "2a602605ff178d18"
+ },
+ "sd@box": {
+  "paths": 6,
+  "sha": "2d8b6743f5380524"
+ },
+ "sd@dense": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@nogrid": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "ceil@floor": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "mono@quota": {
+  "paths": 9,
+  "sha": "6c9d897a849ec28d"
+ },
+ "mono@tax": {
+  "paths": 11,
+  "sha": "b76cfde6ff809abf"
+ },
+ "mono@subsidy": {
+  "paths": 11,
+  "sha": "3b15956f4c84fed3"
+ },
+ "mono@ceiling": {
+  "paths": 9,
+  "sha": "6c9d897a849ec28d"
+ },
+ "costs@loss": {
+  "paths": 8,
+  "sha": "9b3292add3123d97"
+ },
+ "m-tangent@secant": {
+  "paths": 7,
+  "sha": "fd5812225be78379"
+ },
+ "smallopen@tariff": {
+  "paths": 6,
+  "sha": "453a3aef91416982"
+ },
+ "sd@nl": {
+  "paths": 6,
+  "sha": "e43e355026826660"
+ },
+ "taxes@nl": {
+  "paths": 9,
+  "sha": "fa98d53432dc983f"
+ },
+ "taxes@nl-subsidy": {
+  "paths": 9,
+  "sha": "fee924cf57658673"
+ },
+ "taxes@nl-buyer": {
+  "paths": 9,
+  "sha": "f6b9c0ba4ac483fd"
+ },
+ "taxes@nl-vat": {
+  "paths": 9,
+  "sha": "1d9dd7f9046fef6c"
+ },
+ "ceil@nl": {
+  "paths": 6,
+  "sha": "e43e355026826660"
+ },
+ "ceil@nl-floor": {
+  "paths": 7,
+  "sha": "a0caeff2cbb25f0e"
+ },
+ "quota@nl": {
+  "paths": 7,
+  "sha": "fce08bf6d60b2d44"
+ },
+ "elast@nl": {
+  "paths": 6,
+  "sha": "a772beeb6d9303e3"
+ },
+ "ext@nl": {
+  "paths": 5,
+  "sha": "6315a39139c43805"
+ },
+ "smallopen@nl": {
+  "paths": 6,
+  "sha": "03287e08eec52d4c"
+ },
+ "sdsum@nl": {
+  "paths": 14,
+  "sha": "f98320fe7915eda1"
+ },
+ "mono@nl": {
+  "paths": 9,
+  "sha": "43e0b6696a795f84"
+ },
+ "mono@nl-tax": {
+  "paths": 11,
+  "sha": "e6f522dd18caebcb"
+ },
+ "mono@nl-ceiling": {
+  "paths": 9,
+  "sha": "43e0b6696a795f84"
+ },
+ "mono@mc-neg": {
+  "paths": 9,
+  "sha": "9a6627fb12939e7e"
+ },
+ "mono-d1@nl": {
+  "paths": 5,
+  "sha": "c1f2926f675f127b"
+ },
+ "mono-d1@mc-neg": {
+  "paths": 5,
+  "sha": "19368e547b6e2a50"
+ },
+ "mono-nat@nl": {
+  "paths": 7,
+  "sha": "dfd82c154e10f6ea"
+ },
+ "mono-d3@nl": {
+  "paths": 10,
+  "sha": "a56f7295ba3f9b5c"
+ },
+ "mono-kink@nl": {
+  "paths": 10,
+  "sha": "efe839ecd52065f5"
+ },
+ "monoexport@nl": {
+  "paths": 6,
+  "sha": "4571b988ac411192"
+ },
+ "labor@nl": {
+  "paths": 7,
+  "sha": "b62a5a52c60fd526"
+ },
+ "labor-mono@nl": {
+  "paths": 9,
+  "sha": "3a7a74668bb70e96"
+ },
+ "labor-union@nl": {
+  "paths": 7,
+  "sha": "c4dcbfc6dde935af"
+ },
+ "labor-bilat@nl": {
+  "paths": 7,
+  "sha": "ce0a8c9b78140680"
+ },
+ "costs@nl": {
+  "paths": 8,
+  "sha": "bd77c49c05013386"
+ },
+ "prod@nl": {
+  "paths": 4,
+  "sha": "8c5744633eb46f6d"
+ },
+ "plants@nl": {
+  "paths": 4,
+  "sha": "a6be4669d01029da"
+ },
+ "isoquant@nl": {
+  "paths": 5,
+  "sha": "2af13e67c9a99ca8"
+ },
+ "ppf@nl": {
+  "paths": 3,
+  "sha": "2c104f6ee4ff333e"
+ },
+ "ppf@circle": {
+  "paths": 3,
+  "sha": "a00a98b1c3ae236f"
+ },
+ "ppfsum@nl": {
+  "paths": 7,
+  "sha": "3298e2e989658fea"
+ },
+ "trade@nl": {
+  "paths": 5,
+  "sha": "faaa5050626d926b"
+ },
+ "tradeprice@nl": {
+  "paths": 6,
+  "sha": "3c94a48fbfe01e18"
+ },
+ "adas@nl": {
+  "paths": 4,
+  "sha": "1b9b11b2d7c0db6a"
+ },
+ "islm@nl": {
+  "paths": 4,
+  "sha": "78eee7d08c9383d2"
+ },
+ "fx@nl": {
+  "paths": 4,
+  "sha": "b98486aaedb5f4b6"
+ },
+ "loanable@nl": {
+  "paths": 4,
+  "sha": "b5d3fd0e0b9249e8"
+ },
+ "money@nl": {
+  "paths": 2,
+  "sha": "b689b68792dffb78"
+ },
+ "laffer@nl": {
+  "paths": 3,
+  "sha": "58208d2a526a555f"
+ },
+ "m-graph@nl": {
+  "paths": 4,
+  "sha": "2a00d073500e6656"
+ },
+ "m-optimum@nl": {
+  "paths": 2,
+  "sha": "4a07e6b11ebd70cc"
+ },
+ "m-tangent@nl": {
+  "paths": 6,
+  "sha": "56cee774d4893418"
+ },
+ "m-transform@nl": {
+  "paths": 4,
+  "sha": "01389968a4c6a33b"
+ },
+ "m-minmax@nl": {
+  "paths": 6,
+  "sha": "ef7111bf96530492"
+ },
+ "m-constraint@nl": {
+  "paths": 6,
+  "sha": "96ba7d3663062d5d"
+ },
+ "sd@zoomin": {
+  "paths": 6,
+  "sha": "52cac78b92de223b"
+ },
+ "sd@zoomout": {
+  "paths": 6,
+  "sha": "e443edffe2547b2c"
+ },
+ "sd@pan": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@panx": {
+  "paths": 6,
+  "sha": "01cdaa11823c1275"
+ },
+ "sd@pany": {
+  "paths": 6,
+  "sha": "2a3085870cca56c6"
+ },
+ "sd@quad": {
+  "paths": 6,
+  "sha": "20a7be852e3f1214"
+ },
+ "taxes@pan": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes@zoomin": {
+  "paths": 9,
+  "sha": "b18dd521b1a3c0cd"
+ },
+ "taxes@quad": {
+  "paths": 9,
+  "sha": "5368afd3479680c9"
+ },
+ "mono@zoomout": {
+  "paths": 9,
+  "sha": "7a38bf0db4a5748d"
+ },
+ "mono@quad": {
+  "paths": 9,
+  "sha": "91fce4f26eb49c3f"
+ },
+ "mono@pan": {
+  "paths": 9,
+  "sha": "917e14c4e3b0e0d5"
+ },
+ "labor@pan": {
+  "paths": 7,
+  "sha": "3e2b447113435f3d"
+ },
+ "costs@zoomin": {
+  "paths": 8,
+  "sha": "3e5db95556ac046d"
+ },
+ "costs@quad": {
+  "paths": 8,
+  "sha": "e3133b739ce827f4"
+ },
+ "prod@pan-top": {
+  "paths": 4,
+  "sha": "23e7bc0460532d54"
+ },
+ "prod@zoom-bottom": {
+  "paths": 4,
+  "sha": "23e7bc0460532d54"
+ },
+ "ppf@zoomout": {
+  "paths": 3,
+  "sha": "fbce9ee638ef611f"
+ },
+ "ppf@quad": {
+  "paths": 3,
+  "sha": "94e63aba988fa4ac"
+ },
+ "trade@pan": {
+  "paths": 5,
+  "sha": "e6156de91640805f"
+ },
+ "tradeprice@zoom-1": {
+  "paths": 6,
+  "sha": "defce822d64f7c59"
+ },
+ "tradeprice@pan-2": {
+  "paths": 6,
+  "sha": "defce822d64f7c59"
+ },
+ "consumer@zoomin": {
+  "paths": 6,
+  "sha": "865c4e496a419114"
+ },
+ "consumer@pan": {
+  "paths": 6,
+  "sha": "100f3235baee38d4"
+ },
+ "adas@pan": {
+  "paths": 4,
+  "sha": "8b96c4838fb08d14"
+ },
+ "islm@zoomout": {
+  "paths": 4,
+  "sha": "7eea8dd28561f20c"
+ },
+ "ineq@zoomin": {
+  "paths": 4,
+  "sha": "f1f38e0d1d82cbf1"
+ },
+ "mono-d3@zoom-1": {
+  "paths": 10,
+  "sha": "ec912dc4765a9c4b"
+ },
+ "m-graph@zoomin": {
+  "paths": 2,
+  "sha": "301bfc17d9e06c90"
+ },
+ "m-graph@zoomout": {
+  "paths": 2,
+  "sha": "073acaf8d4540022"
+ },
+ "m-graph@pan": {
+  "paths": 2,
+  "sha": "8dec048602821376"
+ },
+ "m-tangent@pan-top": {
+  "paths": 6,
+  "sha": "1b5e06766d8a9065"
+ },
+ "m-tangent@zoom": {
+  "paths": 6,
+  "sha": "e86b3f260c6e6c1f"
+ },
+ "m-optimum@pan": {
+  "paths": 2,
+  "sha": "760ef2af1ece4478"
+ },
+ "m-optimum@zoomout": {
+  "paths": 2,
+  "sha": "a79a26758d4ddc8a"
+ },
+ "m-constraint@zoomin": {
+  "paths": 6,
+  "sha": "a031fc07d35a9f8c"
+ },
+ "cons-slutsky@pan": {
+  "paths": 10,
+  "sha": "2af3bfc06a2a5e67"
+ },
+ "mono@self": {
+  "paths": 9,
+  "sha": "6c9d897a849ec28d"
+ },
+ "mono@self-tax": {
+  "paths": 11,
+  "sha": "b76cfde6ff809abf"
+ },
+ "costs@self": {
+  "paths": 8,
+  "sha": "9b3292add3123d97"
+ },
+ "m-tangent@self": {
+  "paths": 6,
+  "sha": "92f71c1fb74f9cfa"
+ },
+ "labor-mono@self": {
+  "paths": 9,
+  "sha": "c301cdb3abee55ec"
+ },
+ "prod@self": {
+  "paths": 4,
+  "sha": "23e7bc0460532d54"
+ },
+ "sd@marks-area": {
+  "paths": 7,
+  "sha": "e8a725c67113a629"
+ },
+ "sd@area-poly": {
+  "paths": 8,
+  "sha": "2982732c35f2cd54"
+ },
+ "sd@pw-window": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@qp-nl": {
+  "paths": 6,
+  "sha": "2d4b3c8c624d41ba"
+ },
+ "sd@title-pct": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@title-sub": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@title-pow": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@title-brace": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@title-input": {
+  "paths": 6,
+  "sha": "89312765424708df"
+ },
+ "sd@title-canvas": {
+  "paths": 6,
+  "sha": "0af135cca4b77589"
+ },
+ "taxes@nolegend": {
+  "paths": 9,
+  "sha": "bc87c3727b2cdd23"
+ },
+ "taxes@pw-window": {
+  "paths": 9,
+  "sha": "1e2f954775ccd878"
+ },
+ "taxes@qp": {
+  "paths": 9,
+  "sha": "c63bdd25a6d58c66"
+ },
+ "taxes@param": {
+  "paths": 9,
+  "sha": "c30dbcc0e234aa15"
+ },
+ "taxes@self-nl": {
+  "paths": 9,
+  "sha": "fa98d53432dc983f"
+ },
+ "mono-d3@nolegend": {
+  "paths": 10,
+  "sha": "f2557a2cd970a16f"
+ }
+}

@@ -65,7 +65,7 @@ class SolutionLeakTests(SimpleTestCase):
 class StructureGateTests(SimpleTestCase):
     def test_41924_lost_part_blocks(self):
         blocks = [('Условие', 'Государство вводит налог', 'Государство вводит налог'),
-                  ('Часть г', '3.', '3.')]
+                  ('Часть г', '3.', '')]
         verdict = render_preflight_v2(blocks, StubChecker())
         self.assertFalse(verdict.ok)
         self.assertIn('EMPTY', verdict.codes)

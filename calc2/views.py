@@ -90,7 +90,10 @@ def compile_pdf_pdflatex(tex_content):
                  # У разных сборок TeX умолчания разные, а цена ошибки —
                  # выполнение произвольной команды на сервере.
                  '-no-shell-escape',
-                 '-output-directory', tmpdir, str(tex_path)],
+                 # TeX Live 2023 запрещает абсолютный входной путь при
+                 # openin_any=p даже внутри cwd. Имя относительно tmpdir
+                 # работает во всех версиях, ограничения остаются строгими.
+                 '-output-directory', tmpdir, tex_path.name],
                 capture_output=True, timeout=40,
                 # Рабочая папка — сама временная. Без неё MiKTeX на Windows
                 # пытается писать вспомогательные файлы туда, откуда запущен
@@ -157,6 +160,11 @@ class Calc2View(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # Заголовок и описание SEO — отсюда, а не литералом в шаблоне: в них
+        # длинное тире, а сканер типографики смотрит .html, но не .py.
+        from catalog import seo
+        ctx['seo_title'] = seo.CALC_TITLE
+        ctx['seo_description'] = seo.CALC_DESCRIPTION
         # Честно говорим интерфейсу, умеет ли ЭТОТ сервер собирать PDF.
         # Если компилятора нет, кнопка «Скачать PDF» не показывается вовсе —
         # как это уже сделано на странице экспорта подборок

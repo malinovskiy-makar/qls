@@ -133,8 +133,8 @@ class Tour2PracticeTests(TestCase):
         self.assertEqual(self.check(17, '1,61')[1]['is_correct'], True)
         status, data = self.check(4, {'1': 2, '2': 1, '3': 2, '4': 2})
         self.assertEqual((status, data['is_correct']), (200, True))
-        self.assertIn('Прожиточный минимум может использоваться как граница для оценки '
-                      'бедности.: А – абсолютная бедность', data['right'])
+        self.assertIn('Граница бедности определяется стоимостью фиксированного набора товаров и услуг, '
+                      'необходимого для удовлетворения базовых потребностей.: А – абсолютная бедность', data['right'])
         status, data = self.check(3, {'1': 14})
         self.assertEqual((status, data['is_correct']), (200, False))
         self.assertTrue(data['right'].startswith('Пропуск 1: развитый; Пропуск 2: рабочая сила'))

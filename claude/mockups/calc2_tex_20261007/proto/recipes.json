@@ -1,0 +1,35 @@
+{
+ "taxes": {
+  "subsidy": "setType('subsidy'); setTax(20);",
+  "buyer": "setTaxSide('buyer');",
+  "vat": "setTaxForm('vat'); setTax(20);",
+  "excise": "setTaxForm('excise'); setTax(20);",
+  "ghost": "var c=document.getElementById('chk-ghost'); if(c&&!c.checked) c.click();",
+  "nonlinear": "var i=document.getElementById('curve-expr-1'); i.value='2000/(Q+10) - 10'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true})); var j=document.getElementById('curve-expr-2'); j.value='Q^2/80 + 5'; j.dispatchEvent(new Event('input',{bubbles:true})); j.dispatchEvent(new Event('change',{bubbles:true}));",
+  "piecewise": "var i=document.getElementById('curve-expr-2'); i.value='(Q >= 0 and Q < 40) ? 0.5*Q + 10 : (Q >= 40 ? 2*Q - 50 : NaN)'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true}));",
+  "self": "document.getElementById('btn-self').click();",
+  "marks": "var m=newMark(30,70,null,'coords'); STATE.marks.push(m); if(typeof renderMarkList==='function') renderMarkList();",
+  "title": "STATE.graphTitle='Рынок хлеба: налог 20 & субсидия 5%';",
+  "allquad": "STATE.firstQuad=false; CONFIG.Qmin=-20; CONFIG.Pmin=-20;"
+ },
+ "sd": {
+  "param": "var i=document.getElementById('curve-expr-1'); i.value='100 - a*Q'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true}));",
+  "qp": "var i=document.getElementById('curve-expr-1'); i.value='120 - 2*P'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true}));",
+  "nonlin": "var i=document.getElementById('curve-expr-1'); i.value='100 - Q'; var j=document.getElementById('curve-expr-2'); j.value='Q^2/100'; j.dispatchEvent(new Event('input',{bubbles:true})); j.dispatchEvent(new Event('change',{bubbles:true}));",
+  "hyper": "var i=document.getElementById('curve-expr-1'); i.value='1000/Q'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true}));",
+  "zoom": "CONFIG.Qmax=300; CONFIG.Pmax=300; STATE.zoomLock=true;",
+  "box": "CONFIG.Qmin=20; CONFIG.Qmax=80; CONFIG.Pmin=30; CONFIG.Pmax=90; STATE.zoomLock=true;",
+  "dense": "STATE.gridDense=true;",
+  "nogrid": "STATE.showGrid=false;"
+ },
+ "ceil": { "floor": "setType('floor');" },
+ "mono": {
+  "quota": "setType('quota');",
+  "tax": "setType('tax'); setTax(20);",
+  "subsidy": "setType('subsidy'); setTax(10);",
+  "ceiling": "setType('ceiling');"
+ },
+ "costs": { "loss": "var s=document.getElementById('lr-price-slider'); s.value=8; s.dispatchEvent(new Event('input',{bubbles:true}));" },
+ "m-tangent": { "secant": "var c=document.getElementById('chk-secant')||document.querySelector('#math-secant-row input[type=checkbox]'); if(c) c.click();" },
+ "smallopen": { "tariff": "if(typeof setType==='function') setType('tariff');" }
+}

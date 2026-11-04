@@ -39,12 +39,12 @@ class IntroTests(TestCase):
     def test_meta_rule_plaque_drill_link_and_modes(self):
         html = self.client.get(self.url).content.decode()
         self.assertIn('Демоверсия ВШЭ · 2026/27 · 18 заданий · 100 баллов', html)
-        self.assertIn('Ответ-число в неверной записи – 0 баллов, как на туре', html)
-        self.assertIn(reverse('vp:drill'), html)
-        self.assertIn('Потренировать запись – 2 минуты', html)
-        self.assertIn('Первая попытка идёт в таблицу 10 класса.', html)
-        self.assertIn('Без ограничения по времени. В таблицу не идёт.', html)
-        self.assertIn('Ответы сохраняются сами. Закрыли вкладку – продолжите с того же места, '
+        self.assertNotIn('Ответ-число в неверной записи – 0 баллов, как на туре', html)
+        self.assertNotIn('Потренировать запись', html)
+        self.assertNotIn('Потренировать запись – 2 минуты', html)
+        self.assertIn('Первая попытка идёт в лидерборд 10 класса.', html)
+        self.assertIn('Без ограничения по времени. В лидерборд не идёт.', html)
+        self.assertNotIn('Ответы сохраняются сами. Закрыли вкладку – продолжите с того же места, '
                       'таймер при этом идёт.', html)
         self.assertLess(html.index('Начать вариант'), html.index('</form>'))
 

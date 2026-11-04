@@ -1,0 +1,4 @@
+{
+ "consumer": { "ids": ["cons-type"] },
+ "cons-slutsky": { "ids": ["cons-type"] }
+}

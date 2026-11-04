@@ -872,7 +872,7 @@ class ResultTests(TimeAndFinishBase):
         html = self.html(self.guest, attempt)
         self.assertRegex(html, r'<b>2</b><span>/ 100</span>')
         # Сессия R: «Змейка · 1–30», балл блока «<b>2</b> / 60».
-        for name in ('Змейка · 1–30', 'Пропущенные слова · 31–35', 'Все верные · 36–40',
+        for name in ('Змейка · 1–30', 'Пропущенные слова · 31–35', 'Выбор утверждений · 36–40',
                      'Рисунок и таблица · 41–42', 'Расчётные · 43–44'):
             self.assertIn(name, html)
         self.assertIn('<b>2</b> / 60', html)

@@ -6,11 +6,15 @@
      node calc2/tests/night2_font_audit.mjs [--json файл]
    Печатает ЧИСЛО найденных случаев и разбивку по местам. */
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import { writeFileSync } from 'fs';
 const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const OUT = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await (await browser.newContext({ viewport: { width: 1500, height: 950 } })).newPage();
 const errs = []; page.on('pageerror', e => errs.push(e.message));
 await page.goto(`${BASE}/login/`, { waitUntil: 'networkidle' });
@@ -18,6 +22,7 @@ await page.fill('#id_username', 'admin'); await page.fill('#id_password', 'admin
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle' }), page.click('button[type=submit]')]);
 await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
+if (!(await answerShown(page))) { console.log('FAIL предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); process.exitCode = 1; }
 
 const scenes = await page.evaluate(() => Object.keys(SCENE_ROUTE));
 const SWEEP = `(function () {

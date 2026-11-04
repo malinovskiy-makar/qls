@@ -54,7 +54,7 @@ class TakePageTests(TestCase):
                          ['1', '1', '2', '2', '3', '3', '4', '4'])
         self.assertIn('<b>А</b> – абсолютная бедность', matching)
         self.assertIn('aria-label="Б – относительная бедность"', matching)
-        for caption in ('Все верные · 1–2', 'Пропуски · 3', 'Соотнесение · 4',
+        for caption in ('Выбор утверждений · 1–2', 'Пропуски · 3', 'Соотнесение · 4',
                         'Задачи с числом · 5–18'):
             self.assertIn(caption, html)
         self.assertEqual(len(re.findall(r'data-flag="\d+"', html)), 18)

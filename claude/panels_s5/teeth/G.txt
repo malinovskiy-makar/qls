@@ -1,0 +1,37 @@
+## 1 обернуть поле копией с новым id — КРАСНЫЙ
+    FAIL [chromium] mono-kink: ОРГАН — id полей формул те же, что до обёртки (inp-ki-1,inp-ki-2,inp-ki-3,inp-kink-mc)  — сейчас
+    FAIL [chromium] mono-kink: поле inp-ki-1 есть  — нет поля
+    FAIL [chromium] mono-kink «Кусочный»: ОРГАН — id полей формул те же, что до обёртки (inp-kink-mc,inp-kp-1,inp-kp-2)  — сейчас
+    FAIL [chromium] mono-kink «Кусочный»: поле inp-kp-1 есть  — нет поля
+    OK   [chromium] labor: ОРГАН — id полей формул те же, что до обёртки (curve-expr-1,curve-expr-2)
+    ИТОГ cards_probe: 22 из 26, провалов 4
+## 2 глаз без действия — КРАСНЫЙ
+    FAIL [chromium] mono-kink: глаз, «⋯», кнопка цвета что-то делают (глаз 4, «⋯» 0, цвет 0)  — карточка 0: глаз ничего не меняет на холсте | карточка 1: глаз ничего не меняет на холсте | карточка 2: глаз ничего не меняет на холсте | карточка 3: глаз ничего не мен
+    OK   [chromium] mono-kink: ОРГАН — id полей формул те же, что до обёртки (inp-ki-1,inp-ki-2,inp-ki-3,inp-kink-mc)
+    FAIL [chromium] mono-kink «Кусочный»: глаз, «⋯», кнопка цвета что-то делают (глаз 3, «⋯» 0, цвет 0)  — карточка 0: глаз ничего не меняет на холсте | карточка 1: глаз ничего не меняет на холсте | карточка 2: глаз ничего не меняет на холсте
+    OK   [chromium] mono-kink «Кусочный»: ОРГАН — id полей формул те же, что до обёртки (inp-kink-mc,inp-kp-1,inp-kp-2)
+    OK   [chromium] labor: ОРГАН — id полей формул те же, что до обёртки (curve-expr-1,curve-expr-2)
+    ИТОГ cards_probe: 24 из 26, провалов 2
+## 3 убрать обозначение — КРАСНЫЙ
+    FAIL [chromium] mono-kink: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":["inp-ki-1","inp-ki-2","inp-ki-3","inp-kink-mc"],"noName":[],"cut":[]}
+    OK   [chromium] mono-kink: ОРГАН — id полей формул те же, что до обёртки (inp-ki-1,inp-ki-2,inp-ki-3,inp-kink-mc)
+    FAIL [chromium] mono-kink «Кусочный»: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":["inp-kp-1","inp-kp-2","inp-kink-mc"],"noName":[],"cut":[]}
+    OK   [chromium] mono-kink «Кусочный»: ОРГАН — id полей формул те же, что до обёртки (inp-kink-mc,inp-kp-1,inp-kp-2)
+    OK   [chromium] labor: ОРГАН — id полей формул те же, что до обёртки (curve-expr-1,curve-expr-2)
+    ИТОГ cards_probe: 24 из 26, провалов 2
+## 4 клонировать поле без обработчиков (тот же id) — КРАСНЫЙ
+    FAIL [chromium] mono-kink: ОРГАН — id полей формул те же, что до обёртки (inp-ki-1,inp-ki-2,inp-ki-3,inp-kink-mc)  — сейчас
+    FAIL [chromium] mono-kink: ввод в карточке «inp-ki-1» меняет «Ответ» так же, как до обёртки, возврат возвращает  — {"now":"60|50|1800#60|50|1800|1300|1800|1200|120|900|MR=MC@Q=60","was":"55|47,5|1512,5#55|47,5|1512,5|981,25|1512,5|1100|110|756,25|MR=MC@Q=55"}
+    FAIL [chromium] mono-kink «Кусочный»: ОРГАН — id полей формул те же, что до обёртки (inp-kink-mc,inp-kp-1,inp-kp-2)  — сейчас
+    FAIL [chromium] mono-kink «Кусочный»: ввод в карточке «inp-kp-1» меняет «Ответ» так же, как до обёртки, возврат возвращает  — {"now":"40|60|1600#40|60|1600|800|1600|800|66,67|533,33|излом@Q=40","was":"35|55|1225#35|55|1225|612,5|1225|700|66,67|595,83|MR=MC@Q=3
+    OK   [chromium] labor: ОРГАН — id полей формул те же, что до обёртки (curve-expr-1,curve-expr-2)
+    ИТОГ cards_probe: 22 из 26, провалов 4
+## 5 обрезать имя многоточием — КРАСНЫЙ
+    FAIL [chromium] mono-kink: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["inp-ki-1 ellipsis/nowrap","inp-ki-2 ellipsis/nowrap","inp-ki-3 ellipsis/nowrap","inp-kink-mc ellipsis/nowrap"]}
+    OK   [chromium] mono-kink: ОРГАН — id полей формул те же, что до обёртки (inp-ki-1,inp-ki-2,inp-ki-3,inp-kink-mc)
+    FAIL [chromium] mono-kink «Кусочный»: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["inp-kp-1 ellipsis/nowrap","inp-kp-2 ellipsis/nowrap","inp-kink-mc ellipsis/nowrap"]}
+    OK   [chromium] mono-kink «Кусочный»: ОРГАН — id полей формул те же, что до обёртки (inp-kink-mc,inp-kp-1,inp-kp-2)
+    FAIL [chromium] labor: у карточек обозначение KaTeX и имя, имя не обрезается  — {"noSym":[],"noName":[],"cut":["curve-expr-1 ellipsis/nowrap","curve-expr-2 ellipsis/nowrap"]}
+    OK   [chromium] labor: ОРГАН — id полей формул те же, что до обёртки (curve-expr-1,curve-expr-2)
+
+git diff calc2/ после отката: пусто

@@ -31,7 +31,7 @@
   {% endcomment %}
   <div class="ym-hide-content">
   <div class="vp-arow is-head">
-    <span>Дата</span><span>Вариант</span><span>Режим</span>
+    <span>Дата</span><span>Вариант</span><span class="is-mode">Режим</span>
     <span class="is-num">Балл</span><span class="is-num">Время</span><span>Статус</span><span></span>
   </div>
   {% for r in rows %}
@@ -46,7 +46,7 @@
       архив
       {% elif r.kind == 'ranked' %}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
-      в таблице{% if r.place %} · {{ r.place }}-е{% endif %}
+      <span>в лидерборде{% if r.place %} · <span class="vp-nowrap">{{ r.place }}-е</span>{% endif %}</span>
       {% elif r.kind == 'training' %}
       тренировка{% if r.repeat %} · повтор{% endif %}
       {% else %}
@@ -67,6 +67,6 @@
   <p class="vp-land-empty">Здесь пока пусто. <a class="vp-link" href="{% url 'vp:variants' %}">Выберите вариант</a>, и попытка появится в списке.</p>
   {% endif %}
 
-  <p class="vp-my-note">В таблицу лучших попыток идёт первая попытка по каждому варианту с таймером. Повторные и без таймера – тренировка, их разбор доступен так же.</p>
+  <p class="vp-my-note">В лидерборд идёт первая попытка по каждому варианту с таймером. Повторные и без таймера – тренировка, их разбор доступен так же.</p>
 </div>
 {% endblock %}

@@ -6,37 +6,16 @@
  * Адрес `/vp/#rules` открывает окно сразу: с экрана выбора варианта на правила
  * ведёт обычная ссылка, а не кнопка.
  */
+/* Один выбранный класс на формат, таблицу и «моё». Ссылки работают и без JS. */
 (function () {
   'use strict';
-
-  /* Вкладки таблицы лучших попыток по классам (2 тур). Это ссылки `?board=`: без
-     скрипта страница перезагрузится с нужной таблицей, со скриптом — переключит на месте. */
-  var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-board-tab]'));
-  var tablist = document.querySelector('[data-band-url]');
-  /* `?board=` до сервера не доходит — выбор класса сообщаем ему сами (он запомнит его
-     для экрана вариантов и «что дальше»). Ответа не ждём. */
-  function remember(band) {
-    if (!tablist || !window.fetch) return;
-    try {
-      fetch(tablist.getAttribute('data-band-url'), {
-        method: 'POST', credentials: 'same-origin', body: band,
-        headers: { 'X-CSRFToken': tablist.getAttribute('data-csrf') || '',
-                   'Content-Type': 'text/plain;charset=UTF-8' }
-      }).catch(function () { /* не запомнили — не беда */ });
-    } catch (error) { /* старый браузер */ }
-  }
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function (event) {
-      event.preventDefault();
-      var band = tab.getAttribute('data-board-tab');
-      remember(band);
-      tabs.forEach(function (other) {
-        other.setAttribute('aria-selected', other === tab ? 'true' : 'false');
-      });
-      document.querySelectorAll('[data-board-panel]').forEach(function (panel) {
-        panel.hidden = panel.getAttribute('data-board-panel') !== band;
-      });
-    });
+  var select = document.getElementById('vp-format-band');
+  if (!select) return;
+  document.addEventListener('click', function (event) {
+    if (!select.contains(event.target)) select.open = false;
+  });
+  select.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { select.open = false; select.querySelector('summary').focus(); }
   });
 })();
 
@@ -94,47 +73,64 @@
   if (window.location.hash === '#rules') open(null);
 })();
 
-/* Пробник записи ответа: засчитают ли такую запись на туре. Проверяет сервер (`format/check/`,
-   тот же код, что считает баллы), не чаще раза в 300 мс после паузы ввода; ответ — текстом.
-   Без скрипта блока нет (`hidden`). */
+/* Проверка записи использует существующий серверный endpoint, без копии правил. */
 (function () {
   'use strict';
-
+  var dialog = document.getElementById('vp-probe-dialog');
+  var button = document.querySelector('[data-open-probe]');
+  if (!dialog || !button || !window.fetch || typeof dialog.showModal !== 'function') return;
+  button.addEventListener('click', function (event) { event.preventDefault(); dialog.showModal(); });
+  dialog.querySelector('[data-close-probe]').addEventListener('click', function () { dialog.close(); });
+  dialog.addEventListener('click', function (event) {
+    if (event.target !== dialog) return;
+    var rect = dialog.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+  });
+  var help = document.getElementById('vp-probe-help');
+  var tip = document.getElementById('vp-probe-tip');
+  function showHelp(open) { tip.hidden = !open; help.setAttribute('aria-expanded', String(open)); }
+  help.addEventListener('click', function (event) {
+    showHelp(event.pointerType === 'touch' ? tip.hidden : true);
+  });
+  help.addEventListener('focus', function () { if (help.matches(':focus-visible')) showHelp(true); });
+  help.addEventListener('blur', function () { showHelp(false); });
+  help.parentElement.addEventListener('pointerenter', function (event) { if (event.pointerType === 'mouse') showHelp(true); });
+  help.parentElement.addEventListener('pointerleave', function (event) { if (event.pointerType === 'mouse') showHelp(false); });
+  dialog.addEventListener('pointerdown', function (event) { if (!help.parentElement.contains(event.target)) showHelp(false); });
+  dialog.addEventListener('cancel', function (event) { if (!tip.hidden) { event.preventDefault(); showHelp(false); } });
+  dialog.addEventListener('close', function () { showHelp(false); button.focus(); });
   var box = document.getElementById('vp-probe');
-  if (!box || !window.fetch) return;
-  box.hidden = false;
   var input = document.getElementById('vp-probe-in');
   var out = document.getElementById('vp-probe-out');
-  var url = box.getAttribute('data-check-url');
-  var csrf = box.getAttribute('data-csrf') || '';
-  var timer = null;
-  var asked = 0;
-
+  var timer, asked = 0;
   function check() {
-    var raw = input.value;
     var mine = ++asked;
-    fetch(url, {
+    box.classList.remove('is-ok', 'is-bad');
+    if (!input.value.trim()) { out.textContent = ''; return; }
+    fetch(box.dataset.checkUrl, {
       method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-      body: JSON.stringify({ raw: raw })
-    }).then(function (response) { return response.json(); }).then(function (data) {
-      if (mine !== asked) return;                 // пришёл ответ на устаревшую запись
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': box.dataset.csrf },
+      body: JSON.stringify({ raw: input.value })
+    }).then(function (response) {
+      if (!response.ok) throw new Error('format check failed');
+      return response.json();
+    }).then(function (data) {
+      if (mine !== asked) return;
       out.textContent = data.text || '';
       box.classList.toggle('is-ok', !!data.ok);
       box.classList.toggle('is-bad', !data.ok && data.reason !== 'empty');
-    }).catch(function () { out.textContent = 'Нет связи.'; });
+    }).catch(function () {
+      if (mine === asked) out.textContent = 'Не удалось проверить. Попробуйте ещё раз.';
+    });
   }
-
   input.addEventListener('input', function () {
-    window.clearTimeout(timer);
+    window.clearTimeout(timer); ++asked;
+    out.textContent = ''; box.classList.remove('is-ok', 'is-bad');
     timer = window.setTimeout(check, 300);
   });
-  Array.prototype.forEach.call(box.querySelectorAll('[data-probe]'), function (button) {
-    button.addEventListener('click', function () {
-      input.value = button.getAttribute('data-probe');
-      window.clearTimeout(timer);
-      check();
-      input.focus();
+  box.querySelectorAll('[data-probe]').forEach(function (sample) {
+    sample.addEventListener('click', function () {
+      window.clearTimeout(timer); input.value = sample.dataset.probe; check(); input.focus();
     });
   });
 })();

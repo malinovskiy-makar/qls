@@ -119,14 +119,14 @@ const LOR = `
     var f = snapTargets().filter(function (t) { return t.name === 'Лоренц'; })[0];
     if (!p || !f) return null;
     var x = 80, y = f.f(x);
-    // Ставим вершину ровно в узел кривой и меряем, куда её нарисовал слой.
-    STATE.areaVerts = [];
-    addAreaVert(x, y, '');
+    // Ставим вершину ровно в узел кривой и меряем, куда её нарисовал слой. С сессии 7 вершина площади — точка
+    // списка (README пакета calc2_panels_20261014, 9): ставим точку той же дверью, что щелчок (addMarkAt).
+    STATE.marks = [];
+    var v = addMarkAt(x, y, null, null, '');
     redrawAll();
-    var v = STATE.areaVerts[0];
-    var s = mainScales(v.panel);
+    var s = mainScales(markPanelId(v));
     return { dx: Math.abs(s.mx(v.x) - p.mx(x)), dy: Math.abs(s.my(v.y) - p.my(y)),
-             y: y, panel: v.panel };
+             y: y, panel: markPanelId(v) };
   };
 `;
 let r = await run(LOR + `setup(); return probe();`);
@@ -183,33 +183,28 @@ cmp('притяжение на нижней панели: y', r && r.y, 6, 0.05)
 
 /* ── 4. Площадь не пересекает границу панели ─────────────────────────── */
 head('Площадь считается внутри одной панели');
+/* С сессии 7 вершины площади — точки списка (README пакета calc2_panels_20261014, 9): «Площадь по точкам» из точек
+   разных панелей не строится (addPolyArea), объяснение — строкой ошибки раздела «Площади». */
 r = await run(TAN + `setup();
-  var top = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-top'; })[0];
-  var bot = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-bottom'; })[0];
-  STATE.areaVerts = []; STATE.areaCalcMode = 'poly';
-  STATE.pointerPx = (top.x0 + top.x1) / 2; STATE.pointerPy = (top.y0 + top.y1) / 2;
-  addAreaVert(1, 1, ''); addAreaVert(2, 4, '');
-  STATE.pointerPx = (bot.x0 + bot.x1) / 2; STATE.pointerPy = (bot.y0 + bot.y1) / 2;
-  addAreaVert(3, 6, '');
+  STATE.marks = []; STATE.areaCalcList = [];
+  var ids = [addMarkAt(1, 1, null, 'deriv-top', '').id, addMarkAt(2, 4, null, 'deriv-top', '').id, addMarkAt(3, 6, null, 'deriv-bottom', '').id];
+  var made = addPolyArea(ids);
   redrawAll();
-  var btn = document.getElementById('ac-calc');
-  var note = document.querySelector('#ac-verts .vert-mixed');
-  return { panels: STATE.areaVerts.map(function (v) { return v.panel; }),
-           disabled: btn ? !!btn.disabled : null,
-           note: note ? note.textContent.trim() : '' };`);
+  var err = document.getElementById('ac-error');
+  return { panels: ids.map(function (id) { return markPanelId(markById(id)); }),
+           disabled: !made && !(STATE.areaCalcList || []).length,
+           note: err ? err.textContent.trim() : '' };`);
 cmp('вершины помнят разные панели', r.panels.join(','), 'deriv-top,deriv-top,deriv-bottom');
 cmp('кнопка «Посчитать площадь» не активна', r.disabled, true);
 cmp('в списке вершин стоит строка-объяснение',
   /разных графиках/.test(r.note), true);
 // Все вершины в одной панели — кнопка снова живая.
 r = await run(TAN + `setup();
-  var top = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-top'; })[0];
-  STATE.areaVerts = []; STATE.areaCalcMode = 'poly';
-  STATE.pointerPx = (top.x0 + top.x1) / 2; STATE.pointerPy = (top.y0 + top.y1) / 2;
-  addAreaVert(1, 1, ''); addAreaVert(2, 4, ''); addAreaVert(3, 9, '');
+  STATE.marks = []; STATE.areaCalcList = [];
+  var ids = [addMarkAt(1, 1, null, 'deriv-top', '').id, addMarkAt(2, 4, null, 'deriv-top', '').id, addMarkAt(3, 9, null, 'deriv-top', '').id];
+  var made = addPolyArea(ids);
   redrawAll();
-  var btn = document.getElementById('ac-calc');
-  return btn ? !!btn.disabled : null;`);
+  return !made;`);
 cmp('вершины в одной панели: кнопка активна', r, false);
 
 /* ── 5. Колесо работает в панели под курсором ────────────────────────── */

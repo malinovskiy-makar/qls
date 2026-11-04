@@ -5,6 +5,7 @@
 //   ./venv/Scripts/python.exe manage.py runserver 8099 --noreload
 //   node calc2/tests/audit_matrix.mjs > reports/calc2_matrix_before.md
 import { chromium } from 'playwright';
+import { keepAnswerOpen, answerShown } from './answer_open.mjs';
 import { readFileSync, readdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -14,6 +15,9 @@ const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 
 const browser = await chromium.launch();
+/* «Ответ» от 1240 px закрыт по умолчанию (решение 14.10, Notion …81de…, ADR 0150): прибор открывает его,
+   как у человека, однажды открывшего «Ответ»; первая проверка — колонка видна (answer_open.mjs). */
+keepAnswerOpen(browser);
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
@@ -25,6 +29,7 @@ await page.fill('#id_password', PASS);
 await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }), page.click('button[type=submit]')]);
 await page.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle', timeout: 30000 });
 await page.waitForTimeout(1200);
+if (!(await answerShown(page))) { console.log('FAIL предусловие: «Ответ» открыт (#params-panel > .side-inner видна)'); process.exitCode = 1; }
 
 const scenes = await page.$$eval('.scard:not(.soon)', els =>
   els.map(e => [e.dataset.scene, (e.querySelector('.scard-name') || e).textContent.trim()]));

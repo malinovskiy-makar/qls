@@ -157,9 +157,10 @@ try {
                  ih: innerHeight, sh: document.documentElement.scrollHeight };
       });
     }
-    // Короткая страница: прокрутки нет, метка у нижнего края окна (на входе — над полем body в 24 px), слева.
+    // Вход с 29.10 использует body.au без внешнего padding: метка у края окна.
+    // В кабинете отсутствие метки предусмотрено тем же обновлением.
     const ok = (p, gap) => p.sh === p.ih && Math.abs(p.ih - gap - p.bottom) <= 1 && p.left <= 24;
-    check('version_at_the_bottom_of_short_pages', !!seen['/teacher/game-sets/'].none && ok(seen['/login/'], 24), seen);
+    check('version_at_the_bottom_of_short_pages', !!seen['/teacher/game-sets/'].none && ok(seen['/login/'], 0), seen);
   });
 } catch (e) {
   out.error = String((e && e.stack) || e);

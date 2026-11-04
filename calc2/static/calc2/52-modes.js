@@ -18,6 +18,7 @@ function setRanges(qmax, pmax, opts) {
   const sym = !!(opts && opts.symmetric);
   CONFIG.Qmin = STATE.firstQuad ? 0 : (sym ? -qmax : -qmax * 0.08);
   CONFIG.Pmin = STATE.firstQuad ? 0 : (sym ? -pmax : -pmax * 0.08);
+  if (typeof monoBudgetFloor === 'function') CONFIG.Pmin = Math.min(CONFIG.Pmin, monoBudgetFloor());
   syncViewFields();
   // Адвалорная ставка меряется в ПРОЦЕНТАХ — её пределы к масштабу цены не привязаны
   // (ими управляет applyTaxRateBounds), поэтому поля ставки в этом случае пропускаем.
@@ -43,11 +44,14 @@ function syncViewFields() {
     const e = document.getElementById(id);
     if (e && document.activeElement !== e) e.value = Math.round(val * 1000) / 1000;
   });
+  // Отрезок «Наибольшего и наименьшего» с окном больше не связан: это общий
+  // отрезок ответа, его показывает syncAnsSegUI (ADR 0143).
   /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
      showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
      иначе показывало бы прежнее положение. */
-  const ac = document.getElementById('chk-areas');
-  if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
+  const ac = document.getElementById('chk-cs'), ap = document.getElementById('chk-ps');
+  if (ac) ac.checked = !!STATE.showCS;
+  if (ap) ap.checked = !!STATE.showPS;
   /* «Было → стало» — та же болезнь, что была у излишков: SCENE_DEFAULTS гасит
      showGhost при входе в модель, а галочка в разметке стоит отмеченной. Тумблер
      врал: отмечен, а бледного исходного равновесия на графике нет, и первое
@@ -70,6 +74,10 @@ function syncViewFields() {
 function updateResetViewBtn() {
   const b = document.getElementById('btn-resetview');
   if (!b) return;
+  // Редизайн 10.2026: «Вписать» в панели холста доступна всегда; признак
+  // «окно сдвинуто» только меняет её вид.
+  b.classList.toggle('is-dirty', !!STATE.viewDirty);
+  return;
   const show = !!STATE.viewDirty;
   if (show === !b.classList.contains('is-off')) return;
   b.classList.toggle('is-off', !show);
@@ -81,6 +89,7 @@ function updateResetViewBtn() {
 
 // Пользователь сам выбрал масштаб: авто-подгонка сцены отступает.
 function markViewDirty() {
+  cancelRangeAnim();
   STATE.viewDirty = true;
   STATE.zoomLock = true;
   updateResetViewBtn();
@@ -167,7 +176,7 @@ function scheduleRangeAnim(qmax, pmax) {
   clearTimeout(_rangeSchedT);
   _rangeSchedT = setTimeout(() => {
     _rangeSchedT = null;
-    if (_rangeAnimating) return;
+    if (_rangeAnimating || STATE.zoomLock) return;
     const [q, p] = _rangeSchedTarget;
     animateRanges(q, p);
   }, RANGE_DEBOUNCE);
@@ -239,7 +248,7 @@ function boundsOfDrawn(baseQ, baseP) {
   };
   (STATE.marks || []).forEach(m => { if (!m.pending) eat(m.x, m.y); });
   (STATE.areaVerts || []).forEach(v => eat(v.x, v.y));
-  (STATE.areaCalcList || []).forEach(r => {
+  (typeof areasLive === 'function' ? areasLive() : (STATE.areaCalcList || [])).forEach(r => {   // живой обход (сессия 7)
     if (r.ring) r.ring.forEach(p => eat(p[0], p[1]));
     else if (isFinite(r.b)) eat(r.b, 0);
   });
@@ -270,9 +279,10 @@ function boundsOfDrawn(baseQ, baseP) {
 
    Сам признак объявлен рядом с прочими флагами масштаба, выше по файлу: его
    читает и applyTradeRanges, которая стоит раньше этого места. */
-function redrawKeepingWindow() {
+function redrawKeepingWindow(action = redrawAll) {
+  const was = _paramOnlyRedraw;
   _paramOnlyRedraw = true;
-  try { redrawAll(); } finally { _paramOnlyRedraw = false; }
+  try { action(); } finally { _paramOnlyRedraw = was; }
 }
 
 function applyAutoRanges(qmax, pmax) {
@@ -354,9 +364,11 @@ function zoomBy(factor, px, py) {
     if (!(span > 1e-6 && span < 1e9)) return;
     const xc = x0 + (x1 - x0) * tx;
     const yc = y1 - (y1 - y0) * ty;
+    // Пометка «окно человека» — ДО перерисовки внутри setMathWindow: иначе
+    // индикатор масштаба брал за 100 % уже приближенное окно.
+    markViewDirty();
     setMathWindow(xc - (xc - x0) * factor, xc + (x1 - xc) * factor,
                   yc - (yc - y0) * factor, yc + (y1 - yc) * factor);
-    markViewDirty();
     redrawAll();
     return;
   }
@@ -471,14 +483,54 @@ function panByPixels(dxPx, dyPx, panel) {
    Жёсткие числа остаются запасным вариантом, когда кривых ещё нет вовсе.
    Этим пользуются ДВОЕ: кнопка «Вернуть исходный вид» (она ставит ровно эти
    границы) и авто-расширение окна (оно берёт из них только больший край). */
-function wantedRanges() {
-  const fallbackQ = (STATE.mode === 'costs') ? 10 : 100;
-  const fallbackP = (STATE.mode === 'costs') ? 50 : 100;
+function wantedRanges(fit = false) {
+  const defaultQ = (STATE.mode === 'costs') ? 10 : 100;
+  const defaultP = (STATE.mode === 'costs') ? 50 : 100;
+  const fallbackQ = fit ? defaultQ : Math.min(defaultQ, CONFIG.Qmax);
+  const fallbackP = fit ? defaultP : Math.min(defaultP, CONFIG.Pmax);
   const c = curveAxisBounds();
-  const baseQ = (c && c.qmax > fallbackQ) ? padMax(c.qmax) : fallbackQ;
-  const baseP = (c && c.pmax > fallbackP) ? padMax(c.pmax) : fallbackP;
+  // Новая формула и «Вписать» могут сжимать окно. Запас 100×100 нужен
+  // только при отсутствии данных, а не как нижний предел масштаба.
+  const points = modelAnswerPoints();
+  const answerQ = Math.max(0, ...points.map(p => p[0]));
+  const answerP = Math.max(0, ...points.map(p => p[1]));
+  const q = Math.max(c ? c.qmax : 0, answerQ);
+  const p = Math.max(c ? c.pmax : 0, answerP);
+  const baseQ = fit
+    ? (Math.max(c && c.qmax > 0 ? niceMax(c.qmax) : 0, answerQ > 0 ? padMax(answerQ) : 0) || fallbackQ)
+    : (q > fallbackQ * (1 + 1e-9) ? padMax(q) : fallbackQ);
+  const baseP = fit
+    ? (Math.max(c && c.pmax > 0 ? niceMax(c.pmax) : 0, answerP > 0 ? padMax(answerP) : 0) || fallbackP)
+    : (p > fallbackP * (1 + 1e-9) ? padMax(p) : fallbackP);
   const b = boundsOfDrawn(baseQ, baseP);
   return { qmax: b ? b.qmax : baseQ, pmax: b ? b.pmax : baseP };
+}
+
+// Ключевые значения расчёта независимо от текущего кадра. keyTargets
+// намеренно отсекает невидимые точки и потому не может находить окно для них.
+function modelAnswerPoints() {
+  const out = [], add = (x, y) => { if (Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]); };
+  if (STATE.mode === 'market') {
+    if (STATE.eq) add(STATE.eq.Q, STATE.eq.P);
+    if (STATE.market === 'monopoly') {
+      if (STATE.mono) { add(STATE.mono.Qm, STATE.mono.Pm); add(STATE.mono.Qc, STATE.mono.Pc); }
+      if (STATE.monoTax) add(STATE.monoTax.Qt, STATE.monoTax.Pt);
+      if (STATE.monoFloor) add(STATE.monoFloor.Q, STATE.monoFloor.price);
+      if (STATE.monoQuota) add(STATE.monoQuota.Q, STATE.monoQuota.price);
+    } else if (STATE.taxEq) { add(STATE.taxEq.Q, STATE.taxEq.Pb); add(STATE.taxEq.Q, STATE.taxEq.Ps); add(STATE.taxEq.Q, STATE.taxEq.Pm); }
+    if (STATE.ext) add(STATE.ext.Qopt, STATE.ext.Popt);
+  }
+  if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.lrOn && STATE.lr) {
+    add(STATE.lr.Q, STATE.lr.P); add(STATE.lr.Q, STATE.lr.atc);
+  }
+  return out;
+}
+
+let _formulaFitRequested = false;
+function requestFormulaFit() {
+  STATE.zoomLock = false; STATE.viewDirty = false;
+  _formulaFitRequested = true;
+  cancelRangeAnim();
 }
 
 /* ⚠️ ОКНО РАСШИРЯЕТСЯ, НО НЕ СЖИМАЕТСЯ (решение владельца 01.09).
@@ -523,17 +575,27 @@ let _sceneRangedFrame = false;
 function growWindowToModel() {
   const sceneTook = _sceneRangedFrame;
   _sceneRangedFrame = false;
+  const fit = _formulaFitRequested;
+  _formulaFitRequested = false;
   if (sceneTook) return;
   if (_rangeAnimating) return;            // кадром анимации распоряжается сама анимация
   if (STATE.mode === 'math') return;
+  /* «Построение графиков» — полный план и окно по ключевым точкам ответа
+     (ADR 0146), а не экономический запас 100 × 100 от нуля вправо-вверх: тот
+     прижимал параболу x² − 4 к левому краю. Раньше zoomLock: новые точки
+     показываются и после ручного сдвига или масштаба (решение 13.10). */
+  if (STATE.mode === 'graph') { graphShowKeyPoints(); return; }
   if (STATE.zoomLock) return;
-  const w = wantedRanges();
-  growRanges(w.qmax, w.pmax);
+  const w = wantedRanges(fit);
+  if (fit) setRanges(w.qmax, w.pmax);
+  else growRanges(w.qmax, w.pmax);
+  // Полоса субсидии — денежный перевод ниже MC, даже когда MC−s < 0.
+  // При регуляторе нижний край только расширяется, как верхние границы.
+  if (typeof monoBudgetFloor === 'function') CONFIG.Pmin = Math.min(CONFIG.Pmin, monoBudgetFloor());
 }
 
 function resetZoom() {
-  STATE.zoomLock = false;
-  STATE.viewDirty = false;
+  requestFormulaFit();
   tanResetWindows();
   resetPanelWins();      // окна панелей тоже возвращаются к тому, что даёт сцена
   if (STATE.mode === 'math') {
@@ -545,13 +607,27 @@ function resetZoom() {
       let [x0, x1, y0, y1] = p.win;
       const b = boundsOfDrawn(x1, y1);
       if (b) { x1 = Math.max(x1, b.qmax); y1 = Math.max(y1, b.pmax); }
+      /* Ключевая точка ответа (корень, вершина, пересечение) на отрезке
+         ответа, не влезающая в окно пресета, раздвигает его до себя — с тем
+         же запасом 8 %, что у окна «Построения графиков» (ADR 0143). */
+      if (STATE.mathSub !== 'constraint' && typeof answerKeyPoints === 'function') {
+        for (let k = 0; k < 3; k++) {
+          const mx = (x1 - x0) * 0.09, my = (y1 - y0) * 0.09;
+          answerKeyPoints().forEach(q => {
+            x0 = Math.min(x0, q.x - mx); x1 = Math.max(x1, q.x + mx);
+            y0 = Math.min(y0, q.y - my); y1 = Math.max(y1, q.y + my);
+          });
+        }
+      }
       setMathWindow(x0, x1, y0, y1);
     }
+  } else if (STATE.mode === 'graph') {
+    setGraphWindow(graphFitWindow());   // окно по функции (ADR 0143)
   } else {
     /* Порядок Н20 · Н21 живёт в wantedRanges — там же, откуда его берёт
        авто-расширение окна. Возврат ставит эти границы РОВНО, то есть умеет и
        сжать: человек попросил вернуть исходный вид. */
-    const w = wantedRanges();
+    const w = wantedRanges(true);
     setRanges(w.qmax, w.pmax);
   }
   syncViewFields();
@@ -662,7 +738,7 @@ function initZoom() {
       return;
     }
     const t = e.target;
-    if (t && t.closest && t.closest('.graph-tools, .wrench')) return;
+    if (t && t.closest && t.closest('.graph-tools, .wrench, .cv-bar')) return;
     const tag = (t && t.tagName || '').toLowerCase();
     /* ⚠️ ОДНО НАЖАТИЕ — ОДИН СМЫСЛ, манипуляторы сцены (замер владельца 21.08,
        ручка налога в «Потоварных налогах»). Клин налога t, потолок/пол цены,
@@ -745,7 +821,8 @@ function initZoom() {
        браузера, и перехватывать её нельзя. */
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' ||
         e.code === 'KeyZ')) {
-      if (e.shiftKey) return;          // Shift+Z это «вернуть», а его мы не делаем
+      // Shift+Z — «Повторить» (редизайн 10.2026, 91-session.js).
+      if (e.shiftKey) { if (typeof historyRedo === 'function' && historyRedo()) e.preventDefault(); return; }
       if (typeof undoLast === 'function' && undoLast()) e.preventDefault();
       return;
     }
@@ -848,8 +925,11 @@ function setMode(mode) {
     // Роль, а не видимость: погашенная кривая роль всё равно занимает.
     if (!curveByRoleAny('demand') || !curveByRoleAny('supply')) {
       STATE.curves = []; curveCounter = 0;
-      addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
-      addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
+      // Стартовый пример во всех четырёх моделях труда (решение владельца 15.10, Notion …81df…, ADR 0156):
+      // D = 100 − L, S = 10 + 0,5L — конкуренция 60 / 40, монопсония 45 / 32,5, профсоюз по фонду оплаты 50 / 50.
+      // Прежний S = L профсоюзу с целью «фонд оплаты» ничего не давал: MRL = 0 ровно в конкурентной точке.
+      addCurve('100 - L');    if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
+      addCurve('10 + 0.5*L'); if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
     }
     if (!STATE.laborVisited) {
       STATE.laborVisited = true;
@@ -858,7 +938,7 @@ function setMode(mode) {
       STATE.laborMinOn = true;
       const chk = document.getElementById('chk-labmin'); if (chk) chk.checked = true;
       const lf = document.getElementById('labmin-field'); if (lf) lf.style.display = '';
-      if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(65);  // выше равновесия (≈50) → связывающий
+      if (!(STATE.laborMinW > 0) && typeof setLaborMinFields === 'function') setLaborMinFields(45);  // выше равновесия 40 → связывающий
     }
   }
   // Режим неравенства: пометить первый вход и заполнить таблицу групп.

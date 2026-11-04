@@ -40,6 +40,8 @@ body.au { display: flex; flex-direction: column; align-items: stretch;
           justify-content: flex-start; min-height: 100vh; padding: 0; }
 body.au > .site-version { align-self: stretch; }
 body.au { --legal-foot-left: 16px; }
+/* Кружок Telegram не закрывает последние ссылки и возрастную метку. */
+body.au > .legal-foot, body.au > .site-version ~ .legal-foot { padding-right: 80px; }
 /* Полоса с логотипом (раунд 4). На широком экране лежит поверх фона, своей высоты не
    берёт: логотип слева вверху, карточка справа, левая колонка по центру высоты — они
    не пересекаются, а 52 px нужны регистрации, чтобы влезть в окно 1536×730. */
@@ -170,8 +172,13 @@ body.au { position: relative; }
 .au-main > .login-card .back-link { display: none; }
 
 /* Телефон: левой колонки нет, карточка без рамки на всю ширину, поля 16 px. */
+/* Планшет: две колонки не вмещаются рядом с формой 500 px. */
+@media (max-width: 1023px) {
+  .au-pitch { display: none; }
+  .au-main { gap: 0; }
+}
 @media (max-width: 900px) {
-  .au-main { gap: 40px; padding: 32px 24px; }
+  .au-main { padding: 32px 24px; }
   .au-pitch-h { font-size: 32px; }
 }
 @media (max-width: 760px) {

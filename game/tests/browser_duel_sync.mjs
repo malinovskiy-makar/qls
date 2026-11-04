@@ -17,7 +17,10 @@ const BASE = process.env.RUSH_BASE_URL || 'http://127.0.0.1:8000';
 const LOBBY = process.env.RUSH_LOBBY || '/game/';
 const AUTHOR = process.env.RUSH_AUTHOR || '';
 
-const out = { checks: {} };
+const out = { checks: {}, trace: [] };
+const record = (event, detail) => {
+  if (out.trace.length < 80) out.trace.push({ at: Date.now(), event, detail });
+};
 const check = (name, ok, detail) => { out.checks[name] = { ok: !!ok, detail }; };
 
 /* Метки ставит сама страница: какие цифры показал отсчёт и когда открылся
@@ -55,6 +58,18 @@ async function openLobby(session) {
                               domain: new URL(BASE).hostname, path: '/' }]);
   await context.addInitScript(watch);
   const page = await context.newPage();
+  const player = browser.contexts().length;
+  page.on('pageerror', e => record('pageerror', { player, message: String(e) }));
+  page.on('websocket', socket => {
+    record('socket', { player });
+    socket.on('socketerror', e => record('socketerror', { player, message: String(e) }));
+    socket.on('framereceived', frame => {
+      try {
+        const m = JSON.parse(String(frame.payload));
+        record('received', { player, type: m.type, at: m.at, now: m.now, action: m.action });
+      } catch { record('invalid-frame', { player }); }
+    });
+  });
   await page.goto(BASE + LOBBY, { waitUntil: 'load', timeout: 30000 });
   await page.waitForSelector('#duel-lobby', { timeout: 15000 });
   return page;
@@ -101,6 +116,7 @@ try {
   out.error = String(e && e.message || e);
 }
 
+if (Object.values(out.checks).every(c => c.ok) && !out.error) delete out.trace;
 console.log('###RUSH-JSON###');
 console.log(JSON.stringify(out));
 await browser.close();

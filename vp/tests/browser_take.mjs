@@ -281,8 +281,9 @@ try {
     const rows = [...document.querySelectorAll('.vp-land-rows .vp-land-row:not(.is-head)')];
     if (rows.length !== 10) return false;
     const card = document.querySelector('.vp-land-board').getBoundingClientRect();
+    const viewport = rows[rows.length - 1].parentElement.getBoundingClientRect();
     const last = rows[rows.length - 1].getBoundingClientRect();
-    return last.bottom <= card.bottom + 0.5;
+    return last.bottom <= card.bottom + 0.5 && last.bottom <= viewport.bottom + 0.5;
   }), meState);
   await mep.close();
 
@@ -461,6 +462,20 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, 'take_dark_desktop_top');
   await setTheme(page, false);
+
+  // Планшет: подпись часов раньше накладывалась на счётчик ответов.
+  for (const width of [768, 810, 1024]) {
+    await page.setViewportSize({ width, height: 1024 });
+    const bar = await page.evaluate(() => {
+      const clock = document.querySelector('.vp-clock-line').getBoundingClientRect();
+      const side = document.querySelector('.vp-bar-side').getBoundingClientRect();
+      return { clockRight: clock.right, sideLeft: side.left,
+               docWidth: document.documentElement.scrollWidth, width: innerWidth };
+    });
+    check(`t.take_header_fits_${width}`, bar.clockRight + 8 <= bar.sideLeft
+      && bar.docWidth <= bar.width, bar);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   // ---- сдача
   await page.click('#vp-submit');
@@ -698,6 +713,13 @@ try {
   await setTheme(tp, false);
   const warnLight = lowContrast(await contrastOf(tp, ['.vp-banner', '.vp-timer', '.vp-timer-cap']));
   check('t.warn_contrast_both_themes', warnDark.length === 0 && warnLight.length === 0, { warnLight, warnDark });
+  await tp.setViewportSize({ width: 768, height: 1024 });
+  const warnFits = await tp.evaluate(() => {
+    const cap = document.querySelector('.vp-timer-cap').getBoundingClientRect();
+    const side = document.querySelector('.vp-bar-side').getBoundingClientRect();
+    return cap.right + 8 <= side.left;
+  });
+  check('t.warn_header_fits_tablet', warnFits);
 
   // офлайн: индикатор честный, после возврата связи ответ доезжает
   await tctx.setOffline(true);
@@ -706,6 +728,15 @@ try {
   const offState = await tp.evaluate(() => ({ cls: document.getElementById('vp-save-state').className,
     text: document.getElementById('vp-save-state').textContent }));
   check('t.offline_indicator', /is-offline/.test(offState.cls) && /нет связи/.test(offState.text), offState);
+  await tp.setViewportSize({ width: 390, height: 844 });
+  const offlineFits = await tp.evaluate(() => {
+    const status = document.getElementById('vp-save-state').getBoundingClientRect();
+    const button = document.getElementById('vp-submit').getBoundingClientRect();
+    return status.top >= button.bottom && status.right <= innerWidth
+      && document.documentElement.scrollWidth <= innerWidth;
+  });
+  check('t.offline_phone_status_separate_row', offlineFits);
+  await tp.setViewportSize({ width: 1280, height: 900 });
   await tctx.setOffline(false);
   let back = false;
   for (let k = 0; k < 60 && !back; k++) {
