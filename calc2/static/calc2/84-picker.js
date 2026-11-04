@@ -6,6 +6,15 @@
    режима и установка параметра. Никакой новой логики — только композиция.
    --------------------------------------------------------------------- */
 function loadScene(name) {
+  _sceneSetupDepth++;
+  try { return loadScenePreset(name); }
+  finally {
+    _sceneSetupDepth--;
+    if (!_sceneSetupDepth) { renderCurveList(); redrawAll(); }
+  }
+}
+
+function loadScenePreset(name) {
   STATE.sceneKey = name;   // и при выборе из «Готовых сцен», и из окна сценариев
   // Чистый старт: кривые, сценарий анализа и параметры вмешательства — с нуля.
   STATE.curves = []; curveCounter = 0;

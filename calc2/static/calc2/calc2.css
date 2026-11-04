@@ -2718,7 +2718,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 
 /* Тосты (раздел 10): снизу по центру, графитовые, 14,5 px, радиус 10. */
 .toast {
-  left: 50%; right: auto; bottom: 18px; transform: translateX(-50%);
+  left: 50%; right: auto; bottom: calc(18px + var(--ck-h, 0px)); transform: translateX(-50%);
   max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
   background: var(--btn-bg); color: var(--on-btn); font-size: 14.5px; font-weight: 500;
   display: none; align-items: center; gap: 12px;

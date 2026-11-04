@@ -714,7 +714,7 @@ function updateLongRunPanel(html) {
 function prodEval(L) {
   if (!STATE.prodCompiled) return NaN;
   try {
-    const v = STATE.prodCompiled.evaluate(scopeFor(STATE.prodExpr, { L: L, x: L, Q: L }));
+    const v = evalWithParams(STATE.prodCompiled, { L: L, x: L, Q: L }, STATE.prodExpr);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }
@@ -731,7 +731,7 @@ function prodDerivative(L, order) {
   const compiled = _prodDerivatives[order - 1];
   if (!compiled) return NaN;
   try {
-    const value = compiled.evaluate(scopeFor(STATE.prodExpr, { L, x: L, Q: L }));
+    const value = evalWithParams(compiled, { L, x: L, Q: L }, STATE.prodExpr);
     return Number.isFinite(value) ? value : NaN;
   } catch (e) { return NaN; }
 }

@@ -96,4 +96,5 @@ class DuelSyncStartBrowserTest(ChannelsLiveServerTestCase):
         self.assertEqual(set(data['checks']), CHECKS)
         failed = {k: v['detail'] for k, v in data['checks'].items() if not v['ok']}
         self.assertFalse(failed, 'синхронный старт дуэли:\n'
-                         + json.dumps(failed, ensure_ascii=False, indent=1)[:4000])
+                         + json.dumps({'checks': failed, 'trace': data.get('trace', [])},
+                                      ensure_ascii=False, indent=1)[:8000])

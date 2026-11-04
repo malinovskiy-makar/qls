@@ -18,7 +18,7 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import * as L from './lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -28,7 +28,7 @@ const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const BL = arg('base', path.join(HERE, 'baseline'));
 const LAYER = arg('layer', 'old');
 const JOBS = +arg('jobs', '3');
-const layer = await import(path.join(HERE, 'layer_' + LAYER + '.mjs'));
+const layer = await import(pathToFileURL(path.join(HERE, 'layer_' + LAYER + '.mjs')).href);
 L.configure({ layer, base: BASE, layerName: LAYER });
 const ONLY = (arg('keys', '') || '').split(',').filter(Boolean);
 const all = fs.readdirSync(BL).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5));

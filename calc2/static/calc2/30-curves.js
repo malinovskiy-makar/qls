@@ -439,7 +439,12 @@ function curveAnchor(f, fromFrac, toFrac, key) {
   const at = (q) => { try { const v = f(q); return isNaN(v) ? null : v; } catch (e) { return null; } };
   let best = null, loose = null, prevQ = null, prevV = null;
   for (let i = 0; i <= N; i++) {
-    const q = qHi * (from + (to - from) * i / N);
+    // На свободной плоскости оставляем справа место для имени функции.
+    // Якорь у самой границы при изменении параметра быстро уходил за верх,
+    // заставляя подпись менять сторону и перескакивать на соседний участок.
+    const q = STATE.mode === 'graph' && fromFrac == null
+      ? qLo + (qHi - qLo) * (0.8 - 0.76 * i / N)
+      : qHi * (from + (to - from) * i / N);
     const v = at(q);
     if (v == null || v < vLo || v > vHi) { prevQ = q; prevV = v; continue; }
     // Запасное место тоже не должно уходить за четверть: иначе, когда годного
@@ -1118,7 +1123,8 @@ const LABEL_JUMP = 60;         // дальше этого едем сразу: �
 const FLIP_HYST = 12;          // запас на переворот выравнивания, px
 
 function smoothLabel(key, px, py, toLeft) {
-  if (!key) return { px, py, toLeft };
+  // Здесь кривая меняется сразу; отложенная анимация отрывала от неё имя.
+  if (!key || STATE.mode === 'graph') return { px, py, toLeft };
   const prev = _labelPos.get(key);
   if (!prev) { _labelPos.set(key, { px, py, toLeft }); return { px, py, toLeft }; }
   const far = Math.hypot(px - prev.px, py - prev.py) > LABEL_JUMP;

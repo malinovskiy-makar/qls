@@ -889,7 +889,10 @@ function compileTwoVarUncached(expr) {
 }
 function evalTwoVar(compiled, a, b) {
   try {
-    const v = compiled.evaluate(scopeFor(compiled._src, { x: a, y: b, L: a, K: b }));
+    // При трассировке изокванты это десятки тысяч точек. Значения уже
+    // известных параметров подставляем без повторного обхода полей DOM;
+    // общий запасной путь по-прежнему даёт единицу новой букве.
+    const v = evalWithParams(compiled, { x: a, y: b, L: a, K: b }, compiled._src);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) { return NaN; }
 }

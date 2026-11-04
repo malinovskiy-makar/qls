@@ -233,7 +233,11 @@ class FooterRenderTests(TestCase):
         html = self.client.get('/calc2/').content.decode('utf-8')
         self.assertIn('id="scene-picker"', html)
         self.assertNotIn('calc-foot', html)
-        self.assertIn('.app { height: calc(100vh - 48px - var(--ck-h, 0px)); }', html)
+        # На телефоне страница идёт одним потоком, на компьютере занимает
+        # окно за вычетом фактической шапки и cookie-панели, без полосы футера.
+        self.assertRegex(html, r'@media\s*\(min-width:\s*760px\)\s*\{\s*'
+                         r'\.app\s*\{\s*height:\s*calc\(100dvh - '
+                         r'var\(--calc2-app-top, 48px\) - var\(--ck-h, 0px\)\);\s*\}')
         self.assertIn('#scene-picker { bottom: var(--ck-h, 0px); }', html)
 
     def test_calculator_has_the_docs_link_in_the_header(self):

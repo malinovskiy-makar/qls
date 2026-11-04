@@ -327,6 +327,7 @@ const ICON_DOTS = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColo
   + '<circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg>';
 
 function renderCurveList() {
+  if (_sceneSetupDepth) return;
   const list = document.getElementById('curve-list');
   // Ползунки кривых живут под карточками: перед пересборкой списка они уходят
   // домой в «Параметры», иначе пропали бы вместе со старыми карточками.

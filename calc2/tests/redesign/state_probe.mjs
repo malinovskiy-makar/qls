@@ -13,7 +13,7 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import * as L from './lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +24,7 @@ const BL = arg('base', path.join(HERE, 'baseline'));
 const OUT = path.resolve(arg('out', 'reports/calc2_redesign/state'));
 const LAYER = arg('layer', 'old');
 const JOBS = +arg('jobs', '4');
-const layer = await import(path.join(HERE, 'layer_' + LAYER + '.mjs'));
+const layer = await import(pathToFileURL(path.join(HERE, 'layer_' + LAYER + '.mjs')).href);
 L.configure({ layer, base: BASE, layerName: LAYER });
 const KEYS = (arg('keys', '') || '').split(',').filter(Boolean);
 const keys = fs.readdirSync(BL).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)).filter(k => !KEYS.length || KEYS.includes(k));
