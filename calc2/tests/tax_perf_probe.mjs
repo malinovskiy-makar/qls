@@ -86,8 +86,11 @@ try {
     const actual=STATE.taxEq||{Q:STATE.eq.Q,Pb:STATE.eq.P,Ps:STATE.eq.P};
     const comparisons=[[actual.Q,q],[actual.Pb,pb],[actual.Ps,ps],
      [STATE.budget??0,(pb-ps)*q]];
-    if(name!=='radical')comparisons.push([rate===0?STATE.cs:STATE.csTax,q*q/2],
-     [rate===0?STATE.ps:STATE.psTax,b*q*q/2]);
+    const q0=name==='radical'?(-100+Math.sqrt(50000))/2:100/(1+b);
+    const welfare=x=>100*x-x*x/2-(name==='radical'?x*x*x/300:b*x*x/2);
+    comparisons.push([rate===0?STATE.cs:STATE.csTax,q*q/2],
+     [rate===0?STATE.ps:STATE.psTax,name==='radical'?q*q*q/150:b*q*q/2],
+     [STATE.dwl??0,welfare(q0)-welfare(q)]);
     for(const [a,e]of comparisons){if(typeof a!=='number'||!Number.isFinite(a))mathError=Infinity;
      else mathError=Math.max(mathError,Math.abs(a-e)/Math.max(1,Math.abs(e)));}
     const sync=geometry();await raf();const first=geometry();await raf();
