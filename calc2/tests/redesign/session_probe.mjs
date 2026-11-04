@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import * as L from './lib.mjs';
+import { auditStartCheck } from './audit_start.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -274,6 +275,7 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
     await L.settle(p); await p.evaluate(() => redrawAll()); await L.settle(p);
     const st = await p.evaluate(() => window.__RD.stateDump());
     const d = L.stateDiff(rec.start.state, st);
+    const auditStart = auditStartCheck(k, st, rec.start.state);
     // Э3 уточняет сеточные максимумы производственной функции. Исторический
     // JSON не переписываем: он содержит L=14.99997502 и MP=225.0007495.
     // Вычисляемую часть теперь проверяем по аналитическому решению исходной
@@ -337,6 +339,7 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
       /* areaHidden — ключ этапа Г (14.10): в записях старта его нет, на старте он пуст. */
       && !(x === 'areaHidden' && !(x in rec.start.state) && Array.isArray(st.areaHidden) && !st.areaHidden.length)
       && !(x === 'prod' && productionExact)
+      && !(auditStart?.ok && auditStart.fields.includes(x))
       && !(x === 'discr3' && discriminationExact)
       && !(x === 'plants' && plantsExact)
       && !(inequalityExact && ['ineqStats','ineqCountries','ineqDistribution'].includes(x))
@@ -347,6 +350,7 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
     if (supplyFamily && !supplyExact && !real.includes('firmSupply')) real.push('firmSupply: не сошлось аналитическое решение');
     if (k === 'mono-d3' && !discriminationExact && !real.includes('discr3')) real.push('discr3: не сошлось аналитическое решение');
     if (k === 'prod' && !productionExact && !real.includes('prod')) real.push('prod: не сошлось аналитическое решение');
+    if (auditStart && !auditStart.ok) real.push('M01–M03: не сошлось аналитическое решение');
     if (real.length) { bad++; fails.push('заполненное хранилище: ' + k + ' старт разошёлся: ' + real.slice(0, 5).join(', ')); }
   }
   console.log('заполненное хранилище: моделей с иным стартом ' + bad + ' из ' + keys2.length);
