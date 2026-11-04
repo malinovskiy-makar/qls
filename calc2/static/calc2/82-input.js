@@ -800,7 +800,9 @@ function texGroup(s, i) {
 }
 
 function latexToMath(tex) {
-  let s = String(tex == null ? '' : tex);
+  // CalcNumber печатает десятичную запятую как {,}. Возвращаем её в точку
+  // ДО снятия группировки: обычная запятая остаётся разделителем аргументов.
+  let s = String(tex == null ? '' : tex).replace(/(\d)\s*\{\s*,\s*\}\s*(?=\d)/g, '$1.');
   if (!s.trim()) return '';
   let out = '';
   let i = 0;

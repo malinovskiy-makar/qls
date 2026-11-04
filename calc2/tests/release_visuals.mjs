@@ -68,8 +68,11 @@ try {
       failures.push(...found.map(detail=>({key,width,theme,detail})));
       if (key==='m-optimum') {
         const target=page.locator('#chart text').filter({hasText:/^max:/}).first();
-        const a=await target.boundingBox();
-        await target.dblclick();
+        // WebKit's automation quads can retain the pre-layout SVG position.
+        // Use the rendered DOM rectangle, then a real pointer double-click:
+        // this still catches a detached hit target or an overlapping element.
+        const a=await target.evaluate(node=>node.getBoundingClientRect().toJSON());
+        await page.mouse.dblclick(a.x+a.width/2,a.y+a.height/2);
         const input=page.locator('#pt-rename');
         await input.waitFor({state:'visible'});
         const b=await input.boundingBox();

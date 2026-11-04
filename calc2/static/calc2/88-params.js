@@ -302,9 +302,24 @@ function editEqValue(lab, name, current, apply) {
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
-  /* Поле по содержимому: длина числа плюс полсимвола под курсор. Целый
-     запасной символ делал поле у «114» шире 40 px (ширина четырёх цифр). */
-  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 0.5) + 'ch'; };
+  /* ch измеряет обычный ноль, а tabular-nums может сделать цифры шире.
+     Измеряем именно видимый шрифт и добавляем padding и место под курсор;
+     иначе длинное число обрезалось даже при «правильной» длине в ch. */
+  const fitWidth = () => {
+    const cs = getComputedStyle(inp), ruler = document.createElement('span');
+    Object.assign(ruler.style, {
+      position: 'absolute', visibility: 'hidden', whiteSpace: 'pre',
+      fontFamily: cs.fontFamily, fontSize: cs.fontSize,
+      fontWeight: cs.fontWeight, fontStyle: cs.fontStyle,
+      fontVariantNumeric: cs.fontVariantNumeric,
+      letterSpacing: cs.letterSpacing,
+    });
+    ruler.textContent = inp.value || '0';
+    document.body.appendChild(ruler);
+    const width = ruler.getBoundingClientRect().width;
+    ruler.remove();
+    inp.style.width = Math.ceil(width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+  };
   fitWidth();
   inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое

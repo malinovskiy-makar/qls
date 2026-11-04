@@ -50,8 +50,8 @@ ENV PYTHONUNBUFFERED=1 \
 # --build-arg (docs/SERVER.md, «Обновить сайт до свежего кода»), получает
 # `unknown`, и поведение боя от этой правки не меняется ничем — плашку
 # окружения рисует только SITE_ENV=dev, а не наличие хеша.
-ARG GIT_SHA=unknown
-ENV GIT_SHA=$GIT_SHA
+# ARG/ENV объявлены после установки пакетов: новый SHA не должен заново
+# скачивать TeX и Python-зависимости, если их состав не изменился.
 
 # libpq5 — рантайм-часть драйвера PostgreSQL. Без -dev и без компилятора.
 # curl нужен healthcheck-у контейнера.
@@ -76,6 +76,9 @@ COPY --from=build /wheels /wheels
 COPY requirements/base.txt /tmp/base.txt
 RUN pip install --no-index --find-links=/wheels -r /tmp/base.txt \
     && rm -rf /wheels /tmp/base.txt
+
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 
 WORKDIR /app
 COPY --chown=weco:weco . /app

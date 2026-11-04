@@ -25,6 +25,29 @@ const PASS = process.env.CALC2_PASS || 'admin12345';
 // checks — пары [подпись, ключ, ожидание, допуск?].
 const CASES = [
   {
+    name: 'Десятичная формула · правка и восстановление сохраняют число и запятые аргументов',
+    run: `pickScene('labor');
+          var inp = document.getElementById('curve-expr-2');
+          flushMathfieldsSoon();
+          await new Promise(r => setTimeout(r, 250));
+          var mf = inp._mf;
+          mf.value = mathToLatexField('10 + 0.5*L') + '+5';
+          mf.dispatchEvent(new Event('input', {bubbles:true}));
+          await new Promise(r => setTimeout(r, 400));
+          var value = evalCurve(STATE.curves[1], 10);
+          var saved = JSON.stringify(collectModelState());
+          resetSceneMemory(); pickScene('sd');
+          applyModelState(JSON.parse(saved));
+          var restored = evalCurve(STATE.curves[1], 10);
+          var args = math.evaluate(latexToMath(mathToLatexField('min(1.25,2.5)')));
+          var plain = math.evaluate(latexToMath('max(1,2)'));
+          return {value, restored, args, plain};`,
+    checks: [['изменённая кривая при L=10', 'value', 20, 1e-9],
+             ['восстановленная кривая при L=10', 'restored', 20, 1e-9],
+             ['два десятичных аргумента min', 'args', 1.25, 1e-9],
+             ['обычная запятая разделяет аргументы', 'plain', 2, 1e-9]],
+  },
+  {
     name: 'Рынок · равновесие D=100−Q, S=Q',
     run: `loadScene('sd'); redrawAll();
           return { Q: STATE.eq.Q, P: STATE.eq.P };`,

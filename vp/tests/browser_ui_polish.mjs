@@ -31,6 +31,7 @@ try {
           actions:[...document.querySelector('.vp-land-cta').children].map(rect),
           band:[...document.querySelector('.vp-land-band').children].map(rect),
           probe:rect(document.querySelector('[data-open-probe]')),
+          format:rect(document.querySelector('.vp-format')),
           probeInBand:document.querySelector('[data-open-probe]').parentElement.matches('.vp-land-band'),
           labels:[...document.querySelectorAll('.vp-format-label')].map(rect)};
       });
@@ -40,6 +41,7 @@ try {
       assert.equal(geometry.band.length,signedIn?4:2);
       if (width>=1280) {
         assert.ok(geometry.sh<=height,`desktop vertical overflow: ${geometry.sh}`);
+        assert.ok(geometry.actions[0].y-geometry.format.b<200,'hero must not stretch into an empty screen');
         assert.ok(Math.abs(geometry.actions[0].y-geometry.actions[1].y)<2);
         assert.ok(geometry.actions[2].y<geometry.actions[0].b);
         for (let i=1;i<geometry.actions.length;i++)
