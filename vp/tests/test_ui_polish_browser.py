@@ -38,7 +38,7 @@ class LandingPolishBrowserTests(StaticLiveServerTestCase):
                                 text=True, encoding='utf-8', timeout=180)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         report = json.loads(result.stdout.strip().splitlines()[-1])
-        self.assertEqual(report['screens'], 28)
+        self.assertEqual(report['screens'], 40)
         profile.refresh_from_db()
         attempt.refresh_from_db()
         self.assertEqual(profile.grade, '10')

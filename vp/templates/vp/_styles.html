@@ -1573,9 +1573,18 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-format-part:nth-child(even) .vp-format-label { top: auto; bottom: calc(100% + 10px); }
 .vp-format-part:nth-child(even) .vp-format-label::before { bottom: auto; top: calc(100% + 2px); }
 .vp-land-hero:has(.vp-format) .vp-land-cta { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 12px 14px; }
-.vp-land-hero:has(.vp-format) .vp-play { min-height: 54px; font-size: 16px; padding: 12px 14px; }
+.vp-land-hero:has(.vp-format) .vp-play { width: 100%; min-width: 0; min-height: 54px; font-size: 16px; padding: 12px 14px; }
 .vp-land-hero:has(.vp-format) .vp-ext { justify-self: center; }
-.vp-land-cta .vp-probe-open { grid-column: 1/-1; justify-self: start; }
+.vp-land-band.has-probe { grid-template-columns: 1fr 1.15fr .8fr .85fr; }
+.vp-land-band.has-probe .is-guest { grid-column: span 3; }
+.vp-land-band.has-probe .vp-land-cv { grid-column: 1/-1; white-space: normal; }
+.vp-land-band.has-probe .vp-land-ca { grid-row: 3; }
+.vp-land-band.has-probe .vp-land-history { grid-column: 1/-1; grid-row: 3; }
+.vp-probe-open { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px; min-height: 72px; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; line-height: 1.4; }
+.vp-probe-open svg { flex: 0 0 24px; width: 24px; height: 24px; color: var(--accent-ink); }
+.vp-probe-open span { max-width: 17ch; }
+.vp-probe-open:hover { border-color: var(--accent); background: var(--accent-tint); color: var(--text); }
+.vp-probe-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .vp-land-cell.is-live .vp-land-cv { white-space: normal; overflow: visible; }
 .vp-land-cell.is-live .vp-land-cs { display: block; overflow: visible; }
 .vp-land-history { grid-column: 2; grid-row: 2/4; display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; }
@@ -1596,15 +1605,24 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-probe-dialog .vp-land-probe-out:empty { display: none; }
 .vp-probe-dialog button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (min-width:1100px) and (max-width:1350px) {
-  .vp-format-body { grid-template-columns: 1fr; gap: 6px; }
+  .vp-format-body { grid-template-columns: minmax(210px,.65fr) minmax(0,1fr); gap: 20px; }
   .vp-format-facts strong { font-size: 34px; }
-  .vp-land-hero:has(.vp-format) .vp-land-cta { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .vp-land-hero:has(.vp-format) .vp-ext { grid-column: 1/-1; }
+  .vp-land-hero:has(.vp-format) .vp-play { font-size: 14px; padding: 10px; }
+  .vp-land-hero:has(.vp-format) .vp-ext { font-size: 13px; }
+}
+@media (min-width:1100px) and (min-height:650px) {
+  .vp-land:has(.vp-format) { min-height: 0; padding-bottom: 64px; grid-template-columns: minmax(0,1fr) minmax(320px,.5fr); }
+  .vp-land-hero:has(.vp-format) { gap: 16px; }
 }
 @media (max-width:1099px) {
   .vp-format-body { grid-template-columns: 1fr; gap: 10px; }
   .vp-land-hero:has(.vp-format) .vp-land-cta { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .vp-land-hero:has(.vp-format) .vp-ext { grid-column: 1/-1; min-height: 44px; }
+  .vp-land-band.has-probe { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .vp-land-band.has-probe .vp-land-cell { grid-column: auto; }
+  .vp-land-band.has-probe .is-guest { grid-column: auto; }
+  .vp-land-band.has-probe .vp-land-ca { grid-row: auto; }
+  .vp-probe-open span { max-width: none; }
 }
 @media (max-width:599px) {
   .vp-land-hero:has(.vp-format) { padding: 20px 18px; gap: 18px; }
@@ -1619,7 +1637,8 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-format-part.is-number { flex: 1.2; }
   .vp-format-range { font-size: 11px; }
   .vp-land-hero:has(.vp-format) .vp-land-cta { grid-template-columns: 1fr; }
-  .vp-land-cta .vp-probe-open { justify-self: stretch; }
+  .vp-land:has(.vp-format) .vp-land-band { order: 2; }
+  .vp-land:has(.vp-format) .vp-land-board { order: 3; }
   .vp-probe-dialog { padding: 22px; }
   .vp-probe-heading h2 { font-size: 20px; }
   .vp-land-history { grid-column: 1; grid-row: auto; }

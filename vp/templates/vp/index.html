@@ -80,12 +80,6 @@
       <a class="vp-ext" href="https://olymp.hse.ru/mmo/materials-eco" target="_blank" rel="noopener">Материалы ВШЭ
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg>
       </a>
-      {% if tour == 2 and composition.number_total %}
-      <a class="vp-play vp-play--ghost vp-probe-open" href="{% url 'vp:drill' %}" data-open-probe>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 6h6M9 10h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
-        Проверить запись ответа
-      </a>
-      {% endif %}
     </div>
   </div>
 
@@ -152,7 +146,7 @@
   </aside>
 
   {# ─── Зона C: полоса «моё» или приглашение гостю ──────────────── #}
-  <div class="vp-land-band">
+  <div class="vp-land-band{% if tour == 2 and composition.number_total %} has-probe{% endif %}">
     {% if not mine %}
     <div class="vp-land-card vp-land-cell is-guest">
       <div class="vp-land-gtxt">
@@ -208,6 +202,12 @@
       <a class="vp-land-history vp-link" href="{% url 'vp:my' %}">Мои попытки</a>
       <span class="vp-land-pbar" aria-hidden="true"><i style="width: {{ mine.done_percent }}%"></i></span>
     </div>
+    {% endif %}
+    {% if tour == 2 and composition.number_total %}
+    <a class="vp-land-card vp-probe-open" href="{% url 'vp:drill' %}" data-open-probe>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 6h6M9 10h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
+      <span>Проверить запись ответа</span>
+    </a>
     {% endif %}
   </div>
 </div>

@@ -6,7 +6,7 @@ const base = process.env.VP_POLISH_BASE, out = process.env.VP_POLISH_OUT;
 const engine = process.env.VP_POLISH_BROWSER === 'webkit' ? webkit : chromium;
 const browser = await engine.launch();
 const report = {screens:0, themeFrames:[], errors:[]};
-const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[1440,800]];
+const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[1280,720],[1366,768],[1440,800],[1920,1080]];
 try {
   for (const signedIn of [false,true]) {
     const ctx = await browser.newContext();
@@ -29,14 +29,22 @@ try {
         const rect = e => {const r=e.getBoundingClientRect();return {x:r.x,y:r.y,b:r.bottom,r:r.right,h:r.height};};
         return {sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,
           actions:[...document.querySelector('.vp-land-cta').children].map(rect),
+          band:[...document.querySelector('.vp-land-band').children].map(rect),
+          probe:rect(document.querySelector('[data-open-probe]')),
+          probeInBand:document.querySelector('[data-open-probe]').parentElement.matches('.vp-land-band'),
           labels:[...document.querySelectorAll('.vp-format-label')].map(rect)};
       });
       assert.ok(geometry.sw<=width,`horizontal overflow at ${width}: ${geometry.sw}`);
-      if (width===1440) {
+      assert.equal(geometry.actions.length,3,'hero keeps exactly three original actions');
+      assert.ok(geometry.probeInBand,'answer checker belongs to the lower panel');
+      assert.equal(geometry.band.length,signedIn?4:2);
+      if (width>=1280) {
         assert.ok(geometry.sh<=height,`desktop vertical overflow: ${geometry.sh}`);
         assert.ok(Math.abs(geometry.actions[0].y-geometry.actions[1].y)<2);
         assert.ok(geometry.actions[2].y<geometry.actions[0].b);
-        assert.ok(geometry.actions[3].y>=geometry.actions[0].b);
+        for (let i=1;i<geometry.actions.length;i++)
+          assert.ok(geometry.actions[i-1].r+8<=geometry.actions[i].x,'hero actions must keep a visible gap');
+        for (const cell of geometry.band) assert.ok(Math.abs(cell.y-geometry.probe.y)<2,'all lower-panel items share one row');
       }
       if (width===390) assert.ok(geometry.actions[0].b<height,'primary CTA below phone fold');
       for (const [i,a] of geometry.labels.entries()) for (const b of geometry.labels.slice(i+1))
