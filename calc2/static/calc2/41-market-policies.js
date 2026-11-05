@@ -137,7 +137,7 @@ function syncTaxPairUI() {
     TaxMotion.bindInput(root.querySelector('#tax2-slider'));
     root.querySelector('#tax2-slider').addEventListener('input',e=>setSecondTax({rate:+e.target.value},true));
     const ed=makeEditableValue({get:()=>STATE.taxSecond?.rate||0,set:v=>setSecondTax({rate:v},true),
-      min:0,tex:(_,text)=>CalcNumber.texText(text)});
+      min:0,fmt:v=>TaxMotion.formatRate(v),tex:(_,text)=>CalcNumber.texText(text)});
     const field=root.querySelector('#tax2-field'),slider=root.querySelector('#tax2-slider');
     const bounds=attachBoundsEditor(field,field.querySelector('.param-editor'),'Ставка 2',key=>slider[key],(key,value)=>{
       const next={min:+slider.min,max:+slider.max,step:STATE.taxSecond?.bounds?.step||.1,[key]:+value};
@@ -217,7 +217,7 @@ function drawTaxPairPoints() {
     group.append('line').attr('x1',px).attr('x2',px).attr('y1',top).attr('y2',bottom).attr('stroke',COL.ink).attr('stroke-width',2);
     [top,bottom].forEach(y=>group.append('line').attr('x1',px-4).attr('x2',px+4).attr('y1',y).attr('y2',y).attr('stroke',COL.ink));
     const sym=p.form==='unit'?(p.type==='tax'?'t':'s'):'τ';
-    haloText(group,px+9,mid,sym+'_'+(p.index+1)+' = '+CalcNumber.format(p.rate,{percent:p.form!=='unit'}),'start','middle');
+    haloText(group,px+9,mid,sym+'_'+(p.index+1)+' = '+TaxMotion.formatRate(p.rate,{percent:p.form!=='unit'}),'start','middle');
     let startY,startRate;
     const hit=group.append('rect').attr('x',px-8).attr('y',Math.min(top,mid-10)).attr('width',16).attr('height',Math.max(bottom-top,20))
       .attr('fill','transparent').style('cursor','grab').attr('data-service','tax-pair-drag');

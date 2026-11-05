@@ -63,6 +63,19 @@ class TaxPerformanceTest(StaticLiveServerTestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_rate_label_during_held_gesture(self):
+        """A held rate stays short in both controls, regardless of exact-cache state."""
+        node = shutil.which("node")
+        self.assertIsNotNone(node)
+        with tempfile.TemporaryDirectory(prefix="calc2-rate-label-") as out:
+            result = subprocess.run(
+                [node, "calc2/tests/rate_label_probe.mjs", "--out", out],
+                cwd=settings.BASE_DIR,
+                env=dict(os.environ, CALC2_BASE_URL=self.live_server_url),
+                capture_output=True, text=True, encoding="utf-8", timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def _run_motion_probe(self, *args):
         node = shutil.which("node")
         self.assertIsNotNone(node, "Node is required for the native tax gesture probe")

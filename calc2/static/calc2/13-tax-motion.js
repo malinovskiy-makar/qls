@@ -20,6 +20,18 @@ const TaxMotion = (() => {
     && ['taxes','tax','tax-adv'].includes(STATE.sceneKey)
     && ['tax','subsidy'].includes(STATE.intervType)));
 
+  // Ставка — обратная связь о текущем вводе. Её короткая запись во время
+  // жеста не зависит от кэша дробей/корней и никогда не меняет саму модель.
+  function formatRate(value, options={}) {
+    if(!pending||finishing||!Number.isFinite(value))return CalcNumber.format(value,options);
+    const shown=Math.abs(value)>0&&Math.abs(value)<.001
+      ? Number(value.toPrecision(3)) : Number(value.toFixed(3));
+    let text=shown.toLocaleString('ru-RU',{maximumSignificantDigits:15});
+    if(options.tex)text=text.replace(/[\u00a0\u202f]/g,'~').replace(',', '{,}');
+    const approx=shown!==value?(options.tex?'\\approx ':'≈ '):'';
+    return approx+text+(options.percent?(options.tex?'\\,\\%':' %'):'');
+  }
+
   function prepare(values) {
     if (!values.length) return Promise.resolve();
     if (!worker) {
@@ -193,6 +205,6 @@ const TaxMotion = (() => {
     if(pending)indicators(true);
     if(reduced()&&planeAnimation)planeAnimation.finish();
   });
-  return {supported,render,hold,release,cancel,margin,reserve,bindInput,
+  return {supported,render,hold,release,cancel,margin,reserve,bindInput,formatRate,
     get pending(){return pending;},get drawing(){return drawing;},get finishing(){return finishing;}};
 })();

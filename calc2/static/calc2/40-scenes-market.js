@@ -2485,7 +2485,7 @@ function drawTaxPoints() {
      а это не так (решение владельца «ставка только в процентах»). */
   const yMid = (yPb + yPs) / 2;
   const unit = rateUnit();
-  haloText(g, xQ1 + 16, yMid, rateLetter() + '=' + fmt(STATE.tax) + (unit ? ' ' + unit : ''),
+  haloText(g, xQ1 + 16, yMid, rateLetter() + '=' + TaxMotion.formatRate(STATE.tax) + (unit ? ' ' + unit : ''),
            'start', 'middle');
   // Широкая прозрачная зона захвата поверх клина — удобно хватать мышью.
   const hitRect = g.append('rect')
@@ -2547,7 +2547,7 @@ function setTax(t, interactive=false) {
   if (lbl) lbl.textContent = live ? fmtInput(t).replace('.',',') : fmt(t);
   const inp = document.getElementById('tax-input');
   if (inp) inp.value = fmtInput(t);                         // числовое поле (точное)
-  if(live)TaxMotion.render();else redrawAll();
+  if(live)TaxMotion.render(()=>document.getElementById('tax-field')?._regSync?.());else redrawAll();
 }
 
 /* ---------------------------------------------------------------------

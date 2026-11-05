@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-05. HEAD: `d73e123`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-05. HEAD: `3f4d065`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -349,12 +349,12 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1169 | 76.9 | JS |
 | `calc2/static/calc2/12-numbers.js` | 274 | 14.1 | JS |
-| `calc2/static/calc2/13-tax-motion.js` | 198 | 9.5 | JS |
+| `calc2/static/calc2/13-tax-motion.js` | 210 | 10.3 | JS |
 | `calc2/static/calc2/13-number-worker.js` | 13 | 0.8 | JS |
 | `calc2/static/calc2/14-input-snap.js` | 95 | 5.2 | JS |
 | `calc2/static/calc2/20-plane.js` | 1030 | 70.2 | JS |
 | `calc2/static/calc2/30-curves.js` | 1605 | 115.0 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 3905 | 282.7 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 3905 | 282.8 | JS |
 | `calc2/static/calc2/41-market-policies.js` | 271 | 18.0 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 2090 | 154.7 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
@@ -380,7 +380,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/82-input.js` | 2368 | 141.2 | JS |
 | `calc2/static/calc2/84-picker.js` | 600 | 45.3 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2159 | 141.1 | JS |
-| `calc2/static/calc2/88-params.js` | 2043 | 140.4 | JS |
+| `calc2/static/calc2/88-params.js` | 2044 | 140.5 | JS |
 | `calc2/static/calc2/89-model-state.js` | 374 | 24.8 | JS |
 | `calc2/static/calc2/90-explain.js` | 389 | 69.3 | JS |
 | `calc2/static/calc2/91-session.js` | 517 | 27.7 | JS |
@@ -391,7 +391,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 353 | 23.3 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 49 файлов, 49497 строк, 3530.3 КБ.**
+**Итого: 49 файлов, 49510 строк, 3531.3 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1860,41 +1860,41 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 220 — `curveChipLabel`
 - строка 229 — `pultCurveSig`
 - строка 239 — `paintEqLabel`
-- строка 254 — `texifyName`
-- строка 284 — `editEqValue`
-- строка 366 — `centerBandOn`
-- строка 370 — `pullIntoBand`
-- строка 374 — `attachBoundsEditor`
-- строка 455 — `refreshRegulators`
-- строка 466 — `makePchip`
-- строка 494 — `curveShiftBase`
-- строка 504 — `pultShiftHalf`
-- строка 508 — `resetPultShiftHalf`
-- строка 511 — `buildPultCurveChips`
-- строка 602 — `syncPultCurveValues`
-- строка 625 — `capturePultHome`
-- строка 632 — `capturePultHomes`
-- строка 637 — `returnPultHome`
-- строка 649 — `syncPultRegulators`
-- строка 680 — `upgradeRegulator`
-- строка 865 — `boundText`
-- строка 866 — `shortRegulatorName`
-- строка 892 — `ppfLinearFormula`
-- строка 897 — `ppfInterceptsOf`
-- строка 905 — `ppfSetSingle`
-- строка 913 — `ppfSetSum`
-- строка 933 — `addPultXChip`
-- строка 960 — `buildPultExtra`
-- строка 993 — `ineqParseIncomes`
-- строка 996 — `ineqMasterRebase`
-- строка 1001 — `ineqMasterScale`
-- строка 1022 — `ineqMasterApply`
-- строка 1034 — `ineqMasterDetach`
-- строка 1039 — `buildIneqMasterChip`
-- строка 1052 — `showPult`
-- строка 1079 — `updatePult`
-- строка 1114 — `liveFormula`
-- строка 1134 — `wireControls`
+- строка 255 — `texifyName`
+- строка 285 — `editEqValue`
+- строка 367 — `centerBandOn`
+- строка 371 — `pullIntoBand`
+- строка 375 — `attachBoundsEditor`
+- строка 456 — `refreshRegulators`
+- строка 467 — `makePchip`
+- строка 495 — `curveShiftBase`
+- строка 505 — `pultShiftHalf`
+- строка 509 — `resetPultShiftHalf`
+- строка 512 — `buildPultCurveChips`
+- строка 603 — `syncPultCurveValues`
+- строка 626 — `capturePultHome`
+- строка 633 — `capturePultHomes`
+- строка 638 — `returnPultHome`
+- строка 650 — `syncPultRegulators`
+- строка 681 — `upgradeRegulator`
+- строка 866 — `boundText`
+- строка 867 — `shortRegulatorName`
+- строка 893 — `ppfLinearFormula`
+- строка 898 — `ppfInterceptsOf`
+- строка 906 — `ppfSetSingle`
+- строка 914 — `ppfSetSum`
+- строка 934 — `addPultXChip`
+- строка 961 — `buildPultExtra`
+- строка 994 — `ineqParseIncomes`
+- строка 997 — `ineqMasterRebase`
+- строка 1002 — `ineqMasterScale`
+- строка 1023 — `ineqMasterApply`
+- строка 1035 — `ineqMasterDetach`
+- строка 1040 — `buildIneqMasterChip`
+- строка 1053 — `showPult`
+- строка 1080 — `updatePult`
+- строка 1115 — `liveFormula`
+- строка 1135 — `wireControls`
 
 #### `calc2/static/calc2/89-model-state.js`
 

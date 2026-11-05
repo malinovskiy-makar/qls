@@ -240,10 +240,11 @@ function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
   const u = String(unit || '');
-  const plain = name + ' = ' + CalcNumber.format(value,{percent:u==='%'}) + (u && u!=='%' ? ' '+u : '');
+  const format = lab.closest('#tax-field') ? TaxMotion.formatRate : CalcNumber.format;
+  const plain = name + ' = ' + format(value,{percent:u==='%'}) + (u && u!=='%' ? ' '+u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
-    katexInto(lab, texifyName(name) + ' = ' + CalcNumber.format(value,{tex:true,percent:u==='%' }));
+    katexInto(lab, texifyName(name) + ' = ' + format(value,{tex:true,percent:u==='%' }));
   } catch (e) { lab.textContent = plain; }
 }
 
