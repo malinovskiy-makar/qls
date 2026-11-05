@@ -2,6 +2,7 @@
    Это состояние представления, оно не входит в STATE/историю/ссылку. */
 const TaxMotion = (() => {
   const workerSource = document.currentScript.dataset.worker;
+  const numbersSource = document.currentScript.dataset.numbers;
   const motionPreference=matchMedia('(prefers-reduced-motion: reduce)');
   const loaderFrames=Array.from({length:181},(_,i)=>{
     const phase=i/180,air=phase<=1/3,u=air?phase*3:(phase-1/3)*1.5;
@@ -22,7 +23,7 @@ const TaxMotion = (() => {
   function prepare(values) {
     if (!values.length) return Promise.resolve();
     if (!worker) {
-      const numbers=document.querySelector('script[src*="/12-numbers.js"]').src;
+      const numbers=new URL(numbersSource,document.baseURI).href;
       const url=new URL(workerSource,document.baseURI);
       url.searchParams.set('numbers',numbers);
       worker=new Worker(url);

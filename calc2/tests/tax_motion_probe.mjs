@@ -12,6 +12,7 @@ const out=path.resolve(arg('out','reports/calc2-tax-motion'));fs.mkdirSync(out,{
 const browser=await ({chromium,webkit})[engine].launch();
 const page=await browser.newPage({viewport:{width,height:950},locale:'ru-RU'}),errors=[];
 const report={engine,width,checks:[],errors};
+report.manifestPaths=args.includes('--manifest-paths');
 page.on('pageerror',e=>errors.push(e.message));
 const check=(name,ok,detail)=>{report.checks.push({name,ok,detail});assert(ok,`${name}: ${JSON.stringify(detail)}`);};
 const settled=()=>page.waitForFunction(()=>!TaxMotion.pending,null,{timeout:20000});
@@ -20,6 +21,21 @@ const snapshot=()=>page.evaluate(()=>({tax:STATE.tax,eq:STATE.taxEq,cs:STATE.csT
  hero:document.getElementById('ans-hero').textContent,summary:document.getElementById('info-tax').textContent,
  labels:[...document.querySelectorAll('#chart .coord-num')].map(e=>e.textContent)}));
 try{
+ if(report.manifestPaths){
+  // Те же файлы под именами, которые выдаёт ManifestStaticFilesStorage.
+  // Меняем и обычный <script>, и data-атрибуты: поиск по старому имени
+  // не должен незаметно включать синхронный fallback.
+  await page.context().route('**/static/calc2/*.abc123def456.js*',async route=>{
+   const name=path.basename(new URL(route.request().url()).pathname).replace('.abc123def456.js','.js');
+   assert(['12-numbers.js','13-number-worker.js'].includes(name));
+   await route.fulfill({path:new URL('../static/calc2/'+name,import.meta.url).pathname,contentType:'application/javascript'});
+  });
+  await page.route('**/calc2/?m=taxes',async route=>{
+   const response=await route.fetch();
+   const body=(await response.text()).replace(/(calc2\/(?:12-numbers|13-number-worker))\.js/g,'$1.abc123def456.js');
+   await route.fulfill({response,body});
+  });
+ }
  await page.addInitScript(()=>{
   localStorage.setItem('calc2.v1.answerHidden','0');
   // Задерживаем только доставку ответа настоящего worker в тесте гонки.
