@@ -2,9 +2,10 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import{chromium,webkit}from'playwright';
 const args=process.argv.slice(2),arg=(k,d)=>{const i=args.indexOf('--'+k);return i<0?d:args[i+1];};
 const engine=arg('browser','chromium'),width=+arg('width','1024'),height=+arg('height','768'),touch=args.includes('--touch');
+const theme=arg('theme','light');
 const out=path.resolve(arg('out','reports/controls-gestures'));fs.mkdirSync(out,{recursive:true});
 const browser=await({chromium,webkit})[engine].launch(),context=await browser.newContext({viewport:{width,height},hasTouch:touch,isMobile:touch,locale:'ru-RU'}),page=await context.newPage();
-const report={engine,width,height,touch,checks:[],errors:[]},check=(name,ok,data)=>{report.checks.push({name,ok:!!ok,data});assert(ok,name+': '+JSON.stringify(data));};
+const report={engine,width,height,touch,theme,checks:[],errors:[]},check=(name,ok,data)=>{report.checks.push({name,ok:!!ok,data});assert(ok,name+': '+JSON.stringify(data));};
 page.on('pageerror',e=>report.errors.push(e.message));
 const settled=()=>page.waitForFunction(()=>!TaxMotion.pending&&!InputSnap.active,null,{timeout:20000});
 let cdp;
@@ -18,7 +19,7 @@ async function gesture(from,to){
 }
 try{
  await page.goto((process.env.CALC2_BASE_URL||'http://127.0.0.1:8153')+'/calc2/?m=sdsum',{waitUntil:'networkidle'});
- await page.evaluate(async()=>{await document.fonts.ready;setAnswerHidden(false);setToolsOpen(true);});
+ await page.evaluate(async theme=>{await document.fonts.ready;document.documentElement.dataset.theme=theme;refreshColors();redrawAll();setAnswerHidden(false);setToolsOpen(true);},theme);
  const cookie=page.getByRole('button',{name:'Только необходимые'});if(await cookie.isVisible())await cookie.click();
  for(const key of arg('models','sdsum,consumer,ineq,elast,ppf,plants').split(',')){
   await page.evaluate(k=>{InputSnap.cancel();TaxMotion.cancel();cancelRangeAnim();resetSceneMemory();pickScene(k);setAnswerHidden(false);setToolsOpen(['sdsum','plants'].includes(k));if(k==='ppf'){STATE.bundleOn=true;STATE.bundleX=1;STATE.bundleY=1;redrawAll();}historyBaseline();},key);
