@@ -4387,6 +4387,23 @@ body.self-on:not(.self-all) #firm-market-price-value { display: none; }
 body.self-on:not(.self-all) .firm-market-price-mask { display: inline; }
 
 .trade-policy-controls { margin-top: 10px; }
+/* Точные результаты готовятся отдельно от живого графика. Размеры строк
+   сохраняются; прежнее число никогда не выдаётся за результат новой ставки. */
+.tax-values-pending #ans-hero .ans-val { position: relative; color: transparent; min-width: 32px; }
+.tax-values-pending #ans-hero .ans-val > :not(.calc-value-loader),
+.tax-values-pending #ans-hero .ans-was,
+.tax-values-pending #ans-hero .ans-eq,
+.tax-values-pending #ans-burden,
+.tax-values-pending #sb-body .stat > b,
+.tax-values-pending #sb-body .tx-table td:not(:first-child),
+.tax-values-pending #info-final,
+.tax-values-pending #ex-body,
+.tax-values-pending #chart .coord-num { visibility: hidden; }
+.calc-value-loader { display: none; position: absolute; right: 0; top: 50%; width: 29px; height: 5px; margin-top: -2px; color: var(--accent); }
+.tax-values-loading .calc-value-loader { display: block; visibility: visible; }
+.calc-value-loader i { position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.calc-value-loader i:nth-child(2) { transform: translateX(12px); }
+.calc-value-loader i:nth-child(3) { transform: translateX(24px); }
 .trade-policy-controls .seg { flex-wrap: wrap; margin: 7px 0; }
 .trade-policy-controls .seg-btn { flex: 1 1 auto; white-space: normal; }
 .trade-control-label { display: block; margin-top: 10px; color: var(--text2); font-size: 12px; }

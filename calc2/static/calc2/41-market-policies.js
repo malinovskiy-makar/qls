@@ -29,7 +29,7 @@ function removeSecondTax() {
   if(!STATE.taxSecond)return;
   pushUndo();delete STATE.taxSecond;syncTaxPairUI();redrawAll();
 }
-function setSecondTax(patch) {
+function setSecondTax(patch,interactive=false) {
   if(!STATE.taxSecond)return;
   const old=STATE.taxSecond,next={...old,...patch};
   if(!['tax','subsidy'].includes(next.type))return;
@@ -41,12 +41,18 @@ function setSecondTax(patch) {
     if([min,max,step].every(Number.isFinite)&&min>=0&&max>min&&step>0)policy.bounds={min,max,step};
   }
   policy.rate=Math.max(policy.bounds?.min||0,Math.min(policy.rate,taxPairRateMax(policy)));
-  STATE.taxSecond=policy;syncTaxPairUI();redrawAll();
+  STATE.taxSecond=policy;
+  if(interactive&&TaxMotion.supported())TaxMotion.render(syncTaxPairUI);
+  else {
+    if(TaxMotion.pending)TaxMotion.cancel();
+    syncTaxPairUI();redrawAll();
+  }
 }
 
 function taxPairCurve(base,m,b) {
-  if(isVertical(base))return {kind:'vertical',atQ:base.atQ,finalLhs:'Q',finalExpr:CalcNumber.expression(base.atQ)};
+  if(isVertical(base))return {kind:'vertical',atQ:base.atQ,finalLhs:'Q',finalExpr:TaxMotion.drawing?'':CalcNumber.expression(base.atQ)};
   const fn=q=>m*evalCurve(base,q)+b;
+  if(TaxMotion.drawing)return {fn,texExpr:''};
   const wrap=e=>simplifyRecord('('+e+')*('+m+')+('+b+')');
   if(base.srcForm==='QP'&&m!==0)return qpAfter(base,'(Q-('+b+'))/('+m+')',fn,wrap);
   return {fn,texExpr:wrap(curveFormula(base)||base.expr||'0')};
@@ -71,7 +77,7 @@ function recomputeTaxPair() {
   else if(!isVertical(S)&&Math.abs(alpha)>1e-12){
     const z=findEquilibrium({fn:()=>1},{fn:q=>1+alpha*evalCurve(S,q)+u});
     const q=z?.Q;
-    if(q!=null)STATE.taxAfterS={kind:'vertical',atQ:q,finalLhs:'Q',finalExpr:CalcNumber.expression(q)};
+    if(q!=null)STATE.taxAfterS={kind:'vertical',atQ:q,finalLhs:'Q',finalExpr:TaxMotion.drawing?'':CalcNumber.expression(q)};
   }
   STATE.taxCurveOn=!!(STATE.taxAfterD||STATE.taxAfterS);
   if(isVertical(D)&&isVertical(S)){pair.error='Две вертикальные кривые не определяют единственную цену.';return;}
@@ -128,8 +134,9 @@ function syncTaxPairUI() {
     root.querySelectorAll('[data-tax2] button').forEach(button=>button.addEventListener('click',()=>{
       pushUndo();setSecondTax({[button.parentElement.dataset.tax2]:button.dataset.value});
     }));
-    root.querySelector('#tax2-slider').addEventListener('input',e=>setSecondTax({rate:+e.target.value}));
-    const ed=makeEditableValue({get:()=>STATE.taxSecond?.rate||0,set:v=>setSecondTax({rate:v}),
+    TaxMotion.bindInput(root.querySelector('#tax2-slider'));
+    root.querySelector('#tax2-slider').addEventListener('input',e=>setSecondTax({rate:+e.target.value},true));
+    const ed=makeEditableValue({get:()=>STATE.taxSecond?.rate||0,set:v=>setSecondTax({rate:v},true),
       min:0,tex:(_,text)=>CalcNumber.texText(text)});
     const field=root.querySelector('#tax2-field'),slider=root.querySelector('#tax2-slider');
     const bounds=attachBoundsEditor(field,field.querySelector('.param-editor'),'Ставка 2',key=>slider[key],(key,value)=>{
@@ -215,13 +222,13 @@ function drawTaxPairPoints() {
     const hit=group.append('rect').attr('x',px-8).attr('y',Math.min(top,mid-10)).attr('width',16).attr('height',Math.max(bottom-top,20))
       .attr('fill','transparent').style('cursor','grab').attr('data-service','tax-pair-drag');
     hit.call(d3.drag().container(()=>svg.node()).on('start',event=>{
-      pushUndo();startY=event.y;startRate=p.rate;document.body.style.cursor='grabbing';
+      pushUndo();startY=event.y;startRate=p.rate;TaxMotion.hold();document.body.style.cursor='grabbing';
     }).on('drag',event=>{
       let change=sy.invert(event.y)-sy.invert(startY);
       const pf=PCT_FORMS[p.form],base=pf?(pf.base==='buyer'?Pb:Ps):1;
       if(pf){if(base<=0)return;change=change/base*100;}
-      if(p.index===0)setTax(startRate+change);else setSecondTax({rate:startRate+change});
-    }).on('end',()=>{document.body.style.cursor='';}));
+      if(p.index===0)setTax(startRate+change,true);else setSecondTax({rate:startRate+change},true);
+    }).on('end',()=>{document.body.style.cursor='';TaxMotion.release();}));
     cursor=end;
   });
 }

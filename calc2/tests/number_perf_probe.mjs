@@ -9,6 +9,20 @@ assert(start>=0&&end>start,'PSLQ entry points not found');
 const old=source.slice(0,start)+reference.toString()+'\n'+source.slice(end);
 const load=code=>new Function(code+';return CalcNumber;')();
 const current=load(source),before=load(old);
+// Холодные сложные числа в интерактивном кадре только запрашивают запись.
+// Сравниваем с независимым экземпляром штатного точного форматтера.
+const deferred=load(source),worker=load(source);
+const cold=[97/99+83/97*Math.sqrt(997),Math.cbrt(113),-50+50*Math.sqrt(5)];
+let placeholders;
+const requested=deferred.collect(()=>{placeholders=cold.map(v=>deferred.classify(v));});
+assert.deepEqual(requested,cold,'Complex notation must leave the render thread');
+assert(placeholders.every(r=>r.kind==='pending'&&r.text==='…'),'Pending values must not look like approximate answers');
+const exact=cold.map(v=>worker.classify(v));
+deferred.seed(exact);
+assert.deepEqual(cold.map(v=>deferred.classify(v)),exact,'Worker records must preserve exact notation');
+assert.deepEqual(deferred.collect(()=>cold.forEach(v=>deferred.format(v))),[],'Prepared values must not be requested again');
+assert.throws(()=>deferred.collect(()=>{throw new Error('interrupted');}),/interrupted/);
+assert.notEqual(deferred.classify(Math.sqrt(131)).kind,'pending','Collection must end after an error');
 const values=[-11.055555557625098,533.5555555596121,1067.1111111070547,
  -32.83333333941789,522.7222222182071,1045.4444444484598,
  ...Array.from({length:48},(_,i)=>Math.cbrt(i+101)),

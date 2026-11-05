@@ -1,4 +1,4 @@
-/* Налог: немедленный расчёт, один полный кадр, неподвижная плоскость.
+/* Налог: немедленный расчёт, один кадр геометрии, неподвижная плоскость.
  * CALC2_BASE_URL=http://127.0.0.1:8147 node calc2/tests/tax_perf_probe.mjs
  * --browser chromium|webkit --width 1440|390 --theme light|dark
  * --cases unit,thirds,radical,vat --steps 200 --out DIR
@@ -72,6 +72,7 @@ try {
    const read=()=>({eq:STATE.eq,taxEq:STATE.taxEq,cs:STATE.csTax,ps:STATE.psTax,budget:STATE.budget,dwl:STATE.dwl});
    const raf=()=>new Promise(requestAnimationFrame),frames=[],samples=[];
    const start=geometry(),slider=document.getElementById('tax-slider');
+   slider.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
    let mathError=0,areaRelativeError=0,labelOverflow=0,inputLag=0;
    for(let i=0;i<steps;i++){
     await raf();
@@ -112,10 +113,26 @@ try {
     }
     samples.push({value:STATE.tax,handler,elapsed,numbers});
    }
-   return {start,frames,samples,mathError,areaRelativeError,labelOverflow,inputLag,calls:{...__taxPerfCalls}};
+   const calls={...__taxPerfCalls};
+   const visibleCoordinates=[...document.querySelectorAll('#chart .coord-num')].filter(e=>getComputedStyle(e).visibility!=='hidden').length;
+   slider.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));
+   return {start,frames,samples,mathError,areaRelativeError,labelOverflow,inputLag,calls,visibleCoordinates};
   },{steps,name});
+  await page.waitForFunction(()=>typeof TaxMotion==='undefined'||!TaxMotion.pending,null,{timeout:15000});
+  const settled=await page.evaluate(()=>{
+   const chart=document.getElementById('chart').getBoundingClientRect();let overflow=0;
+   for(const e of document.querySelectorAll('#chart .coord-num')){
+    if(e.getAttribute('text-anchor')==='middle')continue;
+    const r=e.getBoundingClientRect();overflow=Math.max(overflow,chart.left+1-r.left,r.right-chart.left-sx(0)+1);
+   }
+   return {calls:{...__taxPerfCalls},overflow,labels:document.querySelectorAll('#chart .coord-num').length,
+    hero:document.getElementById('ans-hero').textContent,summary:document.getElementById('info-tax').textContent,
+    animations:document.getAnimations().filter(a=>a.effect?.getTiming().iterations===Infinity).length};
+  });
   await page.waitForTimeout(900);
   const idle=await page.evaluate(()=>({...__taxPerfCalls}));
+  await page.evaluate(()=>{setTax(STATE.tax);buildAnswer();});
+  const exact=await page.evaluate(()=>({hero:document.getElementById('ans-hero').textContent,summary:document.getElementById('info-tax').textContent}));
   // Одинаковое конечное состояние отделяет удержание DOM от нового содержания.
   await page.evaluate(()=>setTax(20));await page.waitForTimeout(900);
   const after=await memory();
@@ -127,14 +144,17 @@ try {
   const summary={name,engine,width,theme,steps,run,round,p50:pct(data.samples.map(s=>s.handler),.5),
    p95:pct(data.samples.map(s=>s.handler),.95),frameP95:pct(data.samples.map(s=>s.elapsed),.95),
    calls:data.calls,geometry,mathError:data.mathError,areaRelativeError:data.areaRelativeError,labelOverflow:data.labelOverflow,inputLag:data.inputLag,before,after,
-   idleRedraw:(idle.redrawAll||0)-(data.calls.redrawAll||0),errors};
+   settleRedraw:(settled.calls.redrawAll||0)-(data.calls.redrawAll||0),
+   idleRedraw:(idle.redrawAll||0)-(settled.calls.redrawAll||0),settled,errors};
   console.log(JSON.stringify(summary));reports.push({summary,data});
   await page.screenshot({path:path.join(out,`${name}-${engine}-${width}-${theme}-${round}-${run}.png`)});
   if(!measureOnly){
-   check(data.calls.redrawAll===steps,`${name}: ${data.calls.redrawAll} полных кадров на ${steps} вводов`);
+   check((data.calls.redrawAll||0)===0,`${name}: ${data.calls.redrawAll} полных перестроек во время жеста`);
    check(data.calls.redrawScene===steps,`${name}: ${data.calls.redrawScene} сборок SVG на ${steps} вводов`);
    check(data.calls.recompute===steps,`${name}: ${data.calls.recompute} расчётов на ${steps} вводов`);
-   check(data.calls.updateTaxPanel===steps,`${name}: панель не обновляется на каждом вводе`);
+   check((data.calls.updateTaxPanel||0)===0&&(data.calls.buildAnswer||0)===0,`${name}: тяжёлая панель обновляется во время жеста`);
+   check(data.visibleCoordinates===0,`${name}: меняющиеся координаты видны во время жеста`);
+   if(name==='unit')check(data.start.margin.left<100,`${name}: постоянное широкое поле ${data.start.margin.left} px`);
    check(data.inputLag===0,`${name}: расчёт отстаёт от ввода на ${data.inputLag}`);
    check((data.calls.renderCurveList||0)===0,`${name}: пересозданы поля функций`);
    check(geometry.wrap.every(x=>x<=1)&&geometry.chart.every(x=>x<=1),`${name}: движется контейнер`);
@@ -142,6 +162,10 @@ try {
    check(geometry.window.every(x=>x===0),`${name}: изменилось окно модели`);
    check(data.mathError<1e-9,`${name}: ошибка чисел ${data.mathError}`);
    check(data.labelOverflow<=1,`${name}: точная подпись вышла из своего поля на ${data.labelOverflow} px`);
+   check(settled.overflow<=1&&settled.labels>0,`${name}: точные подписи после жеста отсутствуют или не помещаются (${settled.overflow} px)`);
+   check(settled.hero===exact.hero&&settled.summary===exact.summary,`${name}: отложенный ответ отличается от синхронного точного`);
+   check(summary.settleRedraw>=1&&summary.settleRedraw<=6,`${name}: неконтролируемые перестройки при завершении ${summary.settleRedraw}`);
+   check(settled.animations===0,`${name}: индикатор продолжает жить после ответа`);
    check(summary.idleRedraw===0,`${name}: перерисовки после затишья`);
    check(after.nodes-before.nodes<500,`${name}: удержано ${after.nodes-before.nodes} узлов DOM`);
    if(cdp)check(after.jsEventListeners-before.jsEventListeners<20,`${name}: накапливаются слушатели`);

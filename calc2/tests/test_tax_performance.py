@@ -43,3 +43,15 @@ class TaxPerformanceTest(StaticLiveServerTestCase):
             capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_tax_motion_lifecycle(self):
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "Node is required for the native tax gesture probe")
+        with tempfile.TemporaryDirectory(prefix="calc2-tax-motion-") as out:
+            result = subprocess.run(
+                [node, "calc2/tests/tax_motion_probe.mjs", "--out", out],
+                cwd=settings.BASE_DIR,
+                env=dict(os.environ, CALC2_BASE_URL=self.live_server_url),
+                capture_output=True, text=True, encoding="utf-8", timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

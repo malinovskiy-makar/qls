@@ -156,7 +156,9 @@ function recompute() {
        пока запись не показывалась, это было неважно, а теперь она стоит в
        блоке «Итоговая функция». simplifyRecord упрощает ПОКУСОЧНО и сверяет
        результат с исходником численно — не сошлось, оставит исходник. */
-    const sSrc = (STATE.S && STATE.S.expr) ? String(STATE.S.expr) : '';
+    // При жесте меняется численная функция fn. Запись для панели и экспорта
+    // упрощается после отпускания: сама геометрия от texExpr не зависит.
+    const sSrc = !TaxMotion.drawing && STATE.S.expr ? String(STATE.S.expr) : '';
     /* ⚠️ КРИВАЯ Q(P) (24.10, ADR 0157): её expr — запись человека ОТ P («3P − 60»), и
        прибавка ставки к ней как к P(Q) давала «P = 3·P − 36». Здесь две ветки:
        P(Q) — как было, побайтно; Q(P) — запись тоже Q(P), с подстановкой вместо P
@@ -179,7 +181,7 @@ function recompute() {
        D − t, при адвалорном — D/(1+τ). Объём и цены получаются те же самые.
        Строится ЗДЕСЬ, рядом с sAfter: при налоге на покупателя рисуется именно
        она, и её отсутствие означало бы неподвижный график ровно так же. */
-    const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
+    const dSrc = !TaxMotion.drawing && STATE.D.expr ? String(STATE.D.expr) : '';
     STATE.taxAfterD = (STATE.D && STATE.D.srcForm === 'QP')
       // Спрос Q(P): потоварно P → P + ставка, процентно P → P·factor (ADR 0157).
       ? qpAfter(STATE.D, adv ? 'Q * ' + factor : 'Q + (' + shift + ')',
@@ -2507,21 +2509,25 @@ function attachTaxDrag(sel) {
     .on('start', (event) => {
       startY = event.y;
       startTax = STATE.tax;
+      TaxMotion.hold();
       document.body.style.cursor = 'grabbing';
     })
     .on('drag', (event) => {
       // sy.invert: меньший пиксель = выше на экране = бо́льшая цена.
       // Тянем вверх (y уменьшается) → dP > 0 → ставка растёт.
       const dP = sy.invert(event.y) - sy.invert(startY);
-      setTax(startTax + dP);
+      setTax(startTax + dP,true);
     })
     .on('end', () => {
       document.body.style.cursor = '';
+      TaxMotion.release();
     }));
 }
 
 // Установить ставку налога (единый путь для ползунка, числового поля и клина).
-function setTax(t) {
+function setTax(t, interactive=false) {
+  const live=interactive&&TaxMotion.supported();
+  if(!live&&TaxMotion.pending)TaxMotion.cancel();
   const slider = document.getElementById('tax-slider');
   /* Предел спрашиваем у МОДЕЛИ, а не у атрибута ползунка: формулу правят
      после того, как каскад расставил границы, и атрибут остаётся от прежних
@@ -2536,10 +2542,10 @@ function setTax(t) {
   STATE.tax = t;
   if (slider) slider.value = t;                        // ползунок (step=1, целые)
   const lbl = document.getElementById('tax-val');
-  if (lbl) lbl.textContent = fmt(t);
+  if (lbl) lbl.textContent = live ? fmtInput(t).replace('.',',') : fmt(t);
   const inp = document.getElementById('tax-input');
   if (inp) inp.value = fmtInput(t);                         // числовое поле (точное)
-  redrawAll();
+  if(live)TaxMotion.render();else redrawAll();
 }
 
 /* ---------------------------------------------------------------------
@@ -3008,6 +3014,7 @@ function setTaxKind(kind) {
    если кривая прямая (curveFormula, обёрнутая pqWrap); у непрямой — recY, запись
    человека «по вертикали» (так же уходит в файл и сама кривая, markCurve). */
 function qpAfter(c, sub, fn, pqWrap) {
+  if(TaxMotion.drawing)return {fn,texExpr:''};
   const src = String(c.srcExpr || c.expr || '');
   const rec = src ? qpRecordAfter(src, sub) : '';
   const pq = curveFormula(c);

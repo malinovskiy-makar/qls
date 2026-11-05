@@ -115,6 +115,19 @@ function recognize(v){
 }
 
 const cache=new Map();
+// Во время интерактивного кадра собираем недостающие записи для рабочего
+// потока. Поиск радикала никогда не нужен для положения самой кривой.
+let collecting = null;
+function collect(fn) {
+  const previous = collecting, values = new Set();
+  collecting = values;
+  try { fn(); } finally { collecting = previous; }
+  return [...values];
+}
+function seed(records) {
+  if (cache.size + records.length > 4096) cache.clear();
+  records.forEach(r => cache.set(r.value, r));
+}
 const integer=v=>Math.abs(v).toLocaleString('en-US',{useGrouping:false,maximumFractionDigits:0}).replace(/\B(?=(\d{3})+(?!\d))/g,'\u202f');
 const sign=v=>v<0?'−':'';
 // Численный поиск равновесия и интеграл дают шум порядка 10⁻⁹.
@@ -147,7 +160,7 @@ function radical(r,tex=false){
   const root=bq===1?term:tex?'\\tfrac{'+term+'}{'+bq+'}':term+'/'+bq;
   return (ap?fraction(ap,aq,tex)+(bp<0?(tex?' - ':' − '):' + '):(bp<0?(tex?'-':'−'):''))+root;
 }
-function classify(v){
+function classify(v, exact=false){
   if(!Number.isFinite(v)){
     const infinity=v===Infinity||v===-Infinity;
     return{kind:'special',text:infinity?sign(v)+'∞':'не определено',tex:infinity?(v<0?'-':'')+'\\infty':'\\text{не определено}',value:v};
@@ -162,6 +175,10 @@ function classify(v){
     const f=rational(v,1000);
     if(f)r={kind:'fraction',text:fraction(...f),tex:fraction(...f,true)};
     else{
+      if (collecting && !exact) {
+        collecting.add(v);
+        return {kind:'pending', text:'…', tex:'\\ldots', value:v};
+      }
       const rad=recognize(v);
       if(rad)r={kind:'radical',text:radical(rad),tex:radical(rad,true)};
       else{const text=decimal(v,3,true);r={kind:'approx',text:'≈ '+text,tex:'\\approx '+text.replace(/−/g,'-').replace(/\u202f/g,'~').replace(/,/g,'{,}')};}
@@ -172,6 +189,7 @@ function classify(v){
 }
 function format(v,{percent=false,tex=false}={}){
   const r=classify(v);let text=tex?r.tex:r.text;
+  if(r.kind==='pending')return text;
   if(!percent)return text;
   const unit=tex?'\\,\\%':' %';
   if(r.kind==='decimal')return text+unit;
@@ -187,7 +205,7 @@ function factor(v,{tex=false}={}){
 }
 // Поля и формулы, которые движок будет считать, сохраняют машинную точность.
 function expression(v,{atomic=false}={}){
-  const r=classify(v);
+  const r=classify(v,true);
   if(r.kind==='approx'||r.kind==='special')return atomic&&v<0?'('+String(v)+')':String(v);
   const s=r.text.replace(/\u202f/g,'').replace(/−/g,'-').replace(/,/g,'.').replace(/(\d)√(\d+)/g,'$1*sqrt($2)').replace(/√(\d+)/g,'sqrt($1)');
   return atomic&&(v<0||!/^[\d.]+(?:e[+-]?\d+)?$/i.test(s))?'('+s+')':s;
@@ -252,5 +270,5 @@ function readText(el){
   c.querySelectorAll('.katex-mathml, annotation').forEach(n=>n.remove());
   return c.textContent.replace(/[\s\u200b]+/g,' ').trim();
 }
-return {classify,format,factor,expression,texText,parse,readText,recognize};
+return {classify,format,factor,expression,texText,parse,readText,recognize,collect,seed};
 })();

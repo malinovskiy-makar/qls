@@ -323,6 +323,7 @@ function answerSignature() {
    читает страницу из фоновой вкладки). Скрытая страница собирает колонку
    сразу; видимая — на кадре, а таймер страхует, если кадр так и не пришёл. */
 function scheduleAnswer() {
+  if(TaxMotion.pending)return;
   if (_answerQueued) return;
   _answerQueued = true;
   const run = () => { if (!_answerQueued) return; _answerQueued = false; buildAnswer(); };
@@ -593,6 +594,7 @@ function answerCells(spec) {
 }
 
 function buildAnswer() {
+  if(TaxMotion.pending&&!TaxMotion.finishing)return;
   const host = document.getElementById('ans-hero');
   if (!host) return;
   if (retypesetSeenRows()) _answerSig = '';

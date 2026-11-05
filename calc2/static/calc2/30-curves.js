@@ -920,6 +920,9 @@ function redrawAfterFonts() {
     _fontsRedraw = 0;
     if (typeof texPaperActive === 'function' && texPaperActive()) return;
     if (!STATE.sceneKey || typeof redrawAll !== 'function' || !svg || !svg.node()) return;
+    // Налог сам дождётся шрифта перед замером точных координат. Фоновая
+    // перерисовка здесь оборвала бы жест или анимацию всего поля.
+    if(TaxMotion.pending)return;
     redrawAll();
   });
 }

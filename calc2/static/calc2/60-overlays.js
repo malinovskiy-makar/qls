@@ -9,9 +9,10 @@
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 let _sceneSetupDepth = 0;
 function redrawAll() {
+  if(TaxMotion.pending && !TaxMotion.finishing)TaxMotion.cancel();
   syncTaxPairUI();
   const labelsBeforeFit=new Map([..._labelPos].map(([k,v])=>[k,{...v}]));
-  _coordMarginLeft=0;
+  _coordMarginLeft=TaxMotion.finishing?CONFIG.margin.left:0;
   _coordMarginBottom=0;
   syncParams();          // формулы могли завести или потерять буквы-параметры
   refreshLinearForParams();   // Н7: прямые с буквой пересобрать под новое значение
@@ -105,13 +106,13 @@ function redrawAll() {
 
 function redrawScene() {
   refreshColors();      // перечитать цвета из CSS-переменных (учитывает смену темы)
-  clearResultPanels();  // очистить табло — активный режим заполнит свои блоки
+  if(!TaxMotion.drawing)clearResultPanels();  // при жесте табло остаётся под индикатором
   /* ⚠️ РЕЕСТР ПАНЕЛЕЙ ЧИСТИТСЯ ПЕРВЫМ ДЕЛОМ, ДО ЛЮБОЙ ОТРИСОВКИ.
      Панели прошлого кадра не имеют права дожить до нового: сцена сменилась,
      а слой поверх неё считал бы по чужим шкалам. */
   clearPanels();
   resetDrawnKeyPoints();   // и пары нарисованных ключевых точек — тоже заново
-  computeSize();
+  if(!TaxMotion.drawing)computeSize();
   makeScales();
   if (STATE.sceneKey === 'bigopen') { redrawBigTrade(); return; }
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
@@ -217,6 +218,7 @@ function redrawScene() {
   }
   // MC в монополии тянется мышью (ADR 0149): полоса поверх всего, что нарисовано выше.
   if (STATE.market === 'monopoly' && typeof drawMcDragHandle === 'function') drawMcDragHandle();
+  if(TaxMotion.drawing)return;
   updateInfoPanel();
   updateAreasPanel();
   // Табло «По группам» сюжета сложения: в остальных сценах оно молчит само.
@@ -520,6 +522,7 @@ function drawOverlays() {
   drawGraphTitle();
   drawLegend();
   drawMarks();
+  if(TaxMotion.drawing)return;
   syncAxisPlaceholders();
   syncSceneColorPickers();   // образцы в панели идут за темой и за своими цветами
   syncAreaCalcUI();          // выпадашка кривых и список точек для расчёта площади

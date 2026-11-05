@@ -1216,14 +1216,15 @@ function wireControls() {
 
   // Ползунок ставки (синхронизирован с перетаскиванием клина через setTax).
   const taxSlider = document.getElementById('tax-slider');
-  taxSlider.addEventListener('input', () => setTax(parseFloat(taxSlider.value)));
+  TaxMotion.bindInput(taxSlider);
+  taxSlider.addEventListener('input', () => setTax(parseFloat(taxSlider.value),true));
 
   // Числовое поле ставки: принимает дробные значения (0.1), точнее ползунка.
   const taxInput = document.getElementById('tax-input');
   if (taxInput) {
     taxInput.addEventListener('change', () => {
       const v = parseFloat(taxInput.value);
-      if (!isNaN(v)) setTax(v);
+      if (!isNaN(v)) setTax(v,true);
     });
   }
 

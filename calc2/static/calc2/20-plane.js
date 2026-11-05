@@ -85,9 +85,8 @@ const BOTTOM_BAND = 44;
 /* Запас левого поля под подпись координаты (см. разбор в fitMargins). */
 const COORD_LABEL_PAD = 24;
 
-// На экране налоговой сцены поле не зависит от текущей ставки. Иначе
-// 298/3 вместо 99 сдвигало всю плоскость на 3 px, радикал — на 106 px.
-// На бумаге ширина поля подбирается под единственный экспортируемый кадр.
+// Во время жеста поле неподвижно. После него TaxMotion плавно подбирает
+// место под настоящую подпись; постоянного запаса под самый длинный корень нет.
 function fixedTaxCoordinateBand() {
   return STATE.mode === 'market' && ['taxes', 'tax', 'tax-adv'].includes(STATE.sceneKey)
     && !(typeof texPaperActive === 'function' && texPaperActive());
@@ -120,11 +119,7 @@ function fitMargins() {
      оси, и при этом запасе их ноль. */
   m.left = Math.max(_coordMarginLeft, 30, Math.min(120, Math.ceil(wide) + 14 + COORD_LABEL_PAD));
   if (fixedTaxCoordinateBand()) {
-    // Постоянный запас под два слагаемых точной записи с дробями и корнем.
-    // На телефоне ограничиваем резерв половиной ширины холста. Формат числа
-    // и его точность не меняются. Крупный шрифт пересчитывает запас сразу.
-    const reserve = Math.ceil(measureText('−9\u202f999/100 + 9\u202f999√998/100', FS.small * labelScale(), 700)) + 24;
-    m.left = Math.max(m.left, Math.min(W / 2, reserve));
+    m.left = TaxMotion.margin(m.left);
   }
 
   /* Справа за стрелкой стоит НАЗВАНИЕ оси X, и оно бывает длинным:
@@ -170,10 +165,13 @@ function fitCoordinateMargin() {
   node.querySelectorAll('text.coord-num').forEach(label=>{
     if(label.getAttribute('text-anchor')!=='middle')width=Math.max(width,label.getBoundingClientRect().width);
   });
-  const limit=Math.max(0,W-Math.min(240,W*.6));
+  const limit=Math.max(0,W-(fixedTaxCoordinateBand()?Math.min(160,W*.4):Math.min(240,W*.6)));
   const need=Math.min(limit,Math.ceil(width)+18);
   let changed=false;
-  if(!fixedTaxCoordinateBand() && need>CONFIG.margin.left+1){_coordMarginLeft=need;changed=true;}
+  if(!(TaxMotion.pending&&fixedTaxCoordinateBand()) && need>CONFIG.margin.left+1){
+    _coordMarginLeft=need;changed=true;
+    if(fixedTaxCoordinateBand())TaxMotion.reserve(need);
+  }
   const xs=[...node.querySelectorAll('text.coord-num')]
     .filter(t=>t.getAttribute('text-anchor')==='middle').map(t=>t.getBoundingClientRect());
   // На узком холсте соседние значения занимают два ряда, без сдвига вдоль оси.
@@ -849,12 +847,14 @@ function flushDrawnKeyPoints() {
    механизм с параметром, а не второй рядом: список, поиск пар и правило
    пунктира общие. Панель нужна потому, что у мини-рынка свои шкалы. */
 function noteAxisX(g, px, value, idx, panel) {
-  const v = coordValue(value);
+  // Во время жеста запись может быть «…», но точка для привязки и площадей
+  // остаётся численной. Её положение уже вычислено точной моделью.
+  const v = coordValue(TaxMotion.drawing ? sx.invert(px) : value);
   if (v && isFinite(v.num)) _kpX.push({ node: kpNode(g), px, x: v.num, idx: String(idx || ''), panel: panel || '' });
   return v;
 }
 function noteAxisY(g, py, value, idx, panel) {
-  const v = coordValue(value);
+  const v = coordValue(TaxMotion.drawing ? sy.invert(py) : value);
   if (v && isFinite(v.num)) _kpY.push({ node: kpNode(g), py, y: v.num, idx: String(idx || ''), panel: panel || '' });
   return v;
 }
@@ -868,6 +868,7 @@ function kpName(g, px, py, sym) {
 function axisValueX(g, px, oy, value, idx) {
   if (!isFinite(px)) return null;
   const v = noteAxisX(g, px, value, idx);
+  if(TaxMotion.drawing)return null;
   if (!v) return null;
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
@@ -895,6 +896,7 @@ function axisValueX(g, px, oy, value, idx) {
 function axisValueY(g, ox, py, value, idx) {
   if (!isFinite(py)) return null;
   const v = noteAxisY(g, py, value, idx);
+  if(TaxMotion.drawing)return null;
   if (!v) return null;
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
