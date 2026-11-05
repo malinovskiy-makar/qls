@@ -1,6 +1,6 @@
 """Сессия R, фаза 2: страница прохождения по макетам 06/07.
 
-«±» у поля числа, метки пропусков в тексте и списки под абзацем, соотнесение
+Обычная клавиатура у поля числа, метки пропусков в тексте и списки под абзацем, соотнесение
 радиокнопками-буквами, навигация по разделам, «Вернуться позже», шапки разделов.
 Сохранение и подсчёт — те же: сервер получает тот же словарь `{"ключ": вариант}`.
 """
@@ -36,10 +36,11 @@ class TakePageTests(TestCase):
     def page(self, attempt):
         return self.client.get(reverse('vp:take', args=[attempt.public_code])).content.decode()
 
-    def test_demo_10_marks_lists_letters_and_plus_minus(self):
+    def test_demo_10_marks_lists_letters_and_number_input(self):
         _, attempt = self.start('10')
         html = self.page(attempt)
-        self.assertEqual(len(re.findall(r'data-pm="\d+"', html)), 14)
+        self.assertNotIn('data-pm="', html)
+        self.assertEqual(html.count('inputmode="text"'), 14)
         gaps = item_html(html, 3)
         self.assertEqual(len(re.findall(r'<a class="vp-gapmark', gaps)), 8)
         self.assertEqual(sorted(re.findall(r'<select[^>]*name="item-3\.(\d+)"', gaps), key=int),
@@ -62,7 +63,8 @@ class TakePageTests(TestCase):
     def test_demo_9_counts(self):
         _, attempt = self.start('9')
         html = self.page(attempt)
-        self.assertEqual(len(re.findall(r'data-pm="\d+"', html)), 12)
+        self.assertNotIn('data-pm="', html)
+        self.assertEqual(html.count('inputmode="text"'), 12)
         self.assertEqual(len(re.findall(r'<a class="vp-gapmark', item_html(html, 4))), 5)
         self.assertEqual(len(re.findall(r'type="radio" name="item-5\.\d+"', item_html(html, 5))), 8)
         self.assertIn('Пропуски · 4', html)

@@ -15,7 +15,7 @@
     <div class="vp-answer">
       <label class="vp-sr" for="vp-pr-{{ number }}">Ответ на задание {{ number }}, число</label>
       <input class="vp-input vp-input--number" id="vp-pr-{{ number }}" name="raw" type="text" maxlength="40"
-             inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+             inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       <span class="vp-hint">Только число: запятая, до сотых</span>
     </div>
     {% elif kind == 'match' %}

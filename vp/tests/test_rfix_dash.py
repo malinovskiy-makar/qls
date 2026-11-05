@@ -1,21 +1,13 @@
-"""Сессия R-fix, фаза 3: в разделе нет длинного тире «—» вне комментариев.
-
-`scripts/check_em_dash.py` находил «—» в `drill.js`: это был знак длинного минуса в наборе
-регулярки «±». Знаки теперь записаны кодами (`\\u2014` и соседи) — сканеру чисто, а регулярка
-по-прежнему узнаёт все шесть знаков, которые сервер считает длинным минусом
-(`vp.scoring._LONG_MINUS`).
-"""
+"""ВП: длинное тире не попадает в интерфейс, скопированный длинный минус — ошибка формата."""
 import importlib.util
 import os
-import re
 from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from vp import scoring
+from vp import drill, scoring
 
 ROOT = Path(__file__).resolve().parents[2]
-JS = ROOT / 'vp' / 'static' / 'vp' / 'js'
 
 
 def _checker():
@@ -35,10 +27,12 @@ class EmDashTests(SimpleTestCase):
             os.chdir(here)
         self.assertEqual(found, [])
 
-    def test_plus_minus_regex_knows_every_long_minus(self):
-        for name in ('drill.js', 'take.js'):
-            source = (JS / name).read_text(encoding='utf-8')
-            sets = re.findall(r'/\^\[-((?:\\u[0-9a-fA-F]{4})+)\]/', source)
-            self.assertEqual(len(sets), 1, name)
-            codes = {chr(int(c, 16)) for c in re.findall(r'\\u([0-9a-fA-F]{4})', sets[0])}
-            self.assertEqual(codes, set(scoring._LONG_MINUS), name)
+    def test_copied_long_minus_remains_a_format_error(self):
+        # «±» удалена: клавиатура вводит ASCII-минус, а вставленный длинный
+        # минус не должен незаметно превращаться в правильную запись.
+        self.assertTrue(drill.check(12, '-4,5')['ok'])
+        for minus in scoring._LONG_MINUS:
+            with self.subTest(minus=minus):
+                verdict = drill.check(12, minus + '4,5')
+                self.assertFalse(verdict['ok'])
+                self.assertEqual(verdict['reason'], 'minus')

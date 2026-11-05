@@ -5,7 +5,7 @@
 `name="item-<n>"` (у `match` — `item-<n>.<ключ пары>`: и у пропусков, и у соотнесения
 2 тура; у числа — текстовое поле, как у короткого ответа), метки пропусков
 `a.vp-gapmark[data-key]` со словом `[data-word]`, радиокнопки соотнесения
-`input[type=radio][data-key]` внутри `.vp-abseg`, кнопки `[data-pm]` («±») и `[data-flag]`
+`input[type=radio][data-key]` внутри `.vp-abseg`, кнопки `[data-flag]`
 («Вернуться позже», плавает справа в начале текста задания). Менять их, не поправив
 скрипт, нельзя.
 ⚠️ У заданий с вариантами перед радио/галочками стоит скрытое пустое поле с тем же
@@ -64,11 +64,9 @@
       <span class="vp-numrow">
         <label class="vp-sr" for="vp-in-{{ row.number }}">Ответ на задание {{ row.number }}, число</label>
         <input class="vp-input vp-input--number" id="vp-in-{{ row.number }}" name="item-{{ row.number }}" type="text"
-               value="{{ row.text }}" maxlength="40" inputmode="decimal" autocomplete="off"
+               value="{{ row.text }}" maxlength="40" inputmode="text" autocomplete="off"
                autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"
                aria-describedby="vp-hint-{{ row.number }}">
-        {# «±» — только на сенсорных экранах (в цифровой клавиатуре iPhone нет минуса); показ — CSS. #}
-        <button type="button" class="vp-pm" aria-label="Поменять знак" data-pm="{{ row.number }}">±</button>
       </span>
       <span class="vp-hint" id="vp-hint-{{ row.number }}">Только число: запятая, до сотых</span>
     </div>

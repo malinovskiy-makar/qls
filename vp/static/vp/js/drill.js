@@ -75,18 +75,13 @@
       var next = rows[index + 1];
       if (next) next.querySelector('input[type=text]').focus();
     });
+    field.addEventListener('vp-number-next', function () {
+      check(row);
+      var next = rows[index + 1];
+      if (next) next.querySelector('input[type=text]').focus();
+    });
     field.addEventListener('change', function () { check(row); });
     field.addEventListener('blur', function () { check(row); });
   });
 
-  /* «±» на сенсорных экранах: в цифровой клавиатуре iPhone нет минуса. */
-  form.addEventListener('click', function (event) {
-    var button = event.target.closest ? event.target.closest('[data-pm-drill]') : null;
-    if (!button) return;
-    var field = document.getElementById('vp-drill-' + button.getAttribute('data-pm-drill'));
-    if (!field) return;
-    field.value = /^[-\u2212\u2012\u2013\u2014\ufe63\uff0d]/.test(field.value)
-      ? field.value.slice(1) : '-' + field.value;
-    field.focus();
-  });
 })();

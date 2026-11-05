@@ -50,6 +50,8 @@ class DrillPageTests(TestCase):
         html = response.content.decode()
         self.assertIn('Тренировка записи ответа', html)
         self.assertEqual(html.count('name="raw-'), 12)
+        self.assertEqual(html.count('inputmode="text"'), 12)
+        self.assertNotIn('data-pm-drill="', html)
         self.assertIn('Проверить все', html)
 
     def test_form_without_js_draws_the_same_verdicts(self):

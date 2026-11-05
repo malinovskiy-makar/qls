@@ -265,14 +265,6 @@ html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px)
 .vp-note--rule { color: var(--text); }
 .vp-answer-cap { font-size: 13px; color: var(--text2); }
 .vp-numrow { display: inline-flex; align-items: center; gap: 8px; }
-/* «±» нужен только на сенсорном экране: в цифровой клавиатуре iPhone нет минуса. */
-.vp-pm {
-  display: none; font: inherit; font-size: 18px; font-weight: 600; width: 48px; height: 44px;
-  align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
-  border-radius: var(--r); border: var(--line, 1px) solid var(--border);
-  background: var(--surface); color: var(--text);
-}
-@media (hover: none) and (pointer: coarse) { .vp-pm { display: inline-flex; } }
 /* «Вернуться позже»: тихая кнопка в правом верхнем углу задания. */
 .vp-flag {
   float: right; margin: -4px 0 4px 12px; font: inherit; font-size: 12.5px; line-height: 1.3; cursor: pointer;
@@ -1650,3 +1642,31 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-probe-heading h2 { font-size: 20px; }
   .vp-land-history { grid-column: 1; grid-row: auto; }
 }
+
+/* Числовая клавиатура ВП. Ограничена по ширине и на планшете; вне ВП не подключается. */
+.vp-number-keypad {
+  position: fixed; z-index: 180; bottom: 0; left: 0; right: 0; margin: 0 auto;
+  width: min(100%, 420px); padding: 12px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-bottom: 0; border-radius: 12px 12px 0 0; box-shadow: var(--shadow-pop);
+}
+.vp-number-keypad[hidden] { display: none; }
+.vp-number-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.vp-number-keys button {
+  display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 48px;
+  padding: 6px; border: 1px solid var(--border); border-radius: var(--r);
+  font: inherit; font-size: 22px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--surface); cursor: pointer; touch-action: manipulation;
+}
+.vp-number-keys button:active { background: var(--chip-bg); }
+.vp-number-keys button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vp-number-keys .vp-number-tool { background: transparent; }
+.vp-number-keys .vp-number-hide { flex-direction: column; font-size: 11px; gap: 0; }
+.vp-number-hide span { font-size: 22px; line-height: 1; }
+.vp-number-keys .vp-number-next {
+  grid-column: span 2; font-size: 14px; background: var(--btn-bg); color: var(--on-btn); border-color: var(--btn-bg);
+}
+.vp-number-keys .vp-number-next:active { background: var(--btn-bg-hover); }
+.vp-number-keypad-open .vp-main::after { content: ''; display: block; height: var(--vp-number-keypad-height, 240px); }
+.vp-number-keypad-open .tg-fab, .vp-number-keypad-open .corner-stack { visibility: hidden; }
+@media print { .vp-number-keypad { display: none; } .vp-number-keypad-open .vp-main::after { display: none; } }

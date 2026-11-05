@@ -53,14 +53,13 @@ try {
       }
       if (band==='10' && touch) {
         const field=page.locator('#vp-in-11');
-        const sign=page.locator('[data-pm="11"]');
-        assert.equal(await sign.isVisible(),true);
-        await field.fill('0,12');
-        await saved(page,()=>sign.click());
+        assert.equal(await field.getAttribute('inputmode'),'none');
+        assert.equal(await page.locator('[data-pm]').count(),0);
+        await saved(page,()=>field.fill('-0,12'));
         assert.equal(await field.inputValue(),'-0,12');
-        await saved(page,()=>sign.click());
+        await saved(page,()=>field.fill('0,12'));
         assert.equal(await field.inputValue(),'0,12');
-        await saved(page,()=>sign.click());
+        await saved(page,()=>field.fill('-0,12'));
         await page.reload();
         assert.equal(await field.inputValue(),'-0,12');
         report.controls.push('touch_sign_saved');

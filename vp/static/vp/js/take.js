@@ -10,7 +10,7 @@
  *   6. время: часы, состояния шапки, опрос сервера;
  *   7. сдача: окно подтверждения, «время вышло»;
  *   8. 2 тур: метки пропусков, буквы соотнесения (повторное нажатие снимает выбор),
- *      «±» у поля числа, «вернуться позже» (пометки только в браузере).
+ *      «вернуться позже» (пометки только в браузере).
  *
  * ⚠️ КЛИЕНТ НЕ ИСТОЧНИК ПРАВДЫ О ВРЕМЕНИ. Он рисует обратный отсчёт (часы —
  * `platform/exam_timer.js`: монотонные, `Date.now()` не вызывается, серверная
@@ -19,7 +19,7 @@
  *
  * ⚠️ Имена узлов задаёт `templates/vp/take.html` и `_take_item.html`:
  * `#vp-item-<n>`, `.vp-cell[data-n]`, поля `name="item-<n>"`, у 2 тура ещё
- * `a.vp-gapmark[data-key]`, `.vp-abseg input[type=radio][data-key]`, `[data-pm]`, `[data-flag]`.
+ * `a.vp-gapmark[data-key]`, `.vp-abseg input[type=radio][data-key]`, `[data-flag]`.
  */
 (function () {
   'use strict';
@@ -168,6 +168,11 @@
     event.preventDefault();               // Enter форму не отправляет, никогда
     var n = itemOf(target);
     if (n !== null) { moveFrom(n, event.shiftKey ? -1 : 1); }
+  });
+
+  form.addEventListener('vp-number-next', function (event) {
+    var n = itemOf(event.target);
+    if (n !== null) moveFrom(n, 1);
   });
 
   form.addEventListener('focusin', function (event) {
@@ -704,19 +709,6 @@
     }
   });
   rememberSegs(form);
-
-  // --- «±» у поля числа (только на сенсорных экранах, показ — CSS) -----------------
-  var MINUS_LIKE = /^[-\u2212\u2012\u2013\u2014\ufe63\uff0d]/;
-  form.addEventListener('click', function (event) {
-    var button = event.target.closest ? event.target.closest('[data-pm]') : null;
-    if (!button) { return; }
-    event.preventDefault();
-    var field = $('vp-in-' + button.dataset.pm);
-    if (!field) { return; }
-    field.value = MINUS_LIKE.test(field.value) ? field.value.slice(1) : '-' + field.value;
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-    field.focus();
-  });
 
   // --- «вернуться позже»: пометки живут только в этом браузере ---------------------
   var FLAGS_KEY = 'vp:flags:' + cfg.saveUrl;
