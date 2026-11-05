@@ -108,7 +108,10 @@ const TaxMotion = (() => {
     input.addEventListener('keydown',event=>{
       if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))hold();
     });
-    input.addEventListener('keyup',release);input.addEventListener('blur',release);
+    input.addEventListener('keyup',release);
+    // mousedown клина начинает новый жест раньше blur прежнего ползунка.
+    // Завершение активного жеста принадлежит InputSnap, а не старому полю.
+    input.addEventListener('blur',()=>{if(!InputSnap.active)release();});
   }
   function schedule() {
     clearTimeout(timer);

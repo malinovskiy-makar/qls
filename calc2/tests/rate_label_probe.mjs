@@ -60,6 +60,7 @@ try{
  const handle=await page.evaluate(()=>{const r=document.querySelector('#chart circle[r="7"]').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
  await page.mouse.move(handle.x,handle.y);await page.mouse.down();
  await page.mouse.move(handle.x,handle.y-21.7,{steps:8});
+ await page.waitForTimeout(650); // blur прежнего ползунка не завершает новый жест на клине.
  const graphDrag=await read();
  const expected=String(Number(graphDrag.tax.toFixed(3))).replace('.',',');
  check('graph drag updates both labels before release',short(graphDrag.graph||'',expected)&&short(graphDrag.side,expected)&&graphDrag.pending,graphDrag);
