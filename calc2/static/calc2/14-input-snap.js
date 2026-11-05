@@ -32,13 +32,17 @@ const InputSnap = (() => {
     if(xIds.includes(sl.id))span=Math.min(span,Math.abs(CONFIG.Qmax-CONFIG.Qmin));
     return span;
   }
-  function cancel() {
+  function cancel(commit=false) {
     cancelAnimationFrame(frame);frame=0;
-    const g=gesture;gesture=null;g?.cancel?.();
+    const g=gesture,complete=commit&&g?.ending&&STATE.sceneKey===g.scene&&g.sl.isConnected;
+    // Новый жест прерывает анимацию, но сохраняет уже выбранное конечное число.
+    if(complete)g.set(g.target);
+    gesture=null;g?.cancel?.();
     if(g)TaxMotion.release();
+    if(complete){g.done?.();if(typeof historyAfterRedraw==='function')historyAfterRedraw();}
   }
   function begin(sl,options={}) {
-    cancel();
+    cancel(true);
     if(!sl)return;
     const min=sl.min===''?0:+sl.min,max=sl.max===''?100:+sl.max;
     const get=options.get||(()=>+sl.value);
@@ -50,11 +54,12 @@ const InputSnap = (() => {
   }
   function finish(immediate=false) {
     const g=gesture;
-    if(!g||g.ending)return;
+    if(!g)return;
+    if(g.ending){if(immediate)cancel(true);return;}
     const from=g.get(),to=rounded(from,g.unit,g.min,g.max);
     if(from===g.start||Math.abs(to-from)<1e-12){cancel();g.done?.();return;}
-    g.ending=true;
-    const done=()=>{g.set(to);cancel();g.done?.();if(typeof historyAfterRedraw==='function')historyAfterRedraw();};
+    g.ending=true;g.target=to;
+    const done=()=>cancel(true);
     if(immediate||g.keyboard||reduce()){done();return;}
     const start=performance.now();
     const tick=now=>{
@@ -68,14 +73,14 @@ const InputSnap = (() => {
     frame=requestAnimationFrame(tick);
   }
   document.addEventListener('pointerdown',event=>{
-    if(range(event.target))begin(event.target,{native:true});else cancel();
+    if(range(event.target))begin(event.target,{native:true});else cancel(true);
   },true);
   window.addEventListener('pointerup',()=>{if(gesture?.native)finish();},true);
   window.addEventListener('pointercancel',()=>finish(true),true);
   window.addEventListener('blur',()=>finish(true));
   document.addEventListener('keydown',event=>{
     const sl=event.target;
-    if(!range(sl)||!keys.has(event.key)){if(event.key!=='Shift')cancel();return;}
+    if(!range(sl)||!keys.has(event.key)){if(event.key!=='Shift')cancel(true);return;}
     event.preventDefault();
     if(gesture?.sl!==sl||!gesture.keyboard)begin(sl,{native:true,keyboard:true});
     const g=gesture,up=['ArrowRight','ArrowUp','PageUp'].includes(event.key);

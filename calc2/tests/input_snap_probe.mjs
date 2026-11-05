@@ -79,6 +79,13 @@ try{
  const release=await motion('#tax-slider',.4,.5137);await release();await settled();
  check('reduced motion no infinite animations',await page.evaluate(()=>document.getAnimations().every(a=>a.effect?.getTiming().iterations!==Infinity)));
  await page.emulateMedia({reducedMotion:'no-preference'});
+ // Следующий щелчок может прийти раньше первого RAF доведения.
+ await page.evaluate(()=>{setTax(20);const sl=document.getElementById('tax-slider');
+  sl.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));sl.value=73.4689;
+  sl.dispatchEvent(new Event('input',{bubbles:true}));window.dispatchEvent(new PointerEvent('pointerup'));
+  document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));});
+ await settled();
+ check('interrupting snap commits final value',near(await page.evaluate(()=>STATE.tax),73));
  // MC: и ползунок сдвига, и сама линия используют ту же сетку.
  await page.evaluate(()=>{pickScene('mono');setToolsOpen(true);});await page.waitForTimeout(200);
  const mc=await page.evaluate(()=>mcDragCurve().id),selector='[data-cid="'+mc+'"] input[type=range]';
