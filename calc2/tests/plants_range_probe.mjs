@@ -29,6 +29,11 @@ try{
  await page.screenshot({path:path.join(out,'large-manual-output.png')});
  const bounds=await page.evaluate(()=>{const s=document.getElementById('pl-q-slider');s.dataset.boundsByHand='1';s.max=100;setPlantsQ(1000);return {max:+s.max,q:STATE.plQ};});
  check('custom range preserved without rounding manual input',bounds.max===100&&bounds.q===1000,bounds);
+ const exported=await page.evaluate(()=>{
+  setPlantInputRows([{expr:'Q^2',K:null,kind:'sunk'},{expr:'2*Q^2',K:null,kind:'sunk'}]);setPlantsQ(35);buildAnswer();
+  return exportNumbersLine();
+ });
+ check('PNG summary preserves exact fractions',exported.includes('Q1 = 70/3')&&exported.includes('Q2 = 35/3')&&exported.includes('MC = 140/3'),exported);
  check('no page errors',!report.errors.length,report.errors);
 }finally{await browser.close();fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report));
