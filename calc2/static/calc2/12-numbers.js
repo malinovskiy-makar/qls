@@ -118,10 +118,12 @@ const cache=new Map();
 // Во время интерактивного кадра собираем недостающие записи для рабочего
 // потока. Поиск радикала никогда не нужен для положения самой кривой.
 let collecting = null;
-function collect(fn) {
-  const previous = collecting, values = new Set();
+let numericExpressions = false;
+function collect(fn, options={}) {
+  const previous = collecting, previousNumeric = numericExpressions, values = new Set();
   collecting = values;
-  try { fn(); } finally { collecting = previous; }
+  numericExpressions = !!options.numericExpressions;
+  try { fn(); } finally { collecting = previous; numericExpressions = previousNumeric; }
   return [...values];
 }
 function seed(records) {
@@ -205,6 +207,9 @@ function factor(v,{tex=false}={}){
 }
 // Поля и формулы, которые движок будет считать, сохраняют машинную точность.
 function expression(v,{atomic=false}={}){
+  // Во время движения формула для вычисления хранит всё машинное число.
+  // Поиск красивого радикала нужен только её окончательной записи.
+  if(numericExpressions)return atomic&&v<0?'('+String(v)+')':String(v);
   const r=classify(v,true);
   if(r.kind==='approx'||r.kind==='special')return atomic&&v<0?'('+String(v)+')':String(v);
   const s=r.text.replace(/\u202f/g,'').replace(/−/g,'-').replace(/,/g,'.').replace(/(\d)√(\d+)/g,'$1*sqrt($2)').replace(/√(\d+)/g,'sqrt($1)');

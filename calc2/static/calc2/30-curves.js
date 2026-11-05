@@ -350,6 +350,7 @@ function markArea(sel, rec) {
    производная берётся символьно и получается настоящая формула. Пробуем взять
    её; не вышло (корни, модули, кусочные) — возвращаем null, и кривая честно
    уходит точками с пояснением. */
+const _derivativeRecords=new Map();
 function derivativeExpr(expr, varName) {
   if (!expr || typeof math === 'undefined' || typeof math.derivative !== 'function') return null;
   const v = varName || 'Q';
@@ -365,10 +366,14 @@ function derivativeExpr(expr, varName) {
       if (n.type === 'ConditionalNode') return new math.ConditionalNode(n.condition, dn(n.trueExpr), isNaNNode(n.falseExpr) ? n.falseExpr : dn(n.falseExpr));
       return math.derivative(n, v);
     };
+    const key=v+'|'+src,cached=_derivativeRecords.get(key);
+    if(cached){const probe=cached.c.evaluate(paramScope(axisScope(1,{[v]:1})));return typeof probe==='number'&&isFinite(probe)?cached.d:null;}
     const d = (/\?/.test(src) ? dn(liftConditional(math.parse(src))) : math.derivative(src, v)).toString();
     // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
     const c = math.parse(d).compile();
     const probe = c.evaluate(paramScope(axisScope(1, { [v]: 1 })));
+    if(_derivativeRecords.size>=256)_derivativeRecords.delete(_derivativeRecords.keys().next().value);
+    _derivativeRecords.set(key,{d,c});
     return (typeof probe === 'number' && isFinite(probe)) ? d : null;
   } catch (e) { return null; }
 }

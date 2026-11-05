@@ -60,8 +60,8 @@ function recompute() {
       const { Q, P } = STATE.eq;
       /* По участкам, если кривая знает свои изломы (суммарная знает): метод
          трапеций точен на прямой только когда излом лежит в узле сетки. */
-      STATE.cs = integrateBroken(q => quadPrice(STATE.D, q) - P, 0, Q, quadBreaks(STATE.D, Q));   // ∫ (D - P*) dQ
-      STATE.ps = integrateBroken(q => P - quadPrice(STATE.S, q), 0, Q, quadBreaks(STATE.S, Q));   // ∫ (P* - S) dQ
+      STATE.cs = integrateBroken(q => quadPrice(STATE.D, q) - P, 0, Q, quadBreaks(STATE.D, Q), curvePiecewiseLinear(STATE.D));   // ∫ (D - P*) dQ
+      STATE.ps = integrateBroken(q => P - quadPrice(STATE.S, q), 0, Q, quadBreaks(STATE.S, Q), curvePiecewiseLinear(STATE.S));   // ∫ (P* - S) dQ
       STATE.sw = STATE.cs + STATE.ps;
     }
 
@@ -1719,13 +1719,16 @@ function sumLinearRecord(groups, side) {
    узла в 40 нет). Три десятитысячных — это не округление, а промах метода, и
    на сверке двух путей с допуском 1e-6 он виден сразу. Разбиваем отрезок
    точками излома: на каждом куске функция снова прямая и трапеции точны. */
-function integrateBroken(f, a, b, breaks) {
+function curvePiecewiseLinear(c) {
+  return !!c && (!!c.linear || (c.kind==='sum' && !c.sumNumeric));
+}
+function integrateBroken(f, a, b, breaks, linear=false) {
   if (!(b > a)) return 0;
   const inner = (breaks || []).filter(x => x > a + 1e-12 && x < b - 1e-12);
-  if (!inner.length) return integrate(f, a, b);
+  if (!inner.length) return integrate(f, a, b, linear ? 1 : 1000);
   const pts = [a].concat(inner.slice().sort((x, y) => x - y), [b]);
   let acc = 0;
-  for (let i = 0; i < pts.length - 1; i++) acc += integrate(f, pts[i], pts[i + 1], 400);
+  for (let i = 0; i < pts.length - 1; i++) acc += integrate(f, pts[i], pts[i + 1], linear ? 1 : 400);
   return acc;
 }
 
@@ -3237,9 +3240,9 @@ function drawElasticityPoint() {
 // Перетаскивание точки эластичности вдоль спроса (по Q; P берётся с кривой; зажим в recompute).
 function attachElastDrag(sel) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { TaxMotion.hold();document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { STATE.elastQ = toData(event.x, event.y)[0]; redrawAll(); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { TaxMotion.release();document.body.style.cursor = ''; }));
 }
 
 // Точка эластичности на кривой ПРЕДЛОЖЕНИЯ (Фаза 2а) — зеркало точки на спросе.
@@ -3265,9 +3268,9 @@ function drawElasticityPointS() {
 
 function attachElastDragS(sel) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { TaxMotion.hold();document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { STATE.elastQS = toData(event.x, event.y)[0]; redrawAll(); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { TaxMotion.release();document.body.style.cursor = ''; }));
 }
 
 // Табло эластичности: точка, |Ed|, зона, единичная точка и максимальная выручка.

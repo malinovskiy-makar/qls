@@ -392,6 +392,7 @@ function noMinNote(m, what, avgName) {
 
 // Табло издержек: ключевые точки закрытия и безубыточности.
 function updateCostsPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-costs');
   if (!box) return;
   if (STATE.firmSupply) { updateFirmSupplyPanel(box); return; }
@@ -672,6 +673,7 @@ function endLrDrag(exact=false) {
 }
 
 function updateLongRunPanel(html) {
+  if(TaxMotion.drawing)return;
   const lr = STATE.lr;
   if (!lr) return html;
   html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
@@ -929,6 +931,7 @@ function noMaxNote(m, what, name, why) {
 }
 
 function updateProdPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-prod'); if (!box) return;
   const p = STATE.prod;
   if (!p) { box.innerHTML = '<div class="warn">Не понял формулу Q = f(L).</div>'; return; }
@@ -980,6 +983,7 @@ function redrawIsoquant() {
 }
 
 function updateIsoPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-iso'); if (!box) return;
   const err = document.getElementById('iso-error');
   if (err) { err.style.display = STATE.isoErr ? 'block' : 'none'; err.textContent = STATE.isoErr ? ('Не понял формулу: ' + STATE.isoErr) : ''; }

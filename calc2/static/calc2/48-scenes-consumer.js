@@ -127,14 +127,14 @@ function drawChoicePoint(x, y, color, label) {
 
 // Перетаскиваемые концы бюджетной линии: тянем за перехват — меняется соответствующая цена.
 function attachBudgetHandles(opt) {
-  const g = svg.append('g');
+  const g = svg.append('g').attr('class','model-drag-handles');
   const mk = (cx, cy, onDrag) => {
     const h = g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 11)
       .attr('fill', 'transparent').style('cursor', 'grab');
     h.call(d3.drag().container(() => svg.node())
-      .on('start', () => { document.body.style.cursor = 'grabbing'; })
+      .on('start', () => { TaxMotion.hold();document.body.style.cursor = 'grabbing'; })
       .on('drag', (e) => onDrag(e))
-      .on('end', () => { document.body.style.cursor = ''; }));
+      .on('end', () => { TaxMotion.release();document.body.style.cursor = ''; }));
     g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 4.5)
       .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2).style('pointer-events', 'none');
   };
@@ -195,6 +195,7 @@ function redrawConsumer() {
 
 // Табло потребителя: оптимум, MRS, свойства типа предпочтений, разложение Слуцкого.
 function updateConsumerPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-consumer'); if (!box) return;
   const err = document.getElementById('cons-error');
   if (err) { err.style.display = STATE.consErr ? 'block' : 'none'; err.textContent = STATE.consErr ? ('Не понял формулу: ' + STATE.consErr) : ''; }

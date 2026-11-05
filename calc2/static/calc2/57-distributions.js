@@ -13,7 +13,7 @@ function ineqShares(values, label) {
 function ineqWeightedPoints(pops,shares) {
   const pts=[[0,0]];let p=0,s=0;for(let i=0;i<pops.length;i++){p+=pops[i];s+=shares[i];pts.push([p,s]);}pts[pts.length-1]=[1,1];return pts;
 }
-function ineqSimplify(expr){try{return math.simplify(math.rationalize(expr)).toString();}catch(e){return math.simplify(expr).toString();}}
+function ineqSimplify(expr){if(TaxMotion.drawing)return expr;try{return math.simplify(math.rationalize(expr)).toString();}catch(e){return math.simplify(expr).toString();}}
 function ineqPieceExpr(pieces) {
   let expr='NaN';for(let i=pieces.length-1;i>=0;i--)expr='(p '+(i?'>'+CalcNumber.expression(pieces[i].lo):'>=0')+' and p <= '+CalcNumber.expression(pieces[i].hi)+') ? ('+pieces[i].expr+') : ('+expr+')';
   return pieces.length===1?pieces[0].expr:expr;

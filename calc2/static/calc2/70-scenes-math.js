@@ -1505,6 +1505,7 @@ function mathOptimumReasoning(r) {
 
 // Табло раздела.
 function updateMathPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-math');
   if (!box) return;
   const r = STATE.mathRes || {};
@@ -1781,6 +1782,8 @@ function exportBaseName() {
    Из клона вырезаются служебные узлы (data-service: ручки, зажжённые
    ключевые точки, кружок прилипания) — в файл они не идут (COVERAGE, 6.8). */
 function paperChartClone() {
+  // Экспорт берёт текущий точный кадр, даже если ответ ещё под индикатором.
+  InputSnap.cancel(true);TaxMotion.cancel();
   const root = document.documentElement;
   const theme = root.getAttribute('data-theme');
   const paper = cssVar('--paper');
@@ -1789,7 +1792,7 @@ function paperChartClone() {
   root.style.setProperty('--halo', paper);
   let clone = null, w = W, h = H;
   try {
-    refreshColors(); redrawAll();
+    refreshColors(); redrawAll();buildAnswer();
     const node = document.getElementById('chart');
     if (node) {
       w = node.clientWidth || W; h = node.clientHeight || H;
@@ -2092,6 +2095,7 @@ function closeExport() {
    пересекает оси, где у неё вершина, где две кривые встречаются.
    --------------------------------------------------------------------- */
 function updateGraphPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-graph');
   if (!box) return;
   if (STATE.mode !== 'graph') { box.innerHTML = ''; return; }

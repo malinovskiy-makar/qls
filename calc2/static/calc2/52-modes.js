@@ -12,6 +12,7 @@
    одной моделью: у остальных границы выбраны осознанно, и общая правка
    переставила бы оси там, где их никто не просил трогать. */
 function setRanges(qmax, pmax, opts) {
+  if(TaxMotion.drawing)return;
   CONFIG.Qmax = qmax; CONFIG.Pmax = pmax;
   // В режиме «только первая четверть» окно начинается ровно в нуле. Режим сняли —
   // оставляем немного места слева и снизу, чтобы ось не липла к самому краю.
@@ -114,7 +115,7 @@ function prefersReducedMotion() {
 }
 
 // Плавно перевести масштаб осей к (targetQmax, targetPmax) за ~450 мс (ease-out).
-function animateRanges(targetQmax, targetPmax) {
+function animateRanges(targetQmax, targetPmax, motion) {
   // Отменить незавершённую анимацию (быстрые подёргивания ползунка Pw).
   if (_rangeAnimReq != null) { cancelAnimationFrame(_rangeAnimReq); _rangeAnimReq = null; }
   const startQ = CONFIG.Qmax, startP = CONFIG.Pmax;
@@ -131,13 +132,14 @@ function animateRanges(targetQmax, targetPmax) {
     _rangeAnimating = true;             // в кадре recompute не трогает CONFIG (цикл ведёт сам)
     CONFIG.Qmax = startQ + (targetQmax - startQ) * e;
     CONFIG.Pmax = startP + (targetPmax - startP) * e;
-    redrawAll();
+    if(motion)motion.draw();else redrawAll();
     _rangeAnimating = false;
     if (t < 1) {
       _rangeAnimReq = requestAnimationFrame(step);
     } else {
       _rangeAnimReq = null;
-      setRanges(targetQmax, targetPmax);  // точные финальные значения + синк полей «Оси»/ползунков
+      setRanges(targetQmax, targetPmax);
+      if(motion)motion.done();  // точные финальные значения + синк полей «Оси»/ползунков
     }
   };
   _rangeAnimReq = requestAnimationFrame(step);
@@ -146,6 +148,8 @@ function animateRanges(targetQmax, targetPmax) {
 // Применить масштаб осей в КТВ: анимировать (если запрошено сменой Pw и не reduce-motion)
 // либо выставить мгновенно. Вызывается ВМЕСТО прямого setRanges в recompute КТВ.
 function applyTradeRanges(targetQmax, targetPmax) {
+  if(TaxMotion.drawing){TaxMotion.deferRange(targetQmax,targetPmax,_paramOnlyRedraw);return;}
+  if(TaxMotion.finishing){_sceneRangedFrame=true;_wantRangeAnim=false;if(!STATE.zoomLock)setRanges(...TaxMotion.rangeBounds(targetQmax,targetPmax));return;}
   if (_rangeAnimating) return;                 // внутри кадра анимации границами управляет цикл
   _sceneRangedFrame = true;                    // окном этого кадра распоряжается сцена
   /* Окно идёт за формулой, а не за буквой (20.08) — но РАСШИРЯЕТСЯ и за буквой
@@ -286,6 +290,8 @@ function redrawKeepingWindow(action = redrawAll) {
 }
 
 function applyAutoRanges(qmax, pmax) {
+  if(TaxMotion.drawing){TaxMotion.deferRange(qmax,pmax,_paramOnlyRedraw);return;}
+  if(TaxMotion.finishing){_sceneRangedFrame=true;_wantRangeAnim=false;if(!STATE.zoomLock)setRanges(...TaxMotion.rangeBounds(qmax,pmax));return;}
   if (_rangeAnimating) return;
   _sceneRangedFrame = true;                    // окном этого кадра распоряжается сцена
   // Та же оговорка, что и у applyTradeRanges: не сжимаем, но раздвигаем.
@@ -557,6 +563,7 @@ function requestFormulaFit() {
 /* Раздвинуть окно до названных границ — и только раздвинуть. Плавно и с
    дебаунсом; при выключенной анимации в системе — сразу. */
 function growRanges(qmax, pmax) {
+  if(TaxMotion.drawing){TaxMotion.deferRange(qmax,pmax,true);return;}
   if (STATE.zoomLock) return;             // окно человека — его
   const q = Math.max(CONFIG.Qmax, qmax), p = Math.max(CONFIG.Pmax, pmax);
   if (q <= CONFIG.Qmax + 1e-6 && p <= CONFIG.Pmax + 1e-6) return;   // всё помещается
@@ -861,25 +868,7 @@ function cancelRangeAnim() {
   _wantRangeAnim = false;
 }
 
-/* --- Троттл живого пересчёта (неравенство) ---------------------------------
-   Тяжёлый recomputeInequality + полная пересборка SVG/панели на каждый микрошаг
-   ползунка мигают. Троттл (ведущий + хвостовой, ~90 мс) обновляет картинку
-   и числа СОГЛАСОВАННО, не чаще ~11 раз/с — плавно, без мигания. Это не «motion»,
-   а ограничение частоты пересчёта, поэтому действует и при reduce-motion. */
-function makeThrottle(interval) {
-  let last = 0, tid = null, pending = null;
-  return (fn) => {
-    pending = fn;
-    const now = Date.now();
-    const wait = interval - (now - last);
-    if (wait <= 0) { last = now; if (tid) { clearTimeout(tid); tid = null; } const f = pending; pending = null; f(); }
-    else if (tid == null) {
-      tid = setTimeout(() => { last = Date.now(); tid = null; const f = pending; pending = null; if (f) f(); }, wait);
-    }
-  };
-}
-const _ineqThrottle = makeThrottle(90);
-function ineqRedraw() { _ineqThrottle(() => redrawAll()); }   // живой пересчёт неравенства — троттлом
+function ineqRedraw() { redrawAll(); }   // Тяжёлые панели откладывает TaxMotion, геометрия сразу.
 
 // Переключение режима: рынок / издержки / КПВ.
 function setMode(mode) {

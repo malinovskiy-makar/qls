@@ -9,6 +9,9 @@
    так они работают в любом режиме и ни одну сцену не пришлось трогать. */
 let _sceneSetupDepth = 0;
 function redrawAll() {
+  if(!_sceneSetupDepth && !TaxMotion.finishing && TaxMotion.supported() && (InputSnap.active||TaxMotion.held)){
+    TaxMotion.render();return;
+  }
   if(TaxMotion.pending && !TaxMotion.finishing)TaxMotion.cancel();
   syncTaxPairUI();
   const labelsBeforeFit=new Map([..._labelPos].map(([k,v])=>[k,{...v}]));
@@ -1799,7 +1802,9 @@ function drawCurveHits() {
     const nm = this.getAttribute('data-hit-name');
     if (nm) done.add(nm);
   });
-  const g = svg.append('g').attr('class', 'curve-hits').attr('clip-path', 'url(#plot-clip)');
+  // Ручки бюджета и Лоренца сцена уже создала. Полоса выбора кривой не
+  // должна накрывать их: на сенсорном экране она перехватывала даже захват.
+  const g = svg.insert('g', '.model-drag-handles').attr('class', 'curve-hits').attr('clip-path', 'url(#plot-clip)');
   targets.forEach(t => {
     if (done.has(t.name)) return;
     const ts = mainScales(t.panel);
@@ -3375,7 +3380,7 @@ function buildParamChip(box, name) {
     sl.value = p.value;
     loLab.textContent = boundText(p.min);   // настоящий минус в подписи предела (сессия 6, Д1)
     hiLab.textContent = boundText(p.max);
-    val.textContent = fmt(p.value);
+    val.textContent = TaxMotion.formatRate(p.value);
     paintEq();
   };
   syncSlider();
@@ -3392,7 +3397,7 @@ function buildParamChip(box, name) {
 
   sl.addEventListener('input', () => {
     p.value = parseFloat(sl.value);
-    val.textContent = fmt(p.value);
+    val.textContent = TaxMotion.formatRate(p.value);
     paintEq();
     if (bounds && bounds.close) bounds.close();   // Н10: тронули ползунок — меню закрылось
     redrawKeepingWindow();     // окно подбирается под формулу, а не под значение буквы

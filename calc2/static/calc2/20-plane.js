@@ -88,7 +88,7 @@ const COORD_LABEL_PAD = 24;
 // Во время жеста поле неподвижно. После него TaxMotion плавно подбирает
 // место под настоящую подпись; постоянного запаса под самый длинный корень нет.
 function fixedTaxCoordinateBand() {
-  return STATE.mode==='market' && ['taxes','tax','tax-adv','mono','mono-nat','mono-d1'].includes(STATE.sceneKey)
+  return STATE.mode==='market' && !['mono-d3','mono-kink'].includes(STATE.sceneKey)
     && !(typeof texPaperActive==='function'&&texPaperActive());
 }
 

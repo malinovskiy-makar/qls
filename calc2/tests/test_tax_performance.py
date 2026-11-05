@@ -76,6 +76,32 @@ class TaxPerformanceTest(StaticLiveServerTestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_all_model_controls(self):
+        """Shared live rendering preserves computed values in every scene."""
+        self._run_controls_probe("controls_motion_probe.mjs")
+        self._run_controls_probe("controls_motion_probe.mjs", "--parameters")
+        self._run_controls_probe("controls_motion_probe.mjs", "--extras")
+
+    def test_other_graph_handles(self):
+        """Real input, held pause, one history entry and certified affine math."""
+        self._run_controls_probe("controls_gesture_probe.mjs")
+
+    def test_plants_range_does_not_run_away(self):
+        """Stable slider domain and visible TC sampling, including large manual Q."""
+        self._run_controls_probe("plants_range_probe.mjs")
+
+    def _run_controls_probe(self, script, *args):
+        node = shutil.which("node")
+        self.assertIsNotNone(node)
+        with tempfile.TemporaryDirectory(prefix="calc2-controls-") as out:
+            result = subprocess.run(
+                [node, "calc2/tests/" + script, "--out", out, *args],
+                cwd=settings.BASE_DIR,
+                env=dict(os.environ, CALC2_BASE_URL=self.live_server_url),
+                capture_output=True, text=True, encoding="utf-8", timeout=180,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def _run_motion_probe(self, *args):
         node = shutil.which("node")
         self.assertIsNotNone(node, "Node is required for the native tax gesture probe")

@@ -417,6 +417,7 @@ function drawEquilibriumAt(Q, P, label) {
 }
 
 function updateMacroPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-macro'); if (!box) return;
   const r = STATE.macroRes;
   if(!r&&STATE.macroModel==='islm'&&macroP().input==='params')setFinalFunctions([]);

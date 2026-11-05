@@ -17,6 +17,31 @@
 
    Раньше форму надо было выбрать кнопками заранее, и поле принимало только
    правую часть. Возвращаем { f(x), kind, error }; f — всегда «Y от X».  */
+// Сертификат прямой из синтаксического дерева, без подгонки по точкам.
+// В maxAllocY целевая функция двух таких стран аффинна: максимум на краю.
+function ppfAffine(expr) {
+  try {
+    const walk=n=>{
+      if(n.isParenthesisNode)return walk(n.content);
+      if(n.isSymbolNode&&['x','X'].includes(n.name))return[1,0];
+      if(!n.toString().match(/\b[xX]\b/)){
+        const v=n.compile().evaluate(scopeFor(expr,{}));return Number.isFinite(v)?[0,v]:null;
+      }
+      if(!n.isOperatorNode)return null;
+      const xs=n.args.map(walk);if(xs.some(x=>!x))return null;
+      const [a,b]=xs;
+      if(n.fn==='unaryPlus')return a;
+      if(n.fn==='unaryMinus')return a.map(x=>-x);
+      if(n.fn==='add')return[a[0]+b[0],a[1]+b[1]];
+      if(n.fn==='subtract')return[a[0]-b[0],a[1]-b[1]];
+      if(n.fn==='multiply'&&(a[0]===0||b[0]===0))return[a[0]*b[1]+a[1]*b[0],a[1]*b[1]];
+      if(n.fn==='divide'&&b[0]===0&&b[1]!==0)return a.map(x=>x/b[1]);
+      if(n.fn==='pow'&&b[0]===0&&b[1]===1)return a;
+      return null;
+    };
+    return walk(math.parse(prepExpr(expr)));
+  }catch(e){return null;}
+}
 function parsePpfEquation(src) {
   const t = String(src || '').trim();
   if (!t) return { error: 'Пустая строка.' };
@@ -415,7 +440,9 @@ function drawBundleRay(g, f, color, curves) {
     .attr('stroke', 'transparent').attr('stroke-width', 14)
     .style('cursor', 'grab').style('pointer-events', 'stroke')
     .call(d3.drag().container(() => svg.node())
-      .on('drag', (ev) => bundleDragTo(sx.invert(ev.x), sy.invert(ev.y))));
+      .on('start', () => TaxMotion.hold())
+      .on('drag', (ev) => bundleDragTo(sx.invert(ev.x), sy.invert(ev.y)))
+      .on('end', () => TaxMotion.release()));
 
   // Пересечения со всеми заданными кривыми — как ключевые точки, с координатами.
   const list = (curves && curves.length) ? curves : [{ f, name: 'КПВ' }];
@@ -448,6 +475,7 @@ function ppfOppAt(f, x) {
 }
 
 function updatePpfPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-ppf');
   if (!box) return;
   if (!STATE.ppfReady) {
@@ -590,8 +618,21 @@ function redrawPpf() {
 
    Тот же приём, что у `evalWithParams` и `compileTwoVar`: исходный текст
    формулы носит сам скомпилированный узел. */
+const _ppfFrameScopes=new WeakMap();
 function ppfEvalWith(compiled, x) {
   try {
+    // Сотни тысяч проб одной формулы используют один контекст кадра.
+    // Значения, сетка и уточнение прежние; новый кадр перечитывает параметры.
+    if(TaxMotion.drawing){
+      let entry=_ppfFrameScopes.get(compiled);
+      if(!entry||entry.tick!==_spanTick){
+        entry={tick:_spanTick,scope:new Map(Object.entries(scopeFor(compiled._src||'',{x:0,X:0})))};
+        _ppfFrameScopes.set(compiled,entry);
+      }
+      entry.scope.set('x',x);entry.scope.set('X',x);
+      const v=compiled.evaluate(entry.scope);
+      return typeof v==='number'&&isFinite(v)?v:NaN;
+    }
     const ctx = (compiled && compiled._src)
       ? scopeFor(compiled._src, { x: x, X: x })
       : paramScope({ x: x, X: x });
@@ -870,6 +911,7 @@ function maxAllocY(f1, f2, X, x1max, x2max) {
     return (isNaN(y1) || isNaN(y2)) ? -Infinity : y1 + y2;
   };
   if (hi <= lo + 1e-9) { const v = obj(lo); return v === -Infinity ? NaN : v; }
+  if(f1._affine&&f2._affine)return Math.max(obj(lo),obj(hi));
   let best = -Infinity, bx = lo;
   const M = 200;
   for (let j = 0; j <= M; j++) { const x1 = lo + (hi - lo) * j / M; const v = obj(x1); if (v > best) { best = v; bx = x1; } }
@@ -2093,6 +2135,7 @@ function recomputePpfSumRaw() {
   for (let i = 0; i < n; i++) {
     const r = parsePpfEquation(ppfSumGet(i));
     if (r.error) { STATE.ppfSumData = { ok: false, error: (ppfSumName(i) + ': ' + r.error) }; return; }
+    if(r.kind==='explicit')r.f._affine=ppfAffine(r.src);
     const c = classifyPpf(r.f);
     if (c.Xmax == null || !(c.Xmax > 0)) {
       STATE.ppfSumData = { ok: false, error: 'Не удалось определить границы ' + ppfSumName(i)
@@ -2323,6 +2366,7 @@ function drawPpfSumMarks(d) {
    проверенный алгоритм сложения по Минковскому, и ничего не считает заново:
    изломы, концы и порядок специализации берутся из его же результата. */
 function updatePpfSumPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-ppfsum'); if (!box) return;
   const d = STATE.ppfSumData;
   showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
@@ -2743,6 +2787,7 @@ function drawPpfTradeMarks(d) {
 
 // Табло КТВ: режим, мировая цена, точка производства, максимальное потребление, формула линии.
 function updatePpfTradePanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-ppft'); if (!box) return;
   const d = STATE.ppfTradeData;
   showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
@@ -3154,6 +3199,7 @@ function tbName(idx) {
 
 // Табло сценария Б.
 function updateTradeBPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-tb'); if (!box) return;
   const d = STATE.tradeBData;
   showPaneError('tb-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');

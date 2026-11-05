@@ -127,10 +127,10 @@ function applyRedistribution(shares, pops=shares.map(()=>1/shares.length)) {
 function recomputeInequality() {
   // Доли могут стать неравными или временно ошибочными при ручном вводе.
   // Сегмент «Равные группы» должен отражать их до любого раннего выхода.
-  ineqRenderRows(document.getElementById('ineq-groups-table'),false);
+  if(!TaxMotion.drawing)ineqRenderRows(document.getElementById('ineq-groups-table'),false);
   STATE.ineqLorenz=null;STATE.ineqStats=null;STATE.ineqWarn=null;STATE.ineqShares=null;STATE.ineqShareN=0;STATE.ineqRedist=null;STATE.ineqSortNote=false;
   const calc=ineqCalculate(),r=calc.result;STATE.ineqDistribution=r;STATE.ineqCountries=calc.countries;
-  renderIneqCountryControls();
+  if(!TaxMotion.drawing)renderIneqCountryControls();
   if(r.error){STATE.ineqWarn=r.error;return;}
   STATE.ineqLorenz=r.pts;STATE.ineqStats=r.stats;STATE.ineqShares=r.shares||null;STATE.ineqShareN=r.shares?.length||0;
   const first=calc.first;
@@ -250,7 +250,7 @@ function drawRobinHood() {
 function drawLorenzNodes() {
   if (STATE.ineqInput === 'formula' || STATE.ineqCountryB) return;
   const pts = STATE.ineqLorenz;
-  const g = svg.append('g');
+  const g = svg.append('g').attr('class','model-drag-handles');
   for (let i = 1; i < pts.length - 1; i++) {           // концы (0,0) и (1,1) зафиксированы
     const px = sx(pts[i][0] * 100), py = sy(pts[i][1] * 100);
     if (STATE.ineqInput === 'groups' || STATE.ineqInput === 'incomes') {
@@ -302,7 +302,7 @@ function ineqDragIncome(i, vFraction) {
 // — меняется доход соответствующего человека. Общий механизм, разная логика.
 function attachLorenzNodeDrag(sel, i) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { TaxMotion.hold();document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => {
       const v = sy.invert(event.y) / 100;              // тянем по Y (доля дохода, 0..1)
       if (STATE.ineqInput === 'incomes') {
@@ -315,7 +315,7 @@ function attachLorenzNodeDrag(sel, i) {
       if (typeof ineqMasterDetach === 'function') ineqMasterDetach();   // ручная правка узла → отвязка мастера
       redrawAll();
     })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { TaxMotion.release();document.body.style.cursor = ''; }));
 }
 
 // Стрелка «налог подтянул кривую к равенству» (ЧК3) — от «до» к «после» в p=0.5.
@@ -343,6 +343,7 @@ function updateIneqSortNote() {
 
 // Табло неравенства.
 function updateInequalityPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-inequality'); if (!box) return;
   if (!STATE.ineqStats) { setFinalFunctions([]);box.innerHTML = '<div class="warn">' + ffEsc(STATE.ineqWarn || 'Введите данные.') + '</div>'; return; }
   const s = STATE.ineqStats,r=STATE.ineqDistribution;
@@ -460,7 +461,7 @@ function setIneqInput(which) {
 // методом (для p^α совпадает с (α−1)/(α+1)), отдельной формулы не нужно.
 function setIneqAlpha(a) {
   a=Number(a);if(!Number.isFinite(a)||a<1)a=1;STATE.ineqAlpha=a;
-  const sl=document.getElementById('ineq-alpha'),val=document.getElementById('ineq-alpha-val');if(sl)sl.value=a;if(val)val.textContent=fmt(a);
+  const sl=document.getElementById('ineq-alpha'),val=document.getElementById('ineq-alpha-val');if(sl)sl.value=a;if(val)val.textContent=TaxMotion.formatRate(a);
   ineqRedraw();
 }
 
@@ -488,4 +489,4 @@ function setIneqRedistTool(tool) {
 }
 
 // Таблица долей по группам (поля ввода %). Перерисовывается при смене N и при входе в режим.
-function renderIneqGroupsTable() { ineqRenderRows(document.getElementById('ineq-groups-table'),false);renderIneqCountryControls(true); }
+function renderIneqGroupsTable() { if(TaxMotion.drawing)return;ineqRenderRows(document.getElementById('ineq-groups-table'),false);renderIneqCountryControls(true); }

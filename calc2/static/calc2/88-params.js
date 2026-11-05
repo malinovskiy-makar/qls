@@ -240,7 +240,7 @@ function paintEqLabel(lab, name, value, unit) {
   lab.classList.add('param-eq');
   lab.dataset.eqName = name;
   const u = String(unit || '');
-  const format = lab.closest('#tax-field') ? TaxMotion.formatRate : CalcNumber.format;
+  const format = TaxMotion.formatRate;
   const plain = name + ' = ' + format(value,{percent:u==='%'}) + (u && u!=='%' ? ' '+u : '');
   if (typeof katex === 'undefined') { lab.textContent = plain; return; }
   try {
@@ -611,7 +611,7 @@ function syncPultCurveValues(list) {
        при размахе −50…50 и ручка улетала бы за край. */
     const shift = c.linear.b - curveShiftBase(c);
     if (sl && document.activeElement !== sl) sl.value = shift;   // точное, см. п. 3
-    if (val) val.textContent = fmt(shift);
+    if (val) val.textContent = TaxMotion.formatRate(shift);
     /* Видимая строка «Сдвиг D = …» это .reg-eq, её пишет upgradeRegulator;
        .pchip-val он же прячет. Значит после синхронизации значения надо
        позвать его же обновление, иначе число в строке останется прежним. */
@@ -798,7 +798,8 @@ function upgradeRegulator(field) {
   const paint = () => {
     if (!valueOnly()) { paintEqLabel(eq, nameOf(), valueOf(), unitOf()); return; }
     eq.classList.add('param-eq'); eq.dataset.eqName = nameOf();
-    if (!katexInto(eq, fmt(valueOf()))) eq.textContent = fmt(valueOf());
+    const shown=TaxMotion.formatRate(valueOf());
+    if (!katexInto(eq, shown)) eq.textContent = shown;
   };
   const sync = () => { lo.textContent = boundText(+sl.min); hi.textContent = boundText(+sl.max); paint(); };
   sync();
@@ -933,7 +934,7 @@ function ppfSetSum(which, maxX, maxY) {
    после точного ввода, и оба обязаны печатать одинаково. */
 function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr, show) {
   const { chip, lab, val } = makePchip(label, fmt(value), null);
-  const print = show || fmt;
+  const print = show || (v=>TaxMotion.formatRate(v));
   const sl = document.createElement('input');
   sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
   InputSnap.exact(sl,value); sl.style.accentColor = color || cssVar('--accent');
@@ -1010,7 +1011,7 @@ function ineqMasterScale(s) {         // применить масштаб s →
   } else {
     const pops=ineqDistribution(ineqFirstConfig()).pops;if(!pops)return;
     let eff;
-    if(STATE.ineqGroupMode==='counts'){const mean=base.reduce((a,v,i)=>a+v*pops[i],0);STATE.ineqGroups=base.map(v=>Math.max(0,mean+s*(v-mean)));renderIneqGroupsTable();redrawAll();return;}
+    if(STATE.ineqGroupMode==='counts'){const mean=base.reduce((a,v,i)=>a+v*pops[i],0);STATE.ineqGroups=base.map(v=>Math.max(0,mean+s*(v-mean)));renderIneqGroupsTable();if(!TaxMotion.drawing)redrawAll();return;}
     const norm=base.reduce((a,b)=>a+b,0);
     eff=base.map((v,i)=>Math.max(0,100*pops[i]+s*(100*v/norm-100*pops[i])));
     const sum = eff.reduce((a, b) => a + b, 0) || 1;
@@ -1018,19 +1019,18 @@ function ineqMasterScale(s) {         // применить масштаб s →
     STATE.ineqGroups = eff;
     renderIneqGroupsTable();
   }
-  redrawAll();
+  if(!TaxMotion.drawing)redrawAll();
 }
-function ineqMasterApply(sliderVal) { // движение мастера (отвязан → сперва перебазируемся)
-  // Живой readout % — сразу (это сам регулятор). Тяжёлый пересчёт (доли + таблица +
-  // перерисовка + Джини/Робин Гуд) — троттлом, чтобы числа и кривая обновлялись
-  // СОГЛАСОВАННО и без мигания при живом кручении (Фаза 5).
-  const val = document.getElementById('ineq-master-slider-val'); if (val) val.textContent = CalcNumber.format(sliderVal, {percent:true});
-  _ineqThrottle(() => {
-    const s = sliderVal / 100;
+function ineqMasterApply(sliderVal) {
+  const apply = () => {
+    const val = document.getElementById('ineq-master-slider-val');
+    if(val)val.textContent=TaxMotion.formatRate(sliderVal,{percent:true});
     if (STATE.ineqMasterDetached || !STATE.ineqMasterBase) { ineqMasterRebase(); STATE.ineqMasterDetached = false; }
-    STATE.ineqMasterS = s;
-    ineqMasterScale(s);   // доли/доходы + таблица + redrawAll (внутри троттла)
-  });
+    STATE.ineqMasterS = sliderVal / 100;
+    ineqMasterScale(STATE.ineqMasterS);
+  };
+  // Геометрия отвечает в том же событии. Старый троттл задерживал весь ввод.
+  if(TaxMotion.held)TaxMotion.render(apply);else apply();
 }
 function ineqMasterDetach() {         // ручная правка профиля → одним числом не выразить
   STATE.ineqMasterDetached = true;
@@ -1325,7 +1325,7 @@ function wireControls() {
     if (isNaN(v) || v <= 0) return;
     STATE.consPx1 = v;
     if (px1S) px1S.value = v; if (px1I) px1I.value = v;
-    const l = document.getElementById('cons-px1-val'); if (l) l.textContent = fmt(v);
+    const l = document.getElementById('cons-px1-val'); if (l) l.textContent = TaxMotion.formatRate(v);
     _wantRangeAnim = true; redrawKeepingWindow();
   };
   if (px1S) px1S.addEventListener('input', () => applyPx1(parseFloat(px1S.value)));
@@ -1381,7 +1381,7 @@ function wireControls() {
     const apply = (v) => {
       if (isNaN(v) || v < 0) return;
       STATE[key] = v;
-      if (sl) sl.value = v; if (inp) inp.value = fmtInput(v); if (lab) lab.textContent = fmt(v);
+      if (sl) sl.value = v; if (inp) inp.value = fmtInput(v); if (lab) lab.textContent = TaxMotion.formatRate(v);
       redrawAll();
     };
     if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));
@@ -1755,7 +1755,7 @@ function wireControls() {
   const dxs = document.getElementById('mathdx-slider');
   if (dxs) dxs.addEventListener('input', () => {
     STATE.mathDx = parseFloat(dxs.value);
-    const v = document.getElementById('mathdx-val'); if (v) v.textContent = fmt(STATE.mathDx);
+    const v = document.getElementById('mathdx-val'); if (v) v.textContent = TaxMotion.formatRate(STATE.mathDx);
     redrawAll();
   });
   [['chk-convex', 'mathConvex'], ['chk-inflect', 'mathInflect']].forEach(([id, key]) => {
@@ -1965,14 +1965,14 @@ function wireControls() {
   const ineqTau = document.getElementById('ineq-tau');
   if (ineqTau) ineqTau.addEventListener('input', () => {
     STATE.ineqTau = parseFloat(ineqTau.value);
-    const l = document.getElementById('ineq-tau-val'); if (l) l.textContent = fmt(STATE.ineqTau);
-    ineqRedraw();   // живой ползунок τ — пересчёт троттлом
+    const l = document.getElementById('ineq-tau-val'); if (l) l.textContent = TaxMotion.formatRate(STATE.ineqTau);
+    ineqRedraw();
   });
   const ineqTr = document.getElementById('ineq-transfer');
   if (ineqTr) ineqTr.addEventListener('input', () => {
     STATE.ineqTransfer = parseFloat(ineqTr.value);
-    const l = document.getElementById('ineq-transfer-val'); if (l) l.textContent = fmt(STATE.ineqTransfer);
-    ineqRedraw();   // живой ползунок трансферта — пересчёт троттлом
+    const l = document.getElementById('ineq-transfer-val'); if (l) l.textContent = TaxMotion.formatRate(STATE.ineqTransfer);
+    ineqRedraw();
   });
 
   /* Макроэкономика (Фазы 16–22). Поля моделей связываются единообразно:
@@ -2019,7 +2019,7 @@ function wireControls() {
     const apply = (v) => {
       if (isNaN(v) || v < 0) return;
       STATE.macro[model][key] = v;
-      if (sl) sl.value = v; if (inp) inp.value = v; if (lab) lab.textContent = fmt(v);
+      if (sl) sl.value = v; if (inp) inp.value = v; if (lab) lab.textContent = TaxMotion.formatRate(v);
       _wantRangeAnim = true; redrawKeepingWindow();
     };
     if (sl) sl.addEventListener('input', () => apply(parseFloat(sl.value)));

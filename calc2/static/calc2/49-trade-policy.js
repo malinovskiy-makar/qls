@@ -219,6 +219,7 @@ function tradeAnswerRows(r,mono=false){
 }
 function tradeHero(id,r,mono=false){if(!r||r.error)return[[id,'*']];return tradeAnswerRows(r,mono).map(([,key],i)=>[id,i,null,null,null,{before:r.free?.[key]}]);}
 function updateTradePanel(id,r,mono=false){
+  if(TaxMotion.drawing)return;
   const box=document.getElementById(id);if(!box)return;
   if(r.error){box.innerHTML='<div class="warn">'+ffEsc(r.error)+'</div>';return;}
   box.innerHTML=tradeAnswerRows(r,mono).map(([label,key,group])=>'<div class="stat ans-main" data-ans-group="'+group+'"><span>'+label+'</span><b>'+fmt(key==='budget'?Math.abs(r[key]):r[key])+'</b></div>').join('')+

@@ -82,6 +82,7 @@ function bigTradeHero(){
   return bigTradeRows(r).map(([g,label,value,before],i)=>['info-bigtrade',i,null,null,null,{g,...(changed&&typeof value==='number'&&typeof before==='number'?{before}:{})}]);
 }
 function updateBigTradePanel(r){
+  if(TaxMotion.drawing)return;
   const box=document.getElementById('info-bigtrade');
   box.innerHTML=r.error?'<div class="warn">'+ffEsc(r.error)+'</div>':bigTradeRows(r).map(([g,label,value])=>'<div class="stat ans-main" data-ans-group="'+g+'"><span>'+label+'</span><b>'+(typeof value==='number'?fmt(value):value)+'</b></div>').join('')+
     (r.noTrade?'<div class="hint">Внешней торговли нет. В каждой стране – внутреннее равновесие.</div>':'')+

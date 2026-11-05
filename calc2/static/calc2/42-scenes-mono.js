@@ -356,6 +356,7 @@ function drawMonopolyPoints() {
 
 // Табло монополии: Qm, Pm, конкурентные Qc/Pc, DWL, прибыль (если задана ATC).
 function updateMonoPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-mono');
   if (!box) return;
   if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
@@ -760,7 +761,11 @@ function naturalATC(q) {
   const eps = Math.max(1e-9, q * 1e-6);          // страховка: MC в самом нуле может быть NaN
   const m0 = mcAt(eps);
   if (isNaN(m0)) return NaN;
-  const vc = integrate(x => mcFloor(mcAt(x)), eps, q, 400) + mcFloor(m0) * eps;
+  const direct=mcSourceCurve(),line=direct?.linear;
+  // У прямой MC площадь трапеции точна; обрезка нулём добавляет один излом.
+  // Нелинейная MC сохраняет прежнюю сетку и точность интегратора.
+  const fn=x=>mcFloor(mcAt(x)),zero=line&&line.a!==0?-line.b/line.a:NaN;
+  const vc = (line ? integrateBroken(fn,eps,q,[zero],true) : integrate(fn,eps,q,400)) + mcFloor(m0)*eps;
   return isNaN(vc) ? NaN : (STATE.natFC + vc) / q;
 }
 
@@ -917,6 +922,7 @@ function drawNaturalFull() {
 
 // Табло естественной монополии: три ориентира и вывод о компромиссе регулятора.
 function updateNaturalPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-nat'); if (!box) return;
   if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
   if (!mcSourceCurve() && !curveByRole('tc')) {
@@ -1080,6 +1086,7 @@ function drawMonoFloorLine() {
 
 // Табло вмешательства в монополии (info-tax): налог / субсидия / потолок / пол.
 function updateMonoInterventionPanel() {
+  if(TaxMotion.drawing)return;
   /* П12, та же оговорка, что у конкурентного рынка: блок говорит только там,
      где его инструмент есть. Естественная монополия и обе дискриминации
      запирают блок вмешательства (SCENE_ROUTE.lock), и подсказка «двигайте
@@ -1284,6 +1291,7 @@ function drawDiscr1() {
 }
 
 function updateDiscr1Panel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-mono'); if (!box) return;
   if (!STATE.D) { box.innerHTML = '<div class="muted">Отметьте кривую спроса (роль D).</div>'; return; }
   if (!mcSourceCurve() && !curveByRole('tc')) { box.innerHTML = '<div class="muted">Нужны предельные издержки: роль MC (либо TC, либо S как MC).</div>'; return; }
@@ -1670,6 +1678,7 @@ function drawMonoExport() {
 }
 
 function updateDiscr3Panel() {
+  if(TaxMotion.drawing)return;
   if(STATE.discr3?.tradeResult){updateTradePanel('info-d3',STATE.discr3.tradeResult,true);return;}
   const box = document.getElementById('info-d3'); if (!box) return;
   const d = STATE.discr3;
@@ -1972,6 +1981,7 @@ function drawKinkedFull() {
 }
 
 function updateKinkPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-kink'); if (!box) return;
   const k = STATE.kinked;
   if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC.</div>'; return; }

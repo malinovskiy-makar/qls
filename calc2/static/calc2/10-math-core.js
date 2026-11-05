@@ -273,6 +273,7 @@ function sameNumerically(srcNode, srcStr, bStr) {
 }
 
 // Значение кривой в точке Q. Возвращает число или NaN (на ошибке/разрыве).
+const _curveFrameScopes=new WeakMap();
 function evalCurve(curve, q) {
   // Вертикальная кривая (Фаза 15) не задаёт цену как функцию количества.
   if (curve.kind === 'vertical') return NaN;
@@ -281,7 +282,16 @@ function evalCurve(curve, q) {
   // Быстрый путь для прямых (нужен и для плавного перетаскивания).
   if (curve.linear) return curve.linear.a * q + curve.linear.b;
   try {
-    const v = evalWithParams(curve.compiled, axisScope(q), curve.expr);
+    let v;
+    if(TaxMotion.drawing){
+      let entry=_curveFrameScopes.get(curve);
+      if(!entry||entry.tick!==_spanTick||entry.compiled!==curve.compiled){
+        entry={tick:_spanTick,compiled:curve.compiled,scope:new Map(Object.entries(scopeFor(curve.expr,axisScope(0))))};
+        _curveFrameScopes.set(curve,entry);
+      }
+      for(const key of ['x','Q','q','L','l','X'])entry.scope.set(key,q);
+      v=curve.compiled.evaluate(entry.scope);
+    }else v=evalWithParams(curve.compiled,axisScope(q),curve.expr);
     return (typeof v === 'number' && isFinite(v)) ? v : NaN;
   } catch (e) {
     return NaN;

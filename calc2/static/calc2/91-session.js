@@ -112,7 +112,7 @@ function historyBaseline() {
 function historyCheck() {
   _histTimer = null;
   // Пауза с зажатой ручкой и доведение после отпускания — один жест.
-  if(typeof InputSnap!=='undefined'&&InputSnap.active){_histTimer=setTimeout(historyCheck,HIST_QUIET_MS);return;}
+  if(typeof InputSnap!=='undefined'&&(InputSnap.active||TaxMotion.held)){_histTimer=setTimeout(historyCheck,HIST_QUIET_MS);return;}
   if (_histMute || !STATE.sceneKey || typeof collectModelState !== 'function') return;
   const app = document.querySelector('.app');
   if (app && app.hasAttribute('inert')) return;   // модель под окном выбора

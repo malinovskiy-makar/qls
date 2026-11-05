@@ -190,7 +190,10 @@ function recomputePlants(){
     if(pieces)pieces.forEach(s=>{if(s.lo<=horizon)qs.add(s.lo);if(s.hi<=horizon)qs.add(s.hi);});
     p.table=[...qs].sort((a,b)=>a-b).map(q=>plantsAt(q)).filter(Boolean);p.mMax=Math.max(1,...p.table.map(r=>r.m).filter(Number.isFinite));
     p.at=q=>plantsAt(q); // вычисляемое состояние не сериализуется в ссылку
-    const sl=document.getElementById('pl-q-slider');if(sl&&!sl.dataset.boundsByHand)sl.max=Math.max(30,Math.ceil(horizon));
+    // Диапазон не следует за текущим Q: иначе одна позиция мыши каждый
+    // кадр означает всё больший выпуск. Расширяем только для ввода вне шкалы.
+    const sl=document.getElementById('pl-q-slider');
+    if(sl&&!sl.dataset.boundsByHand&&!InputSnap.active&&!TaxMotion.held&&Number(STATE.plQ)>Number(sl.max))sl.max=Math.max(30,Math.ceil(horizon));
     const inp=document.getElementById('pl-q-input');if(inp){if(Number.isFinite(capacity))inp.max=capacity;else inp.removeAttribute('max');}
   }catch(e){STATE.plants=null;STATE.plErr=e.message;}
 }
@@ -200,7 +203,7 @@ function plantsExpr(s,mc=false){
   if(Math.abs(a)>1e-12)terms.push(CalcNumber.expression(a,{atomic:true})+'*Q^2');
   if(Math.abs(b)>1e-12)terms.push(CalcNumber.expression(b,{atomic:true})+'*Q');
   if(Math.abs(c)>1e-12||!terms.length)terms.push(CalcNumber.expression(c,{atomic:true}));
-  const raw=terms.join('+');try{return math.simplify(raw).toString();}catch(e){return raw;}
+  const raw=terms.join('+');if(TaxMotion.drawing)return raw;try{return math.simplify(raw).toString();}catch(e){return raw;}
 }
 function redrawPlants(){
   recomputePlants();const p=STATE.plants,mc=STATE.plView==='mc';
@@ -211,7 +214,7 @@ function redrawPlants(){
   const g=svg.append('g').attr('clip-path','url(#plot-clip)'),colors=[COL.tax,COL.reg,COL.D,COL.S,COL.MR];
   const line=d3.line().defined(d=>d&&Number.isFinite(d[1])).x(d=>sx(d[0])).y(d=>sy(d[1]));
   p.specs.forEach((s,i)=>{
-    const hi=Math.min(s.K,p.Qtot),fn=q=>mc?plantMarginal(s,q):plantCost(s,q),points=Array.from({length:161},(_,k)=>{const q=hi*k/160;return[q,fn(q)];});
+    const hi=Math.min(s.K,p.Qtot,CONFIG.Qmax),fn=q=>mc?plantMarginal(s,q):plantCost(s,q),points=Array.from({length:161},(_,k)=>{const q=hi*k/160;return[q,fn(q)];});
     const path=g.append('path').datum(points).attr('fill','none').attr('stroke',colors[i%colors.length]).attr('stroke-width',2).attr('stroke-dasharray','6 4').attr('d',line);
     const expr=mc?derivativeExpr(s.expr,'Q'):s.expr,name=(mc?'MC_':'TC_')+(i+1);
     if(s.kind==='quasi'&&!mc&&s.fc!==0){points[0]=null;path.datum(points).attr('d',line);}
@@ -220,8 +223,8 @@ function redrawPlants(){
   });
   const totalName=mc?'MC':'TC',totalColor=mc?COL.MC:COL.D;
   if(p.pieces){
-    p.pieces.filter(s=>s.hi>s.lo&&s.lo<p.Qtot).forEach(s=>{
-      const lo=s.lo,hi=Math.min(s.hi,p.Qtot),expr=plantsExpr(s,mc),pts=Array.from({length:81},(_,i)=>{const q=lo+(hi-lo)*i/80;return[q,mc?2*s.a*q+s.b:plantsValue(s,q)];});
+    p.pieces.filter(s=>s.hi>s.lo&&s.lo<Math.min(p.Qtot,CONFIG.Qmax)).forEach(s=>{
+      const lo=s.lo,hi=Math.min(s.hi,p.Qtot,CONFIG.Qmax),expr=plantsExpr(s,mc),pts=Array.from({length:81},(_,i)=>{const q=lo+(hi-lo)*i/80;return[q,mc?2*s.a*q+s.b:plantsValue(s,q)];});
       markExpr(g.append('path').datum(pts).attr('fill','none').attr('stroke',totalColor).attr('stroke-width',2.8).attr('d',line),expr,'Q',[lo,hi],{name:totalName});
     });
   }else markNumeric(g.append('path').datum(p.table.map(r=>[r.Q,mc?r.m:r.tcDirect])).attr('fill','none').attr('stroke',totalColor).attr('stroke-width',2.8).attr('d',line),'приближённый минимум затрат по сеточному перебору',totalName);
@@ -251,6 +254,7 @@ function plantsFinalRecord(p){
   return{...record,expr,lhs:'\\mathrm{TC}'};
 }
 function updatePlantsPanel(){
+  if(TaxMotion.drawing)return;
   const box=document.getElementById('info-plants');if(!box)return;const p=STATE.plants;
   if(!p){setFinalFunctions([]);box.innerHTML='<div class="warn">'+ffEsc(STATE.plErr||'Введите функции затрат заводов.')+'</div>';return;}
   const r=plantsAt(Number(STATE.plQ));let html='';const stat=(name,value)=>'<div class="stat"><span>'+name+'</span><b>'+value+'</b></div>';

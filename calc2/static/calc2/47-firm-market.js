@@ -111,6 +111,7 @@ function firmMarketScaledRecord(m,n){
   return{...firmFinalRecord(scaled),name:'Предложение рынка',lhs:'Q_s'};
 }
 function updateFirmMarketPanel(r){
+  if(TaxMotion.drawing)return;
   const box=document.getElementById('info-costs'),stat=(group,label,value)=>'<div class="stat ans-main" data-ans-group="'+group+'"><span>'+label+'</span><b>'+value+'</b></div>';
   const price=document.getElementById('firm-market-price-value');if(price)price.textContent=r.found?fmt(r.P):'–';
   let html='';
@@ -158,7 +159,7 @@ function firmMarketDrawSupply(panel,m,n=1,old=false){
   const {mx,my,wnd,curves,path,label}=panel,color=COL.S,width=old?1.5:3.6,name=old?'S₀':'S';
   if(m.priceIndependent?.intervals?.length)return;
   if(m.exact){
-    for(const row of m.schedule.rows){if(row.unattained||row.expr==='Infinity')continue;const lo=Math.max(0,row.lo,wnd.y0),hi=Math.min(row.hi,wnd.y1);if(hi<=lo)continue;const expr=macroSimplify(CalcNumber.expression(n)+'*('+row.expr+')'),c=math.compile(expr),pts=Array.from({length:101},(_,i)=>{const P=lo+(hi-lo)*i/100;return[c.evaluate({P}),P];});path(pts,color,width,name,expr,[lo,hi],'y',old?'6 4':null);}
+    for(const row of m.schedule.rows){if(row.unattained||row.expr==='Infinity')continue;const lo=Math.max(0,row.lo,wnd.y0),hi=Math.min(row.hi,wnd.y1);if(hi<=lo)continue;const raw=CalcNumber.expression(n)+'*('+row.expr+')',expr=TaxMotion.drawing?raw:macroSimplify(raw),c=math.compile(expr),pts=Array.from({length:101},(_,i)=>{const P=lo+(hi-lo)*i/100;return[c.evaluate({P}),P];});path(pts,color,width,name,expr,[lo,hi],'y',old?'6 4':null);}
     for(const r of m.schedule.points){if(r.P<wnd.y0||r.P>wnd.y1)continue;const points=(r.outputs||[]).filter(Number.isFinite).map(q=>n*q),ranges=r.intervals||[];
       const segment=(a,b,dash)=>curves.append('line').attr('x1',mx(a)).attr('x2',mx(b)).attr('y1',my(r.P)).attr('y2',my(r.P)).attr('stroke',color).attr('stroke-width',width).attr('stroke-dasharray',dash);
       if(ranges.length)ranges.forEach(x=>segment(n*x[0],Math.min(n*x[1],wnd.x1),old?'6 4':null));

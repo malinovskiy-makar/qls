@@ -1,4 +1,4 @@
-/* Интерактивный налог и MC: математика и геометрия сейчас, точная запись отдельно.
+/* Интерактивные регуляторы: математика и геометрия сейчас, точная запись отдельно.
    Это состояние представления, оно не входит в STATE/историю/ссылку. */
 const TaxMotion = (() => {
   const workerSource = document.currentScript.dataset.worker;
@@ -11,19 +11,18 @@ const TaxMotion = (() => {
     return {offset:phase,transform:`translate(${x.toFixed(5)}px,${y.toFixed(5)}px)`};
   });
   let pending=false, drawing=false, finishing=false, held=false, generation=0;
+  let requestedRange=null,rangeFloor=null,rangeRunning=false;
   let timer, worker=null, sequence=0, loadingSince=0;
   let loaderAnimations=[];
   const jobs=new Map();
   let planeAnimation=null, planeGroup=null, left=null, viewKey='';
   const reduced=()=>motionPreference.matches;
-  const supported=()=>STATE.mode==='market' && (['mono','mono-nat','mono-d1'].includes(STATE.sceneKey) || (STATE.market!=='monopoly'
-    && ['taxes','tax','tax-adv'].includes(STATE.sceneKey)
-    && ['tax','subsidy'].includes(STATE.intervType)));
+  const supported=()=>!!STATE.sceneKey && !(typeof texPaperActive==='function'&&texPaperActive());
 
   // Ставка — обратная связь о текущем вводе. Её короткая запись во время
   // жеста не зависит от кэша дробей/корней и никогда не меняет саму модель.
   function formatRate(value, options={}) {
-    if(!pending||finishing||!Number.isFinite(value))return CalcNumber.format(value,options);
+    if((!pending&&!held)||finishing||!Number.isFinite(value))return CalcNumber.format(value,options);
     const shown=Math.abs(value)>0&&Math.abs(value)<.001
       ? Number(value.toPrecision(3)) : Number(value.toFixed(3));
     let text=shown.toLocaleString('ru-RU',{maximumSignificantDigits:15});
@@ -86,7 +85,8 @@ const TaxMotion = (() => {
   }
   function cancel() {
     generation++;clearTimeout(timer);stopPlane();
-    pending=false;held=false;indicators(false);
+    if(rangeRunning){cancelRangeAnim();rangeRunning=false;}
+    pending=false;held=false;requestedRange=null;rangeFloor=null;indicators(false);
     document.body.classList.remove('tax-values-loading');
   }
   function margin(base) {
@@ -99,7 +99,9 @@ const TaxMotion = (() => {
   function reserve(width) { left=Math.max(left||0,width); }
   function hold() {
     if(!supported())return;
+    if(!held){requestedRange=null;rangeFloor=null;}
     held=true;generation++;clearTimeout(timer);
+    cancelRangeAnim();rangeRunning=false;
     if(planeAnimation)planeAnimation.pause();
   }
   function release() { if(!held)return;held=false;schedule(); }
@@ -112,6 +114,15 @@ const TaxMotion = (() => {
     // mousedown клина начинает новый жест раньше blur прежнего ползунка.
     // Завершение активного жеста принадлежит InputSnap, а не старому полю.
     input.addEventListener('blur',()=>{if(!InputSnap.active)release();});
+  }
+  function deferRange(q,p,grow=false) {
+    if(STATE.zoomLock||_rangeAnimating)return;
+    requestedRange=[grow?Math.max(CONFIG.Qmax,q):q,grow?Math.max(CONFIG.Pmax,p):p];
+    if(grow)rangeFloor=requestedRange;
+    _wantRangeAnim=false;
+  }
+  function rangeBounds(q,p) {
+    return rangeFloor?[Math.max(rangeFloor[0],q),Math.max(rangeFloor[1],p)]:[q,p];
   }
   function schedule() {
     clearTimeout(timer);
@@ -127,16 +138,18 @@ const TaxMotion = (() => {
     try {
       CalcNumber.collect(()=>{
         if(updateControls)updateControls();
+        refreshLinearForParams();
         bumpModelSpan();redrawScene();drawOverlays();applyLabelSize();
         typesetChartLabels();applyLabelInk();markServiceNodes();
+        refreshRegulators();
         if(typeof selfCanvas==='function')selfCanvas();
-      });
+      },{numericExpressions:true});
     } finally {drawing=false;}
     if(typeof historyAfterRedraw==='function')historyAfterRedraw();
     schedule();
   }
   function complete() {
-    pending=false;
+    pending=false;requestedRange=null;rangeFloor=null;
     indicators(false);document.body.classList.remove('tax-values-loading');
     const hero=document.getElementById('ans-hero');
     if(hero&&!reduced())hero.animate([{opacity:.4},{opacity:1}],{duration:120});
@@ -160,6 +173,13 @@ const TaxMotion = (() => {
   }
   async function settle() {
     if(!pending||held)return;
+    if(requestedRange&&!STATE.zoomLock){
+      const [q,p]=requestedRange;requestedRange=null;
+      if(Math.abs(q-CONFIG.Qmax)>1e-6||Math.abs(p-CONFIG.Pmax)>1e-6){
+        if(reduced())setRanges(q,p);
+        else {rangeRunning=true;animateRanges(q,p,{draw:()=>render(),done:()=>{rangeRunning=false;schedule();}});return;}
+      }
+    }
     stopPlane();
     const current= generation, from=CONFIG.margin.left;
     finishing=true;
@@ -181,6 +201,9 @@ const TaxMotion = (() => {
       finishing=false;await document.fonts.ready;
       if(current!==generation||!pending||held)return;
       finishing=true;
+      // Собственные панели и квадрат Лоренца сами задают размещение осей.
+      // Их нельзя растягивать общим горизонтальным transform всего SVG.
+      if(!fixedTaxCoordinateBand()){redrawAll();buildAnswer();complete();return;}
       // К моменту замера все координаты уже точные. Старое поле не задаёт
       // постоянного резерва: после жеста допускается и плавное сужение.
       left=null;_coordMarginLeft=0;fitMargins();
@@ -208,6 +231,6 @@ const TaxMotion = (() => {
     if(pending)indicators(true);
     if(reduced()&&planeAnimation)planeAnimation.finish();
   });
-  return {supported,render,hold,release,cancel,margin,reserve,bindInput,formatRate,
-    get pending(){return pending;},get drawing(){return drawing;},get finishing(){return finishing;}};
+  return {supported,render,hold,release,cancel,margin,reserve,bindInput,formatRate,deferRange,rangeBounds,
+    get held(){return held;},get pending(){return pending;},get drawing(){return drawing;},get finishing(){return finishing;}};
 })();

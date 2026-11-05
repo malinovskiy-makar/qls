@@ -698,6 +698,7 @@ function drawLaborBilateral() {
 
 // Табло двусторонней монополии.
 function updateLaborBilateralPanel() {
+  if(TaxMotion.drawing)return;
   const b = STATE.laborBilateral;
   if (!b) return '<div class="warn">Не удалось найти обе границы: нужны спрос на труд (D) и предложение (S).</div>';
   let html = '';
@@ -756,6 +757,7 @@ function setLaborStruct(mode) {
 
 // Табло рынка труда.
 function updateLaborPanel() {
+  if(TaxMotion.drawing)return;
   const box = document.getElementById('info-labor'); if (!box) return;
   if (!STATE.laborD || !STATE.laborS) {
     box.innerHTML = '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос на труд, MRPL), другую как S&nbsp;(предложение труда).</div>';

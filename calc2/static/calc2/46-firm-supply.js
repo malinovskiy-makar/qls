@@ -254,6 +254,7 @@ function firmFinalRecord(m){
   return rec;
 }
 function updateFirmSupplyPanel(box){
+  if(TaxMotion.drawing)return;
   const m=STATE.firmSupply;if(m.error){box.innerHTML='<div class="warn">'+ffEsc(m.error)+'</div>';return;}
   const r=STATE.firmSupplyResult||m.at(STATE.lrPrice),stat=(label,value,main=false)=>'<div class="stat'+(main?' ans-main':'')+'"><span>'+label+'</span><b>'+value+'</b></div>';
   let html=stat('Выпуск Q'+(r.tie?' – безразлично':''),firmOutputText(r),true)+stat(r.unattained?'Верхняя грань прибыли':'Прибыль Π',r.unbounded?'∞':fmt(r.profit),true)+stat('Цена P',fmt(r.P));
