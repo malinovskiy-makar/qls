@@ -155,6 +155,7 @@
       event.preventDefault();
       check(box);
     });
+    form.addEventListener('vp-number-next', function () { check(box); });
     var revealButton = box.querySelector('[data-practice-reveal]');
     if (revealButton) revealButton.addEventListener('click', function () { reveal(box); });
   });

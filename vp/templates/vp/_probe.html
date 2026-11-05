@@ -11,7 +11,7 @@
     </div>
     <div class="vp-land-probe-row">
       <label class="vp-sr" for="vp-probe-in">Запись числа</label>
-      <input class="vp-input vp-input--number" id="vp-probe-in" type="text" maxlength="40" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="37,5">
+      <input class="vp-input vp-input--number" id="vp-probe-in" type="text" maxlength="40" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="37,5">
       <span class="vp-land-probe-out" id="vp-probe-out" role="status" aria-live="polite"></span>
     </div>
     <div class="vp-land-probe-ex"><span>Примеры:</span>{% for ex in probe_examples %}<button type="button" data-probe="{{ ex }}">{{ ex }}</button>{% endfor %}</div>

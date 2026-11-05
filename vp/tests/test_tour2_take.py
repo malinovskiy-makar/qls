@@ -62,8 +62,8 @@ class Tour2PageTests(Tour2Base):
         self.assertEqual(re.findall(r'type="radio" name="item-4\.(\d+)"', html),
                          ['1', '1', '2', '2', '3', '3', '4', '4'])
         self.assertIn('Граница бедности определяется стоимостью фиксированного набора', html)
-        # Число: текстовое поле с десятичной клавиатурой и подписью.
-        self.assertRegex(html, r'name="item-5" type="text"[^>]*inputmode="decimal"')
+        # Число: текстовое поле с обычной клавиатурой и подписью.
+        self.assertRegex(html, r'name="item-5" type="text"[^>]*inputmode="text"')
         self.assertEqual(html.count('Только число: запятая, до сотых'), 14)
 
     def test_number_rule_stands_once_before_the_number_block(self):

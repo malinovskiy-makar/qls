@@ -47,8 +47,7 @@
       <span class="vp-numrow">
         <label class="vp-sr" for="vp-drill-{{ r.i }}">Запись числа {{ r.shown }}</label>
         <input class="vp-input vp-input--number" id="vp-drill-{{ r.i }}" name="raw-{{ r.i }}" type="text" value="{{ r.value }}"
-               maxlength="40" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
-        <button type="button" class="vp-pm" aria-label="Поменять знак" data-pm-drill="{{ r.i }}">±</button>
+               maxlength="40" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
       </span>
       <span class="vp-drill-out" id="vp-drill-out-{{ r.i }}" role="status">{% if r.verdict %}{{ r.verdict.text }}{% else %}–{% endif %}</span>
     </div>
