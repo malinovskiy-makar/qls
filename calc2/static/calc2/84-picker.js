@@ -544,6 +544,9 @@ function plural(n, forms) {
 }
 
 function pickScene(key) {
+  // Смена модели завершает старый жест и его отложенный расчёт, в том
+  // числе при восстановлении/навигации без нового pointerdown на кнопке.
+  InputSnap.cancel(true);TaxMotion.cancel();cancelRangeAnim();
   /* Смена модели возвращает «Курсор» (ADR 0148). Только СМЕНА: «Сбросить» и
      «Отменить» зовут pickScene той же модели, и режим у человека остаётся. */
   if (STATE.sceneKey && STATE.sceneKey !== key && typeof CANVAS !== 'undefined' && CANVAS.pts

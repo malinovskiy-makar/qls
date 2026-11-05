@@ -5,7 +5,9 @@ import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 const baseline = process.argv.includes('--baseline');
 const elements = new Map();
-const ctx = vm.createContext({ console, d3: {select:()=>({})}, document: {
+// В безбраузерном аудите нет жеста: текстовые панели и точный путь включены.
+// Сам координатор требует DOM/Worker; ни один вычислитель им не подменяется.
+const ctx = vm.createContext({ console, TaxMotion: Object.freeze({drawing:false}), d3: {select:()=>({})}, document: {
   getElementById: id => elements.get(id) || null, querySelector: () => null,
   querySelectorAll: () => [], documentElement: { getAttribute: () => null },
 }, window: {}, getComputedStyle: () => ({ getPropertyValue: () => '' }),

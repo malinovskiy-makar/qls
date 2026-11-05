@@ -54,6 +54,12 @@ try{
   const end=await page.evaluate(()=>({loaders:document.querySelectorAll('.calc-value-loader').length,undo:histOf().undo.length-__beforeUndo,touched:_histTouched,label:_histLabel,active:InputSnap.active,held:TaxMotion.held,draws:__draws,labelFrame:_labelFrame,range:_rangeAnimating}));
   check(key+' finished once',!end.loaders&&end.undo===1,end);
  }
+ const switched=await page.evaluate(()=>{
+  pickScene('plants');const sl=document.getElementById('pl-q-slider');
+  sl.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:42}));sl.value=42.37;sl.dispatchEvent(new Event('input',{bubbles:true}));
+  openModelByUser('ineq');return !InputSnap.active&&!TaxMotion.pending&&!TaxMotion.held&&!document.querySelector('.calc-value-loader');
+ });
+ check('model switch cancels old gesture without pointerup',switched);
  // Символьный сертификат не принимает кривую за прямую по нескольким точкам.
  check('affine certificate excludes nonlinear curves',await page.evaluate(()=>ppfAffine('100-2*x')?.[0]===-2&&ppfAffine('100-x+1e-16*x^3')===null&&ppfAffine('x<40?100-x:120-2*x')===null));
  const oracle=await page.evaluate(()=>{
