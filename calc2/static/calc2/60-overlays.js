@@ -3351,10 +3351,10 @@ function buildParamChip(box, name) {
   track.className = 'param-track';
   const loLab = document.createElement('button');
   loLab.type = 'button'; loLab.className = 'param-bound';
-  loLab.setAttribute('data-tip', 'Границы и шаг');
+  loLab.setAttribute('data-tip', 'Границы ползунка');
   const hiLab = document.createElement('button');
   hiLab.type = 'button'; hiLab.className = 'param-bound';
-  hiLab.setAttribute('data-tip', 'Границы и шаг');
+  hiLab.setAttribute('data-tip', 'Границы ползунка');
 
   const sl = document.createElement('input');
   sl.type = 'range'; sl.style.accentColor = cssVar('--accent');
@@ -3371,7 +3371,7 @@ function buildParamChip(box, name) {
   let bounds = null;
 
   const syncSlider = () => {
-    sl.min = p.min; sl.max = p.max; sl.step = Math.max(1e-9, p.step);
+    sl.min = p.min; sl.max = p.max; sl.step = 'any';
     sl.value = p.value;
     loLab.textContent = boundText(p.min);   // настоящий минус в подписи предела (сессия 6, Д1)
     hiLab.textContent = boundText(p.max);

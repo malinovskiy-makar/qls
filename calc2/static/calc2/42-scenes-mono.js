@@ -266,16 +266,12 @@ function drawMonopoly() {
    «Издержках фирмы» (drawLongRunHandle): прозрачная полоса вдоль линии, курсор
    grab, кружок-рукоятка у края; на сенсорном экране полоса 44 px. В режиме
    «Точки и площади» полосы нет (canvasArmed): щелчок по MC ставит точку.
-   Сдвиг идёт шагом 1-2-5 от размаха окна по P (окно 0…100 — шаг 1): пиксель
-   холста грубее сотой, а «MC = 39,87» вместо 40 было бы шумом руки. */
+   Протяжка свободная; InputSnap выбирает шаг от диапазона и окна при старте
+   и доводит сдвиг до удобного значения только после отпускания. */
 function mcDragCurve() {
   if (STATE.market !== 'monopoly' || typeof pultCurveList !== 'function') return null;
   const mc = mcSourceCurve();
   return mc && mc.linear && pultCurveList().indexOf(mc) >= 0 ? mc : null;
-}
-function mcDragStep() {
-  const span = Math.abs(CONFIG.Pmax - CONFIG.Pmin) || 100;
-  return Math.pow(10, Math.round(Math.log10(span / 100)));
 }
 function drawMcDragHandle() {
   const mc = mcDragCurve();
@@ -304,17 +300,21 @@ function drawMcDragHandle() {
       on = !canvasArmed();
       if (!on) return;
       id = mc.id; b0 = mc.linear.b; y0 = sy.invert(e.y);
+      const sl=document.querySelector('[data-cid="'+id+'"] input[type=range]');
+      InputSnap.begin(sl,{
+        get:()=>{const c=STATE.curves.find(c=>c.id===id);return c.linear.b-curveShiftBase(c);},
+        set:v=>{const c=STATE.curves.find(c=>c.id===id);setCurveFreeTerm(c,curveShiftBase(c)+v);}
+      });
       document.body.style.cursor = 'grabbing';
     })
     .on('drag', (e) => {
       if (!on) return;
       const cur = STATE.curves.find(c => c.id === id);
       if (!cur || !cur.linear) return;
-      const step = mcDragStep();
-      const b = b0 + Math.round((sy.invert(e.y) - y0) / step) * step;
+      const b = b0 + sy.invert(e.y) - y0;
       if (Math.abs(b - cur.linear.b) > 1e-9) setCurveFreeTerm(cur, b);
     })
-    .on('end', () => { on = false; document.body.style.cursor = ''; }));
+    .on('end', () => { if(on)InputSnap.finish();on = false; document.body.style.cursor = ''; }));
 }
 
 // Точки оптимума, проекции и конкурентный ориентир (бледный, по галочке «было → стало»).

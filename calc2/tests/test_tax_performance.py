@@ -50,6 +50,19 @@ class TaxPerformanceTest(StaticLiveServerTestCase):
     def test_tax_motion_manifest_paths(self):
         self._run_motion_probe("--manifest-paths")
 
+    def test_input_snap_and_tablet_results(self):
+        """The omitted tablet strip, exact edits, MC and one undo per gesture."""
+        node = shutil.which("node")
+        self.assertIsNotNone(node)
+        with tempfile.TemporaryDirectory(prefix="calc2-input-snap-") as out:
+            result = subprocess.run(
+                [node, "calc2/tests/input_snap_probe.mjs", "--out", out],
+                cwd=settings.BASE_DIR,
+                env=dict(os.environ, CALC2_BASE_URL=self.live_server_url),
+                capture_output=True, text=True, encoding="utf-8", timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def _run_motion_probe(self, *args):
         node = shutil.which("node")
         self.assertIsNotNone(node, "Node is required for the native tax gesture probe")

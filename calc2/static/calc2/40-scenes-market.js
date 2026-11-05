@@ -754,9 +754,9 @@ function drawOpenLines() {
 
 function attachOpenPwDrag(sel) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { InputSnap.begin(document.getElementById('open-pw-slider')); document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { setOpenPw(sy.invert(event.y)); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
 }
 
 // Единый путь смены мировой цены (ползунок, поле, перетаскивание линии).
@@ -2509,6 +2509,7 @@ function attachTaxDrag(sel) {
     .on('start', (event) => {
       startY = event.y;
       startTax = STATE.tax;
+      InputSnap.begin(document.getElementById('tax-slider'),{get:()=>STATE.tax,set:v=>setTax(v,true)});
       TaxMotion.hold();
       document.body.style.cursor = 'grabbing';
     })
@@ -2519,6 +2520,7 @@ function attachTaxDrag(sel) {
       setTax(startTax + dP,true);
     })
     .on('end', () => {
+      InputSnap.finish();
       document.body.style.cursor = '';
       TaxMotion.release();
     }));
@@ -2540,7 +2542,7 @@ function setTax(t, interactive=false) {
   });
   t = Math.max(0, Math.min(t, maxT));
   STATE.tax = t;
-  if (slider) slider.value = t;                        // ползунок (step=1, целые)
+  if (slider) InputSnap.exact(slider,t);              // то же число, что в модели
   const lbl = document.getElementById('tax-val');
   if (lbl) lbl.textContent = live ? fmtInput(t).replace('.',',') : fmt(t);
   const inp = document.getElementById('tax-input');
@@ -3644,9 +3646,9 @@ function drawPriceControl() {
 function attachPcDrag(sel) {
   sel.call(d3.drag()
     .container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { InputSnap.begin(document.getElementById('pc-slider')); document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { setPReg(sy.invert(event.y)); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
 }
 
 // Табло регулирования: таблица «До / После / Δ» и дефицит/избыток.
@@ -3824,13 +3826,13 @@ function drawQuotaLines() {
 function attachQuotaDrag(sel) {
   sel.call(d3.drag()
     .container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { InputSnap.begin(document.getElementById('quota-price-slider')); document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => {
       const q = STATE.qt;
       if (!q || q.width == null || !(q.width > 0)) return;
       setQuotaPos((sy.invert(event.y) - q.Plo) / q.width);
     })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
 }
 
 // Табло квоты: коридор, выбранная цена, перетекание излишков и потери.

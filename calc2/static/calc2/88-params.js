@@ -430,8 +430,7 @@ function attachBoundsEditor(chip, editor, name, get, set) {
     });
     // C.5: «мин ≤ имя ≤ макс с шагом …» одной строкой.
     const line = document.createElement('div'); line.className = 'param-ed-line';
-    line.append(mk('min'), tex('\\le ' + texifyName(name) + ' \\le'), mk('max'),
-                tex('\\text{с шагом}'), mk('step'));
+    line.append(mk('min'), tex('\\le ' + texifyName(name) + ' \\le'), mk('max'));
     editor.append(line);
     document.addEventListener('pointerdown', onOutside, true);
     /* Курсор встаёт в поле ТОЙ границы, по которой щёлкнули: слева — в левое,
@@ -684,6 +683,8 @@ function upgradeRegulator(field) {
   if (!field || field._regUpgraded || field.dataset.noRegulator === '1') return;
   const sl = field.querySelector('input[type=range]');
   if (!sl) return;
+  // Ползунок хранит и точный ручной ввод. Сетка нужна лишь при отпускании.
+  sl.step='any';
   field._regUpgraded = true;
   const num = field.querySelector('input[type=number]');
 
@@ -703,9 +704,9 @@ function upgradeRegulator(field) {
   }
   field.classList.remove('param-track');   // поле дорожкой больше не притворяется
   const lo = document.createElement('button');
-  lo.type = 'button'; lo.className = 'param-bound'; lo.setAttribute('data-tip', 'Границы и шаг');
+  lo.type = 'button'; lo.className = 'param-bound'; lo.setAttribute('data-tip', 'Границы ползунка');
   const hi = document.createElement('button');
-  hi.type = 'button'; hi.className = 'param-bound'; hi.setAttribute('data-tip', 'Границы и шаг');
+  hi.type = 'button'; hi.className = 'param-bound'; hi.setAttribute('data-tip', 'Границы ползунка');
   track.insertBefore(lo, sl);
   track.insertBefore(hi, sl.nextSibling);
 
@@ -828,7 +829,7 @@ function upgradeRegulator(field) {
         sl.min = b.min; sl.max = b.max;
         sl.dataset.boundsByHand = '1';   // границы переставил человек — модель их больше не двигает
       }
-      sl.value = v;
+      InputSnap.exact(sl,v);
       sl.dispatchEvent(new Event('input', { bubbles: true }));
       sync();
     });
@@ -934,7 +935,7 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr,
   const print = show || fmt;
   const sl = document.createElement('input');
   sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
-  sl.value = Math.round(value); sl.style.accentColor = color || cssVar('--accent');
+  InputSnap.exact(sl,value); sl.style.accentColor = color || cssVar('--accent');
   if (idAttr) { sl.id = idAttr; val.id = idAttr + '-val'; }
   val.textContent = print(value);
   sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = print(v); onInput(v); });
@@ -947,7 +948,7 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr,
   val.addEventListener('click', () => {
     editEqValue(val, '', parseFloat(sl.value), (v) => {
       v = Math.max(min, Math.min(max, isFinite(v) ? v : parseFloat(sl.value)));
-      sl.value = v;
+      InputSnap.exact(sl,v);
       sl.dispatchEvent(new Event('input', { bubbles: true }));   // один путь: печать значения и onInput
     });
   });

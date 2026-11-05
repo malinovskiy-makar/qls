@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-05. HEAD: `2b544bf`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-11-05. HEAD: `8e176fb`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,26 +343,27 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 227 | 13.7 | python |
-| `calc2/templates/calc2/calc2.html` | 2353 | 190.2 | шаблон |
-| `calc2/static/calc2/calc2.css` | 4418 | 334.3 | CSS |
+| `calc2/templates/calc2/calc2.html` | 2354 | 190.3 | шаблон |
+| `calc2/static/calc2/calc2.css` | 4420 | 334.4 | CSS |
 | `calc2/static/calc2/previews.json` | 46 | 33.7 | json |
 | `calc2/static/calc2/00-config.js` | 578 | 50.2 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1169 | 76.9 | JS |
 | `calc2/static/calc2/12-numbers.js` | 274 | 14.1 | JS |
 | `calc2/static/calc2/13-tax-motion.js` | 198 | 9.5 | JS |
 | `calc2/static/calc2/13-number-worker.js` | 13 | 0.8 | JS |
+| `calc2/static/calc2/14-input-snap.js` | 90 | 4.9 | JS |
 | `calc2/static/calc2/20-plane.js` | 1030 | 70.2 | JS |
-| `calc2/static/calc2/30-curves.js` | 1619 | 116.6 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 3903 | 282.4 | JS |
-| `calc2/static/calc2/41-market-policies.js` | 267 | 17.7 | JS |
-| `calc2/static/calc2/42-scenes-mono.js` | 2090 | 154.6 | JS |
+| `calc2/static/calc2/30-curves.js` | 1605 | 115.0 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 3905 | 282.7 | JS |
+| `calc2/static/calc2/41-market-policies.js` | 271 | 18.0 | JS |
+| `calc2/static/calc2/42-scenes-mono.js` | 2090 | 154.7 | JS |
 | `calc2/static/calc2/43-discrimination.js` | 182 | 9.9 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1068 | 69.2 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1071 | 69.4 | JS |
 | `calc2/static/calc2/45-plants.js` | 300 | 23.2 | JS |
 | `calc2/static/calc2/46-firm-supply.js` | 312 | 32.1 | JS |
 | `calc2/static/calc2/47-firm-market.js` | 199 | 19.6 | JS |
-| `calc2/static/calc2/46-scenes-labor.js` | 900 | 68.8 | JS |
-| `calc2/static/calc2/48-scenes-consumer.js` | 279 | 18.2 | JS |
+| `calc2/static/calc2/46-scenes-labor.js` | 900 | 68.9 | JS |
+| `calc2/static/calc2/48-scenes-consumer.js` | 279 | 18.1 | JS |
 | `calc2/static/calc2/49-trade-policy.js` | 262 | 27.3 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 514 | 35.1 | JS |
 | `calc2/static/calc2/51-islm.js` | 112 | 14.8 | JS |
@@ -373,16 +374,16 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/56-scenes-inequality.js` | 491 | 34.7 | JS |
 | `calc2/static/calc2/57-distributions.js` | 161 | 18.6 | JS |
 | `calc2/static/calc2/60-overlays.js` | 5039 | 321.7 | JS |
-| `calc2/static/calc2/70-scenes-math.js` | 2183 | 141.5 | JS |
+| `calc2/static/calc2/70-scenes-math.js` | 2183 | 141.7 | JS |
 | `calc2/static/calc2/72-export-tex.js` | 1669 | 128.6 | JS |
 | `calc2/static/calc2/80-ui.js` | 857 | 54.3 | JS |
 | `calc2/static/calc2/82-input.js` | 2368 | 141.2 | JS |
 | `calc2/static/calc2/84-picker.js` | 600 | 45.3 | JS |
 | `calc2/static/calc2/86-workspace.js` | 2159 | 141.1 | JS |
-| `calc2/static/calc2/88-params.js` | 2042 | 140.3 | JS |
+| `calc2/static/calc2/88-params.js` | 2043 | 140.4 | JS |
 | `calc2/static/calc2/89-model-state.js` | 374 | 24.8 | JS |
 | `calc2/static/calc2/90-explain.js` | 389 | 69.3 | JS |
-| `calc2/static/calc2/91-session.js` | 515 | 27.5 | JS |
+| `calc2/static/calc2/91-session.js` | 517 | 27.7 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 1332 | 92.3 | JS |
 | `calc2/static/calc2/93-shell.js` | 284 | 17.4 | JS |
 | `calc2/static/calc2/94-answer.js` | 1095 | 72.1 | JS |
@@ -390,7 +391,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 353 | 23.3 | JS |
 | `calc2/static/calc2/99-boot.js` | 112 | 9.5 | JS |
 
-**Итого: 48 файлов, 49401 строк, 3524.9 КБ.**
+**Итого: 49 файлов, 49492 строк, 3529.9 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -496,6 +497,10 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 *(объявлений верхнего уровня не найдено)*
 
+#### `calc2/static/calc2/14-input-snap.js`
+
+- строка 3 — `InputSnap`
+
 #### `calc2/static/calc2/20-plane.js`
 
 - строка 14 — `computeSize`
@@ -599,8 +604,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 1497 — `sceneDrawsCurveList`
 - строка 1506 — `syncCurveListVisibility`
 - строка 1521 — `curveDragAllowed`
-- строка 1531 — `roundDrag`
-- строка 1573 — `setCurveFreeTerm`
+- строка 1565 — `setCurveFreeTerm`
 
 #### `calc2/static/calc2/40-scenes-market.js`
 
@@ -679,62 +683,62 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 2411 — `drawTaxAreas`
 - строка 2451 — `drawTaxPoints`
 - строка 2505 — `attachTaxDrag`
-- строка 2528 — `setTax`
-- строка 2648 — `taxFormKey`
-- строка 2656 — `pctForm`
-- строка 2664 — `syncTaxKind`
-- строка 2669 — `applyIntervCascade`
-- строка 2743 — `setTaxForm`
-- строка 2761 — `setType`
-- строка 2812 — `rateLetter`
-- строка 2816 — `rateUnit`
-- строка 2838 — `modelPriceTop`
-- строка 2849 — `unitRateMax`
-- строка 2859 — `applyPriceRegBounds`
-- строка 2868 — `applyTaxRateBounds`
-- строка 2903 — `syncQuotaHint`
-- строка 2919 — `syncPcHint`
-- строка 2927 — `markCurrentIntervHint`
-- строка 2936 — `intervHintKey`
-- строка 2946 — `intervHintHtml`
-- строка 2968 — `syncTaxHint`
-- строка 3006 — `setTaxKind`
-- строка 3016 — `qpAfter`
-- строка 3028 — `updateTaxPanel`
-- строка 3164 — `setTaxSide`
-- строка 3175 — `setTaxSideButtons`
-- строка 3188 — `drawElasticityZones`
-- строка 3206 — `drawElasticityPoint`
-- строка 3236 — `attachElastDrag`
-- строка 3244 — `drawElasticityPointS`
-- строка 3264 — `attachElastDragS`
-- строка 3272 — `updateElasticityPanel`
-- строка 3336 — `drawExtAreas`
-- строка 3350 — `drawExtCurves`
-- строка 3377 — `drawExtPoints`
-- строка 3411 — `drawExtScenario`
-- строка 3420 — `updateExtPanel`
-- строка 3474 — `setExtSign`
-- строка 3483 — `syncSocialFields`
-- строка 3511 — `syncExtHint`
-- строка 3522 — `socialDefaultExpr`
-- строка 3528 — `recompileSocial`
-- строка 3550 — `setPRegFields`
-- строка 3559 — `setPReg`
-- строка 3568 — `drawPcAreas`
-- строка 3595 — `drawPriceControl`
-- строка 3644 — `attachPcDrag`
-- строка 3653 — `updatePcPanel`
-- строка 3697 — `setQuotaFields`
-- строка 3709 — `setQuota`
-- строка 3716 — `setQuotaPos`
-- строка 3724 — `setQuotaPrice`
-- строка 3731 — `updateQuotaPriceLabel`
-- строка 3752 — `drawQuotaAreas`
-- строка 3779 — `drawQuotaLines`
-- строка 3824 — `attachQuotaDrag`
-- строка 3837 — `updateQuotaPanel`
-- строка 3884 — `drawGhost`
+- строка 2530 — `setTax`
+- строка 2650 — `taxFormKey`
+- строка 2658 — `pctForm`
+- строка 2666 — `syncTaxKind`
+- строка 2671 — `applyIntervCascade`
+- строка 2745 — `setTaxForm`
+- строка 2763 — `setType`
+- строка 2814 — `rateLetter`
+- строка 2818 — `rateUnit`
+- строка 2840 — `modelPriceTop`
+- строка 2851 — `unitRateMax`
+- строка 2861 — `applyPriceRegBounds`
+- строка 2870 — `applyTaxRateBounds`
+- строка 2905 — `syncQuotaHint`
+- строка 2921 — `syncPcHint`
+- строка 2929 — `markCurrentIntervHint`
+- строка 2938 — `intervHintKey`
+- строка 2948 — `intervHintHtml`
+- строка 2970 — `syncTaxHint`
+- строка 3008 — `setTaxKind`
+- строка 3018 — `qpAfter`
+- строка 3030 — `updateTaxPanel`
+- строка 3166 — `setTaxSide`
+- строка 3177 — `setTaxSideButtons`
+- строка 3190 — `drawElasticityZones`
+- строка 3208 — `drawElasticityPoint`
+- строка 3238 — `attachElastDrag`
+- строка 3246 — `drawElasticityPointS`
+- строка 3266 — `attachElastDragS`
+- строка 3274 — `updateElasticityPanel`
+- строка 3338 — `drawExtAreas`
+- строка 3352 — `drawExtCurves`
+- строка 3379 — `drawExtPoints`
+- строка 3413 — `drawExtScenario`
+- строка 3422 — `updateExtPanel`
+- строка 3476 — `setExtSign`
+- строка 3485 — `syncSocialFields`
+- строка 3513 — `syncExtHint`
+- строка 3524 — `socialDefaultExpr`
+- строка 3530 — `recompileSocial`
+- строка 3552 — `setPRegFields`
+- строка 3561 — `setPReg`
+- строка 3570 — `drawPcAreas`
+- строка 3597 — `drawPriceControl`
+- строка 3646 — `attachPcDrag`
+- строка 3655 — `updatePcPanel`
+- строка 3699 — `setQuotaFields`
+- строка 3711 — `setQuota`
+- строка 3718 — `setQuotaPos`
+- строка 3726 — `setQuotaPrice`
+- строка 3733 — `updateQuotaPriceLabel`
+- строка 3754 — `drawQuotaAreas`
+- строка 3781 — `drawQuotaLines`
+- строка 3826 — `attachQuotaDrag`
+- строка 3839 — `updateQuotaPanel`
+- строка 3886 — `drawGhost`
 
 #### `calc2/static/calc2/41-market-policies.js`
 
@@ -750,8 +754,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 118 — `syncTaxPairUI`
 - строка 179 — `drawTaxPairCurves`
 - строка 198 — `drawTaxPairPoints`
-- строка 235 — `taxPairExplainHtml`
-- строка 244 — `updateTaxPairPanel`
+- строка 239 — `taxPairExplainHtml`
+- строка 248 — `updateTaxPairPanel`
 
 #### `calc2/static/calc2/42-scenes-mono.js`
 
@@ -770,8 +774,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 197 — `drawMonopolyAreas`
 - строка 236 — `drawMonopoly`
 - строка 271 — `mcDragCurve`
-- строка 276 — `mcDragStep`
-- строка 280 — `drawMcDragHandle`
+- строка 276 — `drawMcDragHandle`
 - строка 321 — `drawMonopolyPoints`
 - строка 358 — `updateMonoPanel`
 - строка 408 — `setMarket`
@@ -875,30 +878,30 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 573 — `drawLongRunMarks`
 - строка 578 — `fillLongRunMarks`
 - строка 610 — `drawLongRunHandle`
-- строка 621 — `setLrPrice`
-- строка 629 — `syncLrPriceFields`
-- строка 647 — `beginLrDrag`
-- строка 649 — `dragLrPrice`
-- строка 664 — `endLrDrag`
-- строка 671 — `updateLongRunPanel`
-- строка 714 — `prodEval`
-- строка 724 — `prodDerivative`
-- строка 738 — `prodMP`
-- строка 745 — `prodAP`
-- строка 753 — `maxOf`
-- строка 780 — `realMax`
-- строка 782 — `recomputeProduction`
-- строка 801 — `redrawProduction`
-- строка 919 — `noMaxNote`
-- строка 928 — `updateProdPanel`
-- строка 952 — `recomputeIsoquant`
-- строка 963 — `redrawIsoquant`
-- строка 979 — `updateIsoPanel`
-- строка 1008 — `setPlantsView`
-- строка 1015 — `setPlantsQ`
-- строка 1026 — `setCostsInputMode`
-- строка 1034 — `syncCostsInputMode`
-- строка 1048 — `setCostsSub`
+- строка 624 — `setLrPrice`
+- строка 632 — `syncLrPriceFields`
+- строка 650 — `beginLrDrag`
+- строка 652 — `dragLrPrice`
+- строка 667 — `endLrDrag`
+- строка 674 — `updateLongRunPanel`
+- строка 717 — `prodEval`
+- строка 727 — `prodDerivative`
+- строка 741 — `prodMP`
+- строка 748 — `prodAP`
+- строка 756 — `maxOf`
+- строка 783 — `realMax`
+- строка 785 — `recomputeProduction`
+- строка 804 — `redrawProduction`
+- строка 922 — `noMaxNote`
+- строка 931 — `updateProdPanel`
+- строка 955 — `recomputeIsoquant`
+- строка 966 — `redrawIsoquant`
+- строка 982 — `updateIsoPanel`
+- строка 1011 — `setPlantsView`
+- строка 1018 — `setPlantsQ`
+- строка 1029 — `setCostsInputMode`
+- строка 1037 — `syncCostsInputMode`
+- строка 1051 — `setCostsSub`
 
 #### `calc2/static/calc2/45-plants.js`
 
@@ -1862,36 +1865,36 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 366 — `centerBandOn`
 - строка 370 — `pullIntoBand`
 - строка 374 — `attachBoundsEditor`
-- строка 456 — `refreshRegulators`
-- строка 467 — `makePchip`
-- строка 495 — `curveShiftBase`
-- строка 505 — `pultShiftHalf`
-- строка 509 — `resetPultShiftHalf`
-- строка 512 — `buildPultCurveChips`
-- строка 603 — `syncPultCurveValues`
-- строка 626 — `capturePultHome`
-- строка 633 — `capturePultHomes`
-- строка 638 — `returnPultHome`
-- строка 650 — `syncPultRegulators`
-- строка 681 — `upgradeRegulator`
-- строка 864 — `boundText`
-- строка 865 — `shortRegulatorName`
-- строка 891 — `ppfLinearFormula`
-- строка 896 — `ppfInterceptsOf`
-- строка 904 — `ppfSetSingle`
-- строка 912 — `ppfSetSum`
-- строка 932 — `addPultXChip`
-- строка 959 — `buildPultExtra`
-- строка 992 — `ineqParseIncomes`
-- строка 995 — `ineqMasterRebase`
-- строка 1000 — `ineqMasterScale`
-- строка 1021 — `ineqMasterApply`
-- строка 1033 — `ineqMasterDetach`
-- строка 1038 — `buildIneqMasterChip`
-- строка 1051 — `showPult`
-- строка 1078 — `updatePult`
-- строка 1113 — `liveFormula`
-- строка 1133 — `wireControls`
+- строка 455 — `refreshRegulators`
+- строка 466 — `makePchip`
+- строка 494 — `curveShiftBase`
+- строка 504 — `pultShiftHalf`
+- строка 508 — `resetPultShiftHalf`
+- строка 511 — `buildPultCurveChips`
+- строка 602 — `syncPultCurveValues`
+- строка 625 — `capturePultHome`
+- строка 632 — `capturePultHomes`
+- строка 637 — `returnPultHome`
+- строка 649 — `syncPultRegulators`
+- строка 680 — `upgradeRegulator`
+- строка 865 — `boundText`
+- строка 866 — `shortRegulatorName`
+- строка 892 — `ppfLinearFormula`
+- строка 897 — `ppfInterceptsOf`
+- строка 905 — `ppfSetSingle`
+- строка 913 — `ppfSetSum`
+- строка 933 — `addPultXChip`
+- строка 960 — `buildPultExtra`
+- строка 993 — `ineqParseIncomes`
+- строка 996 — `ineqMasterRebase`
+- строка 1001 — `ineqMasterScale`
+- строка 1022 — `ineqMasterApply`
+- строка 1034 — `ineqMasterDetach`
+- строка 1039 — `buildIneqMasterChip`
+- строка 1052 — `showPult`
+- строка 1079 — `updatePult`
+- строка 1114 — `liveFormula`
+- строка 1134 — `wireControls`
 
 #### `calc2/static/calc2/89-model-state.js`
 
@@ -1929,36 +1932,36 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 90 — `applyKeepView`
 - строка 102 — `historyBaseline`
 - строка 112 — `historyCheck`
-- строка 143 — `historyAfterRedraw`
-- строка 151 — `historyTouch`
-- строка 159 — `historyMark`
-- строка 164 — `historyUndo`
-- строка 177 — `historyRedo`
-- строка 189 — `historyCan`
-- строка 193 — `historyClearAll`
-- строка 195 — `notifyHistory`
-- строка 201 — `histLabelOf`
-- строка 217 — `storeGet`
-- строка 218 — `storeSet`
-- строка 223 — `compactModelState`
-- строка 237 — `expandModelState`
-- строка 246 — `autosaveModel`
-- строка 260 — `forgetAutosaves`
-- строка 270 — `savedModel`
-- строка 276 — `recentModels`
-- строка 282 — `writeModelToUrl`
-- строка 292 — `dropShareHash`
-- строка 308 — `fromProblemOf`
-- строка 312 — `dropFromParam`
-- строка 321 — `showBackToProblem`
-- строка 328 — `hideBackToProblem`
-- строка 333 — `openFromProblem`
-- строка 344 — `b64urlEncode`
-- строка 348 — `b64urlDecode`
-- строка 385 — `openModelByUser`
-- строка 406 — `restoreOnLoad`
-- строка 445 — `viewDefaults`
-- строка 482 — `resetModelWithUndo`
+- строка 145 — `historyAfterRedraw`
+- строка 153 — `historyTouch`
+- строка 161 — `historyMark`
+- строка 166 — `historyUndo`
+- строка 179 — `historyRedo`
+- строка 191 — `historyCan`
+- строка 195 — `historyClearAll`
+- строка 197 — `notifyHistory`
+- строка 203 — `histLabelOf`
+- строка 219 — `storeGet`
+- строка 220 — `storeSet`
+- строка 225 — `compactModelState`
+- строка 239 — `expandModelState`
+- строка 248 — `autosaveModel`
+- строка 262 — `forgetAutosaves`
+- строка 272 — `savedModel`
+- строка 278 — `recentModels`
+- строка 284 — `writeModelToUrl`
+- строка 294 — `dropShareHash`
+- строка 310 — `fromProblemOf`
+- строка 314 — `dropFromParam`
+- строка 323 — `showBackToProblem`
+- строка 330 — `hideBackToProblem`
+- строка 335 — `openFromProblem`
+- строка 346 — `b64urlEncode`
+- строка 350 — `b64urlDecode`
+- строка 387 — `openModelByUser`
+- строка 408 — `restoreOnLoad`
+- строка 447 — `viewDefaults`
+- строка 484 — `resetModelWithUndo`
 
 #### `calc2/static/calc2/92-ui-kit.js`
 
@@ -2118,6 +2121,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1594.**
+**Итого функций в индексе: 1593.**
 
 <!-- AUTO:END -->

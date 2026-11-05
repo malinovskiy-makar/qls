@@ -473,9 +473,9 @@ function drawLaborMinLine() {
 
 function attachLaborMinDrag(sel) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { InputSnap.begin(document.getElementById('labmin-slider')); document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { setLaborMin(sy.invert(event.y)); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
 }
 
 // Записать уровень МРОТ в поля панели (без перерисовки).
@@ -585,9 +585,9 @@ function drawLaborUnionWageLine() {
 
 function attachUnionWageDrag(sel) {
   sel.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; })
+    .on('start', () => { InputSnap.begin(document.getElementById('union-wage-slider')); document.body.style.cursor = 'grabbing'; })
     .on('drag', (event) => { setUnionWage(sy.invert(event.y)); })
-    .on('end', () => { document.body.style.cursor = ''; }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
 }
 
 // Записать уровень зарплаты профсоюза в поля панели (без перерисовки).

@@ -140,7 +140,7 @@ function syncTaxPairUI() {
       min:0,tex:(_,text)=>CalcNumber.texText(text)});
     const field=root.querySelector('#tax2-field'),slider=root.querySelector('#tax2-slider');
     const bounds=attachBoundsEditor(field,field.querySelector('.param-editor'),'Ставка 2',key=>slider[key],(key,value)=>{
-      const next={min:+slider.min,max:+slider.max,step:+slider.step,[key]:+value};
+      const next={min:+slider.min,max:+slider.max,step:STATE.taxSecond?.bounds?.step||.1,[key]:+value};
       const pf=PCT_FORMS[STATE.taxSecond?.form];
       if(pf?.capped)next.max=Math.min(PCT_CAP,next.max);
       if(next.min>=0&&next.max>next.min&&next.step>0)setSecondTax({bounds:next});
@@ -170,7 +170,7 @@ function syncTaxPairUI() {
   if(label.dataset.tex!==letter){label.dataset.tex=letter;katexInto(label,letter);}
   text(root.querySelector('[data-tax2-unit]'),p.form==='unit'?'':'%');
   const slider=root.querySelector('#tax2-slider');
-  slider.min=p.bounds?.min||0;slider.max=taxPairRateMax(p);slider.step=p.bounds?.step||.1;slider.value=p.rate;
+  slider.min=p.bounds?.min||0;slider.max=taxPairRateMax(p);InputSnap.exact(slider,p.rate);
   text(root.querySelector('[data-tax2-bound=min]'),boundText(+slider.min));
   text(root.querySelector('[data-tax2-bound=max]'),boundText(+slider.max));
   root.querySelector('#tax2-value')._repaint();
@@ -222,13 +222,17 @@ function drawTaxPairPoints() {
     const hit=group.append('rect').attr('x',px-8).attr('y',Math.min(top,mid-10)).attr('width',16).attr('height',Math.max(bottom-top,20))
       .attr('fill','transparent').style('cursor','grab').attr('data-service','tax-pair-drag');
     hit.call(d3.drag().container(()=>svg.node()).on('start',event=>{
-      pushUndo();startY=event.y;startRate=p.rate;TaxMotion.hold();document.body.style.cursor='grabbing';
+      pushUndo();startY=event.y;startRate=p.rate;
+      InputSnap.begin(document.getElementById(p.index===0?'tax-slider':'tax2-slider'),{
+        get:()=>p.index===0?STATE.tax:STATE.taxSecond.rate,
+        set:v=>p.index===0?setTax(v,true):setSecondTax({rate:v},true)});
+      TaxMotion.hold();document.body.style.cursor='grabbing';
     }).on('drag',event=>{
       let change=sy.invert(event.y)-sy.invert(startY);
       const pf=PCT_FORMS[p.form],base=pf?(pf.base==='buyer'?Pb:Ps):1;
       if(pf){if(base<=0)return;change=change/base*100;}
       if(p.index===0)setTax(startRate+change,true);else setSecondTax({rate:startRate+change},true);
-    }).on('end',()=>{document.body.style.cursor='';TaxMotion.release();}));
+    }).on('end',()=>{InputSnap.finish();document.body.style.cursor='';TaxMotion.release();}));
     cursor=end;
   });
 }

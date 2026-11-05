@@ -153,7 +153,7 @@ function attachBudgetHandles(opt) {
 // Единый путь смены числового параметра потребителя (поле / перетаскивание).
 function setConsumerNum(key, value, inputId) {
   if (!(value > 0) || !isFinite(value)) return;
-  STATE[key] = Math.round(value * 1000) / 1000;
+  STATE[key] = value;
   const e = document.getElementById(inputId); if (e) e.value = STATE[key];
   _wantRangeAnim = true;   // масштаб может поехать — плавно, с дебаунсом
   redrawKeepingWindow();

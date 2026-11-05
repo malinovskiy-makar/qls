@@ -4389,7 +4389,9 @@ body.self-on:not(.self-all) .firm-market-price-mask { display: inline; }
 .trade-policy-controls { margin-top: 10px; }
 /* Точные результаты готовятся отдельно от живого графика. Размеры строк
    сохраняются; прежнее число никогда не выдаётся за результат новой ставки. */
-.tax-values-pending #ans-hero .ans-val { position: relative; color: transparent; min-width: 32px; }
+.tax-values-pending #ans-hero .ans-val,
+.tax-values-pending #ans-strip b { position: relative; color: transparent; min-width: 32px; }
+.ans-strip b { display: inline-block; min-width: 32px; position: relative; }
 .tax-values-pending #ans-hero .ans-val > :not(.calc-value-loader),
 .tax-values-pending #ans-hero .ans-was,
 .tax-values-pending #ans-hero .ans-eq,

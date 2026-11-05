@@ -1133,7 +1133,7 @@ function smoothLabel(key, px, py, toLeft) {
   // Доводка имени через redrawKeepingWindow пересчитывала всю экономику,
   // SVG и обе панели ещё 5–6 раз после каждого шага ставки. Имя следует
   // за новой кривой в том же кадре; память стороны нужна для гистерезиса.
-  if (STATE.mode === 'market' && ['taxes', 'tax', 'tax-adv'].includes(STATE.sceneKey)) {
+  if (TaxMotion.supported()) {
     const out = { px, py, toLeft, below: prev?.below };
     _labelPos.set(key, out);
     return out;
@@ -1167,7 +1167,7 @@ let _labelFrame = null;
    подпись до места. Окно в нём обязано остаться прежним. */
 function requestLabelFrame() {
   if (_labelFrame != null) return;
-  _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawKeepingWindow(); });
+  _labelFrame = requestAnimationFrame(() => { _labelFrame = null; if(!TaxMotion.pending)redrawKeepingWindow(); });
 }
 // Сцена сменилась — прошлые места подписей к ней отношения не имеют.
 function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); _labelW.clear(); }
@@ -1522,14 +1522,6 @@ function curveDragAllowed() {
   return NO_CURVE_DRAG.indexOf(STATE.sceneKey) < 0;
 }
 
-/* Глубина округления сдвинутой мышью формулы — три знака (решение владельца
-   19.08). Отдельно от roundShown (два знака, канон 2.2): та отвечает за ЧИСЛА
-   НА ЭКРАНЕ, а это — за запись функции, которая обязана совпадать с тем, что
-   нарисовано, вплоть до последнего разряда. */
-const DRAG_DECIMALS = 3;
-const DRAG_POW = Math.pow(10, DRAG_DECIMALS);
-function roundDrag(v) { return Math.round(v * DRAG_POW) / DRAG_POW; }
-
 /* Ширина полосы попадания по кривой. Одно число на весь калькулятор: по нему
    же считает допуск проверка, и второй копии рядом быть не должно. */
 const CURVE_HIT_PX = 16;
@@ -1572,27 +1564,19 @@ const CURVE_HIT_PX = 16;
 // ползунка-слайдера в пульте — никакой параллельной математики.
 function setCurveFreeTerm(curve, b) {
   if (!curve || !curve.linear) return;
-  /* ⚠️ ДВИЖОК ХРАНИТ РОВНО ТО ЧИСЛО, ЧТО НАПИСАНО В ФОРМУЛЕ (п. 3).
-     Формула собирается ниже через fmtLinear, а он печатает два знака. Пока
-     сюда приходило сырое 85.2247, на экране стояло «85.22 - Q», а считалось
-     по 85.2247 — то есть у одной величины было два значения, и какое из них
-     правда, по экрану узнать было нельзя. Перетаскивание с точностью до сотой
-     ничего не теряет: пиксель холста и так крупнее. */
-  /* ⚠️ ЗАПИСЬ ФУНКЦИИ НЕ ИМЕЕТ ПРАВА ВРАТЬ (главный пункт ревью 19.08).
-     Панель утверждала «y = x», холст рисовал «y = x − 1,7», и оба считали себя
-     правыми. Число в формуле и число в расчёте — одно и то же число, поэтому
-     округление делается ОДИН раз, здесь, и той же глубины, какой печатается
-     ниже. Глубина три знака: решение владельца. */
-  curve.linear.b = roundDrag(b);
+  /* Во время свободного движения ограничиваем шум пиксельной координаты.
+     Точный ручной ввод не округляем; fmtLinear сохраняет то же число в формуле.
+     Финальную сетку самого жеста выбирает InputSnap. */
+  curve.linear.b = InputSnap.dragValue(b);
   b = curve.linear.b;
   if (curve.srcForm === 'QP') {
     // Кривая введена как Q(P) — показываем её в ТОЙ ЖЕ форме (Фаза 1б).
     // P = a·Q + b  ⟺  Q = (−b/a) + (1/a)·P; канон curve.linear уже обновлён выше.
     const a = curve.linear.a;
     curve.srcLinear = { c: -b / a, d: 1 / a };
-    curve.srcExpr = curve.expr = fmtLinear(1 / a, -b / a, 'P', DRAG_DECIMALS);
+    curve.srcExpr = curve.expr = fmtLinear(1 / a, -b / a, 'P');
   } else {
-    curve.expr = fmtLinear(curve.linear.a, curve.linear.b, 'Q', DRAG_DECIMALS);
+    curve.expr = fmtLinear(curve.linear.a, curve.linear.b, 'Q');
   }
   /* Кривую перерисовывает не только холст: строка «Построения графиков» живёт
      своим списком, и без этого прохода в поле оставалась бы прежняя запись —
@@ -1605,7 +1589,9 @@ function setCurveFreeTerm(curve, b) {
   if (gRow) setFormulaFieldQuiet(gRow, curve.expr);
   else if (STATE.mode === 'graph' && typeof renderGraphRows === 'function') renderGraphRows();
   if (STATE.mode === 'labor') _wantRangeAnim = true;   // труд авто-масштабируется → плавно (Фаза 4)
-  redrawAll();        // перерисуем кривую и всё зависимое (равновесие/области)
+  // MC движется тем же лёгким путём, что налог: точные числа после жеста.
+  if(InputSnap.active&&TaxMotion.supported())TaxMotion.render();
+  else redrawAll();
   // Формула в списке кривых — на месте; ползунки пульта идут за значением.
   if (typeof refreshCurveRow === 'function' && refreshCurveRow(curve)) {
     if (typeof updatePult === 'function') updatePult();

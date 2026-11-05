@@ -611,16 +611,19 @@ function drawLongRunHandle(g, lr, ox, xMax, yP) {
   const hit = g.append('rect').attr('x', ox).attr('y', yP - 12).attr('width', xMax - ox).attr('height', 24)
     .attr('fill', 'transparent').style('cursor', 'grab').attr('data-skip-export', '1');
   hit.call(d3.drag().container(() => svg.node())
-    .on('start', () => { document.body.style.cursor = 'grabbing'; beginLrDrag(); })
+    .on('start', () => {
+      InputSnap.begin(document.getElementById('lr-price-slider'),{get:()=>STATE.lrPrice,set:dragLrPrice,done:()=>endLrDrag(true),cancel:()=>{STATE.lrDragging=false;}});
+      document.body.style.cursor = 'grabbing'; beginLrDrag();
+    })
     .on('drag', (e) => dragLrPrice(sy.invert(e.y)))
-    .on('end', () => { document.body.style.cursor = ''; endLrDrag(); }));
+    .on('end', () => { InputSnap.finish(); document.body.style.cursor = ''; }));
   g.append('circle').attr('cx', ox + (xMax - ox) * 0.9).attr('cy', yP).attr('r', 7)
     .attr('fill', COL.price).attr('stroke', COL.halo).attr('stroke-width', 2).style('pointer-events', 'none');
 }
 
 function setLrPrice(p) {
   p = Math.max(0, Math.min(p, CONFIG.Pmax));
-  STATE.lrPrice = Math.round(p * 100) / 100;
+  STATE.lrPrice = p;
   syncLrPriceFields();
   redrawAll();
 }
@@ -661,9 +664,9 @@ function dragLrPrice(p) {
   refreshAnalyticsPanel();
 }
 
-function endLrDrag() {
+function endLrDrag(exact=false) {
   STATE.lrDragging = false;
-  STATE.lrPrice = Math.round(STATE.lrPrice * 100) / 100;
+  if(!exact)STATE.lrPrice = Math.round(STATE.lrPrice * 100) / 100;
   syncLrPriceFields();
   redrawAll();
 }

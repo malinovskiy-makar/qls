@@ -1,4 +1,4 @@
-/* Интерактивный налог: математика и геометрия сейчас, точная запись отдельно.
+/* Интерактивный налог и MC: математика и геометрия сейчас, точная запись отдельно.
    Это состояние представления, оно не входит в STATE/историю/ссылку. */
 const TaxMotion = (() => {
   const workerSource = document.currentScript.dataset.worker;
@@ -11,14 +11,14 @@ const TaxMotion = (() => {
     return {offset:phase,transform:`translate(${x.toFixed(5)}px,${y.toFixed(5)}px)`};
   });
   let pending=false, drawing=false, finishing=false, held=false, generation=0;
-  let timer, loaderTimer, worker=null, sequence=0, loadingSince=0;
+  let timer, worker=null, sequence=0, loadingSince=0;
   let loaderAnimations=[];
   const jobs=new Map();
   let planeAnimation=null, planeGroup=null, left=null, viewKey='';
   const reduced=()=>motionPreference.matches;
-  const supported=()=>STATE.mode==='market' && STATE.market!=='monopoly'
+  const supported=()=>STATE.mode==='market' && (['mono','mono-nat','mono-d1'].includes(STATE.sceneKey) || (STATE.market!=='monopoly'
     && ['taxes','tax','tax-adv'].includes(STATE.sceneKey)
-    && ['tax','subsidy'].includes(STATE.intervType);
+    && ['tax','subsidy'].includes(STATE.intervType)));
 
   function prepare(values) {
     if (!values.length) return Promise.resolve();
@@ -52,7 +52,7 @@ const TaxMotion = (() => {
     document.querySelectorAll('.calc-value-loader').forEach(el=>{
       el.getAnimations({subtree:true}).forEach(a=>a.cancel());el.remove();
     });
-    if(on)document.querySelectorAll('#ans-hero .ans-val').forEach(el=>{
+    if(on)document.querySelectorAll('#ans-hero .ans-val, #ans-strip b').forEach(el=>{
       const loader=document.createElement('span');loader.className='calc-value-loader';
       loader.setAttribute('aria-hidden','true');
       for(let i=0;i<3;i++){
@@ -73,7 +73,7 @@ const TaxMotion = (() => {
     planeGroup=null;
   }
   function cancel() {
-    generation++;clearTimeout(timer);clearTimeout(loaderTimer);stopPlane();
+    generation++;clearTimeout(timer);stopPlane();
     pending=false;held=false;indicators(false);
     document.body.classList.remove('tax-values-loading');
   }
@@ -106,7 +106,7 @@ const TaxMotion = (() => {
     generation++;clearTimeout(timer);stopPlane();
     if(!pending){
       pending=true;loadingSince=performance.now();indicators(true);
-      loaderTimer=setTimeout(()=>document.body.classList.add('tax-values-loading'),90);
+      document.body.classList.add('tax-values-loading');
     }
     drawing=true;
     try {
@@ -121,7 +121,7 @@ const TaxMotion = (() => {
     schedule();
   }
   function complete() {
-    pending=false;clearTimeout(loaderTimer);
+    pending=false;
     indicators(false);document.body.classList.remove('tax-values-loading');
     const hero=document.getElementById('ans-hero');
     if(hero&&!reduced())hero.animate([{opacity:.4},{opacity:1}],{duration:120});

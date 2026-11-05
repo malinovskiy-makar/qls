@@ -470,7 +470,7 @@ function syncAnsSegUI(seg) {
   if (STATE.mode === 'math' && STATE.mathSub === 'tangent') {
     const sl = document.getElementById('mathx0-slider');
     if (sl && (+sl.min !== seg.a || +sl.max !== seg.b)) {
-      sl.min = seg.a; sl.max = seg.b; sl.step = (seg.b - seg.a) / 200; sl.value = STATE.mathX0;
+      sl.min = seg.a; sl.max = seg.b; InputSnap.exact(sl,STATE.mathX0);
     }
   }
 }
@@ -1021,14 +1021,14 @@ function drawMathTangent(f) {
   };
   const dot = gTop.append('circle').attr('cx', s1.mx(x0)).attr('cy', s1.my(y0)).attr('r', 6)
     .attr('fill', COL.tanF).attr('stroke', COL.halo).attr('stroke-width', 2).style('cursor', 'ew-resize');
-  dot.call(d3.drag().container(() => svg.node()).on('drag', grabX(s1.mx, wTop)));
+  dot.call(d3.drag().container(() => svg.node()).on('start',()=>InputSnap.begin(document.getElementById('mathx0-slider'))).on('drag', grabX(s1.mx, wTop)).on('end',()=>InputSnap.finish()));
   if (!isNaN(k)) {
     mathDot(gBot, s2.mx, s2.my, x0, k, COL.tanD, 'f′ = ' + fmt(k), null, 'deriv');
     const dot2 = gBot.append('circle').attr('cx', s2.mx(x0)).attr('cy', s2.my(k)).attr('r', 6)
       .attr('fill', 'transparent').attr('stroke', COL.tanD).attr('stroke-width', 2.2)
       .style('cursor', 'ew-resize');
     // Точку ведут мышью — плашка перехватывала бы указатель.
-    dot2.call(d3.drag().container(() => svg.node()).on('drag', grabX(s2.mx, wBot)));
+    dot2.call(d3.drag().container(() => svg.node()).on('start',()=>InputSnap.begin(document.getElementById('mathx0-slider'))).on('drag', grabX(s2.mx, wBot)).on('end',()=>InputSnap.finish()));
   }
   updateMathPanel();
 }

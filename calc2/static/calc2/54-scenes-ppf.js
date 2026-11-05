@@ -2635,7 +2635,7 @@ function recomputePpfTrade() {
   let ratio = STATE.ppftPrice;
   if (!(ratio > 0)) ratio = sl;                         // запас на пустое/битое значение
   ratio = Math.max(priceMin, Math.min(priceMax, ratio));
-  STATE.ppftPrice = Math.round(ratio * 100) / 100;
+  STATE.ppftPrice = ratio;
   ratio = STATE.ppftPrice;
   let xp, yp, regime;
   if (c.type === 'ellipse' || c.type === 'parabola') {
@@ -3219,7 +3219,7 @@ function syncTbPriceUI(d) {
   if (!d || !d.ok) return;
   // Ползунок ходит только по допустимому промежутку, поле принимает любое
   // число: набранное вручную не подменяем, а объясняем (см. recomputeTradeB).
-  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; sl.step = Math.max((d.priceMax - d.priceMin) / 200, 0.001); sl.value = Math.max(d.priceMin, Math.min(d.priceMax, d.Pw)); sl._modelValue = d.Pw; }
+  if (sl) { sl.min = d.priceMin; sl.max = d.priceMax; InputSnap.exact(sl,Math.max(d.priceMin, Math.min(d.priceMax, d.Pw))); sl._modelValue = d.Pw; }
   if (num) { num.removeAttribute('max'); num.min = 0; if (d.manual) num.value = d.Pw; else num.value = ''; }
   if (val) val.textContent = fmt(d.Pw) + (d.inInterval ? '' : ' (вне промежутка)');
 }
